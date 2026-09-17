@@ -1,5 +1,9 @@
 import { defineConfig } from "@playwright/test"
 
+// D-008: one port per worktree, assigned by scripts/setup.sh into .env.ports.
+// Falls back to the reference's own port when that is not set.
+const E2E_PORT = process.env.E2E_PORT ?? "5174"
+
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
@@ -9,7 +13,7 @@ export default defineConfig({
   reporter: "html",
   timeout: 30_000,
   use: {
-    baseURL: "http://localhost:5174",
+    baseURL: `http://localhost:${E2E_PORT}`,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
@@ -20,8 +24,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "yarn dev --port 5174",
-    port: 5174,
+    command: `pnpm dev --port ${E2E_PORT}`,
+    port: Number(E2E_PORT),
     reuseExistingServer: !process.env.CI,
     env: {
       VITE_CHAIN_ID: "11155111",
