@@ -1,0 +1,21 @@
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# secrets never leave the host (D-039)
+.env
+.env.local
+.env.*.local
+
+# per-worktree, derived by scripts/setup.sh
+.env.ports
+
+# test output
+playwright-report/
+test-results/
+storybook-static/
+
+.DS_Store

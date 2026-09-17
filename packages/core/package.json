@@ -1,0 +1,29 @@
+{
+  "name": "@cobuilders/safenet-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "bootstrap": "echo '@cobuilders/safenet-core: nothing to prepare'",
+    "dev": "tsc --noEmit --watch",
+    "build": "tsc --noEmit",
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "check": "pnpm lint && tsc --noEmit",
+    "verify:abis": "node --env-file-if-exists=../../.env.local --import tsx scripts/verify-abis.ts",
+    "metrics": "node --env-file-if-exists=../../.env.local --import tsx scripts/metrics-poc.ts --json ../../docs/internal/metrics-poc-run.json && node ../../tools/render-metrics-report.mjs",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "viem": "2.46.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.2",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  }
+}
