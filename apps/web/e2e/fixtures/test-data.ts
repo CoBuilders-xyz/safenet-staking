@@ -1,6 +1,8 @@
-/** Contract addresses on Sepolia */
-export const STAKING_CONTRACT = "0x40745eec3fD6E4C005de1dec0031b2EA9f9D7c42".toLowerCase()
-export const TOKEN_CONTRACT = "0xef98bcc90b1373b2ae0d23ec318d3ee70ea61af4".toLowerCase()
+import { DEPLOYMENTS } from "@cobuilders/safenet-core"
+
+/** Mainnet addresses, from core. D-005: no address is written twice. */
+export const STAKING_CONTRACT = DEPLOYMENTS[1].staking.toLowerCase()
+export const TOKEN_CONTRACT = DEPLOYMENTS[1].token.toLowerCase()
 /** Mock MerkleDrop contract address (set via VITE_MERKLE_DROP_ADDRESS in playwright.config.ts) */
 export const MERKLE_DROP_CONTRACT = "0x9999999999999999999999999999999999999999".toLowerCase()
 
@@ -13,12 +15,12 @@ export const VALIDATORS = {
   validatorB: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
 } as const
 
-/** Sepolia chain ID */
-export const CHAIN_ID = 11155111
-export const CHAIN_ID_HEX = "0xaa36a7"
+/** Mainnet. The RPC is fully mocked, so this is the identity the app expects. */
+export const CHAIN_ID = 1
+export const CHAIN_ID_HEX = "0x1"
 
-/** Mainnet chain ID, used to simulate a wallet connected to the wrong network */
-export const WRONG_CHAIN_ID_HEX = "0x1"
+/** Sepolia, used only to simulate a wallet connected to the wrong network */
+export const WRONG_CHAIN_ID_HEX = "0xaa36a7"
 
 /** Mock block number */
 export const BLOCK_NUMBER = "0x6000000"

@@ -4,7 +4,7 @@
  */
 
 import type { Route } from "@playwright/test"
-import { CHAIN_ID_HEX, BLOCK_NUMBER, GAS, MOCK_TX_HASH, STAKING_CONTRACT, TOKEN_CONTRACT } from "../fixtures/test-data"
+import { CHAIN_ID, CHAIN_ID_HEX, BLOCK_NUMBER, GAS, MOCK_TX_HASH, STAKING_CONTRACT, TOKEN_CONTRACT } from "../fixtures/test-data"
 import { buildCallResponses } from "./rpc-responses"
 import { matchGetLogs } from "./event-logs"
 import type { MockChainState } from "./mock-chain-state"
@@ -137,7 +137,7 @@ export function createRpcHandler(userAddress: string, state: MockChainState) {
         return { ...base, result: CHAIN_ID_HEX }
 
       case "net_version":
-        return { ...base, result: "11155111" }
+        return { ...base, result: String(CHAIN_ID) }
 
       case "eth_blockNumber":
         return { ...base, result: BLOCK_NUMBER }

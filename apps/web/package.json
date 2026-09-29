@@ -20,6 +20,7 @@
     "generate:proofs": "tsx scripts/generate-merkle-tree.ts"
   },
   "dependencies": {
+    "@cobuilders/safenet-core": "workspace:*",
     "@fontsource-variable/dm-sans": "5.2.8",
     "@fontsource-variable/geist-mono": "5.2.7",
     "@plausible-analytics/tracker": "0.4.4",

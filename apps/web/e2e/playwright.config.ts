@@ -28,7 +28,6 @@ export default defineConfig({
     port: Number(E2E_PORT),
     reuseExistingServer: !process.env.CI,
     env: {
-      VITE_CHAIN_ID: "11155111",
       VITE_RPC_URL: "https://mock-rpc.test",
       VITE_STAKING_DEPLOY_BLOCK: "5000000",
       VITE_VALIDATOR_INFO_URL: "https://mock-validators.test/validators.json",

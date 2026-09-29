@@ -26,7 +26,7 @@ vi.mock("@/hooks/useToast", () => ({
 }))
 
 vi.mock("@/config/chains", () => ({
-  activeChain: { id: 11155111, name: "Sepolia" },
+  activeChain: { id: 1, name: "Ethereum" },
 }))
 
 describe("ConnectButton", () => {
@@ -69,19 +69,19 @@ describe("ConnectButton", () => {
     mockUseAccount.mockReturnValue({
       isConnected: true,
       address: TEST_ACCOUNTS.user,
-      chain: { id: 1 }, // mainnet instead of sepolia
+      chain: { id: 11155111 }, // a chain the app does not support
     })
 
     render(<ConnectButton />)
 
-    expect(screen.getByRole("button", { name: "Switch to Sepolia" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Switch to Ethereum" })).toBeInTheDocument()
   })
 
   it("shows address and balance when connected on correct chain", () => {
     mockUseAccount.mockReturnValue({
       isConnected: true,
       address: TEST_ACCOUNTS.user,
-      chain: { id: 11155111 },
+      chain: { id: 1 },
     })
 
     render(<ConnectButton />)
@@ -94,7 +94,7 @@ describe("ConnectButton", () => {
     mockUseAccount.mockReturnValue({
       isConnected: true,
       address: TEST_ACCOUNTS.user,
-      chain: { id: 11155111 },
+      chain: { id: 1 },
     })
 
     render(<ConnectButton />)
@@ -106,7 +106,7 @@ describe("ConnectButton", () => {
     mockUseAccount.mockReturnValue({
       isConnected: true,
       address: TEST_ACCOUNTS.user,
-      chain: { id: 11155111 },
+      chain: { id: 1 },
     })
     const user = userEvent.setup()
 
