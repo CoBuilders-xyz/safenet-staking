@@ -1,0 +1,61 @@
+# Heavy services, opt in (D-006). Nothing here starts unless you ask for the profile:
+#
+#   pnpm graph:up      start graph-node, postgres and ipfs
+#   pnpm graph:down    stop them and discard the indexed data
+#
+# Ports come from .env.ports, which scripts/setup.sh writes per worktree (D-008), so two
+# worktrees can run a node at the same time without colliding.
+#
+# The Ethereum endpoint comes from .env.local. It must be an ARCHIVE node: indexing from a
+# deploy block reads historical state, and the public endpoints refuse that with a 403.
+
+services:
+  graph-node:
+    image: graphprotocol/graph-node:v0.40.2
+    profiles: [graph]
+    ports:
+      - "${GRAPH_NODE_PORT:-8000}:8000"     # GraphQL queries
+      - "${GRAPH_WS_PORT:-8100}:8001"       # GraphQL subscriptions
+      - "${GRAPH_ADMIN_PORT:-8020}:8020"    # JSON-RPC, used by `graph deploy`
+      - "${GRAPH_STATUS_PORT:-8030}:8030"   # indexing status
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ipfs:
+        condition: service_started
+    environment:
+      postgres_host: postgres
+      postgres_user: graph
+      postgres_pass: graph
+      postgres_db: graph
+      ipfs: "ipfs:5001"
+      ethereum: "mainnet:${ALCHEMY_MAINNET_RPC_URL}"
+      GRAPH_LOG: info
+      # Without this, a failed handler is retried forever and the node looks busy while
+      # making no progress. We would rather see it stop.
+      GRAPH_KILL_IF_UNRESPONSIVE: "true"
+
+  ipfs:
+    image: ipfs/kubo:v0.33.2
+    profiles: [graph]
+    ports:
+      - "${IPFS_PORT:-5001}:5001"
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: [graph]
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    command: ["postgres", "-cshared_preload_libraries=pg_stat_statements"]
+    environment:
+      POSTGRES_USER: graph
+      POSTGRES_PASSWORD: graph
+      POSTGRES_DB: graph
+      # graph-node requires C collation. The default locale breaks it in a way that only
+      # shows up as wrong sort order much later.
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U graph"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
