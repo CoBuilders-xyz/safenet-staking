@@ -1,0 +1,64 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # daily, 03:17 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  verify-abis-deep:
+    name: verify-abis-deep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      ALCHEMY_MAINNET_RPC_URL: ${{ secrets.ALCHEMY_MAINNET_RPC_URL }}
+    steps:
+      # The deep scan reads every event from its deploy block. Public endpoints cap the
+      # range and rate-limit, so a run without the archive node proves nothing. Refuse it.
+      - name: Require the archive RPC
+        run: |
+          if [ -z "${ALCHEMY_MAINNET_RPC_URL}" ]; then
+            echo "::error title=ALCHEMY_MAINNET_RPC_URL is not set::The deep ABI scan needs an archive RPC. Add the repository secret ALCHEMY_MAINNET_RPC_URL. Not falling back to public endpoints."
+            exit 1
+          fi
+      # Pin actions to full SHA: mutable tags can be moved to malicious code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify every event signature from its deploy block
+        run: pnpm verify:abis:deep
+
+  test:
+    name: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Unit tests
+        run: pnpm test
