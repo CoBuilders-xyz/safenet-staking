@@ -43,6 +43,15 @@
       "cache": false
     },
     "lint": {},
+    "@cobuilders/safenet-subgraph-gnosis#test": {
+      "dependsOn": [
+        "^build",
+        "@cobuilders/safenet-subgraph-mainnet#test"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
+    },
     "@cobuilders/safenet-core#build": {
       "outputs": []
     },

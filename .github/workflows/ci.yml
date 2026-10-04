@@ -50,9 +50,18 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
+      # `graph test` downloads the Matchstick binary into graph-cli's own directory when it is
+      # missing. The subgraph package.json files pin its version, so they key the cache.
+      - name: Cache the Matchstick binary
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.pnpm/@graphprotocol+graph-cli@*/node_modules/@graphprotocol/graph-cli/dist/commands/node_modules/.bin/matchstick-*
+          key: matchstick-${{ runner.os }}-${{ hashFiles('packages/subgraph-mainnet/package.json', 'packages/subgraph-gnosis/package.json') }}
       # Turborepo runs `test` in every package that implements it. New packages join here
       # without a change to this file.
       - name: Unit tests
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: pnpm test
 
   e2e:
