@@ -47,10 +47,10 @@ from [`.env.example`](.env.example) into the root `.env`.
 | `VITE_PRIVACY_URL` | No | Footer privacy link (hidden if unset) |
 | `VITE_IMPRINT_URL` | No | Footer imprint link (hidden if unset) |
 | `VITE_APP_URL` | No | Canonical app URL for social preview meta tags (`og:image`, `twitter:image`); absolute URLs are required for social crawlers (no trailing slash) |
-| `PINATA_JWT` | No | Pinata API JWT for IPFS deployment |
-| `PINATA_GATEWAY` | No | Pinata gateway domain for IPFS deployment |
 
-See [`.env.example`](.env.example) for a template.
+See [`.env.example`](.env.example) for a template. The release build ignores `.env` files: it reads
+[`build.env`](build.env) only. `release:pin` reads `PINATA_JWT` and `PINATA_GATEWAY` from the
+environment or from `.env.local` at the repository root.
 
 ## Scripts
 
@@ -65,7 +65,8 @@ See [`.env.example`](.env.example) for a template.
 | `yarn test:coverage` | Run tests with coverage report |
 | `yarn test:e2e` | Run Playwright end-to-end tests |
 | `pnpm test:fork` | Run the staking flows against real contracts on an Anvil Mainnet fork (see below) |
-| `yarn deploy:ipfs` | Deploy build to IPFS via Pinata |
+| `pnpm release:build` | Reproducible production build, packed into a CAR with its CID |
+| `pnpm release:pin` | Pin the CAR to Pinata and check two gateways |
 | `yarn generate:proofs` | Generate Merkle proofs for reward distribution |
 
 See [`MANUAL_TESTING.md`](./MANUAL_TESTING.md) for the pre-release manual QA checklist
@@ -218,12 +219,16 @@ The `admin/` directory is a separate Vite app for contract administration. Run i
 
 ### IPFS
 
+IPFS is production. See the Release section of the repository README and
+[`VERIFY.md`](../../VERIFY.md).
+
 ```bash
-yarn build
-yarn deploy:ipfs
+pnpm --filter @cobuilders/safenet-web release:build
+pnpm --filter @cobuilders/safenet-web release:pin
 ```
 
-Requires `PINATA_JWT` and `PINATA_GATEWAY` environment variables. The build uses hash-based routing (`HashRouter`) for compatibility with IPFS gateways. Set `VITE_APP_URL` to the canonical URL so that `og:image` and `twitter:image` meta tags resolve correctly for social crawlers.
+The release build reads `build.env` and no `.env` file. `release:pin` needs `PINATA_JWT` and
+`PINATA_GATEWAY`, from the environment or from `.env.local` at the repository root. The build uses hash-based routing (`HashRouter`) for compatibility with IPFS gateways. Set `VITE_APP_URL` in `build.env` to the canonical URL so that `og:image` and `twitter:image` meta tags resolve correctly for social crawlers.
 
 ### Safe App
 

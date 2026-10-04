@@ -35,3 +35,5 @@ test-results/
 .rewards/
 # written by `pnpm fork:up`: pids, logs, the generated proofs, the baseline record
 .fork-env/
+# release output: dist packed into a CAR, and its root CID
+release/

@@ -48,6 +48,23 @@ unless the operator allows writes when the server starts.
   and how to add the server to Claude Desktop and Cursor.
 - [packages/mcp/CLAUDE.md](packages/mcp/CLAUDE.md): how it is built and tested.
 
+## Release
+
+Production is IPFS. Vercel serves previews only.
+
+A release is a tag `v*`, or a manual run of the `Release` workflow. The workflow builds the
+interface from the committed public values in `apps/web/build.env`, fails if the bundle holds
+a secret, packs it into a CAR and pins that CAR to Pinata. Then it checks that two public
+gateways serve it.
+
+The CID depends only on the source, the lockfile and `build.env`, so anyone can rebuild it
+and compare. [`VERIFY.md`](VERIFY.md) has the exact commands.
+
+```sh
+pnpm --filter @cobuilders/safenet-web release:build   # writes apps/web/release/CID and app.car
+pnpm --filter @cobuilders/safenet-web release:pin     # needs PINATA_JWT and PINATA_GATEWAY
+```
+
 ## License
 
 This repository is released under the MIT License, see [LICENSE](LICENSE). `apps/web` derives
