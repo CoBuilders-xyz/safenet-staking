@@ -27,7 +27,7 @@ Every package implements the same five. Turborepo fans them out.
 
 | Verb | What it does |
 |---|---|
-| `pnpm bootstrap` | Runs `scripts/setup.sh`: checks tools, writes `.env.ports`, creates `.env.local`, installs. Safe to re-run. **Not `setup`: that is a pnpm builtin that edits your shell rc.** |
+| `pnpm bootstrap` | Runs `scripts/setup.sh`: checks tools, writes `.env.ports`, installs, then links Vercel and pulls `.env.local`. Safe to re-run. **Not `setup`: that is a pnpm builtin that edits your shell rc.** |
 | `pnpm dev` | Starts the web app's Vite dev server, type-watches `packages/core`, and regenerates the subgraph manifests and types. |
 | `pnpm build` | Builds all packages. |
 | `pnpm test` | Unit tests. `apps/web` has 315 Vitest tests in 39 files. The subgraphs have matchstick tests: 20 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has none. |
@@ -45,7 +45,7 @@ Specific commands, only where they apply:
 | Command | Where | What it proves | Today |
 |---|---|---|---|
 | `pnpm verify:abis` | `packages/core` | The high-frequency event signatures still match the chain, over a recent window | works |
-| `pnpm verify:abis:deep` | `packages/core` | Every signature, including rare events, scanned from each deploy block | needs `ALCHEMY_MAINNET_RPC_URL` in `.env.local` |
+| `pnpm verify:abis:deep` | `packages/core` | Every signature, including rare events, scanned from each deploy block | needs the archive `MAINNET_RPC_URL` from `pnpm env:pull` |
 | `pnpm metrics` | `packages/core` | The 24 metrics, computed against live chains and compared with SEF's published JSON. Writes `packages/core/.metrics/`, which is git-ignored | needs an archive node. With public RPC only, it stopped on a failed Mainnet log range when this file was written |
 | `pnpm check:browser` | root | `apps/web/src` reads no `process.env`, and a built bundle contains no value from `.env.local` | works, part of `check` |
 | `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. 73 Playwright tests in 13 spec files | runs; one navigation test is intermittently flaky |
@@ -136,6 +136,7 @@ fix it rather than working around it.
 
 ## Secrets
 
-Secrets live in `.env.local` at the repository root. `pnpm bootstrap` creates it, and git ignores
-it. If you need a credential, read it from the environment. Never print one, and never write one
-into a file that is not `.env.local`.
+Secrets live in the Vercel project. `pnpm env:pull` writes them to `.env.local` at the repository
+root. `pnpm bootstrap` runs it when the Vercel CLI is signed in. Git ignores the file. If you
+need a credential, read it from the environment. Never print one, and never write one into a file
+that is not `.env.local`.

@@ -8,6 +8,8 @@
   },
   "scripts": {
     "bootstrap": "bash scripts/setup.sh",
+    "link:services": "bash scripts/link-services.sh",
+    "env:pull": "bash scripts/pull-env.sh",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",

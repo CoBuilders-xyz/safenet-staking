@@ -10,6 +10,9 @@ coverage/
 .env.local
 .env.*.local
 
+# per-worktree link to the Vercel project, written by scripts/link-services.sh
+.vercel
+
 # per-worktree, derived by scripts/setup.sh
 .env.ports
 

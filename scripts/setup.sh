@@ -56,29 +56,58 @@ PORTS
 say "worktree" "$WT"
 say "port offset" "+$OFFSET, see .env.ports"
 
-# --- 3. secrets --------------------------------------------------------------
-# Secrets stay on the host, git-ignored, passed into the container at exec time.
-if [ ! -f .env.local ]; then
-  cat > .env.local <<'ENVV'
-# Host-only. Never committed, never baked into an image.
-# Archive node for Anvil fork tests and deep ABI verification.
-ALCHEMY_MAINNET_RPC_URL=
-# Optional overrides. Public fallbacks are used when these are empty.
-MAINNET_RPC_URL=
-GNOSIS_RPC_URL=
-ENVV
-  say ".env.local" "created, fill in ALCHEMY_MAINNET_RPC_URL"
-else
-  say ".env.local" "present"
-fi
-
-# --- 4. dependencies ---------------------------------------------------------
+# --- 3. dependencies ---------------------------------------------------------
 pnpm install --silent
 say "dependencies" "installed"
 
-# --- 5. per-package setup ----------------------------------------------------
-pnpm -r --if-present run setup >/dev/null 2>&1 || true
-say "package setup" "done"
+# --- 4. per-package bootstrap ------------------------------------------------
+pnpm -r --if-present run bootstrap >/dev/null
+say "package bootstrap" "done"
+
+# --- 5. browser for the end-to-end tests -------------------------------------
+# Playwright skips the download when this Chromium build is already installed.
+if ! out="$(pnpm --filter @cobuilders/safenet-web exec playwright install chromium 2>&1)"; then
+  printf '%s\n' "$out" | tail -5
+  exit 1
+fi
+say "playwright chromium" "installed"
+
+# --- 6. secrets --------------------------------------------------------------
+# Secrets live in the Vercel project. They come down into .env.local, which stays on
+# the host, git-ignored, and passed into a container only at exec time.
+pulled=0
+if command -v vercel >/dev/null 2>&1 && vercel whoami >/dev/null 2>&1; then
+  echo
+  if pnpm --silent run link:services && pnpm --silent run env:pull; then
+    pulled=1
+  fi
+  echo
+  if [ "$pulled" -eq 1 ]; then
+    say ".env.local" "pulled from Vercel"
+  else
+    say "vercel" "signed in, but link or pull failed, see above"
+    exit 1
+  fi
+else
+  say "vercel" "not signed in, secrets not pulled"
+  echo "    After 'vercel login', run:"
+  echo "      pnpm link:services"
+  echo "      pnpm env:pull"
+fi
+
+if [ "$pulled" -eq 0 ] && [ ! -f .env.local ]; then
+  cat > .env.local <<'ENVV'
+# Host-only. Never committed, never baked into an image.
+# Normally written by `pnpm env:pull`. Fill it by hand only without Vercel access.
+# Archive RPC endpoints for fork tests and deep ABI verification. Public fallbacks
+# are used when these are empty.
+MAINNET_RPC_URL=
+GNOSIS_RPC_URL=
+ENVV
+  say ".env.local" "template created"
+elif [ "$pulled" -eq 0 ]; then
+  say ".env.local" "present"
+fi
 
 echo
 echo "  Ready. Next:"
