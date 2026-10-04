@@ -12,7 +12,7 @@
  * Stake button, a stake increases "Your Stake", a claim empties the withdrawal queue.
  */
 
-import { AMOUNTS, VALIDATORS, TEST_USER } from "../fixtures/test-data"
+import { AMOUNTS, VALIDATORS, TEST_USER, TEST_MERKLE_ROOT, MERKLE_DROP_BALANCE, REWARDS_LATEST } from "../fixtures/test-data"
 import type { RewardProof } from "./rpc-responses"
 
 export interface PendingWithdrawal {
@@ -30,6 +30,12 @@ export interface MockChainState {
   merkleDropClaimed: bigint
   /** undefined = no reward proof configured for this address (served as 404) */
   rewardProof?: RewardProof | null
+  /** Root the MerkleDrop reports on chain (merkleRoot()) */
+  merkleRoot: string
+  /** SAFE the MerkleDrop holds (token balanceOf(merkleDrop)); a claim pays out of it */
+  merkleDropBalance: bigint
+  /** SEF's rewards/latest.json; null is served as a 404 */
+  rewardsLatest: typeof REWARDS_LATEST | null
   /** When true, the next eth_sendTransaction simulates the user rejecting the wallet prompt. */
   rejectNextTx: boolean
 }
@@ -41,6 +47,9 @@ export interface MockChainStateOverrides {
   pendingWithdrawals?: PendingWithdrawal[]
   merkleDropClaimed?: bigint
   rewardProof?: RewardProof | null
+  merkleRoot?: string
+  merkleDropBalance?: bigint
+  rewardsLatest?: typeof REWARDS_LATEST | null
 }
 
 export function createMockChainState(overrides: MockChainStateOverrides = {}): MockChainState {
@@ -63,6 +72,9 @@ export function createMockChainState(overrides: MockChainStateOverrides = {}): M
       [{ amount: AMOUNTS.pendingWithdrawalAmount, claimableAt: BigInt(Math.floor(Date.now() / 1000) - 3600) }],
     merkleDropClaimed: overrides.merkleDropClaimed ?? 0n,
     rewardProof: overrides.rewardProof,
+    merkleRoot: overrides.merkleRoot ?? TEST_MERKLE_ROOT,
+    merkleDropBalance: overrides.merkleDropBalance ?? MERKLE_DROP_BALANCE,
+    rewardsLatest: overrides.rewardsLatest === undefined ? { ...REWARDS_LATEST } : overrides.rewardsLatest,
     rejectNextTx: false,
   }
 }
@@ -132,6 +144,7 @@ export function applyMockTx(state: MockChainState, data: string, userAddress: st
       if (delta > 0n) {
         state.merkleDropClaimed = cumulativeAmount
         state.balance += delta
+        state.merkleDropBalance -= delta
       }
       break
     }

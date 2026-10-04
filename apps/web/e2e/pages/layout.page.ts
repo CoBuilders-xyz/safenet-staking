@@ -7,6 +7,7 @@ export class LayoutPage {
   readonly navDashboard: Locator
   readonly navValidators: Locator
   readonly navWithdrawals: Locator
+  readonly navRewards: Locator
   readonly themeToggle: Locator
   readonly connectButton: Locator
   readonly disconnectButton: Locator
@@ -22,6 +23,7 @@ export class LayoutPage {
     this.navDashboard = page.getByRole("link", { name: "Dashboard" })
     this.navValidators = page.getByRole("link", { name: "Validators" })
     this.navWithdrawals = page.getByRole("link", { name: "Withdrawals" })
+    this.navRewards = page.getByRole("link", { name: "Rewards", exact: true })
     this.themeToggle = page.getByRole("button", { name: /Switch to (light|dark) mode/ })
     this.connectButton = page.getByRole("button", { name: "Connect Wallet" })
     this.disconnectButton = page.getByRole("button", { name: "Disconnect" })

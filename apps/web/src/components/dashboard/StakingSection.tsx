@@ -4,14 +4,13 @@ import { useAccount } from "wagmi"
 import { useValidators, findValidator, type ValidatorInfo } from "@/hooks/useValidators"
 import { useUserStakesOnValidators } from "@/hooks/useStakingReads"
 import { useRewards } from "@/hooks/useRewards"
-import { useRewardProof } from "@/hooks/useRewardProof"
+import { useRewardProof, heldPendingCompliance } from "@/hooks/useRewardProof"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { UndelegateDialog } from "@/components/staking/UndelegateDialog"
-import { ClaimRewardsDialog } from "./ClaimRewardsDialog"
 import { truncateAddress, formatTokenAmount } from "@/lib/format"
 import Info from "lucide-react/dist/esm/icons/info"
 import type { Address } from "viem"
@@ -83,7 +82,6 @@ export function StakingSection() {
   const { data: stakes, isLoading } = useUserStakesOnValidators(validatorAddresses)
   const { data: rewards } = useRewards()
   const { data: proof } = useRewardProof(address)
-  const [claimOpen, setClaimOpen] = useState(false)
 
   if (!isConnected) {
     return null
@@ -173,18 +171,13 @@ export function StakingSection() {
                 </p>
               )}
             </div>
-            <Button
-              size="sm"
-              variant="gradient"
-              disabled={!rewards.canClaim}
-              onClick={() => setClaimOpen(true)}
-            >
-              Claim Rewards
+            <Button asChild size="sm" variant="gradient">
+              <Link to="/rewards">Go to Rewards</Link>
             </Button>
           </div>
 
           {/* Compliance note */}
-          {address && proof && proof.kycAmount && BigInt(proof.kycAmount) > 0n && proof.kyc !== true && (
+          {address && heldPendingCompliance(proof) > 0n && (
             <p className="text-sm text-muted-foreground rounded-md border border-border bg-muted/50 px-3 py-2">
               Some rewards for{" "}
               <span className="font-mono">{truncateAddress(address)}</span> are
@@ -231,8 +224,6 @@ export function StakingSection() {
           )}
         </CardContent>
       </Card>
-
-      <ClaimRewardsDialog open={claimOpen} onOpenChange={setClaimOpen} />
     </>
   )
 }

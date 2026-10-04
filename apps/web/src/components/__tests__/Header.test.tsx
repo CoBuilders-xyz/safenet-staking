@@ -25,6 +25,7 @@ describe("Header", () => {
     expect(screen.getByText("Dashboard")).toBeInTheDocument()
     expect(screen.getByText("Validators")).toBeInTheDocument()
     expect(screen.getByText("Withdrawals")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Rewards" })).toHaveAttribute("href", "/rewards")
   })
 
   it("renders dark mode toggle button", () => {

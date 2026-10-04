@@ -13,6 +13,7 @@ const navItems = [
   { label: "Dashboard", path: "/" },
   { label: "Validators", path: "/validators" },
   { label: "Withdrawals", path: "/withdrawals" },
+  { label: "Rewards", path: "/rewards" },
 ]
 
 export function Header() {

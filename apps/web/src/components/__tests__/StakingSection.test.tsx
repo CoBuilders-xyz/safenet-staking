@@ -45,11 +45,8 @@ vi.mock("@/components/staking/UndelegateDialog", () => ({
   UndelegateDialog: () => null,
 }))
 
-vi.mock("@/components/dashboard/ClaimRewardsDialog", () => ({
-  ClaimRewardsDialog: () => null,
-}))
-
-vi.mock("@/hooks/useRewardProof", () => ({
+vi.mock("@/hooks/useRewardProof", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/useRewardProof")>()),
   useRewardProof: mockUseRewardProof,
 }))
 
@@ -82,7 +79,7 @@ describe("StakingSection", () => {
 
     expect(screen.getByText("Your Rewards")).toBeInTheDocument()
     expect(screen.getByText("Claimable SAFE")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Claim Rewards" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Go to Rewards" })).toHaveAttribute("href", "/rewards")
   })
 
   it("shows position table with validator", () => {
@@ -114,7 +111,7 @@ describe("StakingSection", () => {
     expect(screen.getByRole("link", { name: "legal@safefoundation.org" })).toBeInTheDocument()
   })
 
-  it("shows compliance note AND keeps claim button enabled when kycAmount > 0, kyc absent, but proof and cumulativeAmount are both present", () => {
+  it("shows compliance note AND keeps the rewards link when kycAmount > 0, kyc absent, but proof and cumulativeAmount are both present", () => {
     mockUseAccount.mockReturnValue({
       isConnected: true,
       address: "0x1234567890123456789012345678901234567890",
@@ -131,7 +128,7 @@ describe("StakingSection", () => {
     renderSection()
 
     expect(screen.getByText(/pending compliance checks/)).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Claim Rewards" })).not.toBeDisabled()
+    expect(screen.getByRole("link", { name: "Go to Rewards" })).toBeInTheDocument()
   })
 
   it("hides compliance note when kyc:true even with kycAmount > 0", () => {

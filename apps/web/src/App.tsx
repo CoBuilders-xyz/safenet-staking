@@ -22,6 +22,8 @@ const pageImports = {
     .then(m => ({ default: m.ValidatorDetailPage })),
   Withdrawals: () => import("@/pages/WithdrawalsPage")
     .then(m => ({ default: m.WithdrawalsPage })),
+  Rewards: () => import("@/pages/RewardsPage")
+    .then(m => ({ default: m.RewardsPage })),
   NotFound: () => import("@/pages/NotFoundPage")
     .then(m => ({ default: m.NotFoundPage })),
 }
@@ -30,6 +32,7 @@ const DashboardPage = lazy(pageImports.Dashboard)
 const ValidatorsPage = lazy(pageImports.Validators)
 const ValidatorDetailPage = lazy(pageImports.ValidatorDetail)
 const WithdrawalsPage = lazy(pageImports.Withdrawals)
+const RewardsPage = lazy(pageImports.Rewards)
 const NotFoundPage = lazy(pageImports.NotFound)
 
 /** Preload all route chunks so IPFS-hosted builds are warm. */
@@ -117,6 +120,7 @@ function App() {
             <Route path="/validators" element={<ErrorBoundary><ValidatorsPage /></ErrorBoundary>} />
             <Route path="/validators/:address" element={<ErrorBoundary><ValidatorDetailPage /></ErrorBoundary>} />
             <Route path="/withdrawals" element={<ErrorBoundary><WithdrawalsPage /></ErrorBoundary>} />
+            <Route path="/rewards" element={<ErrorBoundary><RewardsPage /></ErrorBoundary>} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>

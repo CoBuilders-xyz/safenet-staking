@@ -1,13 +1,16 @@
 import { useQuery } from "@tanstack/react-query"
 import { getAddress } from "viem"
 import type { Address, Hex } from "viem"
+import { SEF_DATA } from "@cobuilders/safenet-core"
 
 export interface RewardProof {
   cumulativeAmount: string
   merkleRoot: Hex
   proof: Hex[] | null
-  kycAmount?: string
-  kyc?: boolean
+  /** `null` is treated as absent: nothing held. */
+  kycAmount?: string | null
+  /** `null` is treated as absent: not marked as checked. */
+  kyc?: boolean | null
 }
 
 function isValidProof(data: unknown): data is RewardProof {
@@ -23,13 +26,16 @@ function isValidProof(data: unknown): data is RewardProof {
     )
   )
     return false
-  if (obj.kycAmount !== undefined && (typeof obj.kycAmount !== "string" || !/^\d+$/.test(obj.kycAmount))) return false
-  if (obj.kyc !== undefined && typeof obj.kyc !== "boolean") return false
+  // SEF's live files (checked 2026-10-04) omit these keys or give a string and a boolean.
+  // A null is accepted as absent, so a change in how they serialise cannot lock users out.
+  if (obj.kycAmount != null && (typeof obj.kycAmount !== "string" || !/^\d+$/.test(obj.kycAmount))) return false
+  if (obj.kyc != null && typeof obj.kyc !== "boolean") return false
   return true
 }
 
-const DEFAULT_REWARDS_BASE_URL =
-  "https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/refs/heads/main/assets/rewards"
+/** Where SEF publishes the reward files. The e2e suite points this at a mock. */
+export const rewardsBaseUrl: string =
+  import.meta.env.VITE_REWARDS_BASE_URL || SEF_DATA.rewardsProofBase
 
 function radixProofPath(addr: string): string {
   const hex = addr.slice(2, 10).toLowerCase()
@@ -39,14 +45,23 @@ function radixProofPath(addr: string): string {
 async function fetchProof(address: Address): Promise<RewardProof | null> {
   const normalized = getAddress(address)
   const lower = normalized.toLowerCase()
-  const baseUrl = import.meta.env.VITE_REWARDS_BASE_URL || DEFAULT_REWARDS_BASE_URL
-  const url = `${baseUrl}/proofs/${radixProofPath(lower)}/${lower}.json`
+  const url = `${rewardsBaseUrl}/proofs/${radixProofPath(lower)}/${lower}.json`
   const response = await fetch(url)
   if (response.status === 404) return null
   if (!response.ok) throw new Error(`Failed to fetch reward proof: ${response.status}`)
   const json: unknown = await response.json()
   if (!isValidProof(json)) throw new Error("Invalid reward proof format")
   return json
+}
+
+/**
+ * The part of an address's reward that SEF holds back until compliance checks pass.
+ * Zero when nothing is held (`kycAmount` absent, null or "0"), or when the file marks the
+ * address as checked (`kyc: true`). A null `kyc` counts as not checked.
+ */
+export function heldPendingCompliance(proof: RewardProof | null | undefined): bigint {
+  if (!proof?.kycAmount || proof.kyc === true) return 0n
+  return BigInt(proof.kycAmount)
 }
 
 export function useRewardProof(address: Address | undefined, enabled = true) {

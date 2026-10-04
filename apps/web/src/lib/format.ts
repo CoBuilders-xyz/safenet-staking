@@ -46,3 +46,17 @@ export function formatCountdown(seconds: number): string {
   if (m > 0) return `${m}m ${s}s`
   return `${s}s`
 }
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+/**
+ * Format an ISO timestamp in UTC, e.g. "Tue 22 Sep 2026, 00:00 UTC".
+ * Built by hand rather than with Intl, whose month abbreviations vary by runtime.
+ */
+export function formatUtcDateTime(iso: string): string {
+  const d = new Date(iso)
+  const hh = String(d.getUTCHours()).padStart(2, "0")
+  const mm = String(d.getUTCMinutes()).padStart(2, "0")
+  return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${hh}:${mm} UTC`
+}
