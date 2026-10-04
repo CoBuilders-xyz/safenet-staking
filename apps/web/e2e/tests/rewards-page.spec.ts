@@ -26,7 +26,8 @@ test.describe("Rewards page", () => {
     await layout.navRewards.click()
 
     await expect(page).toHaveURL(/#\/rewards$/)
-    expect(await layout.getActiveNavItem()).toBe("Rewards")
+    // A retrying assertion: the URL can change a render before aria-current does.
+    await expect(layout.navRewards).toHaveAttribute("aria-current", "page")
   })
 
   test("disconnected: explains, prompts to connect, and still shows the programme", async ({ disconnectedPage: page }) => {
