@@ -77,6 +77,7 @@ export const INDEXED_EVENTS = [
 /** Read-only calls the interface and the CLI both make. */
 export const stakingAbi = parseAbi([
   "function totalStakedAmount() view returns (uint256)",
+  "function totalPendingWithdrawals() view returns (uint256)",
   "function stakes(address staker, address validator) view returns (uint256)",
   "function totalStakerStakes(address staker) view returns (uint256)",
   "function totalValidatorStakes(address validator) view returns (uint256)",
@@ -94,4 +95,9 @@ export const merkleDropAbi = parseAbi([
 
 export const sanctionsOracleAbi = parseAbi([
   "function isSanctioned(address addr) view returns (bool)",
+])
+
+/** The one ERC-20 read we make: the SAFE balance held by the MerkleDrop. Standard ERC-20. */
+export const erc20Abi = parseAbi([
+  "function balanceOf(address account) view returns (uint256)",
 ])
