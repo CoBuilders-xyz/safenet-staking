@@ -16,10 +16,9 @@
  *
  * Usage: pnpm --filter @cobuilders/safenet-subgraph-mainnet differential
  */
-import { createPublicClient, fallback, http, parseAbi } from "viem"
+import { createPublicClient, fallback, http } from "viem"
 import { mainnet } from "viem/chains"
-import { CONTRACTS } from "@cobuilders/safenet-core"
-import { rpcUrls } from "@cobuilders/safenet-core"
+import { CONTRACTS, SEF_DATA, erc20Abi, merkleDropAbi, rpcUrls, stakingAbi } from "@cobuilders/safenet-core"
 
 const PORT = process.env.GRAPH_NODE_PORT ?? "8000"
 const ENDPOINT = `http://localhost:${PORT}/subgraphs/name/safenet/mainnet`
@@ -29,12 +28,9 @@ const client = createPublicClient({
   transport: fallback(rpcUrls("mainnet").map((u) => http(u))),
 })
 
-const stakingAbi = parseAbi([
-  "function totalStakedAmount() view returns (uint256)",
-  "function totalPendingWithdrawals() view returns (uint256)",
-])
-const erc20Abi = parseAbi(["function balanceOf(address) view returns (uint256)"])
-const dropAbi = parseAbi(["function merkleRoot() view returns (bytes32)"])
+// graph-node caps `first` at 1000. Every list is read in one page and asserted to be below
+// the cap, so a list that outgrows it fails loudly instead of being summed short.
+const PAGE = 1000
 
 async function query<T>(gql: string): Promise<T> {
   const r = await fetch(ENDPOINT, {
@@ -46,6 +42,13 @@ async function query<T>(gql: string): Promise<T> {
   if (j.errors) throw new Error(j.errors.map((e) => e.message).join("; "))
   if (!j.data) throw new Error("no data in response")
   return j.data
+}
+
+function underPage<T>(name: string, list: T[]): T[] {
+  if (list.length >= PAGE) {
+    throw new Error(`${name} returned ${list.length} rows, the page limit. Paginate before trusting any sum.`)
+  }
+  return list
 }
 
 let failures = 0
@@ -68,7 +71,7 @@ async function main(): Promise<void> {
   // Refuse rather than compare against a partial index. A freshly deployed subgraph reports
   // its start block, one before the contract existed, and every contract read then returns
   // "0x" with a message that says nothing about the real cause.
-  const deployed = 24_585_750n
+  const deployed = CONTRACTS.staking.deployBlock
   if (at < deployed) {
     console.error(
       `\n  the subgraph has indexed nothing yet: block ${at} is before the Staking deploy` +
@@ -83,12 +86,19 @@ async function main(): Promise<void> {
 
   // Read the contracts at the SAME block the subgraph reached. Comparing against the chain
   // head instead would measure the lag between them, not whether they agree.
-  const [totalStaked, pending, dropBalance, chainRoot] = await Promise.all([
+  const [totalStaked, pending] = await Promise.all([
     client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "totalStakedAmount", blockNumber: at }),
     client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "totalPendingWithdrawals", blockNumber: at }),
-    client.readContract({ address: CONTRACTS.safeToken.address, abi: erc20Abi, functionName: "balanceOf", args: [CONTRACTS.merkleDrop.address], blockNumber: at }),
-    client.readContract({ address: CONTRACTS.merkleDrop.address, abi: dropAbi, functionName: "merkleRoot", blockNumber: at }),
   ])
+  // The MerkleDrop deployed after Staking. Before its deploy block there is no code to read, and
+  // merkleRoot() would fail with the same uninformative "0x".
+  const dropLive = at >= CONTRACTS.merkleDrop.deployBlock
+  const [dropBalance, chainRoot] = dropLive
+    ? await Promise.all([
+      client.readContract({ address: CONTRACTS.safeToken.address, abi: erc20Abi, functionName: "balanceOf", args: [CONTRACTS.merkleDrop.address], blockNumber: at }),
+      client.readContract({ address: CONTRACTS.merkleDrop.address, abi: merkleDropAbi, functionName: "merkleRoot", blockNumber: at }),
+    ])
+    : [0n, null]
 
   const d = await query<{
     network: {
@@ -103,17 +113,20 @@ async function main(): Promise<void> {
     withdrawals: { id: string }[]
     rewardPeriods: { id: string; period: number; root: string; previousRoot: string; cumulativeClaimedAtStart: string }[]
   }>(`{
-    network(id: "1") {
+    network(id: "1", block: { number: ${at} }) {
       totalStaked pendingWithdrawals rewardsClaimed
       activeValidators stakersCurrent stakersEver
       delegationsCurrent delegationsEver
       stakeCount withdrawalCount
       rewardPeriods currentRoot
     }
-    validators(first: 100) { id totalStaked stakersCurrent }
-    withdrawals(first: 1000, where: { claimed: false }) { id }
-    rewardPeriods(first: 100, orderBy: period) { id period root previousRoot cumulativeClaimedAtStart }
+    validators(first: ${PAGE}, block: { number: ${at} }) { id totalStaked stakersCurrent }
+    withdrawals(first: ${PAGE}, where: { claimed: false }, block: { number: ${at} }) { id }
+    rewardPeriods(first: ${PAGE}, orderBy: period, block: { number: ${at} }) { id period root previousRoot cumulativeClaimedAtStart }
   }`)
+  underPage("validators", d.validators)
+  underPage("withdrawals", d.withdrawals)
+  underPage("rewardPeriods", d.rewardPeriods)
 
   if (!d.network) throw new Error("no Network entity: the subgraph indexed no events")
   const n = d.network
@@ -122,18 +135,30 @@ async function main(): Promise<void> {
   check("stakes minus withdrawals", BigInt(n.totalStaked), totalStaked)
   check("initiated minus claimed", BigInt(n.pendingWithdrawals), pending)
 
-  // The drop balance is what is left unclaimed, so allocated minus claimed. We hold claimed,
-  // not allocated, so this asserts the relationship the other way round: the balance plus what
-  // we say was claimed must equal what was ever funded. Reported, not asserted, until the
-  // funding total is indexed too.
-  console.log(`\n  MerkleDrop balance at this block      ${dropBalance}`)
-  console.log(`  rewards claimed, per the subgraph     ${n.rewardsClaimed}`)
-  console.log(`  implied total funded                  ${dropBalance + BigInt(n.rewardsClaimed)}`)
+  if (chainRoot === null) {
+    console.log(`\n  block ${at} is before the MerkleDrop deploy at ${CONTRACTS.merkleDrop.deployBlock};`)
+    console.log("  the rewards identity and the current root are not checked")
+  } else {
+    // The drop balance is what is left unclaimed, so allocated minus claimed. The subgraph holds
+    // claimed. Allocated is SEF's tokenTotal for the current root, the same source metrics-poc.ts
+    // uses. That figure belongs to SEF's LATEST root, so the identity only applies when the
+    // chain's root at this block is that root. If it is not, the subgraph is behind SEF's latest
+    // distribution, and that is a failure: let it sync and run again.
+    const sef = (await (await fetch(SEF_DATA.rewardsLatest)).json()) as { merkleRoot: string; tokenTotal: string }
+    const sameRoot = sef.merkleRoot.toLowerCase() === chainRoot.toLowerCase()
+    check("SEF's latest root is the root here", sef.merkleRoot.toLowerCase(), chainRoot.toLowerCase(),
+      sameRoot ? "" : "the subgraph is behind SEF's latest distribution; the identity below is skipped")
+    if (sameRoot) {
+      const allocated = BigInt(sef.tokenTotal)
+      check("allocated minus claimed", allocated - BigInt(n.rewardsClaimed), dropBalance,
+        "equals the MerkleDrop balance at this block")
+    }
 
-  console.log("\n  The reward root history\n")
-  // The last root we indexed must be the root the contract reports now. If a distribution
-  // were missed, this is where it shows: the chain would be ahead of us.
-  check("current root", n.currentRoot ?? "none", chainRoot)
+    console.log("\n  The reward root history\n")
+    // The last root we indexed must be the root the contract reports now. If a distribution
+    // were missed, this is where it shows: the chain would be ahead of us.
+    check("current root", n.currentRoot ?? "none", chainRoot)
+  }
   console.log(`       distributions indexed              ${n.rewardPeriods}`)
 
   // Each period's previousRoot must be the prior period's root. A gap means a missed event.
