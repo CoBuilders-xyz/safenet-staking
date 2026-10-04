@@ -231,7 +231,8 @@ async function run() {
     // developer running this has a credential; asking them to copy it into a second place only
     // creates a secret to leak. On 2026-09-29 the limit was 0 of 60 and the fallback silently
     // downgraded two metrics from PROVEN to PARTIAL, which is what this line prevents.
-    const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? ghCliToken()
+    // `||`, not `??`: an empty GITHUB_TOKEN= line in .env.local means unset, not "no token".
+    const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || ghCliToken()
     const commits = (await (await fetch(
       "https://api.github.com/repos/safe-fndn/safenet-beta-data/commits?path=assets/validator-info.json&per_page=1",
       { headers: { accept: "application/vnd.github+json", ...(token ? { authorization: `Bearer ${token}` } : {}) } },
