@@ -1,8 +1,8 @@
 /**
  * What the interface needs, keyed by chain id.
  *
- * Mainnet only. Sepolia was removed on 2026-09-29: D-014 puts end-to-end tests on an
- * Anvil fork of Mainnet, which gives real contracts and real state, and SEF deploys no
+ * Mainnet only. Sepolia was removed on 2026-09-29: tests that need real contracts are meant
+ * to run on an Anvil fork of Mainnet, which gives real contracts and real state, and SEF deploys no
  * rewards contract on Sepolia, so the screens we build next could not run there anyway.
  *
  * Addresses derive from CONTRACTS rather than repeat it, so the two cannot drift.

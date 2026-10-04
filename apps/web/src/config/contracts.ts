@@ -1,4 +1,4 @@
-// Addresses come from @cobuilders/safenet-core. D-005: this repository writes a hex
+// Addresses come from @cobuilders/safenet-core. This repository writes a hex
 // address in exactly one place, so a redeploy is one edit and `pnpm verify:abis`
 // covers what the interface uses as well as what the indexer does.
 //

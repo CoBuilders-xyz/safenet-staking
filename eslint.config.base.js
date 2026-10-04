@@ -1,5 +1,5 @@
-// Shared lint base. D-024: we start on the reference's ESLint config
-// (safe-fndn/safenet-staking-ui, eslint.config.js) and migrate to Biome after M1,
+// Shared lint base. We start on the reference's ESLint config
+// (safe-fndn/safenet-staking-ui, eslint.config.js) and migrate to Biome after the first milestone,
 // so that merging their tree does not also mean re-litigating lint.
 //
 // Packages extend this. Nothing here assumes a browser or React; apps/web adds both.

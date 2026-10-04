@@ -5,7 +5,7 @@ coverage/
 .turbo/
 *.tsbuildinfo
 
-# secrets never leave the host (D-039)
+# secrets never leave the host
 .env
 .env.local
 .env.*.local

@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test"
 
-// D-008: one port per worktree, assigned by scripts/setup.sh into .env.ports.
+// One port per worktree, so several worktrees can run the suite at once.
+// scripts/setup.sh assigns it into .env.ports.
 // Falls back to the reference's own port when that is not set.
 const E2E_PORT = process.env.E2E_PORT ?? "5174"
 

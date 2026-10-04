@@ -5,8 +5,9 @@
  * 2026-09-17 and must be re-checked, not assumed, when `verify:abis` or
  * `test:parity` starts failing for a reason that is not a contract change.
  *
- * Their cron overwrites these every three hours (D-036), and D-061 records which of
- * them we pin to a commit SHA and which we read from `main`.
+ * Their cron overwrites validator-info.json and network-info.json every three hours, so a
+ * parity run pins those two to the commit that last wrote them. rewards/latest.json is written
+ * by a separate fortnightly pull request, so it is read from `main`.
  */
 
 /** `assets/validator-info.json` — a bare array, indexed by position, not an object. */
@@ -15,13 +16,13 @@ export interface SefValidator {
   commission: number
   is_active: boolean
   label: string
-  /** A double. D-051: our own computation reproduces this bit-for-bit on an aligned run. */
+  /** A double. Our own computation reproduces this bit-for-bit on an aligned run. */
   participation_rate_14d: number
 }
 
 /** `assets/network-info.json` */
 export interface SefNetworkInfo {
-  /** Decimal string, in wei. D-054: parse it exactly. `Number()` rounds at 1e6. */
+  /** Decimal string, in wei. Parse it exactly. `Number()` rounds at 1e6. */
   total_staked_amount: string
   total_transactions_checked: number
 }
