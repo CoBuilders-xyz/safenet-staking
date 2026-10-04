@@ -17,8 +17,14 @@ SAFENET_VERCEL_ORG_ID="team_TPIgHN6kXsahQxg5O69ubU0F"
 unset VERCEL_PROJECT_ID VERCEL_ORG_ID
 
 # Prints one field of .vercel/project.json, or nothing when it is absent.
+# Parsed as JSON, because the CLI's formatting is not a contract.
 linked_value() {
-  sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\\1/p" "$REPO_ROOT/.vercel/project.json" 2>/dev/null
+  node -e '
+    try {
+      const value = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))[process.argv[2]]
+      if (typeof value === "string") process.stdout.write(value)
+    } catch {}
+  ' "$REPO_ROOT/.vercel/project.json" "$1"
 }
 
 # Succeeds when .vercel/ points at this project, in this team.
@@ -86,9 +92,15 @@ guard_env_overwrite() {
 
   # `.env.local` -> `.env.backup.<time>.local`, so the repo's `.env.*.local`
   # rule already ignores the backup. A `.bak` suffix would not match it. The
-  # time stamp keeps each backup, so a later pull never replaces an earlier one.
-  local backup
-  backup="${target%.local}.backup.$(date +%Y%m%d-%H%M%S).local"
+  # time stamp, and a counter within one second, keep each backup, so a later
+  # pull never replaces an earlier one.
+  local stamp backup n=1
+  stamp="${target%.local}.backup.$(date +%Y%m%d-%H%M%S)"
+  backup="$stamp.local"
+  while [ -e "$backup" ]; do
+    backup="$stamp-$n.local"
+    n=$((n + 1))
+  done
   cp "$target" "$backup"
   chmod 600 "$backup"
   warn "These keys exist only in $target: $lost"
