@@ -40,6 +40,16 @@ export const INDEXED_EVENTS = [
   { contract: "merkleDrop", frequency: "rare",
     signature: "event Claimed(address indexed account, uint256 amount)" },
 
+
+  // The contract spells it "Merkel". That is not a transcription error on our side: the typo
+  // is in the deployed bytecode, and topic0 only matches the misspelling.
+  //
+  // Neither parameter is indexed, and the order is (old, new). Both determined from real logs
+  // on 2026-09-29, not from the signature: a log carries one topic, so no parameter is indexed,
+  // and each log's first word equals the previous log's second. D-060 records that topic0
+  // alone cannot tell us either fact.
+  { contract: "merkleDrop", frequency: "rare",
+    signature: "event MerkelRootUpdated(bytes32 oldRoot, bytes32 newRoot)" },
   // --- Gnosis Chain: consensus ---
   { contract: "consensus", frequency: "high",
     signature: "event TransactionAttested(bytes32 indexed safeTxHash, uint256 indexed chainId, address indexed safe, uint64 epoch, bytes32 signatureId, ((uint256 x, uint256 y) r, uint256 z) attestation)" },
@@ -67,6 +77,7 @@ export const INDEXED_EVENTS = [
 /** Read-only calls the interface and the CLI both make. */
 export const stakingAbi = parseAbi([
   "function totalStakedAmount() view returns (uint256)",
+  "function totalPendingWithdrawals() view returns (uint256)",
   "function stakes(address staker, address validator) view returns (uint256)",
   "function totalStakerStakes(address staker) view returns (uint256)",
   "function totalValidatorStakes(address validator) view returns (uint256)",
@@ -84,4 +95,9 @@ export const merkleDropAbi = parseAbi([
 
 export const sanctionsOracleAbi = parseAbi([
   "function isSanctioned(address addr) view returns (bool)",
+])
+
+/** The one ERC-20 read we make: the SAFE balance held by the MerkleDrop. Standard ERC-20. */
+export const erc20Abi = parseAbi([
+  "function balanceOf(address account) view returns (uint256)",
 ])

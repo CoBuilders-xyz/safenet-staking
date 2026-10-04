@@ -1,0 +1,11 @@
+{
+  "//": "scripts/ only. src/ and tests/ are AssemblyScript and are checked by `graph build`.",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"]
+  },
+  "include": ["scripts/**/*.ts"]
+}

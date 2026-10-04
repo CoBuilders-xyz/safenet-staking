@@ -20,7 +20,10 @@
     "spec:check": "node tools/spec-check.mjs",
     "check:browser": "node tools/check-browser-safety.mjs",
     "metrics": "pnpm --filter @cobuilders/safenet-core metrics && node tools/build-web-snapshot.mjs",
-    "lint": "eslint . && turbo run lint"
+    "lint": "eslint . && turbo run lint",
+    "graph:up": "docker compose --profile graph --env-file .env.ports --env-file .env.local up -d",
+    "graph:down": "docker compose --profile graph down -v",
+    "graph:logs": "docker compose --profile graph logs -f graph-node | sed -E 's#https?://[^ ]+#<redacted-url>#g'"
   },
   "devDependencies": {
     "@eslint/js": "9.39.2",

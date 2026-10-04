@@ -24,6 +24,7 @@ import { writeFileSync } from "node:fs"
 import { CHAINS, RPC_URLS } from "../src/chains.js"
 import { CONTRACTS, SEF_DATA } from "../src/contracts.js"
 import { stakingAbi, merkleDropAbi } from "../src/abis.js"
+import { execFileSync } from "node:child_process"
 
 // ---------------------------------------------------------------------------
 const argNum = (flag: string, dflt: number) => {
@@ -226,7 +227,12 @@ async function run() {
   try {
     // Authenticated if a token is present: unauthenticated GitHub is 60 requests/hour per IP and
     // routinely exhausted, which used to drop us into the fallback without anyone noticing.
-    const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN
+    // The third source is `gh auth token`. scripts/setup.sh already requires the gh CLI, so a
+    // developer running this has a credential; asking them to copy it into a second place only
+    // creates a secret to leak. On 2026-09-29 the limit was 0 of 60 and the fallback silently
+    // downgraded two metrics from PROVEN to PARTIAL, which is what this line prevents.
+    // `||`, not `??`: an empty GITHUB_TOKEN= line in .env.local means unset, not "no token".
+    const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || ghCliToken()
     const commits = (await (await fetch(
       "https://api.github.com/repos/safe-fndn/safenet-beta-data/commits?path=assets/validator-info.json&per_page=1",
       { headers: { accept: "application/vnd.github+json", ...(token ? { authorization: `Bearer ${token}` } : {}) } },
@@ -870,6 +876,22 @@ async function run() {
     console.log(`  wrote ${JSON_OUT}\n`)
   }
   if (c("BLOCKED")) process.exitCode = 1
+}
+
+/**
+ * The token the gh CLI already holds, or undefined. Never printed, never written to a file.
+ * A failure here is not an error: the caller falls back to an unauthenticated request.
+ */
+function ghCliToken(): string | undefined {
+  try {
+    const t = execFileSync("gh", ["auth", "token"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim()
+    return t.length > 0 ? t : undefined
+  } catch {
+    return undefined
+  }
 }
 
 function wrap(s: string, n: number): string[] {

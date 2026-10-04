@@ -1,0 +1,294 @@
+# Safenet Beta, Ethereum Mainnet: staking and rewards.
+#
+# The shape follows what metrics-poc.ts already proves against the chain. That script is the
+# oracle this subgraph is tested against, so every figure it reports must be answerable here
+# with one query and no arithmetic in the browser.
+#
+# Volume over the whole history is small: 1,342 stakes, 82 withdrawals, 6 validators. So we
+# keep every event as well as the running totals. Storage is not the constraint; having to
+# reindex from block 24,585,750 to answer a new question is.
+
+# -----------------------------------------------------------------------------------------
+# Running state
+# -----------------------------------------------------------------------------------------
+
+"Network-wide totals. One row, id \"1\"."
+type Network @entity(immutable: false) {
+  id: ID!
+
+  "Sum of stakes minus withdrawals. D-055: this must equal totalStakedAmount() on chain."
+  totalStaked: BigInt!
+
+  "Initiated minus claimed. D-055: this must equal totalPendingWithdrawals() on chain."
+  pendingWithdrawals: BigInt!
+
+  "Sum of Claimed events on the MerkleDrop. D-055: allocated minus this equals its balance."
+  rewardsClaimed: BigInt!
+
+  "Validators with isRegistered true."
+  activeValidators: Int!
+
+  """
+  Stakers holding a non-zero total, counted as ADDRESSES not positions.
+
+  Summing the per-validator counts gives a different, larger number: 78 addresses stake with
+  more than one validator, so a sum counts them once per validator. On 2026-09-29 that sum
+  was 1,014 against 884 real addresses, a 15% overstatement of a figure the proposal calls a
+  trust signal. That is why this is maintained from Staker and not from Validator.
+  """
+  stakersCurrent: Int!
+
+  "Stakers that have ever held a position. Only ever grows."
+  stakersEver: Int!
+
+  "Open positions: staker and validator pairs with a non-zero amount. NOT a count of people."
+  delegationsCurrent: Int!
+
+  "Positions ever opened. Only ever grows."
+  delegationsEver: Int!
+
+  stakeCount: Int!
+  withdrawalCount: Int!
+
+  "Distributions to date, one per MerkelRootUpdated event."
+  rewardPeriods: Int!
+
+  "The root currently in force. Must equal merkleRoot() on the contract."
+  currentRoot: Bytes
+}
+
+type Validator @entity(immutable: false) {
+  "The validator address, lowercase hex."
+  id: ID!
+  address: Bytes!
+
+  "False after a ValidatorUpdated event with isRegistered false. No such event has occurred yet."
+  isRegistered: Boolean!
+
+  "Stakes minus withdrawals for this validator."
+  totalStaked: BigInt!
+
+  """
+  Addresses currently staking with this validator.
+
+  Per validator an address appears at most once, so counting positions and counting addresses
+  agree here. They only diverge network-wide.
+  """
+  stakersCurrent: Int!
+
+  "Addresses that have ever staked with this validator. Only ever grows."
+  stakersEver: Int!
+
+  registeredAtBlock: BigInt!
+  registeredAtTimestamp: BigInt!
+  lastUpdatedAtBlock: BigInt!
+
+  stakes: [Stake!]! @derivedFrom(field: "validator")
+  delegations: [Delegation!]! @derivedFrom(field: "validator")
+  withdrawals: [Withdrawal!]! @derivedFrom(field: "validator")
+}
+
+"""
+One row per staker and validator pair. Created on the first stake and NEVER deleted: the
+amount goes to zero instead.
+
+That is deliberate. "Unique delegators" can mean currently staked or ever staked, and the two
+are a different trust signal. Deleting the row would force that choice into the schema, and
+changing it later would mean reindexing from the deploy block. Keeping the row makes both
+numbers a query. At 884 addresses the cost is nothing.
+"""
+type Delegation @entity(immutable: false) {
+  "staker address, a dash, validator address. Both lowercase hex."
+  id: ID!
+  staker: Bytes!
+  stakerRef: Staker!
+  validator: Validator!
+
+  "Staked minus withdrawn for this pair. Zero means a past position, not an absent one."
+  amount: BigInt!
+
+  firstStakedAtBlock: BigInt!
+  firstStakedAtTimestamp: BigInt!
+  lastActivityAtBlock: BigInt!
+}
+
+"""
+One row per staking address, across every validator.
+
+The word follows the contract: the event is StakeIncreased(address indexed staker, ...). The
+interface says "delegation" for the act, which is the same relationship named from the other
+side. Neither source defines them as different things.
+
+Created on the first stake anywhere and NEVER deleted, for the same reason as Delegation: it
+keeps both "currently staking" and "ever staked" answerable without a reindex.
+"""
+type Staker @entity(immutable: false) {
+  "The staker address, lowercase hex."
+  id: ID!
+  address: Bytes!
+
+  "Total staked by this address across all validators."
+  totalStaked: BigInt!
+
+  "Validators this address currently holds a non-zero position with."
+  validatorCount: Int!
+
+  firstStakedAtBlock: BigInt!
+  firstStakedAtTimestamp: BigInt!
+  lastActivityAtBlock: BigInt!
+
+  delegations: [Delegation!]! @derivedFrom(field: "stakerRef")
+}
+
+# -----------------------------------------------------------------------------------------
+# Event records
+# -----------------------------------------------------------------------------------------
+
+"One StakeIncreased event. Immutable: a past event never changes."
+type Stake @entity(immutable: true) {
+  "transaction hash, a dash, log index."
+  id: ID!
+  staker: Bytes!
+  validator: Validator!
+  amount: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+"""
+One withdrawal, keyed by the contract's own withdrawalId.
+
+NOT immutable, unlike the other event records. A withdrawal is initiated and then claimed
+later, by a second event. The row is written once and updated once.
+"""
+type Withdrawal @entity(immutable: false) {
+  "The uint64 withdrawalId from the contract, as a string."
+  id: ID!
+  staker: Bytes!
+
+  """
+  The validator the stake was withdrawn from.
+
+  WithdrawalClaimed carries no validator, only the withdrawalId. So this is read from the
+  matching WithdrawalInitiated. That join is why this entity is keyed by withdrawalId and
+  not by transaction hash.
+  """
+  validator: Validator!
+  amount: BigInt!
+
+  claimed: Boolean!
+
+  initiatedAtBlock: BigInt!
+  initiatedAtTimestamp: BigInt!
+  claimedAtBlock: BigInt
+  claimedAtTimestamp: BigInt
+  initiatedTxHash: Bytes!
+  claimedTxHash: Bytes
+}
+
+"One Claimed event on the MerkleDrop. Immutable."
+type RewardClaim @entity(immutable: true) {
+  "transaction hash, a dash, log index."
+  id: ID!
+  account: Bytes!
+
+  """
+  The cumulative amount the account has claimed to date, NOT the amount of this claim.
+
+  The CumulativeMerkleDrop pattern pays the difference between a new cumulative total and
+  what was already claimed. Summing this field over a staker double counts. The network
+  total is maintained separately, by difference, in the handler.
+  """
+  cumulativeAmount: BigInt!
+
+  "This claim alone: cumulativeAmount minus what the account had claimed before."
+  amount: BigInt!
+
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+"""
+One MerkelRootUpdated event: a rewards distribution.
+
+The contract spells it "Merkel". The typo is in the deployed bytecode, so the handler name
+follows it rather than correcting it silently.
+
+This is what makes the per-period Rewards history possible. m1-screens.md records that field
+as the riskiest in the specification, because a staker's share per period appears in no file:
+SEF overwrites each address's proof every period, so only the git history holds the past. The
+root updates give the period boundary and the distribution transaction on chain, which is what
+the proposal promised to link to.
+
+Immutable: a past distribution never changes.
+"""
+type RewardPeriod @entity(immutable: true) {
+  "The sequence number of this distribution, from 1, as a string."
+  id: ID!
+
+  "1 for the first distribution. Rises by one each time."
+  period: Int!
+
+  "The root this distribution replaced. Zero for the first one."
+  previousRoot: Bytes!
+
+  "The root this distribution set. Every proof served against it belongs to this period."
+  root: Bytes!
+
+  blockNumber: BigInt!
+  timestamp: BigInt!
+
+  "The distribution transaction. This is the link the Rewards screen shows per period."
+  transactionHash: Bytes!
+
+  """
+  Total claimed across all accounts at the moment this root was set.
+
+  The difference between one period's value and the next is what stakers actually took during
+  that period. The amount FUNDED per period is not on chain; it is in SEF's published files.
+  """
+  cumulativeClaimedAtStart: BigInt!
+}
+
+"Running cumulative claims per account, so each RewardClaim can compute its own difference."
+type RewardAccount @entity(immutable: false) {
+  "account address, lowercase hex."
+  id: ID!
+  account: Bytes!
+  cumulativeClaimed: BigInt!
+  claimCount: Int!
+  firstClaimAtTimestamp: BigInt!
+  lastClaimAtTimestamp: BigInt!
+}
+
+# -----------------------------------------------------------------------------------------
+# Daily buckets
+# -----------------------------------------------------------------------------------------
+
+"""
+One row per UTC day, written as events arrive.
+
+The network overview shows staked over time as a daily series. Precomputing it is why The
+Graph exists: the browser asks for rows, it does not fold 1,342 events.
+
+Days with no activity have no row. A consumer drawing a line must carry the last value
+forward. That is cheaper than writing 145 rows a day for a chain that is mostly quiet.
+"""
+type DayData @entity(immutable: false) {
+  "The UTC day start as a unix timestamp, as a string."
+  id: ID!
+  date: Int!
+
+  "Network totalStaked at the end of this day."
+  totalStaked: BigInt!
+
+  "Sums for this day alone."
+  stakedIn: BigInt!
+  withdrawnOut: BigInt!
+  rewardsClaimed: BigInt!
+
+  stakeCount: Int!
+  withdrawalCount: Int!
+}
