@@ -1,7 +1,7 @@
 import { defineConfig } from "@playwright/test"
 
 // One port per worktree, so several worktrees can run the suite at once.
-// scripts/setup.sh writes one into .env.ports. Nothing loads that file automatically,
+// scripts/setup.sh writes one into .env.ports. This suite does not load that file,
 // so export E2E_PORT from it before running the suite.
 // Falls back to the reference's own port when that is not set.
 const E2E_PORT = process.env.E2E_PORT ?? "5174"
