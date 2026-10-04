@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Generates docs/internal/metrics-poc-results.md from the JSON the POC emits.
+ * Generates packages/core/.metrics/metrics-poc-results.md from the JSON the POC emits.
+ * Both files are git-ignored: run `pnpm metrics` to produce them against live chains.
  * Nothing is retyped. Version one of the results document was hand-copied and a
  * truncated string became a finding, so the report is now generated or it is not written.
  */
@@ -9,7 +10,9 @@ import { resolve } from "node:path"
 
 const ROOT = resolve(import.meta.dirname, "..")
 
-const RUN = resolve(ROOT, "docs/internal/metrics-poc-run.json")
+const OUT_DIR = resolve(ROOT, "packages/core/.metrics")
+const RUN = resolve(OUT_DIR, "metrics-poc-run.json")
+const REPORT = resolve(OUT_DIR, "metrics-poc-results.md")
 const j = JSON.parse(readFileSync(RUN, "utf8"))
 
 // Refuse to render a report from a stale run. If metrics-poc.ts throws, it never writes the JSON,
@@ -32,7 +35,7 @@ let md = `# Metrics proof of concept — results
 
 <!-- GENERATED FILE. Do not edit by hand.
      Produced by: node tools/render-metrics-report.mjs
-     From:        docs/internal/metrics-poc-run.json
+     From:        packages/core/.metrics/metrics-poc-run.json
      Which comes from: packages/core/scripts/metrics-poc.ts -->
 
 **Run:** ${j.runAt.slice(0, 19).replace("T", " ")} UTC
@@ -104,6 +107,6 @@ ${best.absences < 10
   ? `We quote the two counts rather than their ratio: with a denominator of ${best.absences} a ratio is not a meaningful statistic.`
   : `That is a factor of ${(worst.absences / best.absences).toFixed(1)}.`}
 `
-mkdirSync(resolve(ROOT, "docs/internal"), { recursive: true })
-writeFileSync(resolve(ROOT, "docs/internal/metrics-poc-results.md"), md)
-console.log(`wrote docs/internal/metrics-poc-results.md — ${j.rows.length} metrics, ${counts[0]}/${counts[1]}/${counts[2]}`)
+mkdirSync(OUT_DIR, { recursive: true })
+writeFileSync(REPORT, md)
+console.log(`wrote packages/core/.metrics/metrics-poc-results.md — ${j.rows.length} metrics, ${counts[0]}/${counts[1]}/${counts[2]}`)

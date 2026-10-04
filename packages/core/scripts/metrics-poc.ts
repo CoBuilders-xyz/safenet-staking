@@ -20,7 +20,8 @@ import {
   createPublicClient, fallback, http, parseAbiItem, formatUnits,
   type AbiEvent, type Address, type Hex, type Log, type PublicClient,
 } from "viem"
-import { writeFileSync } from "node:fs"
+import { mkdirSync, writeFileSync } from "node:fs"
+import { dirname } from "node:path"
 import { CHAINS, RPC_URLS } from "../src/chains.js"
 import { CONTRACTS, SEF_DATA } from "../src/contracts.js"
 import { stakingAbi, merkleDropAbi } from "../src/abis.js"
@@ -850,6 +851,7 @@ async function run() {
   console.log(`  ${scanRequests} RPC log requests across ${scanCalls} scans, ${scanRetries} retries, ${((Date.now() - t0) / 1000).toFixed(0)}s\n`)
 
   if (JSON_OUT) {
+    mkdirSync(dirname(JSON_OUT), { recursive: true })
     writeFileSync(JSON_OUT, JSON.stringify({
       runAt: new Date().toISOString(), mainnetBlock: String(mLatest), gnosisBlock: String(gLatest),
       gnosisBlockTime: gBlockTime, windowDays: DAYS,

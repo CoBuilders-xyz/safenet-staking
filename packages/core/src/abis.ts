@@ -2,10 +2,9 @@
  * Event signatures we index.
  *
  * THE RULE: no source file is authoritative. Only the chain is.
- * These signatures were verified by matching keccak topic0 against live logs.
  * The deployed contracts match NEITHER published branch of safe-research/safenet:
- * the `beta` tag is older than what is deployed, `main` is newer.
- * See project-context.md section 4.
+ * the `beta` tag is older than what is deployed, `main` is newer. So every signature here
+ * is proven against live logs by matching keccak topic0, never taken from a branch.
  *
  * `scripts/verify-abis.ts` re-proves these against the chain: the "high" entries on every run,
  * and the "rare" entries under --deep, which scans from each contract's deploy block.

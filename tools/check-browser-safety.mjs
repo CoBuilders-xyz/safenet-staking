@@ -10,7 +10,7 @@ let failed = false
 
 // 1. source: no process.env under the web app's src
 const hits = execSync(
-  `grep -rn "process\\.env" ${join(ROOT, "apps/web-proto/src")} || true`,
+  `grep -rn "process\\.env" ${join(ROOT, "apps/web/src")} || true`,
   { encoding: "utf8" },
 ).trim()
 if (hits) {
