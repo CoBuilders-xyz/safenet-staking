@@ -168,12 +168,24 @@ describe("useProgrammeRewards", () => {
     expect(result.current.rootMatches).toBe(true)
   })
 
-  it("reports a root that differs from the published one", () => {
+  it("reports a differing root and derives no totals across two roots", () => {
+    // SEF can publish a new root, with a larger tokenTotal, before it is set and funded on
+    // chain. Allocated minus balance would then count unpaid rewards as claimed.
     mockUseQuery.mockReturnValue({ data: LATEST, error: null })
-    readsReturn({ merkleRoot: { data: ROOT_B } })
+    readsReturn({ merkleRoot: { data: ROOT_B }, balanceOf: { data: 250n * SAFE } })
     const { result } = renderHook(() => useProgrammeRewards())
 
     expect(result.current.rootMatches).toBe(false)
+    expect(result.current.totals).toBeUndefined()
+  })
+
+  it("derives no totals before the on-chain root is read", () => {
+    mockUseQuery.mockReturnValue({ data: LATEST, error: null })
+    readsReturn({ balanceOf: { data: 250n * SAFE } })
+    const { result } = renderHook(() => useProgrammeRewards())
+
+    expect(result.current.rootMatches).toBeUndefined()
+    expect(result.current.totals).toBeUndefined()
   })
 
   it("keeps each source's error separate", () => {

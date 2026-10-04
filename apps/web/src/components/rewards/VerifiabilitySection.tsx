@@ -82,7 +82,7 @@ export function VerifiabilitySection({ programme }: { programme: ReturnType<type
       </dl>
       {(onChainRoot.error || dropBalance.error) && (
         <SectionError
-          message="The MerkleDrop contract could not be read from Ethereum."
+          message={MESSAGES.contractReadFailed}
           onRetry={() => {
             void onChainRoot.refetch()
             void dropBalance.refetch()

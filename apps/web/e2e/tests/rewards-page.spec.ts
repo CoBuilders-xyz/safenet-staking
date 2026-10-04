@@ -130,6 +130,11 @@ test.describe("Rewards page", () => {
 
     await expect(section(page, "Actions").getByText(/Claiming opens when they match/)).toBeVisible()
     await expect(claimButton(page)).toBeDisabled()
+
+    // Allocation and balance belong to different roots, so no claimed figure is derived.
+    const programme = section(page, "Programme")
+    await expect(valueOf(programme, "Claimed network-wide")).toHaveText("Not derivable")
+    await expect(programme.getByText(/root on chain differs from the one SEF published/)).toBeVisible()
   })
 
   test("never earned: says so instead of showing zeros", async ({ connectedPage: page }) => {

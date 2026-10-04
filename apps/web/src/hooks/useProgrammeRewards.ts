@@ -71,7 +71,7 @@ export function sameRoot(a: string | undefined, b: string | undefined): boolean 
 
 /**
  * Programme-wide rewards data: SEF's published file, and the MerkleDrop's root and balance
- * on chain. Each source keeps its own loading and error state, so a screen can fail one
+ * on chain. `totals` is derived only when the on-chain root matches the published one. Each source keeps its own loading and error state, so a screen can fail one
  * section without failing the others. Nothing here depends on the connected wallet.
  */
 export function useProgrammeRewards() {
@@ -97,17 +97,15 @@ export function useProgrammeRewards() {
     query: { enabled: !!merkleDrop, refetchInterval: 15_000 },
   })
 
+  const rootMatches = sameRoot(onChainRoot.data, latest.data?.merkleRoot)
+
+  // tokenTotal is the allocation behind the published root, so allocated minus the live
+  // balance measures claims only while the contract holds that root. Before SEF's new root
+  // is set and funded on chain, the difference would count unpaid rewards as claimed.
   const totals =
-    latest.data && dropBalance.data !== undefined
+    rootMatches === true && latest.data && dropBalance.data !== undefined
       ? deriveProgramme(BigInt(latest.data.tokenTotal), dropBalance.data)
       : undefined
 
-  return {
-    merkleDrop,
-    latest,
-    onChainRoot,
-    dropBalance,
-    totals,
-    rootMatches: sameRoot(onChainRoot.data, latest.data?.merkleRoot),
-  }
+  return { merkleDrop, latest, onChainRoot, dropBalance, totals, rootMatches }
 }

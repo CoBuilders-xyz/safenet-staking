@@ -18,7 +18,8 @@ export function PublishedFileLink() {
 }
 
 export function ProgrammeSection({ programme }: { programme: ReturnType<typeof useProgrammeRewards> }) {
-  const { latest, dropBalance, totals } = programme
+  const { latest, onChainRoot, dropBalance, totals, rootMatches } = programme
+  const contractError = onChainRoot.error ?? dropBalance.error
 
   return (
     <RewardsSection
@@ -26,7 +27,8 @@ export function ProgrammeSection({ programme }: { programme: ReturnType<typeof u
       source={
         <>
           Allocated, period and epoch: SEF&apos;s published file <PublishedFileLink />. Claimed and
-          unclaimed: allocated minus the MerkleDrop&apos;s live SAFE balance on Ethereum.
+          unclaimed: allocated minus the MerkleDrop&apos;s live SAFE balance on Ethereum, derived only
+          while the contract holds the published root.
         </>
       }
     >
@@ -53,8 +55,20 @@ export function ProgrammeSection({ programme }: { programme: ReturnType<typeof u
             </StatRow>
             <StatRow label="Epoch">{latest.data.epoch}</StatRow>
           </dl>
-          {dropBalance.error && (
-            <SectionError message="The MerkleDrop balance could not be read from Ethereum." onRetry={() => void dropBalance.refetch()} />
+          {contractError && (
+            <SectionError
+              message={MESSAGES.contractReadFailed}
+              onRetry={() => {
+                void onChainRoot.refetch()
+                void dropBalance.refetch()
+              }}
+            />
+          )}
+          {rootMatches === false && (
+            <SectionNote>
+              The root on chain differs from the one SEF published, so allocated minus the contract
+              balance does not measure claims.
+            </SectionNote>
           )}
           {totals && totals.claimed === undefined && (
             <SectionNote>
@@ -69,9 +83,13 @@ export function ProgrammeSection({ programme }: { programme: ReturnType<typeof u
   )
 }
 
+/** A value derived from both on-chain reads: the root (to gate it) and the balance. */
 function OnChainValue({ programme, children }: { programme: ReturnType<typeof useProgrammeRewards>; children: ReactNode }) {
-  if (programme.dropBalance.error) return <>Unavailable</>
-  if (programme.dropBalance.data === undefined) return <Skeleton className="inline-block h-5 w-24 align-middle" />
+  const { onChainRoot, dropBalance } = programme
+  if (onChainRoot.error || dropBalance.error) return <>Unavailable</>
+  if (onChainRoot.data === undefined || dropBalance.data === undefined) {
+    return <Skeleton className="inline-block h-5 w-24 align-middle" />
+  }
   return <>{children}</>
 }
 

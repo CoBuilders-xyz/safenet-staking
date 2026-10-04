@@ -285,7 +285,16 @@ describe("RewardsPage", () => {
       const prog = section("Programme")
       expect(valueOf(prog, "Claimed network-wide")).toHaveTextContent("Unavailable")
       expect(valueOf(prog, "Allocated to date")).toHaveTextContent("1,000 SAFE")
-      expect(within(prog).getByRole("alert")).toHaveTextContent("MerkleDrop balance could not be read")
+      expect(within(prog).getByRole("alert")).toHaveTextContent("The MerkleDrop contract could not be read from Ethereum.")
+    })
+
+    it("waits for the on-chain root before showing derived figures", () => {
+      mockUseProgramme.mockReturnValue(
+        programme({ onChainRoot: { data: undefined, error: null, refetch: vi.fn() }, rootMatches: undefined, totals: undefined }),
+      )
+      renderPage()
+
+      expect(valueOf(section("Programme"), "Claimed network-wide")).not.toHaveTextContent("Not derivable")
     })
 
     it("refuses to derive claims when the contract holds more than the allocation", () => {
@@ -315,15 +324,21 @@ describe("RewardsPage", () => {
       expect(within(ver).getByText("300 SAFE")).toBeInTheDocument()
     })
 
-    it("flags a root that differs from the published one", () => {
+    it("flags a root that differs, and Programme derives no claims across the two roots", () => {
       mockUseProgramme.mockReturnValue(
-        programme({ onChainRoot: { data: ROOT_B, error: null, refetch: vi.fn() }, rootMatches: false }),
+        programme({ onChainRoot: { data: ROOT_B, error: null, refetch: vi.fn() }, rootMatches: false, totals: undefined }),
       )
       renderPage()
 
       const ver = section("Verifiability")
       expect(within(ver).getByText("Differs")).toBeInTheDocument()
       expect(within(ver).getByText(/Claims built from the published files fail/)).toBeInTheDocument()
+
+      const prog = section("Programme")
+      expect(valueOf(prog, "Claimed network-wide")).toHaveTextContent("Not derivable")
+      expect(valueOf(prog, "Unclaimed share")).toHaveTextContent("Not derivable")
+      expect(valueOf(prog, "Allocated to date")).toHaveTextContent("1,000 SAFE")
+      expect(within(prog).getByText(/root on chain differs from the one SEF published/)).toBeInTheDocument()
     })
 
     it("shows a section error when the contract cannot be read", async () => {
