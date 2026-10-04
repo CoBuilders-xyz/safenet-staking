@@ -24,7 +24,6 @@
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
-      "Bash(openspec:*)",
       "Bash(gh api:*)",
       "Bash(gh run view:*)"
     ]

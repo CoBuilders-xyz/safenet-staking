@@ -17,7 +17,6 @@
     "test:e2e": "node tools/require-task.mjs test:e2e \"apps/web\" && turbo run test:e2e",
     "test:fork": "node tools/require-task.mjs test:fork \"apps/web and packages/cli\" && turbo run test:fork",
     "test:parity": "node tools/require-task.mjs test:parity \"the subgraph packages\" && turbo run test:parity",
-    "spec:check": "node tools/spec-check.mjs",
     "check:browser": "node tools/check-browser-safety.mjs",
     "metrics": "pnpm --filter @cobuilders/safenet-core metrics",
     "lint": "eslint . && turbo run lint",
