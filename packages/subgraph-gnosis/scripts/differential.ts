@@ -6,20 +6,36 @@
  * events. So the only independent source is metrics-poc.ts, which scans the same events by a
  * different route and reproduces SEF's published figures bit-for-bit.
  *
- * Usage:
- *   pnpm --filter @cobuilders/safenet-core metrics --days 2 --json /tmp/oracle-2d.json
+ * Usage, run the oracle directly from packages/core (`pnpm metrics --days 2` drops the flags,
+ * see below), then this script, close together in time:
+ *   cd packages/core && node --env-file-if-exists=../../.env.local --import tsx \
+ *     scripts/metrics-poc.ts --days 2 --json /tmp/oracle-2d.json
  *   ORACLE=/tmp/oracle-2d.json pnpm --filter @cobuilders/safenet-subgraph-gnosis differential
  *
  * The windows will not match exactly: the oracle aligns its window to SEF's publish instant
  * (D-052), while the subgraph indexes from whatever block the manifest names. So counts are
  * compared as ratios and orderings, not as equal integers. What must match exactly is the
- * ORDER of validators by participation, and the participation rates to a few decimal places.
+ * ORDER of validators by participation. Each rate must agree within RATE_TOLERANCE.
  */
 import { readFileSync } from "node:fs"
 
 const PORT = process.env.GRAPH_NODE_PORT ?? "8000"
 const ENDPOINT = `http://localhost:${PORT}/subgraphs/name/safenet/gnosis`
 const ORACLE = process.env.ORACLE ?? "/tmp/oracle-2d.json"
+
+// The oracle records the chain head at the moment it ran. The subgraph follows the head too, so
+// the two heads differ by however long passed between the runs. 720 Gnosis blocks is about one
+// hour at Gnosis's nominal 5s block time. Beyond that the windows have drifted apart enough that a
+// rate disagreement says more about timing than about the handlers, so the check fails.
+const MAX_BLOCK_OFFSET = 720
+
+// Absolute difference allowed between the oracle's rate and the subgraph's, as a fraction:
+// 0.01 is one percentage point. The two windows cover the same two days give or take a few
+// hours at either edge, so a validator with steady participation lands well inside this. One
+// that went offline inside a non-overlapping edge can exceed it; if that happens, regenerate
+// both windows closer together before suspecting a handler. This bound is reasoned, not yet
+// measured on a run.
+const RATE_TOLERANCE = 0.01
 
 interface OracleRun {
   gnosisBlock: string
@@ -87,8 +103,17 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  console.log(`\n  oracle   ${oracle.windowDays} day window, gnosis block ${oracle.gnosisBlock}`)
-  console.log(`  subgraph indexed to block ${sg._meta.block.number}\n`)
+  const oracleHead = BigInt(oracle.gnosisBlock)
+  const sgHead = BigInt(sg._meta.block.number)
+  const offset = sgHead > oracleHead ? sgHead - oracleHead : oracleHead - sgHead
+  console.log(`\n  oracle   ${oracle.windowDays} day window, gnosis head ${oracleHead}`)
+  console.log(`  subgraph indexed to block ${sgHead}\n`)
+  check(
+    "oracle and subgraph heads are close",
+    offset <= BigInt(MAX_BLOCK_OFFSET),
+    `${offset} blocks apart, at most ${MAX_BLOCK_OFFSET} allowed`,
+  )
+  console.log()
 
   console.log("  Counts. The windows differ, so these are compared as shape, not equality.\n")
   console.log(`       oracle ceremonies, all            ${oracle.ceremonies.all}`)
@@ -119,21 +144,25 @@ async function main(): Promise<void> {
   check("validator count", oracle.participation.length === sg.signingValidators.length,
     `oracle ${oracle.participation.length}  subgraph ${sg.signingValidators.length}`)
 
-  const label = new Map(oracle.participation.map((p) => [p.address.toLowerCase(), p.label]))
-  console.log()
-  console.log(`       ${"validator".padEnd(20)} ${"oracle rate".padEnd(14)} ${"subgraph rate".padEnd(14)} attended / ceremonies`)
+  const byAddress = new Map(oracle.participation.map((p) => [p.address.toLowerCase(), p]))
+  console.log(`\n  Rates, each within ${RATE_TOLERANCE} of the oracle. oracle, subgraph, attended / ceremonies\n`)
   let orderOk = true
   for (let i = 0; i < sg.signingValidators.length; i++) {
     const v = sg.signingValidators[i]!
-    const name = label.get(v.id) ?? v.id.slice(0, 10)
+    const theirs = byAddress.get(v.id)
+    const name = theirs?.label ?? v.id.slice(0, 10)
     const rate = Number(v.attended) / sgAttest
     const expected = oracleOrder[i]
     if (!expected || expected.address.toLowerCase() !== v.id) orderOk = false
-    const oracleRate = expected ? expected.ours : NaN
-    console.log(
-      `       ${name.padEnd(20)} ${oracleRate.toFixed(6).padEnd(14)} ${rate.toFixed(6).padEnd(14)} ${v.attended} / ${sgAttest}`,
+    // A validator the oracle does not know has no rate to agree with, so it fails.
+    const oracleRate = theirs ? theirs.ours : NaN
+    check(
+      name,
+      Math.abs(oracleRate - rate) <= RATE_TOLERANCE,
+      `${oracleRate.toFixed(6)}  ${rate.toFixed(6)}  ${v.attended} / ${sgAttest}`,
     )
   }
+  console.log()
   check("validators rank in the same order", orderOk, "by participation, descending")
 
   console.log(
