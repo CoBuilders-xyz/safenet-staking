@@ -36,11 +36,12 @@ All wagmi hooks, React Query, Radix tooltip context, and toast context are avail
 
 ### Routing (src/App.tsx)
 
-Five routes under a shared `Layout` (header + footer + `<Outlet />`), wrapped in `ErrorBoundary`:
+Six routes under a shared `Layout` (header + footer + `<Outlet />`), wrapped in `ErrorBoundary`:
 - `/` → `DashboardPage` (stats, claimable banner, quick actions, rewards, staking section, stake distribution chart)
 - `/validators` → `ValidatorsPage` (validator cards with delegate/undelegate; supports `?delegate=0x...` deep-link to auto-open delegate dialog)
 - `/validators/:address` → `ValidatorDetailPage` (full validator info, delegate/undelegate buttons)
 - `/withdrawals` → `WithdrawalsPage` (pending withdrawal queue with FIFO tooltip, cooldown progress bars, claim)
+- `/rewards` → `RewardsPage` (your rewards, claim, programme totals, and the on-chain root checked against SEF's published one)
 - `*` → `NotFoundPage` (404 catch-all)
 
 All pages are lazy-loaded with `React.lazy()` and preloaded via `requestIdleCallback` in a `useEffect` with cleanup.
@@ -58,7 +59,7 @@ App-level guards: `useSanctionsCheck` blocks the entire app if `VITE_SANCTIONS_A
 - **Validator discovery** (`src/hooks/useValidators.ts`): Fetches validator data from a remote JSON endpoint (`VITE_VALIDATOR_INFO_URL`, defaults to GitHub raw URL). Returns `ValidatorInfo[]` with `{ address, isActive, label, commission, participationRate }`. Cached with React Query (5 min staleTime). Also exports `findValidator()` helper for synchronous address lookup.
 - **Withdrawals** (`src/hooks/useWithdrawals.ts`): Fetches pending withdrawals for the connected user. Includes `useNextClaimable` for the claimable banner.
 - **Gas estimation** (`src/hooks/useGasEstimate.ts`): Uses `estimateGas` + `getGasPrice` from viem to show estimated gas cost in delegate/undelegate dialogs. Debounced 500ms on amount change.
-- **Rewards** (`src/hooks/useRewards.ts`, `src/hooks/useRewardProof.ts`, `src/hooks/useClaimRewards.ts`): Rewards reading, Merkle proof fetching, and claim transaction hooks. Proofs are served from `public/rewards/proofs/{address}.json` and the current root/total from `public/rewards/latest.json`.
+- **Rewards** (`src/hooks/useRewards.ts`, `src/hooks/useRewardProof.ts`, `src/hooks/useClaimRewards.ts`, `src/hooks/useProgrammeRewards.ts`): Rewards reading, Merkle proof fetching, claim transaction hooks, and the programme-wide figures (SEF's `latest.json`, the MerkleDrop's root and SAFE balance). Proofs are served from `public/rewards/proofs/{address}.json` and the current root/total from `public/rewards/latest.json`.
 - **Approval flow** (`src/hooks/useApprovalFlow.ts`): Wraps `useTokenAllowance` with approval type tracking (exact vs unlimited), toast notifications, and a unified API for DelegateDialog.
 - **Transaction toasts** (`src/hooks/useTxToast.ts`): Shared hook for success/error/Safe-queued toast notifications, used by DelegateDialog, UndelegateDialog, and other tx dialogs.
 

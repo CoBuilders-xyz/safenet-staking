@@ -93,10 +93,20 @@ async function setupPage(page: Page, options: SetupPageOptions, state: MockChain
     })
   })
 
-  // Intercept the reward proof endpoint (see src/hooks/useRewardProof.ts). Served from
-  // `state.rewardProof`, so tests can configure per-address rewards before navigating.
+  // Intercept SEF's reward files (see src/hooks/useRewardProof.ts). `latest.json` is served
+  // from `state.rewardsLatest` (null = 404). Every other path is the per-address proof, served
+  // from `state.rewardProof`, so tests can configure per-address rewards before navigating.
   // Undefined (the default) is served as a 404, matching "this address never earned rewards".
   await page.route("**/mock-rewards.test/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/latest.json")) {
+      const latest = state.rewardsLatest
+      await route.fulfill(
+        latest
+          ? { status: 200, contentType: "application/json", body: JSON.stringify(latest) }
+          : { status: 404, contentType: "application/json", body: "{}" },
+      )
+      return
+    }
     const proof = state.rewardProof
     if (!proof) {
       await route.fulfill({ status: 404, contentType: "application/json", body: "{}" })

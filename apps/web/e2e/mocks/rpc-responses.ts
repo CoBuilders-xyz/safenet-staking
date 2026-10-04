@@ -5,7 +5,7 @@
  * Encoding: abi.encode for each return type, padded to 32 bytes.
  */
 
-import { AMOUNTS, STAKING_CONTRACT, TOKEN_CONTRACT, MERKLE_DROP_CONTRACT, TEST_MERKLE_ROOT, VALIDATORS } from "../fixtures/test-data"
+import { AMOUNTS, STAKING_CONTRACT, TOKEN_CONTRACT, MERKLE_DROP_CONTRACT, VALIDATORS } from "../fixtures/test-data"
 import type { MockChainState } from "./mock-chain-state"
 
 export interface RewardProof {
@@ -175,6 +175,10 @@ export function buildCallResponses(userAddress: string, state: MockChainState): 
     if (ownerParam === user) {
       return "0x" + toUint256(state.balance)
     }
+    // What the Rewards page reads as the programme's unclaimed SAFE
+    if (ownerParam === merkleDrop) {
+      return "0x" + toUint256(state.merkleDropBalance)
+    }
     return "0x" + toUint256(0n)
   })
 
@@ -189,7 +193,7 @@ export function buildCallResponses(userAddress: string, state: MockChainState): 
 
   // MerkleDrop: merkleRoot() → bytes32
   responses.set(key(merkleDrop, SELECTORS.merkleRoot), () =>
-    "0x" + TEST_MERKLE_ROOT.replace("0x", "")
+    "0x" + state.merkleRoot.replace("0x", "")
   )
 
   // MerkleDrop: cumulativeClaimed(address) → uint256

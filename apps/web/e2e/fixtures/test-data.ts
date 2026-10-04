@@ -60,6 +60,22 @@ export const MOCK_TX_HASH = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 /** MerkleDrop root reported on-chain by the mock RPC (merkleRoot()) */
 export const TEST_MERKLE_ROOT = "0x" + "ab".repeat(32)
 
+/** A root that differs from TEST_MERKLE_ROOT, for root-mismatch tests */
+export const OTHER_MERKLE_ROOT = "0x" + "cc".repeat(32)
+
+/** SAFE the mocked MerkleDrop holds by default: 400 of the 1,000 allocated, so 600 claimed */
+export const MERKLE_DROP_BALANCE = 400n * 10n ** 18n
+
+/** SEF's rewards/latest.json as the mock serves it by default, agreeing with the mocked chain */
+export const REWARDS_LATEST = {
+  epoch: 7,
+  merkleRoot: TEST_MERKLE_ROOT,
+  rewardsUntil: "2026-09-22T00:00:00.000Z",
+  tokenTotal: (1000n * 10n ** 18n).toString(),
+  unpaidAmount: "0",
+  updatedAt: "2026-09-22T08:55:44.268Z",
+}
+
 /** Sample reward proofs (matching public/rewards/proofs/{address}.json format) for rewards.spec.ts */
 export const REWARD_PROOFS = {
   /** cumulativeAmount (100 SAFE) > claimed (0) → claimable, canClaim: true */
@@ -77,7 +93,7 @@ export const REWARD_PROOFS = {
   /** proof's embedded root doesn't match the mocked on-chain root → rootStale, disabled */
   staleRoot: {
     cumulativeAmount: (100n * 10n ** 18n).toString(),
-    merkleRoot: "0x" + "cc".repeat(32),
+    merkleRoot: OTHER_MERKLE_ROOT,
     proof: ["0x" + "11".repeat(32)],
   },
   /** part of the claimable amount is pending compliance review (kyc !== true) */

@@ -13,14 +13,26 @@ export interface RewardsData {
   rootStale: boolean
 }
 
+const EMPTY: RewardsData = { claimable: 0n, totalClaimed: 0n, canClaim: false, rootStale: false }
+
 export function useRewards() {
   const { address } = useAccount()
 
-  const { data: proof, isLoading: isProofLoading } = useRewardProof(address, !!merkleDrop)
+  const {
+    data: proof,
+    isLoading: isProofLoading,
+    error: proofError,
+    refetch: refetchProof,
+  } = useRewardProof(address, !!merkleDrop)
 
   const hasProof = !!proof
 
-  const { data: cumulativeClaimed, isLoading: isClaimedLoading } = useReadContract({
+  const {
+    data: cumulativeClaimed,
+    isLoading: isClaimedLoading,
+    error: claimedError,
+    refetch: refetchClaimed,
+  } = useReadContract({
     address: merkleDrop,
     abi: merkleDropAbi,
     functionName: "cumulativeClaimed",
@@ -42,12 +54,18 @@ export function useRewards() {
   })
 
   const isLoading = isProofLoading || isClaimedLoading
+  // The proof comes from SEF's published file, the claimed amount from the chain.
+  // Either failing leaves the numbers unknown, so callers get one error to show.
+  const error = proofError ?? claimedError ?? null
+  const refetch = () => {
+    void refetchProof()
+    if (hasProof) void refetchClaimed()
+  }
+  // `null` means SEF published no file for this address: it never earned rewards.
+  const meta = { isLoading, error, refetch, proof, hasMerkleDrop: !!merkleDrop }
 
   if (!proof || cumulativeClaimed === undefined) {
-    return {
-      data: { claimable: 0n, totalClaimed: 0n, canClaim: false, rootStale: false },
-      isLoading,
-    }
+    return { data: EMPTY, ...meta }
   }
 
   const cumulativeAmount = BigInt(proof.cumulativeAmount)
@@ -61,6 +79,6 @@ export function useRewards() {
       canClaim: claimable > 0n && !rootStale,
       rootStale,
     },
-    isLoading,
+    ...meta,
   }
 }

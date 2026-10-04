@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest"
 import { renderHook } from "@testing-library/react"
 import type { Address } from "viem"
+import { heldPendingCompliance, type RewardProof } from "../useRewardProof"
 
 const mockFetch = vi.fn()
 vi.stubGlobal("fetch", mockFetch)
@@ -207,5 +208,29 @@ describe("useRewardProof", () => {
 
       await expect(callQueryFn()).rejects.toThrow("Invalid reward proof format")
     })
+  })
+})
+
+describe("heldPendingCompliance", () => {
+  const base: RewardProof = {
+    cumulativeAmount: "1000",
+    merkleRoot: ("0x" + "ab".repeat(32)) as `0x${string}`,
+    proof: null,
+  }
+
+  it("is the kycAmount while the address is not marked as checked", () => {
+    expect(heldPendingCompliance({ ...base, kycAmount: "500" })).toBe(500n)
+    expect(heldPendingCompliance({ ...base, kycAmount: "500", kyc: false })).toBe(500n)
+  })
+
+  it("is zero once the file marks the address as checked", () => {
+    expect(heldPendingCompliance({ ...base, kycAmount: "500", kyc: true })).toBe(0n)
+  })
+
+  it("is zero without a held amount or without a file", () => {
+    expect(heldPendingCompliance({ ...base, kycAmount: "0" })).toBe(0n)
+    expect(heldPendingCompliance(base)).toBe(0n)
+    expect(heldPendingCompliance(null)).toBe(0n)
+    expect(heldPendingCompliance(undefined)).toBe(0n)
   })
 })

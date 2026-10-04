@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { formatTokenAmount, truncateAddress, formatCountdown } from "../format"
+import { formatTokenAmount, truncateAddress, formatCountdown, formatUtcDateTime } from "../format"
 
 describe("formatTokenAmount", () => {
   it("formats zero", () => {
@@ -85,5 +85,19 @@ describe("formatCountdown", () => {
 
   it("formats exactly 7 days (withdrawal delay)", () => {
     expect(formatCountdown(604800)).toBe("7d 0h 0m")
+  })
+})
+
+describe("formatUtcDateTime", () => {
+  it("formats a period boundary in UTC", () => {
+    expect(formatUtcDateTime("2026-09-22T00:00:00.000Z")).toBe("Tue 22 Sep 2026, 00:00 UTC")
+  })
+
+  it("converts an offset timestamp to UTC", () => {
+    expect(formatUtcDateTime("2026-09-22T08:55:44+02:00")).toBe("Tue 22 Sep 2026, 06:55 UTC")
+  })
+
+  it("rolls over the date when the offset crosses midnight", () => {
+    expect(formatUtcDateTime("2026-09-21T23:30:00-01:00")).toBe("Tue 22 Sep 2026, 00:30 UTC")
   })
 })
