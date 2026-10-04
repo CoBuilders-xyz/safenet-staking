@@ -1,9 +1,10 @@
-# Heavy services, opt in (D-006). Nothing here starts unless you ask for the profile:
+# Heavy services, opt in, so a plain install stays light. Nothing here starts unless you
+# ask for the profile:
 #
 #   pnpm graph:up      start graph-node, postgres and ipfs
 #   pnpm graph:down    stop them and discard the indexed data
 #
-# Ports come from .env.ports, which scripts/setup.sh writes per worktree (D-008), so two
+# Ports come from .env.ports, which scripts/setup.sh writes per worktree, so two
 # worktrees can run a node at the same time without colliding.
 #
 # The Ethereum endpoint comes from .env.local. It must be an ARCHIVE node: indexing from a

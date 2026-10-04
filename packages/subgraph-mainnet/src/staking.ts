@@ -78,7 +78,7 @@ export function handleStakeIncreased(event: StakeIncreased): void {
  * Unstaking. The amount leaves the validator's stake immediately and enters the queue; it
  * leaves the queue later, on WithdrawalClaimed.
  *
- * D-055 holds two identities here at once: stakes minus withdrawals equals totalStakedAmount(),
+ * Two conservation identities hold here at once: stakes minus withdrawals equals totalStakedAmount(),
  * and initiated minus claimed equals totalPendingWithdrawals(). The differential test asserts
  * both against the chain.
  */

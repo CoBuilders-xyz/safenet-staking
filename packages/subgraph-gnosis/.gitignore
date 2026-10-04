@@ -1,5 +1,5 @@
 # Generated from packages/core by `pnpm generate`. Committing them would create a second
-# source for addresses, start blocks and event signatures, which D-005 exists to prevent.
+# source for addresses, start blocks and event signatures, and two sources drift.
 subgraph.yaml
 abis/
 

@@ -9,8 +9,8 @@
 # participation over a window, attestations per day, latency percentiles.
 #
 # The cost of aggregating is that a new question needs a resync. On Gnosis that is expensive,
-# so the aggregates below are chosen to answer everything the proposal promises, not to be
-# minimal.
+# so the aggregates below are chosen to answer every metric the interface and API are meant
+# to serve, not to be minimal.
 
 # -----------------------------------------------------------------------------------------
 # Transient. These exist to join events across blocks, then they are deleted.
@@ -22,7 +22,7 @@ A signing ceremony, held only until it can be counted.
 Counting needs two facts that arrive in separate events:
 
   SignCompleted        gives the WINNING selectionRoot. Shares for a losing root do not
-                       count (D-057), and shares are emitted BEFORE completion.
+                       count, and shares are emitted BEFORE completion.
   TransactionAttested  says the ceremony was a transaction attestation. 1 ceremony in 400
                        is not, and the oracle excludes those.
 
@@ -154,8 +154,8 @@ type SigningValidator @entity(immutable: false) {
 """
 Per validator, per UTC day.
 
-This is what makes participation over 7, 30 or all days a query rather than a scan. The
-proposal promises that window selector on the validator detail screen.
+This is what makes participation over 7, 30 or all days a query rather than a scan, which is
+the window selector the validator detail screen is meant to offer.
 """
 type ValidatorDay @entity(immutable: false) {
   "validator address, a dash, the UTC day start as a unix timestamp."

@@ -1,14 +1,13 @@
 /**
  * Layer two of validation: the subgraph against the chain, and against the oracle.
  *
- * The matchstick tests prove each handler does what I meant, using events I wrote. They
+ * The matchstick tests prove each handler does what it is meant to, using hand-built events. They
  * cannot prove the event shapes, the addresses or the totals are right, because they never
  * touch a chain.
  *
  * This does. It reads the subgraph, reads the contracts directly, and asserts they agree.
  *
- * The three conservation identities are D-055, each already proven by metrics-poc.ts against
- * live chains over seven review rounds:
+ * The three conservation identities, each already proven by metrics-poc.ts against live chains:
  *
  *   stakes minus withdrawals          == totalStakedAmount()
  *   initiated minus claimed           == totalPendingWithdrawals()
@@ -131,7 +130,7 @@ async function main(): Promise<void> {
   if (!d.network) throw new Error("no Network entity: the subgraph indexed no events")
   const n = d.network
 
-  console.log("\n  D-055, the three conservation identities\n")
+  console.log("\n  the three conservation identities\n")
   check("stakes minus withdrawals", BigInt(n.totalStaked), totalStaked)
   check("initiated minus claimed", BigInt(n.pendingWithdrawals), pending)
 

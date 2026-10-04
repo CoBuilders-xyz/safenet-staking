@@ -45,7 +45,7 @@ describe("staking", () => {
     handleStakeIncreased(stakeIncreased(ALICE, VAL_B, "100", 1, DAY1, 1))
 
     assert.entityCount("Delegation", 2)
-    // The defect the differential test found: this used to say 2. One address is one staker,
+    // The differential test caught a handler that counted this as 2. One address is one staker,
     // whatever number of validators it spreads across.
     assert.fieldEquals("Network", "1", "stakersCurrent", "1")
     assert.fieldEquals("Network", "1", "delegationsCurrent", "2")
@@ -113,7 +113,7 @@ describe("staking", () => {
     assert.fieldEquals("Validator", VAL_A, "totalStaked", "70")
   })
 
-  test("D-055: stakes minus withdrawals equals totalStaked", () => {
+  test("stakes minus withdrawals equals totalStaked", () => {
     handleStakeIncreased(stakeIncreased(ALICE, VAL_A, "100", 1, DAY1, 0))
     handleStakeIncreased(stakeIncreased(BOB, VAL_A, "300", 1, DAY1, 1))
     handleWithdrawalInitiated(withdrawalInitiated(ALICE, VAL_A, 1, "40", 2, DAY1, 2))
@@ -121,7 +121,7 @@ describe("staking", () => {
     assert.fieldEquals("Network", "1", "totalStaked", "360")
   })
 
-  test("D-055: initiated minus claimed equals pendingWithdrawals", () => {
+  test("initiated minus claimed equals pendingWithdrawals", () => {
     handleStakeIncreased(stakeIncreased(ALICE, VAL_A, "100", 1, DAY1, 0))
     handleWithdrawalInitiated(withdrawalInitiated(ALICE, VAL_A, 7, "60", 2, DAY1, 1))
     assert.fieldEquals("Network", "1", "pendingWithdrawals", "60")

@@ -45,8 +45,8 @@ export const INDEXED_EVENTS = [
   //
   // Neither parameter is indexed, and the order is (old, new). Both determined from real logs
   // on 2026-09-29, not from the signature: a log carries one topic, so no parameter is indexed,
-  // and each log's first word equals the previous log's second. D-060 records that topic0
-  // alone cannot tell us either fact.
+  // and each log's first word equals the previous log's second. topic0 alone cannot tell us
+  // either fact, because it does not encode which parameters are indexed.
   { contract: "merkleDrop", frequency: "rare",
     signature: "event MerkelRootUpdated(bytes32 oldRoot, bytes32 newRoot)" },
   // --- Gnosis Chain: consensus ---
