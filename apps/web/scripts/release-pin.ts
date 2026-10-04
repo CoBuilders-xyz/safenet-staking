@@ -7,7 +7,8 @@
  * if Pinata reports any other CID.
  *
  * Then it fetches index.html through the Pinata gateway and through dweb.link, and fails
- * unless both answer 200 inside the retry window. A pin no gateway serves is not a release.
+ * unless both answer 200 with the index.html inside the CAR, within the retry window. A pin no
+ * gateway serves is not a release, and a 200 with a fallback page is not a pin being served.
  *
  * PINATA_GATEWAY is a secret, so its host never reaches the log or the step summary. Output
  * names it "the dedicated Pinata gateway" and prints the dweb.link URL in full.
@@ -21,7 +22,9 @@
  *
  * Usage: pnpm --filter @cobuilders/safenet-web release:pin
  */
-import { appendFileSync, existsSync, readFileSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { PinataSDK } from "pinata"
 
@@ -68,6 +71,15 @@ if (upload.cid !== cid) {
 console.log(`release-pin: pinned ${cid}`)
 
 // --- Gateways ---
+// The expected index.html comes from the CAR that was pinned, unpacked by the same ipfs-car.
+const unpacked = mkdtempSync(join(tmpdir(), "release-pin-"))
+execFileSync(process.execPath, [
+  resolve(import.meta.dirname, "../node_modules/ipfs-car/bin.js"),
+  "unpack", carPath, "--output", join(unpacked, "root"),
+])
+const expectedIndex = readFileSync(join(unpacked, "root", "index.html"))
+rmSync(unpacked, { recursive: true, force: true })
+
 const dwebUrl = `https://${cid}.ipfs.dweb.link/index.html`
 const gateways = [
   { label: "the dedicated Pinata gateway", url: `https://${gateway}/ipfs/${cid}/index.html` },
@@ -80,11 +92,15 @@ async function waitFor200({ label, url }: { label: string; url: string }): Promi
   for (let attempt = 1; ; attempt++) {
     try {
       const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(60_000) })
-      await res.body?.cancel()
       if (res.status === 200) {
-        console.log(`release-pin: 200 from ${label} (attempt ${attempt})`)
+        // The path is immutable: a 200 with other bytes will not get better with retries.
+        if (!Buffer.from(await res.arrayBuffer()).equals(expectedIndex)) {
+          fail(`${label} answered 200 with a body that is not the release's index.html.`)
+        }
+        console.log(`release-pin: 200 from ${label} with the release's index.html (attempt ${attempt})`)
         return
       }
+      await res.body?.cancel()
       last = `HTTP ${res.status}`
     } catch (err) {
       last = (err instanceof Error ? err.message : String(err)).replaceAll(gateway!, "<gateway>")
