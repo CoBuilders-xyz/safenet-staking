@@ -66,8 +66,8 @@ async function verify(): Promise<Result[]> {
     // Filtering by `event` makes viem derive topic0 from OUR signature. If the
     // deployed contract no longer emits it, the result is empty. That is the test.
     // Chunked, because a deep scan spans millions of blocks and providers cap the range.
-    // The previous version issued one unchunked request and died on the first rare event,
-    // which meant seven of ten signatures were never actually proven.
+    // A single unchunked request over that span fails, and every rare signature would then
+    // go unproven.
     let logs: Awaited<ReturnType<typeof client.getLogs>> = []
     let cursor = from < 0n ? 0n : from
     let chunk = 50_000n

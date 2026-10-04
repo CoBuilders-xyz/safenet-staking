@@ -43,6 +43,6 @@ export interface SefRewardsLatest {
 }
 
 // Not typed yet: the per-address proof at `assets/rewards/<address>.json`. Its shape has
-// not been read in the session that wrote this file, and guessing it here would put a
-// plausible wrong type in the one module that is supposed to be authoritative.
+// not been read from the live file, and guessing it here would put a plausible wrong type
+// in the one module that is supposed to be authoritative.
 // Type it when the Rewards screen needs it, from the live file.

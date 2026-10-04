@@ -2,8 +2,8 @@
 /**
  * Generates packages/core/.metrics/metrics-poc-results.md from the JSON the POC emits.
  * Both files are git-ignored: run `pnpm metrics` to produce them against live chains.
- * Nothing is retyped. Version one of the results document was hand-copied and a
- * truncated string became a finding, so the report is now generated or it is not written.
+ * Nothing is retyped. A hand-copied report can turn a truncated string into a finding,
+ * so the report is generated or it is not written.
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs"
 import { resolve } from "node:path"
@@ -17,7 +17,6 @@ const j = JSON.parse(readFileSync(RUN, "utf8"))
 
 // Refuse to render a report from a stale run. If metrics-poc.ts throws, it never writes the JSON,
 // and rendering the previous run would produce a document with a fresh timestamp and old contents.
-// An earlier version of this pipeline did exactly that and exited 0.
 const ageMin = (Date.now() - Date.parse(j.runAt)) / 60000
 const MAX_AGE_MIN = Number(process.env.METRICS_MAX_AGE_MIN ?? 30)
 if (!Number.isFinite(ageMin) || ageMin > MAX_AGE_MIN) {
@@ -45,9 +44,6 @@ let md = `# Metrics proof of concept — results
 **${counts[0]} proven · ${counts[1]} partial · ${counts[2]} blocked, across ${j.rows.length} metrics.**
 
 This script is the subgraph's mapping logic in scratch form. Every metric here becomes a handler.
-
-> Version one of this document was wrong in four places and its narrative was wrong in two more,
-> because numbers were hand-copied and one was truncated mid-string. This file is generated.
 
 ---
 
@@ -89,10 +85,9 @@ const spread = (Math.max(...j.participation.map((p) => p.ours)) - Math.min(...j.
 const worst = j.participation.reduce((a, b) => (a.absences > b.absences ? a : b))
 const best = j.participation.reduce((a, b) => (a.absences < b.absences ? a : b))
 
-// The conclusion is DERIVED, not asserted. An earlier version emitted "Validator performance
-// does differentiate" as a string literal, sitting two lines above a paragraph explaining that a
-// previous run had shown the opposite. Generating the file removed the risk of mis-copying
-// numbers and left the risk of mis-copying conclusions.
+// The conclusion is DERIVED, not asserted. A conclusion written as a string literal can
+// contradict the numbers printed beside it: generating the file removes the risk of mis-copying
+// numbers, not the risk of mis-copying conclusions.
 const MATERIAL_SPREAD_PP = 1.0
 const differentiates = spread >= MATERIAL_SPREAD_PP
 

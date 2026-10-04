@@ -63,8 +63,8 @@ export const INDEXED_EVENTS = [
   { contract: "frostCoordinator", frequency: "rare",
     signature: "event KeyGenConfirmed(bytes32 indexed gid, address participant, bool confirmed)" },
 
-  // These three are indexed by the metrics work and were previously declared only inside the
-  // script, so nothing verified them against the chain.
+  // These three are indexed by the metrics work. They are declared here rather than inside
+  // the script, so verify:abis proves them against the chain.
   { contract: "consensus", frequency: "high",
     signature: "event TransactionProposed(bytes32 indexed safeTxHash, uint256 indexed chainId, address indexed safe, uint64 epoch, (uint256 chainId, address safe, address to, uint256 value, bytes data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, uint256 nonce) transaction)" },
   { contract: "consensus", frequency: "high",
