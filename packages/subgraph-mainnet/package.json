@@ -7,7 +7,7 @@
     "generate": "tsx scripts/generate-manifest.ts",
     "dev": "pnpm generate && graph codegen",
     "build": "pnpm generate && graph codegen && graph build",
-    "test": "pnpm generate && graph codegen && graph test",
+    "test": "pnpm generate && graph codegen && graph test -v 0.6.0",
     "check": "eslint . && tsc --noEmit -p tsconfig.check.json",
     "deploy:studio": "graph deploy safenet-mainnet",
     "differential": "tsx scripts/differential.ts"
