@@ -2,7 +2,7 @@
  * Generates subgraph.yaml and abis/*.json from @cobuilders/safenet-core.
  *
  * A subgraph manifest carries a contract address and a start block. An ABI file carries
- * event signatures. D-005 says those are written in packages/core and nowhere else, so
+ * event signatures. Those are written in packages/core and nowhere else, so
  * neither file is authored by hand: both are outputs.
  *
  * This also means `pnpm verify:abis` covers the subgraph. It re-derives every signature
@@ -103,7 +103,7 @@ const manifest = `# GENERATED FILE. Do not edit by hand.
 # Produced by: pnpm --filter @cobuilders/safenet-subgraph-mainnet generate
 # From:        packages/core/src/contracts.ts and packages/core/src/abis.ts
 #
-# Addresses, start blocks and event signatures live in core (D-005). Editing this file
+# Addresses, start blocks and event signatures live in core. Editing this file
 # creates a second source for them, which is the drift that rule exists to prevent.
 specVersion: 1.0.0
 description: Safenet Beta staking and rewards on Ethereum Mainnet. CoBuilders, Track A.

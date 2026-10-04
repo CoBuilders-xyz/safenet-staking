@@ -16,13 +16,13 @@
 type Network @entity(immutable: false) {
   id: ID!
 
-  "Sum of stakes minus withdrawals. D-055: this must equal totalStakedAmount() on chain."
+  "Sum of stakes minus withdrawals. This must equal totalStakedAmount() on chain."
   totalStaked: BigInt!
 
-  "Initiated minus claimed. D-055: this must equal totalPendingWithdrawals() on chain."
+  "Initiated minus claimed. This must equal totalPendingWithdrawals() on chain."
   pendingWithdrawals: BigInt!
 
-  "Sum of Claimed events on the MerkleDrop. D-055: allocated minus this equals its balance."
+  "Sum of Claimed events on the MerkleDrop. Allocated minus this must equal its balance."
   rewardsClaimed: BigInt!
 
   "Validators with isRegistered true."
@@ -33,7 +33,7 @@ type Network @entity(immutable: false) {
 
   Summing the per-validator counts gives a different, larger number: 78 addresses stake with
   more than one validator, so a sum counts them once per validator. On 2026-09-29 that sum
-  was 1,014 against 884 real addresses, a 15% overstatement of a figure the proposal calls a
+  was 1,014 against 884 real addresses, a 15% overstatement of a figure stakers read as a
   trust signal. That is why this is maintained from Staker and not from Validator.
   """
   stakersCurrent: Int!
@@ -216,11 +216,11 @@ One MerkelRootUpdated event: a rewards distribution.
 The contract spells it "Merkel". The typo is in the deployed bytecode, so the handler name
 follows it rather than correcting it silently.
 
-This is what makes the per-period Rewards history possible. m1-screens.md records that field
-as the riskiest in the specification, because a staker's share per period appears in no file:
-SEF overwrites each address's proof every period, so only the git history holds the past. The
-root updates give the period boundary and the distribution transaction on chain, which is what
-the proposal promised to link to.
+This is what makes the per-period Rewards history possible, and it is the hardest field in the
+interface to source, because a staker's share per period appears in no published file: SEF
+overwrites each address's proof every period, so only the git history holds the past. The root
+updates give the period boundary and the distribution transaction on chain, so the history can
+link to that transaction.
 
 Immutable: a past distribution never changes.
 """

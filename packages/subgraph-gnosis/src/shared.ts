@@ -97,7 +97,7 @@ export function ceremony(sid: Bytes, block: BigInt, ts: BigInt, c: Consensus): C
  * neither order can be assumed:
  *
  *   SignCompleted        the winning selectionRoot. Shares for a losing root do not count
- *                        (D-057), and shares are emitted before completion.
+ *                        and shares are emitted before completion.
  *   TransactionAttested  that the ceremony was a transaction attestation. About 1 in 400 is
  *                        not, and the oracle excludes those from participation.
  *

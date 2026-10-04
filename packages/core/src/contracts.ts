@@ -2,7 +2,7 @@
  * Contract addresses and deploy blocks.
  *
  * THIS FILE IS THE ONLY PLACE THESE VALUES ARE WRITTEN.
- * Never type a hex address anywhere else in this repository (D-005).
+ * Never type a hex address anywhere else in this repository.
  *
  * Source: safe-fndn/safenet-beta-data/config/beta.env, cross-checked against
  * the Security page of SEF's documentation. Verified 2026-08-26.
@@ -87,6 +87,6 @@ export const SEF_DATA = {
     "https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/main/assets/rewards/latest.json",
   rewardsProofBase:
     "https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/main/assets/rewards",
-  /** Their cron runs every 3 hours. Three missed runs is our staleness threshold (D-036). */
+  /** Their cron runs every 3 hours. Three missed runs is our staleness threshold. */
   staleAfterMs: 9 * 60 * 60 * 1000,
 } as const

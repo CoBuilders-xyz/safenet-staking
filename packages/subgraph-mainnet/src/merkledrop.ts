@@ -10,7 +10,7 @@ import { network, dayData, ZERO } from "./shared"
  * double count every repeat claimer, so this handler keeps a per-account running total and
  * records the difference as the amount actually paid.
  *
- * D-055 checks the result: allocated minus claimed equals the live MerkleDrop balance.
+ * The differential test checks the result: allocated minus claimed equals the live MerkleDrop balance.
  */
 export function handleClaimed(event: Claimed): void {
   const account = event.params.account.toHexString()

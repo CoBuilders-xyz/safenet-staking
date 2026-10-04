@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Prepares this worktree. Safe to run again (D-009).
+# Prepares this worktree. Safe to run again.
 #
-#   pnpm bootstrap                      everything
-#   pnpm --filter @safenet/core setup   one package
+#   pnpm bootstrap                                     everything
+#   pnpm --filter @cobuilders/safenet-core bootstrap   one package
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
@@ -37,7 +37,7 @@ if [ "$missing" -eq 1 ]; then
 fi
 
 # --- 2. per-worktree ports ---------------------------------------------------
-# Several worktrees run at once, so ports must not collide (D-008).
+# Several worktrees run at once, so ports must not collide.
 WT="$(basename "$ROOT")"
 OFFSET=$(( $(printf '%s' "$WT" | cksum | cut -d' ' -f1) % 40 * 10 ))
 cat > .env.ports <<PORTS
@@ -57,11 +57,11 @@ say "worktree" "$WT"
 say "port offset" "+$OFFSET, see .env.ports"
 
 # --- 3. secrets --------------------------------------------------------------
-# Secrets stay on the host, git-ignored, passed into the container at exec time (D-039).
+# Secrets stay on the host, git-ignored, passed into the container at exec time.
 if [ ! -f .env.local ]; then
   cat > .env.local <<'ENVV'
 # Host-only. Never committed, never baked into an image.
-# Archive node for Anvil fork tests and deep ABI verification (D-033).
+# Archive node for Anvil fork tests and deep ABI verification.
 ALCHEMY_MAINNET_RPC_URL=
 # Optional overrides. Public fallbacks are used when these are empty.
 MAINNET_RPC_URL=
@@ -82,7 +82,8 @@ say "package setup" "done"
 
 echo
 echo "  Ready. Next:"
-echo "    pnpm check         lint and types (no tests yet)"
+echo "    pnpm check         lint, browser safety and types"
+echo "    pnpm test          unit tests"
 echo "    pnpm verify:abis   prove our ABIs still match the chain"
 echo "    pnpm dev           start the app"
 echo

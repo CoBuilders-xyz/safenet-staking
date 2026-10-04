@@ -4,7 +4,7 @@
  * This is the subgraph's mapping logic in scratch form. Every metric here becomes a
  * handler, so the subgraph is a port rather than an invention.
  *
- * Rules this script follows, learned from an adversarial review that broke version one:
+ * Rules this script follows. Breaking any of them produces a number that looks right and is not:
  *
  *   1. No silent failures. A scan that cannot complete throws. A skipped range fails the run.
  *   2. No truncated output. Formatting never alters a value.
@@ -20,7 +20,8 @@ import {
   createPublicClient, fallback, http, parseAbiItem, formatUnits,
   type AbiEvent, type Address, type Hex, type Log, type PublicClient,
 } from "viem"
-import { writeFileSync } from "node:fs"
+import { mkdirSync, writeFileSync } from "node:fs"
+import { dirname } from "node:path"
 import { CHAINS, RPC_URLS } from "../src/chains.js"
 import { CONTRACTS, SEF_DATA } from "../src/contracts.js"
 import { stakingAbi, merkleDropAbi } from "../src/abis.js"
@@ -44,10 +45,9 @@ const argStr = (flag: string) => {
  * (their args.ts default is Tuesday-aligned, but production overrides it; this shape was
  * confirmed by fitting our output against their published file across the hour).
  *
- * Version two used a block-count window instead, which drifts against theirs by however long
- * ago they last published. That drift was being reported as OUR inaccuracy: it read 0.083pp at
- * one hour of the cycle and over 0.3pp at another. Aligning to the hour makes the comparison
- * measure the formula rather than the clock.
+ * A block-count window would drift against theirs by however long ago they last published,
+ * and that drift would read as OUR inaccuracy: 0.083pp at one hour of the cycle and over 0.3pp
+ * at another. Aligning to the hour makes the comparison measure the formula rather than the clock.
  */
 const DAYS = argNum("--days", 14)
 const JSON_OUT = argStr("--json")
@@ -69,10 +69,10 @@ const mainnet = createPublicClient({
 // ---------------------------------------------------------------------------
 // Strict chunked scan.
 //
-// Version one had a bare `catch {}` that swallowed everything, including a bad RPC key,
-// and a fallback that skipped 390-block slices with no signal. A total infrastructure
-// failure printed a plausible, mostly-green table. This one distinguishes "the response
-// was too big, retry smaller" from "something is actually wrong", and throws on the latter.
+// A bare `catch {}` here would swallow everything, including a bad RPC key, and a fallback
+// that skipped slices with no signal would let a total infrastructure failure print a
+// plausible, mostly-green table. This scan distinguishes "the response was too big, retry
+// smaller" from "something is actually wrong", and throws on the latter.
 // ---------------------------------------------------------------------------
 // Deciding "the range was too big" from an error string is brittle: providers word it
 // differently and a fallback transport hides the original. So decide empirically instead.
@@ -174,7 +174,7 @@ async function run() {
 
   const [mLatest, gLatest] = await Promise.all([mainnet.getBlockNumber(), gnosis.getBlockNumber()])
 
-  // Measure Gnosis block time instead of assuming 5s. Version one assumed 5 and was 1.8% out.
+  // Measure Gnosis block time instead of assuming 5s. The nominal 5s is 1.8% out.
   const [gNow, gThen] = await Promise.all([
     gnosis.getBlock({ blockNumber: gLatest }),
     gnosis.getBlock({ blockNumber: gLatest - 20_000n }),
@@ -226,11 +226,11 @@ async function run() {
   const sefRewardsUrl: string = SEF_DATA.rewardsLatest
   try {
     // Authenticated if a token is present: unauthenticated GitHub is 60 requests/hour per IP and
-    // routinely exhausted, which used to drop us into the fallback without anyone noticing.
+    // routinely exhausted, which drops us into the fallback below.
     // The third source is `gh auth token`. scripts/setup.sh already requires the gh CLI, so a
     // developer running this has a credential; asking them to copy it into a second place only
-    // creates a secret to leak. On 2026-09-29 the limit was 0 of 60 and the fallback silently
-    // downgraded two metrics from PROVEN to PARTIAL, which is what this line prevents.
+    // creates a secret to leak. When the limit is exhausted, the fallback downgrades two metrics
+    // from PROVEN to PARTIAL without saying why, which is what this line prevents.
     // `||`, not `??`: an empty GITHUB_TOKEN= line in .env.local means unset, not "no token".
     const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || ghCliToken()
     const commits = (await (await fetch(
@@ -261,7 +261,7 @@ async function run() {
   const [gFrom, gTo] = await Promise.all([blockAt(startSec, "first"), blockAt(endSec, "last")])
   const gWindow = gTo - gFrom
 
-  console.log(`\n  metrics proof of concept  (v2, rebuilt after adversarial review)\n`)
+  console.log(`\n  metrics proof of concept\n`)
   console.log(`  mainnet   ${mFrom}..${mLatest}  full history, ${Number(mLatest - mFrom).toLocaleString("en-US")} blocks`)
   console.log(`  gnosis    ${gFrom}..${gTo}  ${DAYS} days aligned to the hour, ${Number(gWindow).toLocaleString("en-US")} blocks`)
   console.log(`  window    ${new Date(startSec * 1000).toISOString()} .. ${new Date(endSec * 1000).toISOString()}`)
@@ -515,7 +515,7 @@ async function run() {
       (setsMatch ? "" : ` — on chain only: ${onlyOnChain.join(", ")}; SEF only: ${onlyInSef.join(", ")}`),
   })
 
-  // Rewards: allocated vs actually claimed. Version one conflated these.
+  // Rewards: allocated vs actually claimed. They are different numbers, reported separately.
   const claimedTotal = (claims as unknown as { args: { account: Address; amount: bigint } }[])
     .reduce((a, l) => a + l.args.amount, 0n)
   const allocated = BigInt(sefRewards.tokenTotal)
@@ -544,8 +544,8 @@ async function run() {
   // ============================================== C. PARTICIPATION, SEF-EXACT
   // SEF's workflow computes a ROLLING 14-day window ending at the top of the current hour.
   // Numerator: SignShared matching the winning selection root of a completed ceremony that
-  // is a transaction attestation. Denominator: those ceremonies. We implement the
-  // is_transaction_attestation filter this time; version one claimed to and did not.
+  // is a transaction attestation. Denominator: those ceremonies. The is_transaction_attestation
+  // filter is applied here; without it both counts include ceremonies SEF excludes.
   const attested = await scan(gnosis, consensus, E.txAttested, gFrom, gTo, 20_000n)
   const attestationSids = new Set(
     (attested as unknown as { args: { signatureId: Hex } }[]).map((l) => l.args.signatureId.toLowerCase()),
@@ -622,16 +622,16 @@ async function run() {
     group: "Participation", metric: "Performance spread between validators",
     value: `${(best.ours * 100).toFixed(2)}% (${best.label}) down to ${(worst.ours * 100).toFixed(2)}% (${worst.label})`,
     source: "same computation", window: `${DAYS} days`,
-    // The spread is only meaningful if the rates it is drawn from reproduce SEF's. Previously
-    // this asserted max >= min, which is true of any array.
+    // The spread is only meaningful if the rates it is drawn from reproduce SEF's. A check
+    // such as max >= min would be true of any array, so it proves nothing.
     verdict: bitExact ? "PROVEN" : "PARTIAL",
     note: `spread of ${((best.ours - worst.ours) * 100).toFixed(2)} percentage points. ` +
       `Absences: ${ceremoniesAttest - worst.rounds} vs ${ceremoniesAttest - best.rounds}`,
   })
 
   // Drop-outs. The expected set is the participants of the CURRENT group, taken from every
-  // KeyGenConfirmed for that gid. Version one filtered on `confirmed`, which is a
-  // "generation complete" flag set only on the last submitter, and under-reported by 5/6.
+  // KeyGenConfirmed for that gid. Not filtered on `confirmed`: that is a "generation complete"
+  // flag set only on the last submitter, so filtering on it would under-report by 5/6.
   const keyGen = await scan(gnosis, coordinator, E.keyGenConfirmed, kFrom, gLatest, 20_000n)
   const kg = keyGen as unknown as { args: { gid: Hex; participant: Address }; blockNumber: bigint }[]
   // 8.1% of historical keygen groups permanently have fewer than the full participant set, so
@@ -678,9 +678,9 @@ async function run() {
   })
 
   // ==================================================== D. ATTESTATION RATES
-  // Day boundaries are found exactly, by binary search on block timestamps. The previous version
-  // sampled one block in 200 and interpolated, with a mean error of 10s and a max of 34s, which
-  // moved events across midnight and published a per-day range that was wrong by two.
+  // Day boundaries are found exactly, by binary search on block timestamps. Sampling one block
+  // in 200 and interpolating has a mean error of 10s and a max of 34s, enough to move events
+  // across midnight and put a per-day range off by two.
   const perDay = new Map<string, number>()
   const dayEdges: { day: string; from: bigint }[] = []
   const firstDay = Math.ceil(startSec / 86_400) * 86_400
@@ -850,6 +850,7 @@ async function run() {
   console.log(`  ${scanRequests} RPC log requests across ${scanCalls} scans, ${scanRetries} retries, ${((Date.now() - t0) / 1000).toFixed(0)}s\n`)
 
   if (JSON_OUT) {
+    mkdirSync(dirname(JSON_OUT), { recursive: true })
     writeFileSync(JSON_OUT, JSON.stringify({
       runAt: new Date().toISOString(), mainnetBlock: String(mLatest), gnosisBlock: String(gLatest),
       gnosisBlockTime: gBlockTime, windowDays: DAYS,

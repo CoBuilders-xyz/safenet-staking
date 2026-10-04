@@ -1,6 +1,6 @@
 import { DEPLOYMENTS } from "@cobuilders/safenet-core"
 
-/** Mainnet addresses, from core. D-005: no address is written twice. */
+/** Mainnet addresses, from core, so no address is written twice. */
 export const STAKING_CONTRACT = DEPLOYMENTS[1].staking.toLowerCase()
 export const TOKEN_CONTRACT = DEPLOYMENTS[1].token.toLowerCase()
 /** Mock MerkleDrop contract address (set via VITE_MERKLE_DROP_ADDRESS in playwright.config.ts) */

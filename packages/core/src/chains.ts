@@ -20,7 +20,7 @@ export const PUBLIC_RPC_URLS: Record<ChainKey, readonly string[]> = {
 
 /**
  * Node only. Reads environment, so never call this from browser code.
- * ALCHEMY_MAINNET_RPC_URL is the archive node the fork tests and deep scans need (D-033).
+ * ALCHEMY_MAINNET_RPC_URL is the archive node the fork tests and deep scans need.
  */
 export function rpcUrls(chain: ChainKey): readonly string[] {
   const env = typeof process === "undefined" ? undefined : process.env

@@ -2,10 +2,9 @@
  * Event signatures we index.
  *
  * THE RULE: no source file is authoritative. Only the chain is.
- * These signatures were verified by matching keccak topic0 against live logs.
  * The deployed contracts match NEITHER published branch of safe-research/safenet:
- * the `beta` tag is older than what is deployed, `main` is newer.
- * See project-context.md section 4.
+ * the `beta` tag is older than what is deployed, `main` is newer. So every signature here
+ * is proven against live logs by matching keccak topic0, never taken from a branch.
  *
  * `scripts/verify-abis.ts` re-proves these against the chain: the "high" entries on every run,
  * and the "rare" entries under --deep, which scans from each contract's deploy block.
@@ -46,8 +45,8 @@ export const INDEXED_EVENTS = [
   //
   // Neither parameter is indexed, and the order is (old, new). Both determined from real logs
   // on 2026-09-29, not from the signature: a log carries one topic, so no parameter is indexed,
-  // and each log's first word equals the previous log's second. D-060 records that topic0
-  // alone cannot tell us either fact.
+  // and each log's first word equals the previous log's second. topic0 alone cannot tell us
+  // either fact, because it does not encode which parameters are indexed.
   { contract: "merkleDrop", frequency: "rare",
     signature: "event MerkelRootUpdated(bytes32 oldRoot, bytes32 newRoot)" },
   // --- Gnosis Chain: consensus ---
@@ -64,8 +63,8 @@ export const INDEXED_EVENTS = [
   { contract: "frostCoordinator", frequency: "rare",
     signature: "event KeyGenConfirmed(bytes32 indexed gid, address participant, bool confirmed)" },
 
-  // These three are indexed by the metrics work and were previously declared only inside the
-  // script, so nothing verified them against the chain.
+  // These three are indexed by the metrics work. They are declared here rather than inside
+  // the script, so verify:abis proves them against the chain.
   { contract: "consensus", frequency: "high",
     signature: "event TransactionProposed(bytes32 indexed safeTxHash, uint256 indexed chainId, address indexed safe, uint64 epoch, (uint256 chainId, address safe, address to, uint256 value, bytes data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, uint256 nonce) transaction)" },
   { contract: "consensus", frequency: "high",

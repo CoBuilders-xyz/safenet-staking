@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PostToolUse hook. Runs after an agent edits a file (D-012, D-013).
+ * PostToolUse hook. Runs after an agent edits a file.
  *
  *   lint   -> warns, the agent fixes it. Never blocks.
  *   types  -> blocks. A type error means the agent is building on a wrong assumption.
@@ -56,7 +56,7 @@ if (existsSync(resolve(pkgDir, "eslint.config.js"))) {
   const lint = run("npx --no-install eslint --fix " + JSON.stringify(relative(pkgDir, resolve(filePath))))
   if (!lint.ok) {
     console.error(`[lint] ${where}: issues remain after --fix. Please fix them.\n${lint.out.slice(0, 1500)}`)
-    // exit 0 on purpose: lint warns, it does not block (D-012)
+    // exit 0 on purpose: lint warns, it does not block
   }
 }
 

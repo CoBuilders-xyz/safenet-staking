@@ -44,7 +44,7 @@ describe("participation", () => {
     assert.fieldEquals("SigningValidator", V1, "attended", "1")
   })
 
-  test("D-057: a share for a losing root does not count", () => {
+  test("a share for a losing root does not count", () => {
     handleSignShared(signShared(SID, WIN, V1, 1, DAY1, 0))
     handleSignShared(signShared(SID, LOSE, V2, 1, DAY1, 1))
     handleSignCompleted(signCompleted(SID, WIN, 1, DAY1, 2))

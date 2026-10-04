@@ -2,8 +2,8 @@ import { http, fallback, type Chain } from "viem"
 import { mainnet } from "wagmi/chains"
 import { DEPLOYMENTS, DEFAULT_CHAIN_ID, isSupportedChain } from "@cobuilders/safenet-core"
 
-// Mainnet only. The reference supports Sepolia as well; we removed it, because D-014
-// puts our end-to-end tests on an Anvil fork of Mainnet instead.
+// Mainnet only. The reference supports Sepolia as well; we removed it, because tests that
+// need real contracts and real state are meant to run on an Anvil fork of Mainnet instead.
 export const activeChainId = Number(import.meta.env.VITE_CHAIN_ID || DEFAULT_CHAIN_ID)
 
 export const activeChain: Chain = mainnet

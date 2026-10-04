@@ -6,7 +6,7 @@ import { consensus, ceremony, signingValidator, tryCount, ONE } from "./shared"
 /**
  * A participant published their share for one selectionRoot.
  *
- * The share cannot be counted yet: only the WINNING root counts (D-057), and the winner is
+ * The share cannot be counted yet: only the WINNING root counts, and the winner is
  * not known until SignCompleted. So the participant is recorded against the root it chose,
  * and the tally is read when the ceremony completes.
  *

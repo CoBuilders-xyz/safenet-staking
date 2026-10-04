@@ -15,7 +15,7 @@
     "test": "node --import tsx --test src/**/*.test.ts",
     "check": "pnpm lint && tsc --noEmit",
     "verify:abis": "node --env-file-if-exists=../../.env.local --import tsx scripts/verify-abis.ts",
-    "metrics": "node --env-file-if-exists=../../.env.local --import tsx scripts/metrics-poc.ts --json ../../docs/internal/metrics-poc-run.json && node ../../tools/render-metrics-report.mjs",
+    "metrics": "node --env-file-if-exists=../../.env.local --import tsx scripts/metrics-poc.ts --json .metrics/metrics-poc-run.json && node ../../tools/render-metrics-report.mjs",
     "lint": "eslint ."
   },
   "dependencies": {

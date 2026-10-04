@@ -13,7 +13,8 @@
  *   ORACLE=/tmp/oracle-2d.json pnpm --filter @cobuilders/safenet-subgraph-gnosis differential
  *
  * The windows will not match exactly: the oracle aligns its window to SEF's publish instant
- * (D-052), while the subgraph indexes from whatever block the manifest names. So counts are
+ * so the comparison measures the formula rather than the gap between runs, while the
+ * subgraph indexes from whatever block the manifest names. So counts are
  * compared as ratios and orderings, not as equal integers. What must match exactly is the
  * ORDER of validators by participation. Each rate must agree within RATE_TOLERANCE.
  */
