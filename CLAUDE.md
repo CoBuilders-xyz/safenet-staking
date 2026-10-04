@@ -115,7 +115,7 @@ Docker Compose, with ports from `.env.ports` and the archive RPC from `.env.loca
 
 `.github/workflows/ci.yml` runs four jobs on every pull request and on every push to `main`:
 `check`, `test`, `e2e` and `verify-abis`. `nightly.yml` runs the deep ABI scan and the unit tests
-daily; the deep scan needs the `ALCHEMY_MAINNET_RPC_URL` repository secret. `security.yml` runs a
+daily; the deep scan needs the `MAINNET_RPC_URL` secret. `security.yml` runs a
 dependency review on pull requests, skipped until the repository is public, and `pnpm audit`
 weekly.
 

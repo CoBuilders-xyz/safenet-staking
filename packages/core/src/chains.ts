@@ -20,13 +20,13 @@ export const PUBLIC_RPC_URLS: Record<ChainKey, readonly string[]> = {
 
 /**
  * Node only. Reads environment, so never call this from browser code.
- * ALCHEMY_MAINNET_RPC_URL is the archive node the fork tests and deep scans need.
+ * MAINNET_RPC_URL is the archive RPC endpoint the fork tests and deep scans need.
  */
 export function rpcUrls(chain: ChainKey): readonly string[] {
   const env = typeof process === "undefined" ? undefined : process.env
   const priv =
     chain === "mainnet"
-      ? [env?.ALCHEMY_MAINNET_RPC_URL, env?.MAINNET_RPC_URL]
+      ? [env?.MAINNET_RPC_URL]
       : [env?.GNOSIS_RPC_URL]
   return [...priv.filter((u): u is string => !!u), ...PUBLIC_RPC_URLS[chain]]
 }
@@ -36,6 +36,3 @@ export const RPC_URLS: Record<ChainKey, readonly string[]> = {
   get mainnet() { return rpcUrls("mainnet") },
   get gnosis() { return rpcUrls("gnosis") },
 }
-
-export const ARCHIVE_RPC_URL =
-  typeof process === "undefined" ? undefined : process.env.ALCHEMY_MAINNET_RPC_URL
