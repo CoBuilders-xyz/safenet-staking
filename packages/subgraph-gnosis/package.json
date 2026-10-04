@@ -1,0 +1,26 @@
+{
+  "name": "@cobuilders/safenet-subgraph-gnosis",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bootstrap": "echo '@cobuilders/safenet-subgraph-gnosis ready'",
+    "generate": "tsx scripts/generate-manifest.ts",
+    "dev": "pnpm generate && graph codegen",
+    "build": "pnpm generate && graph codegen && graph build",
+    "test": "pnpm generate && graph codegen && graph test",
+    "check": "eslint . && tsc --noEmit -p tsconfig.check.json",
+    "differential": "tsx scripts/differential.ts"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "0.98.1",
+    "@graphprotocol/graph-ts": "0.38.2"
+  },
+  "devDependencies": {
+    "@cobuilders/safenet-core": "workspace:*",
+    "assemblyscript": "0.19.23",
+    "matchstick-as": "0.6.0",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "viem": "2.46.2"
+  }
+}

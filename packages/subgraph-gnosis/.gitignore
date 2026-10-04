@@ -1,0 +1,12 @@
+# Generated from packages/core by `pnpm generate`. Committing them would create a second
+# source for addresses, start blocks and event signatures, which D-005 exists to prevent.
+subgraph.yaml
+abis/
+
+# Build output
+build/
+generated/
+
+# matchstick compiles the mappings here before running them
+tests/.bin/
+tests/.latest.json

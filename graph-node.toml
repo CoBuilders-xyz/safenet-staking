@@ -1,0 +1,32 @@
+# graph-node configuration, for running two chains at once.
+#
+# The `ethereum` environment variable cannot do this: the container's entrypoint splits it on
+# spaces, so a second "network:url" pair arrives as a stray argument and the node refuses to
+# start. A config file is the documented way.
+#
+# The URLs are interpolated from the environment at startup, so no endpoint is written here.
+# ALCHEMY_MAINNET_RPC_URL and GNOSIS_RPC_URL come from .env.local, which is gitignored.
+
+[store]
+[store.primary]
+connection = "postgresql://graph:graph@postgres:5432/graph"
+pool_size = 10
+
+[chains]
+ingestor = "default"
+
+[chains.mainnet]
+shard = "primary"
+provider = [
+  { label = "mainnet", url = "${ALCHEMY_MAINNET_RPC_URL}", features = ["archive", "traces"] },
+]
+
+[chains.gnosis]
+shard = "primary"
+provider = [
+  { label = "gnosis", url = "${GNOSIS_RPC_URL}", features = ["archive"] },
+]
+
+[deployment]
+[[deployment.rule]]
+indexers = ["default"]

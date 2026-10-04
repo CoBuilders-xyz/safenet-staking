@@ -1,0 +1,195 @@
+# Safenet Beta, Gnosis Chain: consensus and signing.
+#
+# The shape differs from the Mainnet subgraph for one reason: volume. Mainnet holds 1,835
+# logs over its entire history. Gnosis emits 153,646 in two days, and roughly 15 million
+# over its history. Storing a row per event is not available here.
+#
+# So this aggregates. Ceremonies exist only until they are counted, then they are removed.
+# What survives is per-validator daily counters, which is what the promised metrics need:
+# participation over a window, attestations per day, latency percentiles.
+#
+# The cost of aggregating is that a new question needs a resync. On Gnosis that is expensive,
+# so the aggregates below are chosen to answer everything the proposal promises, not to be
+# minimal.
+
+# -----------------------------------------------------------------------------------------
+# Transient. These exist to join events across blocks, then they are deleted.
+# -----------------------------------------------------------------------------------------
+
+"""
+A signing ceremony, held only until it can be counted.
+
+Counting needs two facts that arrive in separate events:
+
+  SignCompleted        gives the WINNING selectionRoot. Shares for a losing root do not
+                       count (D-057), and shares are emitted BEFORE completion.
+  TransactionAttested  says the ceremony was a transaction attestation. 1 ceremony in 400
+                       is not, and the oracle excludes those.
+
+Measured on 2026-09-29: all 691 attestations in a 2,000 block window sat in the SAME BLOCK
+as their SignCompleted, so log order within the block decides which handler runs first. The
+handlers therefore do not depend on the order: whichever arrives second does the counting.
+
+Removed once counted. Without that, this table would grow by about 4,600 rows a day forever.
+"""
+type Ceremony @entity(immutable: false) {
+  "The signature id, sid."
+  id: ID!
+
+  "Set by SignCompleted. Null until then."
+  winningRoot: Bytes
+
+  "Set by TransactionAttested. A ceremony that never gets one is not counted."
+  isAttestation: Boolean!
+
+  "True once both facts are known and the counters have been updated."
+  counted: Boolean!
+
+  """
+  True once this was written off as completed-without-attestation.
+
+  Kept because the write-off is reversible: the two events sit in the same block, so
+  SignCompleted may simply have run first. If an attestation then arrives, the count is
+  corrected rather than double counted.
+  """
+  countedAsNonAttestation: Boolean!
+
+  "Distinct selectionRoots seen for this sid, so every tally can be cleaned up."
+  roots: [Bytes!]!
+
+  firstSeenBlock: BigInt!
+  timestamp: BigInt!
+}
+
+"""
+Participants who shared for one sid under one selectionRoot.
+
+Keyed by sid and root together because a ceremony can see shares for more than one root, and
+only the winner counts. Removed with its ceremony.
+"""
+type RootTally @entity(immutable: false) {
+  "sid, a dash, selectionRoot."
+  id: ID!
+  ceremony: Ceremony!
+  root: Bytes!
+  participants: [Bytes!]!
+}
+
+"""
+A proposed transaction awaiting its attestation, held to measure latency.
+
+Latency is the block distance from TransactionProposed to TransactionAttested for the same
+safeTxHash. The proposal comes first, so it must be stored until the attestation arrives.
+Removed once measured.
+"""
+type PendingProposal @entity(immutable: false) {
+  "safeTxHash, a dash, chainId, a dash, safe address."
+  id: ID!
+  proposedAtBlock: BigInt!
+  proposedAtTimestamp: BigInt!
+}
+
+# -----------------------------------------------------------------------------------------
+# What survives
+# -----------------------------------------------------------------------------------------
+
+"Network-wide totals for this chain. One row, id \"1\"."
+type Consensus @entity(immutable: false) {
+  id: ID!
+
+  "Ceremonies that completed AND carried an attestation. The participation denominator."
+  attestationCeremonies: BigInt!
+
+  "Ceremonies that completed without an attestation. About 1 in 400."
+  nonAttestationCeremonies: BigInt!
+
+  "TransactionAttested events seen."
+  attestations: BigInt!
+
+  "TransactionProposed events seen."
+  proposals: BigInt!
+
+  "Attestations matched to a proposal, so a latency was measurable."
+  latencySamples: BigInt!
+
+  epochRollovers: Int!
+  currentEpoch: BigInt
+
+  validatorCount: Int!
+
+  "Ceremonies still waiting to be counted. Should stay small; a rising number means a leak."
+  openCeremonies: Int!
+}
+
+"A validator on this chain, identified by its signing address."
+type SigningValidator @entity(immutable: false) {
+  "The participant address, lowercase hex."
+  id: ID!
+  address: Bytes!
+
+  """
+  The Mainnet staker this validator signs for, from ValidatorStakerSet.
+
+  Null when no such event has been seen. A windowed subgraph will usually see none, because
+  the mapping is set once at registration and never repeated.
+  """
+  staker: Bytes
+
+  """
+  Winning attestation ceremonies this validator shared in.
+
+  Absences are NOT stored. The oracle derives them: absent = attestationCeremonies - attended.
+  A stored counter would be a second source for the same fact and could drift from the first,
+  which is the failure this project keeps finding. Both operands are here, so the subtraction
+  is one step for the consumer.
+  """
+  attended: BigInt!
+
+  firstSeenBlock: BigInt!
+  lastSeenBlock: BigInt!
+
+  days: [ValidatorDay!]! @derivedFrom(field: "validator")
+}
+
+"""
+Per validator, per UTC day.
+
+This is what makes participation over 7, 30 or all days a query rather than a scan. The
+proposal promises that window selector on the validator detail screen.
+"""
+type ValidatorDay @entity(immutable: false) {
+  "validator address, a dash, the UTC day start as a unix timestamp."
+  id: ID!
+  validator: SigningValidator!
+  date: Int!
+
+  "Derive absences as ConsensusDay.attestationCeremonies - this."
+  attended: BigInt!
+}
+
+"""
+Per UTC day, network-wide.
+
+Attestations per day is promised as a bar chart. Latency is promised as a median and a p95,
+which a sum cannot give, so the samples are bucketed by block distance instead.
+"""
+type ConsensusDay @entity(immutable: false) {
+  "The UTC day start as a unix timestamp, as a string."
+  id: ID!
+  date: Int!
+
+  attestations: BigInt!
+  attestationCeremonies: BigInt!
+
+  """
+  Latency in blocks, bucketed. Index n holds the count of attestations that arrived n blocks
+  after their proposal, for n from 0 to 64.
+
+  A histogram rather than raw samples because a percentile needs the distribution and there
+  are about 4,600 attestations a day. 64 is the oracle's MAX_EXPECTED_LATENCY; anything
+  beyond it lands in overflow and is excluded, as the oracle excludes it.
+  """
+  latencyBuckets: [BigInt!]!
+  latencyOverflow: BigInt!
+  latencySamples: BigInt!
+}
