@@ -59,10 +59,7 @@ const gnosis = createPublicClient({
 }) as PublicClient
 const mainnet = createPublicClient({
   chain: CHAINS.mainnet,
-  transport: fallback(
-    [process.env.ALCHEMY_MAINNET_RPC_URL, ...RPC_URLS.mainnet]
-      .filter((u): u is string => !!u).map((u) => http(u)),
-  ),
+  transport: fallback(RPC_URLS.mainnet.map((u) => http(u))),
   batch: { multicall: true },
 }) as PublicClient
 

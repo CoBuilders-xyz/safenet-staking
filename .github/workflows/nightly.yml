@@ -21,14 +21,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
-      ALCHEMY_MAINNET_RPC_URL: ${{ secrets.ALCHEMY_MAINNET_RPC_URL }}
+      MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
     steps:
       # The deep scan reads every event from its deploy block. Public endpoints cap the
       # range and rate-limit, so a run without the archive node proves nothing. Refuse it.
       - name: Require the archive RPC
         run: |
-          if [ -z "${ALCHEMY_MAINNET_RPC_URL}" ]; then
-            echo "::error title=ALCHEMY_MAINNET_RPC_URL is not set::The deep ABI scan needs an archive RPC. Add the repository secret ALCHEMY_MAINNET_RPC_URL. Not falling back to public endpoints."
+          if [ -z "${MAINNET_RPC_URL}" ]; then
+            echo "::error title=MAINNET_RPC_URL is not set::The deep ABI scan needs an archive RPC endpoint. Add the secret MAINNET_RPC_URL. Not falling back to public endpoints."
             exit 1
           fi
       # Pin actions to full SHA: mutable tags can be moved to malicious code.

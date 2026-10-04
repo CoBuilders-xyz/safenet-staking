@@ -5,7 +5,8 @@
 # start. A config file is the documented way.
 #
 # The URLs are interpolated from the environment at startup, so no endpoint is written here.
-# ALCHEMY_MAINNET_RPC_URL and GNOSIS_RPC_URL come from .env.local, which is gitignored.
+# MAINNET_RPC_URL and GNOSIS_RPC_URL, the archive RPC endpoints, come from .env.local, which is
+# gitignored.
 
 [store]
 [store.primary]
@@ -18,7 +19,7 @@ ingestor = "default"
 [chains.mainnet]
 shard = "primary"
 provider = [
-  { label = "mainnet", url = "${ALCHEMY_MAINNET_RPC_URL}", features = ["archive", "traces"] },
+  { label = "mainnet", url = "${MAINNET_RPC_URL}", features = ["archive", "traces"] },
 ]
 
 [chains.gnosis]
