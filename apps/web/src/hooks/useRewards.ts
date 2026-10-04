@@ -3,6 +3,7 @@ import { merkleDropAbi } from "@/abi/merkleDropAbi"
 import { getContractAddresses } from "@/config/contracts"
 import { activeChain } from "@/config/chains"
 import { useRewardProof } from "./useRewardProof"
+import { sameRoot } from "./useProgrammeRewards"
 
 const { merkleDrop } = getContractAddresses(activeChain.id)
 
@@ -70,7 +71,8 @@ export function useRewards() {
 
   const cumulativeAmount = BigInt(proof.cumulativeAmount)
   const claimable = cumulativeAmount > cumulativeClaimed ? cumulativeAmount - cumulativeClaimed : 0n
-  const rootStale = !!onChainRoot && onChainRoot !== proof.merkleRoot
+  // viem decodes bytes32 in lower case; the proof file may not be.
+  const rootStale = sameRoot(onChainRoot, proof.merkleRoot) === false
 
   return {
     data: {
