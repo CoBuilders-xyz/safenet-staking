@@ -21,7 +21,11 @@ import { createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, rmS
 import { join, relative, resolve, sep } from "node:path"
 import { Readable } from "node:stream"
 import { parseEnv } from "node:util"
+import * as UnixFS from "@ipld/unixfs"
+import { withMaxChunkSize } from "@ipld/unixfs/file/chunker/fixed"
+import { withWidth } from "@ipld/unixfs/file/layout/balanced"
 import { CAREncoderStream, createDirectoryEncoderStream, type Block, type FileLike } from "ipfs-car"
+import * as raw from "multiformats/codecs/raw"
 import { build } from "vite"
 
 const APP = resolve(import.meta.dirname, "..")
@@ -46,6 +50,8 @@ for (const key of Object.keys(process.env)) {
   if (key.startsWith("VITE_")) delete process.env[key]
 }
 Object.assign(process.env, publicEnv)
+// Vite keeps a NODE_ENV already set in the shell, and NODE_ENV=development changes the bundle.
+process.env.NODE_ENV = "production"
 
 // --- 2. Build ---
 rmSync(DIST, { recursive: true, force: true })
@@ -82,7 +88,14 @@ const files: FileLike[] = paths.map((name) => ({
 
 // Collect the blocks first: the root is the last block, and the CAR header names the root.
 const blocks: Block[] = []
-await createDirectoryEncoderStream(files).pipeTo(
+// ipfs-car 3.1.0's defaults, written out so an ipfs-car upgrade cannot change the CID silently.
+const settings = UnixFS.configure({
+  fileChunkEncoder: raw,
+  smallFileEncoder: raw,
+  chunker: withMaxChunkSize(1024 * 1024),
+  fileLayout: withWidth(1024),
+})
+await createDirectoryEncoderStream(files, settings).pipeTo(
   new WritableStream<Block>({ write: (block) => void blocks.push(block) }),
 )
 const root = blocks.at(-1)?.cid

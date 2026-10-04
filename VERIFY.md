@@ -63,6 +63,8 @@ public values; a value there ships to every visitor.
 
 1. `git status` must be clean, and `git rev-parse HEAD` must be the released commit.
 2. `node --version` must print `v22.14.0`, and `pnpm --version` must print `10.28.2`.
+   The release build forces `NODE_ENV=production`. If you changed the script, check that
+   your shell's `NODE_ENV` does not reach Vite: `NODE_ENV=development` gives another CID.
 3. `pnpm install` must have run with `--frozen-lockfile`, so the lockfile did not change.
 4. Compare the files: `ls -lR apps/web/dist` on both sides, then `diff` the first file that
    differs. A difference there is a reproducibility bug. Please open an issue with it.

@@ -142,6 +142,9 @@ importers:
       '@graphql-codegen/typescript-operations':
         specifier: 6.1.9
         version: 6.1.9(graphql@16.14.2)
+      '@ipld/unixfs':
+        specifier: 3.0.0
+        version: 3.0.0
       '@playwright/test':
         specifier: 1.58.2
         version: 1.58.2
@@ -196,6 +199,9 @@ importers:
       jsdom:
         specifier: 28.1.0
         version: 28.1.0(@noble/hashes@2.4.0)
+      multiformats:
+        specifier: 13.4.2
+        version: 13.4.2
       pinata:
         specifier: 2.5.5
         version: 2.5.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

@@ -52,7 +52,8 @@ jobs:
       # apps/web/release/app.car and apps/web/release/CID.
       - name: Release build, CAR and CID
         run: pnpm --filter @cobuilders/safenet-web release:build
-      # Again on the final dist, as its own step, so a reader of the run sees it pass.
+      # CI has no root .env.local, so this step only proves src reads no process.env. The real
+      # guarantee here is that the build job references no secrets.* at all.
       - name: Browser-safety check
         run: pnpm check:browser
       - name: Record the CID

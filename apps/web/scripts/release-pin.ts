@@ -9,6 +9,9 @@
  * Then it fetches index.html through the Pinata gateway and through dweb.link, and fails
  * unless both answer 200 inside the retry window. A pin no gateway serves is not a release.
  *
+ * PINATA_GATEWAY is a secret, so its host never reaches the log or the step summary. Output
+ * names it "the dedicated Pinata gateway" and prints the dweb.link URL in full.
+ *
  * Required environment variables. Missing ones fail the run; nothing is skipped:
  *   PINATA_JWT       API JWT from https://app.pinata.cloud/developers/api-keys
  *   PINATA_GATEWAY   dedicated gateway domain, e.g. "example.mypinata.cloud"
@@ -65,9 +68,13 @@ if (upload.cid !== cid) {
 console.log(`release-pin: pinned ${cid}`)
 
 // --- Gateways ---
-const urls = [`https://${gateway}/ipfs/${cid}/index.html`, `https://${cid}.ipfs.dweb.link/index.html`]
+const dwebUrl = `https://${cid}.ipfs.dweb.link/index.html`
+const gateways = [
+  { label: "the dedicated Pinata gateway", url: `https://${gateway}/ipfs/${cid}/index.html` },
+  { label: dwebUrl, url: dwebUrl },
+]
 
-async function waitFor200(url: string): Promise<void> {
+async function waitFor200({ label, url }: { label: string; url: string }): Promise<void> {
   const deadline = Date.now() + timeoutMs
   let last = "no answer"
   for (let attempt = 1; ; attempt++) {
@@ -75,27 +82,33 @@ async function waitFor200(url: string): Promise<void> {
       const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(60_000) })
       await res.body?.cancel()
       if (res.status === 200) {
-        console.log(`release-pin: 200 from ${url} (attempt ${attempt})`)
+        console.log(`release-pin: 200 from ${label} (attempt ${attempt})`)
         return
       }
       last = `HTTP ${res.status}`
     } catch (err) {
-      last = err instanceof Error ? err.message : String(err)
+      last = (err instanceof Error ? err.message : String(err)).replaceAll(gateway!, "<gateway>")
     }
     if (Date.now() + 15_000 > deadline) {
-      fail(`${url} did not return 200 within ${timeoutMs / 1000} s. Last: ${last}.`)
+      fail(`${label} did not return 200 within ${timeoutMs / 1000} s. Last: ${last}.`)
     }
-    console.log(`release-pin: ${url}: ${last}, retrying in 15 s`)
+    console.log(`release-pin: ${label}: ${last}, retrying in 15 s`)
     await new Promise((r) => setTimeout(r, 15_000))
   }
 }
 
-await Promise.all(urls.map(waitFor200))
+await Promise.all(gateways.map(waitFor200))
 
 if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(
     process.env.GITHUB_STEP_SUMMARY,
-    [`### Pinned \`${cid}\``, "", ...urls.map((u) => `- ${u}`), ""].join("\n"),
+    [
+      `### Pinned \`${cid}\``,
+      "",
+      `- ${dwebUrl}`,
+      `- \`/ipfs/${cid}/index.html\` on the dedicated Pinata gateway`,
+      "",
+    ].join("\n"),
   )
 }
 console.log(`release-pin: ${cid} is pinned and served by both gateways`)
