@@ -86,6 +86,22 @@ test.describe("Rewards page", () => {
     await expect(section(page, "Verifiability").getByText("300 SAFE")).toBeVisible()
   })
 
+  test("a proof with null KYC fields still loads and claims", async ({ connectedPage: page, mockChainState }) => {
+    mockChainState.rewardProof = REWARD_PROOFS.kycNull
+
+    await page.goto("/#/rewards")
+
+    const yours = section(page, "Your rewards")
+    await expect(valueOf(yours, "Available to claim")).toHaveText("100 SAFE", { timeout: 10_000 })
+    await expect(yours.getByText("Held pending compliance")).toHaveCount(0)
+
+    await claimButton(page).click()
+    await page.getByRole("dialog").getByRole("button", { name: "Claim Rewards" }).click()
+
+    await expect(page.getByText("Rewards claimed")).toBeVisible({ timeout: 10_000 })
+    await expect(valueOf(yours, "Already claimed")).toHaveText("100 SAFE", { timeout: 10_000 })
+  })
+
   test("verifiability: names the contract and confirms the roots match", async ({ disconnectedPage: page }) => {
     await page.goto("/#/rewards")
 

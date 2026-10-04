@@ -7,8 +7,10 @@ export interface RewardProof {
   cumulativeAmount: string
   merkleRoot: Hex
   proof: Hex[] | null
-  kycAmount?: string
-  kyc?: boolean
+  /** `null` is treated as absent: nothing held. */
+  kycAmount?: string | null
+  /** `null` is treated as absent: not marked as checked. */
+  kyc?: boolean | null
 }
 
 function isValidProof(data: unknown): data is RewardProof {
@@ -24,8 +26,10 @@ function isValidProof(data: unknown): data is RewardProof {
     )
   )
     return false
-  if (obj.kycAmount !== undefined && (typeof obj.kycAmount !== "string" || !/^\d+$/.test(obj.kycAmount))) return false
-  if (obj.kyc !== undefined && typeof obj.kyc !== "boolean") return false
+  // SEF's live files (checked 2026-10-04) omit these keys or give a string and a boolean.
+  // A null is accepted as absent, so a change in how they serialise cannot lock users out.
+  if (obj.kycAmount != null && (typeof obj.kycAmount !== "string" || !/^\d+$/.test(obj.kycAmount))) return false
+  if (obj.kyc != null && typeof obj.kyc !== "boolean") return false
   return true
 }
 
@@ -52,7 +56,8 @@ async function fetchProof(address: Address): Promise<RewardProof | null> {
 
 /**
  * The part of an address's reward that SEF holds back until compliance checks pass.
- * Zero when nothing is held, or when the file marks the address as checked (`kyc: true`).
+ * Zero when nothing is held (`kycAmount` absent, null or "0"), or when the file marks the
+ * address as checked (`kyc: true`). A null `kyc` counts as not checked.
  */
 export function heldPendingCompliance(proof: RewardProof | null | undefined): bigint {
   if (!proof?.kycAmount || proof.kyc === true) return 0n

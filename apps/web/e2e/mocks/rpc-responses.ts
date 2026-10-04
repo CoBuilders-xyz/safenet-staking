@@ -12,8 +12,8 @@ export interface RewardProof {
   cumulativeAmount: string
   merkleRoot: string
   proof: string[] | null
-  kycAmount?: string
-  kyc?: boolean
+  kycAmount?: string | null
+  kyc?: boolean | null
 }
 
 /** Pad a bigint to a 32-byte hex string (no 0x prefix) */

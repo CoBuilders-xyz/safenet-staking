@@ -96,6 +96,14 @@ export const REWARD_PROOFS = {
     merkleRoot: OTHER_MERKLE_ROOT,
     proof: ["0x" + "11".repeat(32)],
   },
+  /** claimable, with the KYC fields serialised as null rather than omitted; null means absent */
+  kycNull: {
+    cumulativeAmount: (100n * 10n ** 18n).toString(),
+    merkleRoot: TEST_MERKLE_ROOT,
+    proof: ["0x" + "11".repeat(32)],
+    kycAmount: null,
+    kyc: null,
+  },
   /** part of the claimable amount is pending compliance review (kyc !== true) */
   partialKyc: {
     cumulativeAmount: (100n * 10n ** 18n).toString(),
