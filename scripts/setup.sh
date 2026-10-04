@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Prepares this worktree. Safe to run again.
 #
-#   pnpm bootstrap                      everything
-#   pnpm --filter @safenet/core setup   one package
+#   pnpm bootstrap                                     everything
+#   pnpm --filter @cobuilders/safenet-core bootstrap   one package
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
@@ -82,7 +82,8 @@ say "package setup" "done"
 
 echo
 echo "  Ready. Next:"
-echo "    pnpm check         lint and types (no tests yet)"
+echo "    pnpm check         lint, browser safety and types"
+echo "    pnpm test          unit tests"
 echo "    pnpm verify:abis   prove our ABIs still match the chain"
 echo "    pnpm dev           start the app"
 echo
