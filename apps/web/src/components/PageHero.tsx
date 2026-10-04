@@ -1,61 +1,32 @@
 interface PageHeroProps {
-  illustration: string
-  illustrationDark?: string
-  illustrationAlt: string
   title: string
   subtitle: string
   children?: React.ReactNode
 }
 
-export function PageHero({
-  illustration,
-  illustrationDark,
-  illustrationAlt,
-  title,
-  subtitle,
-  children,
-}: PageHeroProps) {
+export function PageHero({ title, subtitle, children }: PageHeroProps) {
   return (
-    <div className="relative overflow-hidden border border-black/12 dark:border-[#12FF80]/20 p-6 min-h-[300px] flex items-center justify-center">
-      {/* Checkerboard grid background */}
+    <section className="relative overflow-hidden rounded-xl border border-border bg-card px-6 py-10 md:px-10 md:py-12">
+      {/* Accent wash and dot grid, drawn from tokens so both follow the theme */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.06] dark:opacity-[0.14]"
-        style={{
-          backgroundImage: `
-            linear-gradient(45deg, #03843E 25%, transparent 25%),
-            linear-gradient(-45deg, #03843E 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, #03843E 75%),
-            linear-gradient(-45deg, transparent 75%, #03843E 75%)
-          `,
-          backgroundSize: "8px 8px",
-          backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0",
-        }}
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,var(--accent)_0%,transparent_55%)]"
+        aria-hidden="true"
       />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-70 bg-[radial-gradient(var(--border)_1px,transparent_1px)] bg-[length:16px_16px] [mask-image:linear-gradient(to_left,black,transparent_70%)]"
+        aria-hidden="true"
+      />
+      <div className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden="true" />
 
-      {/* Content */}
-      <div className="relative flex flex-col items-center text-center px-4 gap-8">
-        <img
-          src={illustration}
-          alt={illustrationAlt}
-          className={illustrationDark ? "h-28 w-auto md:h-36 dark:hidden" : "h-28 w-auto md:h-36"}
-        />
-        {illustrationDark && (
-          <img
-            src={illustrationDark}
-            alt={illustrationAlt}
-            className="h-28 w-auto md:h-36 hidden dark:block"
-          />
-        )}
-        <div>
-          <h1 className="font-heading text-4xl md:text-5xl lg:text-[56px] font-normal tracking-[-0.02em] leading-none">
-            {title}
-          </h1>
-          <p className="mt-6 text-sm md:text-lg uppercase tracking-[-0.02em] text-foreground/50 font-mono opacity-[0.56]">
-            {subtitle}
-          </p>
-          {children}
-        </div>
+      <div className="relative max-w-2xl">
+        <h1 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight leading-tight">
+          {title}
+        </h1>
+        <p className="mt-3 text-base md:text-lg text-muted-foreground">
+          {subtitle}
+        </p>
+        {children}
       </div>
-    </div>
+    </section>
   )
 }

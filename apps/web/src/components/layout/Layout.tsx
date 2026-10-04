@@ -23,15 +23,15 @@ export function Layout() {
       <Header />
       <div className="relative flex-1">
         {/* Decorative tick marks + vertical delimiter */}
-        <div className="hidden xl:block absolute left-0 top-0 bottom-0 w-[50px] border-r border-black/10 dark:border-white/30 pointer-events-none z-10" aria-hidden="true">
+        <div className="hidden xl:block absolute left-0 top-0 bottom-0 w-[50px] border-r border-border pointer-events-none z-10" aria-hidden="true">
           <div
-            className="absolute left-4 top-0 bottom-0 w-[18px] [--tick-color:#DBDBDB] dark:[--tick-color:rgba(255,255,255,0.3)]"
+            className="absolute left-4 top-0 bottom-0 w-[18px] [--tick-color:var(--border)]"
             style={tickStyle}
           />
         </div>
-        <div className="hidden xl:block absolute right-0 top-0 bottom-0 w-[50px] border-l border-black/10 dark:border-white/30 pointer-events-none z-10" aria-hidden="true">
+        <div className="hidden xl:block absolute right-0 top-0 bottom-0 w-[50px] border-l border-border pointer-events-none z-10" aria-hidden="true">
           <div
-            className="absolute right-4 top-0 bottom-0 w-[18px] [--tick-color:#DBDBDB] dark:[--tick-color:rgba(255,255,255,0.3)]"
+            className="absolute right-4 top-0 bottom-0 w-[18px] [--tick-color:var(--border)]"
             style={tickStyle}
           />
         </div>

@@ -40,6 +40,7 @@ export function AmountInput({ value, onChange, maxAmount, label = "Amount", disa
         type="text"
         inputMode="decimal"
         placeholder="0.0"
+        className="font-mono tabular-nums"
         value={value}
         disabled={disabled}
         onChange={(e) => {

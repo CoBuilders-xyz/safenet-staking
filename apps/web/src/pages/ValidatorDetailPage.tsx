@@ -149,7 +149,7 @@ export function ValidatorDetailPage() {
               {loadingTotal ? (
                 <Skeleton className="h-7 w-32 mt-1" />
               ) : (
-                <p className="text-xl font-bold">{formatTokenAmount(asBigint(totalStake), 18, 0)}</p>
+                <p className="text-xl font-mono font-medium tabular-nums">{formatTokenAmount(asBigint(totalStake), 18, 0)}</p>
               )}
             </div>
             {isConnected && (
@@ -158,7 +158,7 @@ export function ValidatorDetailPage() {
                 {loadingUser ? (
                   <Skeleton className="h-7 w-32 mt-1" />
                 ) : (
-                  <p className="text-xl font-bold">{formatTokenAmount(userStakeAmount ?? 0n, 18, 0)}</p>
+                  <p className="text-xl font-mono font-medium tabular-nums">{formatTokenAmount(userStakeAmount ?? 0n, 18, 0)}</p>
                 )}
               </div>
             )}

@@ -32,9 +32,9 @@ const LazyPieChart = lazy(() =>
               if (!active || !payload?.length) return null
               const entry = payload[0].payload as ChartEntry
               return (
-                <div className="rounded-lg border bg-background p-2 shadow-md">
+                <div className="rounded-md border bg-popover text-popover-foreground p-2 shadow-md">
                   <p className="text-sm font-medium">{entry.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs font-mono tabular-nums text-muted-foreground">
                     {formatTokenAmount(entry.amount)}
                   </p>
                 </div>
@@ -47,13 +47,14 @@ const LazyPieChart = lazy(() =>
   }))
 )
 
+// Chart series tokens from index.css, so the palette follows light and dark mode.
 const COLORS = [
-  "#12FF80", // Safe Green
-  "#5FDDFF", // Safe Blue
-  "#FF8061", // Safe Orange
-  "#00B460", // Safe Dark Green
-  "#FF5F72", // Safe Red
-  "#B0FFC9", // Safe Light Green
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
 ]
 
 interface ChartEntry {

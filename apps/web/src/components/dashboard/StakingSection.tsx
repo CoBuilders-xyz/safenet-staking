@@ -39,10 +39,10 @@ function PositionRow({ position, validators }: { position: Position; validators?
             {metadata ? metadata.label : <span className="font-mono">{truncateAddress(position.validator)}</span>}
           </Link>
         </td>
-        <td className="py-3 pr-4 text-sm font-semibold text-right">
+        <td className="py-3 pr-4 text-sm font-mono font-medium tabular-nums text-right">
           {formatTokenAmount(position.amount, 18, 0)}
         </td>
-        <td className="py-3 pr-4 text-sm text-right text-muted-foreground">
+        <td className="py-3 pr-4 text-sm font-mono tabular-nums text-right text-muted-foreground">
           {metadata ? `${metadata.participationRate}%` : "—"}
         </td>
         <td className="py-3 pr-4 text-right">
@@ -163,10 +163,10 @@ export function StakingSection() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Rewards */}
-          <div className="flex items-center justify-between rounded-none bg-muted/30 p-3">
+          <div className="flex items-center justify-between rounded-md bg-muted/50 p-3">
             <div>
               <span className="text-sm text-muted-foreground">Claimable SAFE</span>
-              <p className="font-semibold">{formatTokenAmount(rewards.claimable, 18, 0)}</p>
+              <p className="font-mono font-medium tabular-nums">{formatTokenAmount(rewards.claimable, 18, 0)}</p>
               {rewards.totalClaimed > 0n && (
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Total claimed: {formatTokenAmount(rewards.totalClaimed, 18, 0)} SAFE
@@ -185,7 +185,7 @@ export function StakingSection() {
 
           {/* Compliance note */}
           {address && proof && proof.kycAmount && BigInt(proof.kycAmount) > 0n && proof.kyc !== true && (
-            <p className="text-sm text-muted-foreground rounded-lg border border-border bg-muted/30 px-3 py-2">
+            <p className="text-sm text-muted-foreground rounded-md border border-border bg-muted/50 px-3 py-2">
               Some rewards for{" "}
               <span className="font-mono">{truncateAddress(address)}</span> are
               pending compliance checks. Please reach out to the Safe Ecosystem

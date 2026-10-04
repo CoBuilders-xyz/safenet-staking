@@ -1,6 +1,6 @@
 {
   "name": "Safenet Beta Staking",
-  "short_name": "Safe Staking",
+  "short_name": "Safenet Staking",
   "description": "Stake SAFE to participate in Safenet Beta.",
   "icons": [
     {
@@ -14,7 +14,7 @@
       "type": "image/png"
     }
   ],
-  "theme_color": "#12ff80",
-  "background_color": "#121312",
+  "theme_color": "#0e7a6b",
+  "background_color": "#0d1211",
   "display": "standalone"
 }

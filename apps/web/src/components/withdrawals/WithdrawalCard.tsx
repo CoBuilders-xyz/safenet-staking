@@ -59,7 +59,7 @@ export function WithdrawalCard({
         : undefined
 
   return (
-    <div className="border border-black/12 dark:border-white/32 bg-white dark:bg-card">
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
       <div className="flex items-center justify-between px-6 py-4">
         {/* Left: validator info + status badge */}
         <div className="flex flex-col gap-4">
@@ -72,7 +72,7 @@ export function WithdrawalCard({
             {validator && !isZero && (
               <span
                 className="text-sm font-mono leading-[18px]
-                  text-black/30 dark:text-white/30"
+                  text-faint"
               >
                 {truncateAddress(validator)}
               </span>
@@ -80,23 +80,23 @@ export function WithdrawalCard({
           </div>
           {secondsLeft === 0 ? (
             <span
-              className="inline-flex items-center self-start
+              className="inline-flex items-center self-start rounded-sm
                 px-[7px] py-[3px] text-sm font-mono uppercase
                 leading-[18px]
-                text-[#007441] dark:text-[#27D18B]
-                bg-[#27D18B]/[0.18]
-                border border-[#27D18B]/[0.42]"
+                text-success
+                bg-success/15
+                border border-success/40"
             >
               Ready to withdraw
             </span>
           ) : (
             <span
-              className="inline-flex items-center self-start
+              className="inline-flex items-center self-start rounded-sm
                 px-[7px] py-[3px] text-sm font-mono uppercase
                 leading-[18px]
-                text-black/60 dark:text-white/60
-                bg-black/[0.06] dark:bg-white/[0.06]
-                border border-black/12 dark:border-white/12"
+                text-muted-foreground
+                bg-muted
+                border border-border"
             >
               {formatCountdown(secondsLeft)}
             </span>
@@ -105,7 +105,7 @@ export function WithdrawalCard({
 
         {/* Right: amount + claim button */}
         <div className="flex flex-col items-end gap-4">
-          <span className="text-xl font-mono leading-none uppercase">
+          <span className="text-xl font-mono tabular-nums leading-none uppercase">
             {formatTokenAmount(amount, 18, 0)} SAFE
           </span>
           {canClaim && (
@@ -114,8 +114,9 @@ export function WithdrawalCard({
               disabled={isBusy}
               className="inline-flex items-center gap-[5px]
                 px-2 py-1 text-[11.5px] font-mono uppercase
-                leading-[15px] border border-foreground
-                bg-background hover:bg-accent
+                leading-[15px] rounded-sm border border-foreground
+                bg-card hover:bg-accent hover:text-accent-foreground
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
                 disabled:opacity-50 transition-colors"
             >
               {isSigningTx ? (

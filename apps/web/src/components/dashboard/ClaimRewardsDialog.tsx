@@ -89,7 +89,7 @@ export function ClaimRewardsDialog({ open, onOpenChange }: ClaimRewardsDialogPro
         <div className="space-y-4">
           <div className="flex items-center justify-between rounded-lg border p-4">
             <span className="text-sm text-muted-foreground">Claimable SAFE</span>
-            <span className="text-lg font-semibold">
+            <span className="text-lg font-mono font-medium tabular-nums">
               {formatTokenAmount(rewards.claimable)}
             </span>
           </div>
