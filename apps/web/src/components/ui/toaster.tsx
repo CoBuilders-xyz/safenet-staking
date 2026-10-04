@@ -58,7 +58,7 @@ export function Toaster() {
               </div>
               <button
                 onClick={() => dismiss(toast.id)}
-                className="shrink-0 opacity-60 hover:opacity-100"
+                className="shrink-0 rounded-sm opacity-60 hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label="Dismiss notification"
               >
                 <X className="h-4 w-4" aria-hidden="true" />

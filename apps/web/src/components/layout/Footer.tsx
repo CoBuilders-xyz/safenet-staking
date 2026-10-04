@@ -8,28 +8,34 @@ const linkClass = "hover:text-foreground transition-colors"
 export function Footer() {
   return (
     <footer className="border-t border-border mt-auto">
-      <div className="container mx-auto flex items-center justify-center gap-6 px-4 py-5 text-xs font-mono uppercase tracking-wider text-muted-foreground">
-        {termsUrl && (
-          <a href={termsUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
-            Terms
+      <div className="container mx-auto flex flex-col items-center gap-3 px-4 py-5 sm:flex-row sm:justify-between">
+        <p className="flex items-baseline gap-2">
+          <span className="font-heading text-sm font-semibold tracking-tight text-foreground">Safenet Staking</span>
+          <span className="text-xs text-muted-foreground">by CoBuilders</span>
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          {termsUrl && (
+            <a href={termsUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
+              Terms
+            </a>
+          )}
+          {privacyUrl && (
+            <a href={privacyUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
+              Privacy
+            </a>
+          )}
+          {imprintUrl && (
+            <a href={imprintUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
+              Imprint
+            </a>
+          )}
+          <a href={docsUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
+            Documentation
           </a>
-        )}
-        {privacyUrl && (
-          <a href={privacyUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
-            Privacy
+          <a href="https://docs.safefoundation.org/safenet/resources/faq" target="_blank" rel="noopener noreferrer" className={linkClass}>
+            FAQ
           </a>
-        )}
-        {imprintUrl && (
-          <a href={imprintUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
-            Imprint
-          </a>
-        )}
-        <a href={docsUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
-          Documentation
-        </a>
-        <a href="https://docs.safefoundation.org/safenet/resources/faq" target="_blank" rel="noopener noreferrer" className={linkClass}>
-          FAQ
-        </a>
+        </div>
       </div>
     </footer>
   )

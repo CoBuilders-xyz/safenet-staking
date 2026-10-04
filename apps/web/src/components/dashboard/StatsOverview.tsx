@@ -42,7 +42,7 @@ export function StatsOverview() {
         {globalStats.map((stat) => (
           <Card key={stat.title} className="flex flex-col justify-between min-h-[140px] md:min-h-[200px] p-4 md:px-6 md:py-4">
             <CardHeader className="p-0">
-              <CardTitle className="text-base uppercase tracking-[0.04em] text-foreground/30 font-normal">
+              <CardTitle className="text-base uppercase tracking-[0.04em] text-faint font-normal">
                 {stat.title}
               </CardTitle>
             </CardHeader>
@@ -63,7 +63,7 @@ export function StatsOverview() {
           {userStats.map((stat) => (
             <Card key={stat.title} className="flex flex-col justify-between min-h-[200px] p-4 md:px-6 md:py-4">
               <CardHeader className="p-0">
-                <CardTitle className="text-base uppercase tracking-[0.04em] text-foreground/30 font-normal">
+                <CardTitle className="text-base uppercase tracking-[0.04em] text-faint font-normal">
                   {stat.title}
                 </CardTitle>
               </CardHeader>

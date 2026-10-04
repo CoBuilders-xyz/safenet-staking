@@ -8,7 +8,6 @@ import X from "lucide-react/dist/esm/icons/x"
 import Sun from "lucide-react/dist/esm/icons/sun"
 import Moon from "lucide-react/dist/esm/icons/moon"
 import { Button } from "@/components/ui/button"
-import safenetLogo from "@/assets/SafenetLogo.svg"
 
 const navItems = [
   { label: "Dashboard", path: "/" },
@@ -27,9 +26,20 @@ export function Header() {
     <header className="border-b border-border bg-background">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-8">
-          <Link to="/" className="flex flex-col items-start" onClick={closeMobileMenu}>
-            <img src={safenetLogo} alt="Safenet" className="h-[22px] dark:invert" />
-            <span className="self-end font-mono text-[10.89px] leading-[95%] text-foreground">BETA</span>
+          <Link
+            to="/"
+            className="flex flex-col items-start gap-0.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
+            onClick={closeMobileMenu}
+          >
+            <span className="flex items-center gap-2">
+              <span className="font-heading text-lg font-semibold leading-none tracking-tight text-foreground">
+                Safenet Staking
+              </span>
+              <span className="rounded-sm border border-primary/40 bg-accent px-1 py-px text-[10px] font-medium uppercase leading-none tracking-wider text-accent-foreground">
+                Beta
+              </span>
+            </span>
+            <span className="text-xs leading-none text-muted-foreground">by CoBuilders</span>
           </Link>
           <nav className="hidden md:flex items-stretch h-16 gap-1 -mb-px">
             {navItems.map((item) => (
@@ -38,9 +48,9 @@ export function Header() {
                 to={item.path}
                 aria-current={pathname === item.path ? "page" : undefined}
                 className={cn(
-                  "flex items-center px-6 text-sm font-mono uppercase leading-5 transition-colors border-b-2",
+                  "flex items-center px-5 text-sm font-medium uppercase tracking-wider leading-5 transition-colors border-b-2",
                   pathname === item.path
-                    ? "text-foreground border-foreground"
+                    ? "text-foreground border-primary"
                     : "text-muted-foreground border-transparent hover:text-foreground",
                 )}
               >
@@ -84,9 +94,9 @@ export function Header() {
                 onClick={closeMobileMenu}
                 aria-current={pathname === item.path ? "page" : undefined}
                 className={cn(
-                  "px-6 py-2 text-sm font-mono uppercase leading-5 transition-colors border-b-2 -mb-[1px]",
+                  "px-6 py-2 text-sm font-medium uppercase tracking-wider leading-5 transition-colors border-b-2 -mb-[1px]",
                   pathname === item.path
-                    ? "text-foreground border-foreground"
+                    ? "text-foreground border-primary"
                     : "text-muted-foreground border-transparent hover:text-foreground",
                 )}
               >
