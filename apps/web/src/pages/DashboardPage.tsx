@@ -13,7 +13,7 @@ export function DashboardPage() {
         title="Stake your SAFE"
         subtitle="Earn rewards for helping secure Safenet Beta"
       >
-        <p className="mt-4 text-xs text-faint">
+        <p className="mt-4 text-xs text-muted-foreground">
           Rewards are not guaranteed and may vary.{" "}
           {termsUrl ? (
             <a href={termsUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">

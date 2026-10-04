@@ -13,8 +13,9 @@
  * so components never reference a palette colour directly. Change a colour in the palette;
  * change what a role means in the semantic layer.
  *
- * Text contrast against `surface` is at least 4.5:1 for `ink`, `muted` and the status
- * colours, and at least 4:1 for `faint`, which is reserved for labels.
+ * Text colours (`ink`, `muted`, `faint` and the status colours) reach at least 4.5:1 on
+ * `ground`, `surface` and `surface-2`. Input borders (`rule-strong`) and chart series reach
+ * at least 3:1 on `surface`.
  */
 
 /* Palette, light mode */
@@ -25,10 +26,10 @@
   --sn-surface: #ffffff;
   --sn-surface-2: #eaefee;
   --sn-ink: #131a19;
-  --sn-muted: #5c6b68;
-  --sn-faint: #6f7e7a;
+  --sn-muted: #505f5c;
+  --sn-faint: #5e6d69;
   --sn-rule: #dce3e1;
-  --sn-rule-strong: #b9c4c1;
+  --sn-rule-strong: #85938f;
   --sn-accent: #0e7a6b;
   --sn-accent-ink: #0a6357;
   --sn-accent-soft: #ddede9;
@@ -43,7 +44,7 @@
   --sn-series-2: #4c6fd6;
   --sn-series-3: #c08a2e;
   --sn-series-4: #9a5bb5;
-  --sn-series-5: #7fa89f;
+  --sn-series-5: #64748b;
   --sn-series-6: #d4644f;
 }
 
@@ -58,7 +59,7 @@
   --sn-muted: #98a8a4;
   --sn-faint: #7d8d89;
   --sn-rule: #242f2d;
-  --sn-rule-strong: #3a4744;
+  --sn-rule-strong: #61706c;
   --sn-accent: #3fbfa8;
   --sn-accent-ink: #6fd3c1;
   --sn-accent-soft: #12312c;
@@ -72,7 +73,7 @@
   --sn-series-2: #7c97ee;
   --sn-series-3: #d99b3d;
   --sn-series-4: #c08ad8;
-  --sn-series-5: #8fbcb2;
+  --sn-series-5: #94a3b8;
   --sn-series-6: #f07067;
 }
 
