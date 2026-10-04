@@ -13,6 +13,10 @@ if [ ! -f .vercel/project.json ]; then
   warn "Vercel is not linked. Run 'pnpm link:services' first."
   exit 1
 fi
+if ! linked_to_safenet; then
+  warn ".vercel points at a different project. Run 'pnpm link:services' first."
+  exit 1
+fi
 require_cli vercel || exit 1
 
 fresh="$(mktemp)"

@@ -6,10 +6,6 @@ SCRIPT_TAG="link"
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 cd "$REPO_ROOT"
 
-linked_value() {
-  sed -n "s/.*\"$1\":\"\\([^\"]*\\)\".*/\\1/p" .vercel/project.json 2>/dev/null
-}
-
 # `vercel link` also pulls the development variables into .env.local, without
 # the backup that `pnpm env:pull` keeps. Put the file back as it was, so that
 # env:pull stays the only writer.
@@ -35,8 +31,7 @@ without_env_edits() {
 }
 
 link_vercel() {
-  if [ "$(linked_value projectId)" = "$SAFENET_VERCEL_PROJECT_ID" ] &&
-    [ "$(linked_value orgId)" = "$SAFENET_VERCEL_ORG_ID" ]; then
+  if linked_to_safenet; then
     log "Vercel is already linked to ${SAFENET_VERCEL_SCOPE}/${SAFENET_VERCEL_PROJECT}. Skip."
     return 0
   fi
@@ -49,8 +44,8 @@ link_vercel() {
   without_gitignore_edits without_env_edits \
     vercel link --yes --scope "$SAFENET_VERCEL_SCOPE" --project "$SAFENET_VERCEL_PROJECT" </dev/null
 
-  if [ "$(linked_value projectId)" != "$SAFENET_VERCEL_PROJECT_ID" ]; then
-    warn "The link did not produce project $SAFENET_VERCEL_PROJECT_ID. Check .vercel/project.json."
+  if ! linked_to_safenet; then
+    warn "The link did not produce ${SAFENET_VERCEL_SCOPE}/${SAFENET_VERCEL_PROJECT}. Check .vercel/project.json."
     return 1
   fi
 }

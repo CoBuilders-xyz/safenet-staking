@@ -13,6 +13,20 @@ SAFENET_VERCEL_PROJECT="safenet-staking"
 SAFENET_VERCEL_PROJECT_ID="prj_ZLbUcYUyeXy2pYAdIg5I0Hs4kSfY"
 SAFENET_VERCEL_ORG_ID="team_TPIgHN6kXsahQxg5O69ubU0F"
 
+# An inherited project selection would override the checked .vercel link.
+unset VERCEL_PROJECT_ID VERCEL_ORG_ID
+
+# Prints one field of .vercel/project.json, or nothing when it is absent.
+linked_value() {
+  sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\\1/p" "$REPO_ROOT/.vercel/project.json" 2>/dev/null
+}
+
+# Succeeds when .vercel/ points at this project, in this team.
+linked_to_safenet() {
+  [ "$(linked_value projectId)" = "$SAFENET_VERCEL_PROJECT_ID" ] &&
+    [ "$(linked_value orgId)" = "$SAFENET_VERCEL_ORG_ID" ]
+}
+
 log() {
   echo "[$SCRIPT_TAG] $*"
 }
@@ -54,10 +68,11 @@ without_gitignore_edits() {
   return "$rc"
 }
 
-# Prints the variable names of an env file, sorted.
+# Prints the variable names of an env file, sorted. Accepts the dotenv forms
+# `KEY=value`, `KEY = value` and `export KEY=value`.
 env_keys() {
   [ -f "$1" ] || return 0
-  sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$1" | sort -u
+  sed -n -E 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=.*/\2/p' "$1" | sort -u
 }
 
 # Keeps a backup when the new content drops keys that the target holds.
@@ -69,9 +84,11 @@ guard_env_overwrite() {
   [ -n "$lost" ] || return 0
   lost="$(echo "$lost" | tr '\n' ' ')"
 
-  # `.env.local` -> `.env.backup.local`, so the repo's `.env.*.local` rule
-  # already ignores the backup. A `.bak` suffix would not match it.
-  local backup="${target%.local}.backup.local"
+  # `.env.local` -> `.env.backup.<time>.local`, so the repo's `.env.*.local`
+  # rule already ignores the backup. A `.bak` suffix would not match it. The
+  # time stamp keeps each backup, so a later pull never replaces an earlier one.
+  local backup
+  backup="${target%.local}.backup.$(date +%Y%m%d-%H%M%S).local"
   cp "$target" "$backup"
   chmod 600 "$backup"
   warn "These keys exist only in $target: $lost"

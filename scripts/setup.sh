@@ -85,7 +85,8 @@ if command -v vercel >/dev/null 2>&1 && vercel whoami >/dev/null 2>&1; then
   if [ "$pulled" -eq 1 ]; then
     say ".env.local" "pulled from Vercel"
   else
-    say "vercel" "link or pull failed, see above"
+    say "vercel" "signed in, but link or pull failed, see above"
+    exit 1
   fi
 else
   say "vercel" "not signed in, secrets not pulled"
