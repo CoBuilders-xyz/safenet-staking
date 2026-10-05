@@ -68,6 +68,7 @@ export function signingValidator(addr: Bytes, block: BigInt, c: Consensus): Sign
   return v as SigningValidator
 }
 
+// dayStart and hourStart key on ts.toI32(), which overflows on 2038-01-19.
 export function dayStart(ts: BigInt): i32 {
   return (ts.toI32() / DAY) * DAY
 }

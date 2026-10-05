@@ -50,6 +50,9 @@ jobs:
       - name: Compare with SEF's published data
         env:
           PARITY_STATE_DIR: ${{ runner.temp }}/parity
+          # A Studio deploy retires older version labels of its slug: Studio keeps only the
+          # newest versions, and 2a0e6b8 answered Not found once edc2588 was deployed. So a
+          # deploy moves the pin here, and in any preview, in the same change.
           SUBGRAPH_URL_MAINNET: https://api.studio.thegraph.com/query/1762768/safenet-mainnet/0abe5fb
           SUBGRAPH_URL_GNOSIS: https://api.studio.thegraph.com/query/1762768/safenet-gnosis/edc2588
           MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}

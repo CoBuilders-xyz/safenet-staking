@@ -1,7 +1,8 @@
 import { assert, describe, test, clearStore, afterEach } from "matchstick-as/assembly/index"
 import { handleSignShared, handleSignCompleted } from "../src/frostcoordinator"
 import { handleTransactionProposed, handleTransactionAttested, handleEpochRolledOver } from "../src/consensus"
-import { COUNTED_HORIZON } from "../src/shared"
+import { Address, BigInt } from "@graphprotocol/graph-ts"
+import { COUNTED_HORIZON, consensus, signingValidator } from "../src/shared"
 import { signShared, signCompleted, transactionProposed, transactionAttested, epochRolledOver } from "./events"
 
 const SID = "0x" + "aa".repeat(32)
@@ -193,6 +194,17 @@ describe("participation", () => {
     assert.notInStore("CountedCeremony", SID)
     assert.fieldEquals("Consensus", "1", "countedOldest", SID2)
     assert.fieldEquals("Consensus", "1", "countedNewest", SID3)
+  })
+
+  test("signingValidator never moves lastSeenBlock backwards", () => {
+    // Called directly: every handler passes its own block, so no handler sequence reaches the
+    // guard with an older block. The guard is the contract of the helper, tested as such.
+    const c = consensus()
+    signingValidator(Address.fromString(V1), BigInt.fromI32(5), c).save()
+    signingValidator(Address.fromString(V1), BigInt.fromI32(1), c).save()
+
+    assert.fieldEquals("SigningValidator", V1, "lastSeenBlock", "5")
+    assert.fieldEquals("SigningValidator", V1, "firstSeenBlock", "5")
   })
 
   test("counting an older ceremony does not move lastSeenBlock backwards", () => {

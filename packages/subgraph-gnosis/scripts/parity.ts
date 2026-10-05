@@ -30,7 +30,9 @@
  *   SUBGRAPH_URL_GNOSIS=<query URL> pnpm --filter @cobuilders/safenet-subgraph-gnosis test:parity
  *
  */
-import { SEF_DATA, participationWindow, type SefNetworkInfo, type SefValidator } from "@cobuilders/safenet-core"
+import {
+  SEF_DATA, SHARE_LOOKBACK_BLOCKS, participationWindow, type SefNetworkInfo, type SefValidator,
+} from "@cobuilders/safenet-core"
 import {
   EXIT_CODE, NEEDS_HOURLY_BUCKETS, appendSummary, chainReader, compareParticipation, formatAge, freshness,
   githubToken, lacksHourlyBuckets, lastSefCommit, notComparable, overall, participationFromHours, querySubgraph,
@@ -39,13 +41,6 @@ import {
 } from "@cobuilders/safenet-core/parity"
 
 const TITLE = "Gnosis: participation per validator against SEF's validator-info.json"
-
-// A ceremony can complete inside the window with its shares emitted just before the start. The
-// subgraph counts a share when its ceremony completes, so it only needs to have indexed those
-// earlier blocks. 1,000 blocks is metrics-poc.ts's look-back: over 70,510 ceremonies in the
-// 16 days to block 48,602,160, the span from first winning share to completion had a median of
-// 1 block and a max of 260.
-const SHARE_LOOKBACK = 1_000n
 
 // graph-node caps `first` at 1000. The hours are read in pages of that size.
 const PAGE = 1000
@@ -154,12 +149,13 @@ async function main(): Promise<number> {
   if (indexed < last) refusals.push(`the subgraph has indexed to block ${indexed}, before the window's last block ${last}`)
   // This deployment starts a fixed number of days before it was deployed; see this package's
   // CLAUDE.md. The window keeps moving forward, so this only stops a run right after a deploy.
-  // The look-back matters for the buckets too: a ceremony attested at the window's first block
-  // counts the shares before it, and the deployment must have indexed them.
+  // A ceremony can complete inside the window with its shares emitted just before the start. The
+  // subgraph counts a share when its ceremony completes, so it only needs to have indexed those
+  // earlier blocks: SHARE_LOOKBACK_BLOCKS in packages/core, the look-back metrics-poc.ts uses.
   const earliest = meta.signingValidators[0] ? BigInt(meta.signingValidators[0].firstSeenBlock) : undefined
-  const coverage = earliest === undefined || earliest > first - SHARE_LOOKBACK
-    ? `the deployment's first share is at block ${earliest ?? "none"}, after block ${first - SHARE_LOOKBACK}: ` +
-      `it does not cover SEF's window with ${SHARE_LOOKBACK} blocks of look-back, so it started too late to compare it`
+  const coverage = earliest === undefined || earliest > first - SHARE_LOOKBACK_BLOCKS
+    ? `the deployment's first sight of a validator is at block ${earliest ?? "none"}, after block ${first - SHARE_LOOKBACK_BLOCKS}: ` +
+      `it does not cover SEF's window with ${SHARE_LOOKBACK_BLOCKS} blocks of look-back, so it started too late to compare it`
     : undefined
 
   let rows: ParityRow[] = refusals.map((note) => ({
