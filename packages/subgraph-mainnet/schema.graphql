@@ -194,15 +194,19 @@ type RewardClaim @entity(immutable: true) {
   account: Bytes!
 
   """
-  The cumulative amount the account has claimed to date, NOT the amount of this claim.
+  What the account had claimed in total after this claim: the running sum of its claims.
 
-  The CumulativeMerkleDrop pattern pays the difference between a new cumulative total and
-  what was already claimed. Summing this field over a staker double counts. The network
-  total is maintained separately, by difference, in the handler.
+  Computed by the handler. The event does not carry it. Summing this field over a staker
+  double counts; sum `amount` instead.
   """
   cumulativeAmount: BigInt!
 
-  "This claim alone: cumulativeAmount minus what the account had claimed before."
+  """
+  What this claim alone paid: the event's `amount`.
+
+  The event carries the payment, not a cumulative total. Checked against the chain on
+  2026-10-04: an account's event amounts sum to cumulativeClaimed(account) on the contract.
+  """
   amount: BigInt!
 
   blockNumber: BigInt!
@@ -252,7 +256,7 @@ type RewardPeriod @entity(immutable: true) {
   cumulativeClaimedAtStart: BigInt!
 }
 
-"Running cumulative claims per account, so each RewardClaim can compute its own difference."
+"Running cumulative claims per account. cumulativeClaimed must equal cumulativeClaimed(account) on the MerkleDrop."
 type RewardAccount @entity(immutable: false) {
   "account address, lowercase hex."
   id: ID!

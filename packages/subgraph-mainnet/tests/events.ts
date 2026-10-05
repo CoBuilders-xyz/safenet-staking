@@ -67,12 +67,12 @@ export function validatorUpdated(
 }
 
 export function claimed(
-  account: string, cumulativeAmount: string, block: i32, ts: i32, logIndex: i32 = 0,
+  account: string, amount: string, block: i32, ts: i32, logIndex: i32 = 0,
 ): Claimed {
   const e = changetype<Claimed>(newMockEvent())
   e.parameters = new Array()
   e.parameters.push(new ethereum.EventParam("account", ethereum.Value.fromAddress(Address.fromString(account))))
-  e.parameters.push(new ethereum.EventParam("amount", ethereum.Value.fromUnsignedBigInt(BigInt.fromString(cumulativeAmount))))
+  e.parameters.push(new ethereum.EventParam("amount", ethereum.Value.fromUnsignedBigInt(BigInt.fromString(amount))))
   return at(e, block, ts, logIndex)
 }
 
