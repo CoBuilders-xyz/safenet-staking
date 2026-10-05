@@ -171,7 +171,7 @@ test("pruned history is NOT COMPARABLE, exits 0, and says why in one line", () =
   const kept = prunedFrom(PRUNED)
   assert.equal(kept, 48_599_400n)
   const rows = [
-    notComparable("participation_rate_14d", prunedHistoryReason(kept!, 48_363_900n)),
+    notComparable("participation_rate_14d", prunedHistoryReason({ indexed: 48_601_462n, kept: kept!, needed: 48_363_900n })),
     { figure: "total_transactions_checked", ours: "", sef: "980515", precision: "", verdict: "NOT COMPARED" as const },
   ]
   const state = overall(rows)
@@ -179,8 +179,8 @@ test("pruned history is NOT COMPARABLE, exits 0, and says why in one line", () =
   assert.equal(EXIT_CODE[state], 0)
   assert.equal(
     rows[0]!.note,
-    "Studio keeps 1,000 blocks of history; SEF's window starts 235500 blocks earlier; " +
-      "the hourly buckets that make this comparable are COB-612",
+    "the deployment keeps 2062 blocks of history; SEF's window starts 235500 blocks earlier; " +
+      "hourly buckets with completion semantics are needed to compare this window",
   )
   assert.notEqual(state, "PASS")
 })
@@ -217,11 +217,12 @@ test("the publish instant is the committer date of the last commit", () => {
   assert.equal(c.publishedAt.toISOString(), "2026-10-05T06:04:11.000Z")
 })
 
-test("a rate-limit answer is reported with GitHub's message", () => {
+test("a rate-limit answer is reported with GitHub's message and the remedy", () => {
   assert.throws(
     () => parseLastCommit({ message: "API rate limit exceeded for 203.0.113.7." }),
-    /did not return a list: API rate limit exceeded/,
+    /did not return a list: API rate limit exceeded.*; .*set GITHUB_TOKEN, or sign in to gh so `gh auth token` answers/,
   )
+  assert.throws(() => parseLastCommit({ message: "Bad credentials" }), /Bad credentials; check GITHUB_TOKEN/)
 })
 
 test("an empty list, a short sha or a bad date is refused", () => {

@@ -3,7 +3,8 @@
 [![Parity with SEF](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml/badge.svg)](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml)
 
 Mainnet total staked compared to the wei against SEF's published figure at its publish instant,
-daily. Gnosis participation is not comparable on Studio until the hourly buckets land (COB-612).
+daily. Gnosis participation is not comparable on Studio until the subgraph keeps hourly buckets
+with completion semantics.
 
 ## Setup
 

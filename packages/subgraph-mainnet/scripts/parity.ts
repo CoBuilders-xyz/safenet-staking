@@ -51,7 +51,7 @@ async function main(): Promise<number> {
   const gh = githubToken()
   say(`GitHub token   ${gh.source}`)
 
-  const commit = await lastSefCommit(SEF_DATA.networkInfoCommits, gh.token)
+  const commit = await lastSefCommit("mainnet", SEF_DATA.networkInfoCommits, gh.token)
   const fresh = freshness(commit.publishedAt, new Date())
   const published = `${commit.publishedAt.toISOString()} (commit ${commit.sha.slice(0, 7)}), ${formatAge(fresh.ageMs)} ago`
   say(`SEF published  ${published}`)
@@ -66,7 +66,7 @@ async function main(): Promise<number> {
     return EXIT_CODE[stale.state]
   }
 
-  const network = await sefAsset<SefNetworkInfo>(commit.sha, "network-info.json")
+  const network = await sefAsset<SefNetworkInfo>("mainnet", commit.sha, "network-info.json")
   const sef = parseSefAmount(network.total_staked_amount)
 
   const span = sefRunSpan(commit.publishedAt)

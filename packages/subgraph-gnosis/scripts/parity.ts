@@ -7,10 +7,18 @@
  * packages/core turns it into the window, and the window into its first and last Gnosis block.
  *
  * The subgraph keeps running counters, and a deployment that keeps its history answers for any
- * block it has indexed. So the window is one subtraction: a counter at the last block of the window minus the same counter at the
- * block before the first. That gives the attestation ceremonies completed in the window and,
- * per validator, the ones it shared in, which is SEF's numerator and denominator. The rate is
- * then compared with SEF's double exactly: it is the same division of the same integers.
+ * block it has indexed. So the window is one subtraction: a counter at the last block of the
+ * window minus the same counter at the block before the first. That gives the attestation
+ * ceremonies completed in the window and, per validator, the ones it shared in, which is SEF's
+ * numerator and denominator. The rate is then compared with SEF's double exactly: it is the
+ * same division of the same integers.
+ *
+ * A premise, not a fact: that bit-exactness rests on SignCompleted and TransactionAttested for
+ * a ceremony sitting in the same block. SEF files a ceremony under the block it completed in;
+ * the subgraph counts it in the block where the second of the two events arrives. They agree
+ * only when that is one block. It was measured once, on 2026-09-29, over 691 attestations in
+ * 2,000 blocks, and nothing enforces it. A ceremony attested a block later, across a window
+ * edge, would move one count and fail the run.
  *
  * Studio keeps about 1,000 blocks of history, so it cannot answer 14 days back. That is a known
  * limit of the deployment, not a disagreement, and the run reports it as NOT COMPARABLE.
@@ -29,7 +37,7 @@
  */
 import { SEF_DATA, participationWindow, type SefNetworkInfo, type SefValidator } from "@cobuilders/safenet-core"
 import {
-  EXIT_CODE, HOURLY_BUCKETS_ISSUE, appendSummary, chainReader, compareParticipation, formatAge, freshness,
+  EXIT_CODE, NEEDS_HOURLY_BUCKETS, appendSummary, chainReader, compareParticipation, formatAge, freshness,
   githubToken, lastSefCommit, notComparable, overall, prunedFrom, prunedHistoryReason, querySubgraph,
   recordState, redact, renderMarkdown, renderText, sefAsset, staleOutcome, subgraphEndpoint, type ParityRow,
 } from "@cobuilders/safenet-core/parity"
@@ -59,7 +67,7 @@ interface Counters {
  * deployment answers only for its last blocks, and SEF's window starts 14 days back.
  */
 async function windowCounts(
-  endpoint: string, first: bigint, last: bigint,
+  endpoint: string, indexed: bigint, first: bigint, last: bigint,
 ): Promise<{ attended: Map<string, bigint>; ceremonies: bigint } | string> {
   const counters = (prefix: string, block: bigint) => `
     ${prefix}Consensus: consensus(id: "1", block: { number: ${block} }) { attestationCeremonies }
@@ -73,7 +81,7 @@ async function windowCounts(
   } catch (e) {
     const kept = prunedFrom(e instanceof Error ? e.message : "")
     if (kept === undefined) throw e
-    return prunedHistoryReason(kept, first - 1n)
+    return prunedHistoryReason({ indexed, kept, needed: first - 1n })
   }
   if (q.endValidators.length >= PAGE || q.beforeValidators.length >= PAGE) {
     throw new Error(`signingValidators reached the page limit of ${PAGE}`)
@@ -97,7 +105,7 @@ async function main(): Promise<number> {
   const gh = githubToken()
   say(`GitHub token   ${gh.source}`)
 
-  const commit = await lastSefCommit(SEF_DATA.validatorInfoCommits, gh.token)
+  const commit = await lastSefCommit("gnosis", SEF_DATA.validatorInfoCommits, gh.token)
   const fresh = freshness(commit.publishedAt, new Date())
   const published = `${commit.publishedAt.toISOString()} (commit ${commit.sha.slice(0, 7)}), ${formatAge(fresh.ageMs)} ago`
   say(`SEF published  ${published}`)
@@ -114,8 +122,8 @@ async function main(): Promise<number> {
 
   const window = participationWindow(commit.publishedAt)
   const [sef, network] = await Promise.all([
-    sefAsset<SefValidator[]>(commit.sha, "validator-info.json"),
-    sefAsset<SefNetworkInfo>(commit.sha, "network-info.json"),
+    sefAsset<SefValidator[]>("gnosis", commit.sha, "validator-info.json"),
+    sefAsset<SefNetworkInfo>("gnosis", commit.sha, "network-info.json"),
   ])
 
   const gnosis = chainReader("gnosis")
@@ -145,12 +153,11 @@ async function main(): Promise<number> {
   if (meta._meta.hasIndexingErrors) refusals.push("the subgraph reports indexing errors")
   if (indexed < last) refusals.push(`the subgraph has indexed to block ${indexed}, before the window's last block ${last}`)
   // This deployment starts a fixed number of days before it was deployed; see this package's
-  // CLAUDE.md. The window keeps moving forward, so this only fails right after a deploy.
+  // CLAUDE.md. The window keeps moving forward, so this only stops a run right after a deploy.
   const earliest = meta.signingValidators[0] ? BigInt(meta.signingValidators[0].firstSeenBlock) : undefined
   const coverage = earliest === undefined || earliest > first - SHARE_LOOKBACK
     ? `the deployment's first share is at block ${earliest ?? "none"}, after block ${first - SHARE_LOOKBACK}: ` +
-      `it does not cover SEF's window with ${SHARE_LOOKBACK} blocks of look-back; the hourly buckets that ` +
-      `make this comparable are ${HOURLY_BUCKETS_ISSUE}`
+      `it does not cover SEF's window with ${SHARE_LOOKBACK} blocks of look-back; ${NEEDS_HOURLY_BUCKETS}`
     : undefined
 
   let rows: ParityRow[] = refusals.map((note) => ({
@@ -159,7 +166,7 @@ async function main(): Promise<number> {
   if (refusals.length === 0 && coverage) {
     rows = [notComparable("participation_rate_14d", coverage)]
   } else if (refusals.length === 0) {
-    const counted = await windowCounts(endpoint, first, last)
+    const counted = await windowCounts(endpoint, indexed, first, last)
     if (typeof counted === "string") {
       rows = [notComparable("participation_rate_14d", counted)]
     } else {

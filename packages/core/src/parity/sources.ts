@@ -18,6 +18,41 @@ export function redact(text: string): string {
   return text.replace(/https?:\/\/[^\s"'`)]+/g, "<redacted-url>")
 }
 
+/** The four kinds of endpoint a run reads. Each fails for its own reason. */
+export type EndpointFamily = "github" | "sef" | "rpc" | "subgraph"
+
+/**
+ * The error for an endpoint that did not answer at all, such as Node's bare `fetch failed`.
+ * It names which endpoint and which variable to check, and leaves every URL out.
+ */
+export function unreachable(family: EndpointFamily, chain: ChainKey, cause: unknown): Error {
+  const err = cause as { shortMessage?: unknown; message?: unknown; cause?: { message?: unknown } } | null
+  // Node's fetch hides the reason, such as ECONNREFUSED, in `cause`; viem's first line is
+  // `shortMessage`.
+  const why = [err?.shortMessage, err?.cause?.message, err?.message].find((m) => typeof m === "string") as string | undefined
+  const rpcVariable = chain === "mainnet" ? "MAINNET_RPC_URL" : "GNOSIS_RPC_URL"
+  const [what, hint] = {
+    github: ["the GitHub API", "the network, and GITHUB_TOKEN when it is set"],
+    sef: ["SEF's files on raw.githubusercontent.com", "the network"],
+    rpc: [`the ${chain} RPC`, `${rpcVariable}; when it is unset, the public endpoints in packages/core are used`],
+    subgraph: [
+      `the ${chain} subgraph`,
+      `${chain === "mainnet" ? "SUBGRAPH_URL_MAINNET" : "SUBGRAPH_URL_GNOSIS"}; when it is unset, ` +
+        "the local graph-node on GRAPH_NODE_PORT is used",
+    ],
+  }[family]
+  return new Error(`could not reach ${what} (${redact((why ?? "no reason given").split("\n")[0]!)}); check ${hint}`)
+}
+
+/** Runs one request, and turns a failure to get any answer into `unreachable`. */
+export async function reach<T>(family: EndpointFamily, chain: ChainKey, request: () => Promise<T>): Promise<T> {
+  try {
+    return await request()
+  } catch (e) {
+    throw unreachable(family, chain, e)
+  }
+}
+
 /**
  * A GitHub token, if one is available, and where it came from. Never printed.
  *
@@ -37,14 +72,17 @@ export function githubToken(): { token?: string; source: string } {
   return { source: "none: unauthenticated, 60 requests an hour per IP" }
 }
 
-/** The last commit that wrote one of SEF's files. `url` is one of the `*Commits` in SEF_DATA. */
-export async function lastSefCommit(url: string, token?: string): Promise<SefCommit> {
-  const r = await fetch(url, {
+/**
+ * The last commit that wrote one of SEF's files. `url` is one of the `*Commits` in SEF_DATA.
+ * `chain` only says which run asked, for the error.
+ */
+export async function lastSefCommit(chain: ChainKey, url: string, token?: string): Promise<SefCommit> {
+  const r = await reach("github", chain, () => fetch(url, {
     headers: {
       accept: "application/vnd.github+json",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
-  })
+  }))
   const body: unknown = await r.json().catch(() => null)
   return parseLastCommit(body)
 }
@@ -54,8 +92,8 @@ export async function lastSefCommit(url: string, token?: string): Promise<SefCom
  * does not count against the API limit; reading `main` instead could serve a file one cron run
  * newer or older than the commit, because the API and the raw CDN cache separately.
  */
-export async function sefAsset<T>(sha: string, file: string): Promise<T> {
-  const r = await fetch(`${SEF_DATA.assetsAtCommit(sha)}/${file}`)
+export async function sefAsset<T>(chain: ChainKey, sha: string, file: string): Promise<T> {
+  const r = await reach("sef", chain, () => fetch(`${SEF_DATA.assetsAtCommit(sha)}/${file}`))
   if (!r.ok) throw new Error(`SEF's ${file} at ${sha.slice(0, 7)} answered HTTP ${r.status}`)
   return (await r.json()) as T
 }
@@ -77,11 +115,11 @@ export function subgraphEndpoint(chain: ChainKey): string {
  */
 export async function querySubgraph<T>(chain: ChainKey, endpoint: string, query: string): Promise<T> {
   const variable = chain === "mainnet" ? "SUBGRAPH_URL_MAINNET" : "SUBGRAPH_URL_GNOSIS"
-  const r = await fetch(endpoint, {
+  const r = await reach("subgraph", chain, () => fetch(endpoint, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query }),
-  })
+  }))
   if (!r.ok) throw new Error(`the ${chain} subgraph answered HTTP ${r.status}; check ${variable}`)
   const j = (await r.json().catch(() => ({}))) as { data?: T; errors?: { message: string }[]; message?: string }
   if (j.errors) throw new Error(`the ${chain} subgraph: ${j.errors.map((e) => e.message).join("; ")}`)
@@ -94,11 +132,11 @@ export function chainReader(chain: ChainKey) {
   const client = createPublicClient({ chain: CHAINS[chain], transport: fallback(rpcUrls(chain).map((u) => http(u))) })
   const floor = chain === "mainnet" ? CONTRACTS.staking.deployBlock : CONTRACTS.consensus.deployBlock
   return {
-    head: () => client.getBlockNumber(),
+    head: () => reach("rpc", chain, () => client.getBlockNumber()),
     /** The block at an instant on this chain. See blockAtTimestamp for `side`. */
     blockAt: async (at: Date, side: "first" | "last", head: bigint) =>
       blockAtTimestamp({
-        timestampOf: async (n) => (await client.getBlock({ blockNumber: n })).timestamp,
+        timestampOf: async (n) => (await reach("rpc", chain, () => client.getBlock({ blockNumber: n }))).timestamp,
         lo: floor,
         hi: head,
         target: BigInt(Math.floor(at.getTime() / 1000)),

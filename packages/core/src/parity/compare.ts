@@ -33,8 +33,11 @@ export const EXIT_CODE: Readonly<Record<ParityState, 0 | 1>> = {
   "NOT COMPARABLE": 0,
 }
 
-/** The issue that adds the hourly buckets the Gnosis comparison needs on a pruned deployment. */
-export const HOURLY_BUCKETS_ISSUE = "COB-612"
+/**
+ * What a pruned Gnosis deployment lacks to compare SEF's window: counts filed by the hour a
+ * ceremony completed in, so a 14-day window ending on the hour is a sum of stored rows.
+ */
+export const NEEDS_HOURLY_BUCKETS = "hourly buckets with completion semantics are needed to compare this window"
 
 /**
  * How a figure is compared. SEF's participation rates are doubles and its staked total is
@@ -211,10 +214,15 @@ export function prunedFrom(message: string): bigint | undefined {
   return m ? BigInt(m[1]!) : undefined
 }
 
-/** The reason line for a deployment that answers from block `kept` when SEF needs `needed`. */
-export function prunedHistoryReason(kept: bigint, needed: bigint): string {
-  return `Studio keeps 1,000 blocks of history; SEF's window starts ${kept - needed} blocks earlier; ` +
-    `the hourly buckets that make this comparable are ${HOURLY_BUCKETS_ISSUE}`
+/**
+ * The reason line for a deployment indexed to block `indexed` that answers from block `kept`
+ * only, when SEF's window needs block `needed`. The depth printed is the one observed, not the
+ * `historyBlocks` setting: graph-node prunes lazily, so it keeps somewhat more.
+ */
+export function prunedHistoryReason(input: { indexed: bigint; kept: bigint; needed: bigint }): string {
+  const { indexed, kept, needed } = input
+  return `the deployment keeps ${indexed - kept} blocks of history; SEF's window starts ${kept - needed} ` +
+    `blocks earlier; ${NEEDS_HOURLY_BUCKETS}`
 }
 
 /** A row that says why a figure cannot be compared today. Never a pass, never a failure. */
@@ -241,9 +249,14 @@ export interface SefCommit {
  */
 export function parseLastCommit(payload: unknown): SefCommit {
   if (!Array.isArray(payload)) {
-    // A rate limit or a bad token answers with an object that carries a message. Say it.
+    // A rate limit or a bad token answers with an object that carries a message. Say it, and
+    // say what fixes it.
     const message = (payload as { message?: unknown } | null)?.message
-    throw new Error(`the GitHub commits API did not return a list${typeof message === "string" ? `: ${message}` : ""}`)
+    const said = typeof message === "string" ? `: ${message}` : ""
+    const remedy = /rate limit/i.test(said)
+      ? "unauthenticated requests are limited to 60 an hour; set GITHUB_TOKEN, or sign in to gh so `gh auth token` answers"
+      : "check GITHUB_TOKEN, or `gh auth token` when it is unset"
+    throw new Error(`the GitHub commits API did not return a list${said}; ${remedy}`)
   }
   const c = payload[0] as { sha?: unknown; commit?: { committer?: { date?: unknown } } } | undefined
   if (!c) throw new Error("the GitHub commits API returned no commit for the file")

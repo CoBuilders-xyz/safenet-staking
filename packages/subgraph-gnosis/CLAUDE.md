@@ -56,6 +56,12 @@ after the window's last block minus the same counter after the block before its 
 numerator and denominator. The rate is the same division, and is compared as the identical
 double.
 
+That rests on a premise, not a fact: `SignCompleted` and `TransactionAttested` for a ceremony sit
+in the same block. SEF files a ceremony under the block it completed in, and the subgraph counts
+it in the block where the second of the two events arrives. They agree only when that is one
+block. It was measured once, on 2026-09-29, over 691 attestations in 2,000 blocks, and nothing
+enforces it. A ceremony attested a block later, across a window edge, would fail the run.
+
 That needs `block: { number }` 14 days back. Studio keeps about 1,000 blocks of history, about
 1.4 hours here, so against Studio the run reports NOT COMPARABLE, exits 0, and says why in one
 line. A real difference, when the comparison is possible, still fails. It can pass only against a

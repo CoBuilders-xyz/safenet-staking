@@ -68,13 +68,16 @@ jobs:
             echo
           } >> "$GITHUB_STEP_SUMMARY"
           pnpm test:parity
-      # Both chains in one table, also when a run failed. A chain with no state file never
-      # reached the point of writing one, which is itself a failure.
+      # Both chains in one table, also when a run failed. A chain with no state file never ran
+      # its comparison, or died before reporting; turbo reports success for a task no package
+      # implements. Either way nothing was proven, so this step fails the job rather than leave
+      # a green badge over a FAIL row. So does any count of state files other than two.
       - name: Summarise the state of each chain
         if: always()
         env:
           PARITY_STATE_DIR: ${{ runner.temp }}/parity
         run: |
+          missing=0
           {
             echo "### State by chain"
             echo
@@ -85,6 +88,12 @@ jobs:
                 cat "$PARITY_STATE_DIR/$chain.md"
               else
                 echo "| $chain | FAIL | the run wrote no state |"
+                missing=1
               fi
             done
           } >> "$GITHUB_STEP_SUMMARY"
+          count=$(find "$PARITY_STATE_DIR" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$missing" -ne 0 ] || [ "$count" -ne 2 ]; then
+            echo "::error title=Parity state missing::Expected exactly two state files, one for mainnet and one for gnosis; found ${count}. A chain that wrote no state proved nothing."
+            exit 1
+          fi
