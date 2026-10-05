@@ -26,7 +26,12 @@ if (existsSync(envPath) && existsSync(distDir)) {
   const secrets = readFileSync(envPath, "utf8")
     .split("\n")
     .filter((l) => !l.trim().startsWith("VITE_"))
-    .map((l) => l.split("=").slice(1).join("=").trim())
+    .map((l) => {
+      // `vercel env pull` quotes every value. Strip a quote pair only when both ends match.
+      const v = l.split("=").slice(1).join("=").trim()
+      const quoted = v.match(/^(["'])(.*)\1$/)
+      return quoted ? quoted[2] : v
+    })
     .filter((v) => v.length > 12)
   const bundle = readdirSync(distDir)
     .filter((f) => f.endsWith(".js"))
