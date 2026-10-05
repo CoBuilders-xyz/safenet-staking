@@ -9,7 +9,7 @@
     "build": "pnpm generate && graph codegen && graph build",
     "test": "pnpm generate && graph codegen && graph test -v 0.6.0",
     "check": "eslint . && tsc --noEmit -p tsconfig.check.json",
-    "deploy:studio": "graph deploy safenet-mainnet",
+    "deploy:studio": "pnpm build && node --env-file-if-exists=../../.env.local ../../tools/deploy-studio.mjs safenet-mainnet",
     "differential": "node --env-file-if-exists=../../.env.ports --import tsx scripts/differential.ts"
   },
   "dependencies": {
