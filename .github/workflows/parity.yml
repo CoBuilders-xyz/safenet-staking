@@ -1,0 +1,64 @@
+name: Parity with SEF
+
+# Once a day, our deployed subgraphs against the figures SEF publishes in safe-fndn's data
+# repository, each at the instant SEF published it. The comparison table goes to the job
+# summary, and the badge in README.md shows the last result.
+#
+# Not on pull requests: the result depends on SEF's data and on the deployed subgraphs, not on
+# the code under review. The unit tests of the comparison itself run in ci.yml.
+
+on:
+  schedule:
+    # SEF's job writes every three hours, from 00:00 UTC, and commits a few minutes later.
+    # 06:43 lands well after the 06:00 write, and away from the top of the hour, when
+    # scheduled runs queue longest.
+    - cron: "43 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: parity
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  parity:
+    name: parity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # Pin actions to full SHA: mutable tags can be moved to malicious code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      # Each package appends its own table to the job summary. The query URLs are public and
+      # carry no key, so they sit here in plain text. The RPC endpoints are only used to find
+      # the block at an instant; without the secrets the scripts fall back to public endpoints.
+      # GITHUB_TOKEN lifts the GitHub API limit for the two commit lookups.
+      - name: Compare with SEF's published data
+        env:
+          SUBGRAPH_URL_MAINNET: https://api.studio.thegraph.com/query/1762768/safenet-mainnet/0abe5fb
+          SUBGRAPH_URL_GNOSIS: https://api.studio.thegraph.com/query/1762768/safenet-gnosis/2a0e6b8
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+          GNOSIS_RPC_URL: ${{ secrets.GNOSIS_RPC_URL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "## Parity with SEF"
+            echo
+            echo "Each figure is compared at the instant SEF published it: the commit that last wrote the file."
+            echo "STALE means SEF's file is more than 9 hours old, and is not a failure. Past 24 hours the run fails."
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          pnpm test:parity

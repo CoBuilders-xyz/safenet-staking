@@ -43,6 +43,12 @@ legitimately contains none of them.
 - `src/sef.ts` — the shapes of SEF's published files, the URL of an address's reward proof, and
   the window a published participation rate covers.
 - `src/deployments.ts` — what the interface needs per chain, derived from `src/contracts.ts`.
+- `src/parity/` — the comparison behind `pnpm test:parity`, which both subgraph packages share.
+  `compare.ts` holds the rules as pure functions: exact and declared-precision comparison, the
+  stale rule, the publish instant, the staked total rewound through its movements. `blocks.ts`
+  finds the block at an instant. `sources.ts` reads SEF's files at a commit, the subgraphs and
+  the RPC. It is exported as `@cobuilders/safenet-core/parity`, not from the main entry, because
+  `sources.ts` reads the environment and runs `gh`, and the browser app imports the main entry.
 - `src/fork.ts` — the Mainnet block both fork suites fork from, pinned together with the commit of
   SEF's data it reads. A test fixture: move the two together.
 - `scripts/verify-abis.ts` — the check itself.
@@ -57,4 +63,5 @@ legitimately contains none of them.
 3. Keep the export surface to constants, ABIs, and small accessors that only look a constant up
    or derive a location from it, such as `indexedEvent()` or `rewardProofUrl()`. No business
    logic lives here, because every other package imports this one and nothing should import them
-   back.
+   back. The one exception is `src/parity/`, behind its own export: both subgraph packages need
+   the same comparison, and it imports nothing from them.

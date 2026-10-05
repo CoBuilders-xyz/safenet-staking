@@ -1,5 +1,11 @@
 # safenet-staking
 
+[![Parity with SEF](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml/badge.svg)](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml)
+
+The badge is the last daily comparison of our deployed subgraphs with the data SEF publishes,
+each figure taken at the instant SEF published it: the staked total to the wei, and each
+validator's participation rate as the identical number.
+
 ## Setup
 
 Use the Node version in `.nvmrc` and pnpm.

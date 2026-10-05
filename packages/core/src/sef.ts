@@ -23,7 +23,10 @@ export interface SefValidator {
 
 /** `assets/network-info.json` */
 export interface SefNetworkInfo {
-  /** Decimal string, in wei. Parse it exactly. `Number()` rounds at 1e6. */
+  /**
+   * Decimal string in SAFE, with the 18 decimals written out, such as "73352054.1339…929". It
+   * is exact to the wei. Parse it with `parseSefAmount`: `Number()` rounds it.
+   */
   total_staked_amount: string
   total_transactions_checked: number
 }
@@ -87,4 +90,21 @@ export function participationWindow(publishedAt: Date): { start: Date; end: Date
   const hour = 3_600_000
   const end = Math.floor(publishedAt.getTime() / hour) * hour
   return { start: new Date(end - PARTICIPATION_WINDOW_DAYS * 24 * hour), end: new Date(end) }
+}
+
+/** SAFE has 18 decimals. */
+const SAFE_DECIMALS = 18
+
+/**
+ * A decimal SAFE amount as SEF writes it, in wei, exactly. Refuses a value with more places
+ * than SAFE has, because rounding it would hide a change in SEF's format.
+ */
+export function parseSefAmount(amount: string): bigint {
+  const m = /^(\d+)(?:\.(\d+))?$/.exec(amount)
+  if (!m) throw new Error(`not a decimal amount: ${JSON.stringify(amount)}`)
+  const [, whole = "0", frac = ""] = m
+  if (frac.length > SAFE_DECIMALS) {
+    throw new Error(`${frac.length} decimal places, more than SAFE's ${SAFE_DECIMALS}: ${amount}`)
+  }
+  return BigInt(whole + frac.padEnd(SAFE_DECIMALS, "0"))
 }
