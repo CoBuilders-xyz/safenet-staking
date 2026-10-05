@@ -3,13 +3,19 @@ packages:
   - "packages/*"
 
 # Advisories with no patched release, all reached only through @graphprotocol/graph-cli 0.98.1.
-# Each entry holds only while graph-cli pins the vulnerable version.
+# This list is global: pnpm ignores these CVEs on every path, including any new path that brings
+# decompress or braces in later. Before removing an entry, or when a dependency changes, check
+# both the paths and the latest releases:
+#   pnpm why -r decompress braces && pnpm view decompress version && pnpm view braces version
+# A path outside graph-cli needs its own review. A release above 4.2.1 (decompress) or 3.0.3
+# (braces) means a fix exists: override to it and drop the entries.
 auditConfig:
   ignoreCves:
     # decompress <=4.2.1, path traversal on extraction: graph-cli calls it only in
     # `graph node install`, which no script here runs.
-    - CVE-2026-53486
-    - CVE-2026-101894
-    # braces <=3.0.3, stack exhaustion on nested patterns: reached through kubo-rpc-client's
-    # it-glob, which expands only the build paths graph-cli passes it.
-    - CVE-2026-93687
+    - CVE-2026-53486 # GHSA-mp2f-45pm-3cg9
+    - CVE-2026-101894 # GHSA-hrh2-vp3x-79xf
+    # braces <=3.0.3, stack exhaustion on nested patterns: it sits under kubo-rpc-client's
+    # globSource (it-glob, fast-glob, micromatch). graph-cli never calls globSource; it passes
+    # addAll in-memory {path, content} objects, so no braces code runs on any input.
+    - CVE-2026-93687 # GHSA-vfj7-8cjw-p6xm
