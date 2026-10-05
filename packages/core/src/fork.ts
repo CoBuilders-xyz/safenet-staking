@@ -1,7 +1,7 @@
 /**
- * The Mainnet state the fork suite runs against: `pnpm test:fork` in apps/web starts Anvil on a
- * fork of this block. A test fixture, not a production constant. Nothing outside that suite
- * reads it.
+ * The Mainnet state the fork suites run against: `pnpm test:fork` in apps/web and in packages/cli
+ * each start Anvil on a fork of this block. A test fixture, not a production constant. Nothing
+ * outside those suites reads it.
  *
  * The block and SEF's data commit are pinned together, and must move together. SEF overwrites
  * its proof files on `main` with every new Merkle root, so a pinned block read with proofs from
@@ -10,7 +10,7 @@
  * Chosen 2026-10-05. Block 26,122,454 is the first block after 00:03 UTC, a few seconds after
  * SEF's data commit 4cdcc6e (00:02:56 UTC). The root of rewards period 12, published
  * 2026-09-24, was the last root update before both, so the root on chain at the block equals
- * the root in that commit's proof files. The suite checks this on every run.
+ * the root in that commit's proof files. Both suites check this on every run.
  */
 export const MAINNET_FORK = {
   blockNumber: 26_122_454n,

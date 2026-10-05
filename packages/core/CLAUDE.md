@@ -43,7 +43,7 @@ legitimately contains none of them.
 - `src/sef.ts` — the shapes of SEF's published files, the URL of an address's reward proof, and
   the window a published participation rate covers.
 - `src/deployments.ts` — what the interface needs per chain, derived from `src/contracts.ts`.
-- `src/fork.ts` — the Mainnet block the fork suite forks from, pinned together with the commit of
+- `src/fork.ts` — the Mainnet block both fork suites fork from, pinned together with the commit of
   SEF's data it reads. A test fixture: move the two together.
 - `scripts/verify-abis.ts` — the check itself.
 - `scripts/verify-abis-scan.ts` — the per-event scans, the window and the ceiling, taking the
