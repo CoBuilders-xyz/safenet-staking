@@ -1,0 +1,38 @@
+{
+  "name": "@cobuilders/safenet-cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "safenet, a command-line interface for Safenet Beta. Read-only for now.",
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "bin": {
+    "safenet": "./dist/index.js"
+  },
+  "exports": {
+    "./lib": "./src/lib/index.ts"
+  },
+  "scripts": {
+    "bootstrap": "echo '@cobuilders/safenet-cli: nothing to prepare'",
+    "dev": "tsc --noEmit --watch",
+    "build": "tsup",
+    "start": "node --env-file-if-exists=../../.env.local --import tsx src/index.ts",
+    "test": "node ../../tools/run-node-tests.mjs src",
+    "test:smoke": "node --env-file-if-exists=../../.env.local ../../tools/run-node-tests.mjs src/smoke",
+    "check": "pnpm lint && tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@cobuilders/safenet-core": "workspace:*",
+    "commander": "15.0.0",
+    "viem": "2.46.2",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.2",
+    "tsup": "8.5.1",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  }
+}
