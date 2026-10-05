@@ -21,6 +21,7 @@
     "test:parity": "node tools/require-task.mjs test:parity \"the subgraph packages\" && turbo run test:parity",
     "check:browser": "node tools/check-browser-safety.mjs",
     "metrics": "pnpm --filter @cobuilders/safenet-core metrics",
+    "test:smoke": "pnpm --filter @cobuilders/safenet-cli test:smoke",
     "lint": "eslint . && turbo run lint",
     "graph:up": "docker compose --profile graph --env-file .env.ports --env-file .env.local up -d",
     "graph:down": "docker compose --profile graph --env-file .env.ports --env-file .env.local down -v",

@@ -30,15 +30,15 @@ Every package implements the same five. Turborepo fans them out.
 | `pnpm bootstrap` | Runs `scripts/setup.sh`: checks tools, writes `.env.ports`, installs, then links Vercel and pulls `.env.local`. Safe to re-run. **Not `setup`: that is a pnpm builtin that edits your shell rc.** |
 | `pnpm dev` | Starts the web app's Vite dev server, type-watches `packages/core`, and regenerates the subgraph manifests and types. |
 | `pnpm build` | Builds all packages. |
-| `pnpm test` | Unit tests. `apps/web` has 380 Vitest tests in 42 files. The subgraphs have matchstick tests: 20 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has 25 node:test tests in 5 files, and its script fails when it finds no test file. |
+| `pnpm test` | Unit tests. `apps/web` has 380 Vitest tests in 42 files. The subgraphs have matchstick tests: 20 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has 34 node:test tests in 6 files, and its script fails when it finds no test file. `packages/cli` has 49 node:test tests in 4 files, plus 6 Mainnet smoke tests in a fifth that skip here; see `test:smoke`. |
 | `pnpm check` | Lint, the browser-safety check, then types in every package. Run it before every commit. |
 
 The test counts were measured with `pnpm test` when this file was written. Run it for the
 current numbers.
 
 Scope to one package with `pnpm --filter <name> check`. The names are
-`@cobuilders/safenet-core`, `@cobuilders/safenet-web`, `@cobuilders/safenet-subgraph-mainnet` and
-`@cobuilders/safenet-subgraph-gnosis`.
+`@cobuilders/safenet-core`, `@cobuilders/safenet-cli`, `@cobuilders/safenet-web`,
+`@cobuilders/safenet-subgraph-mainnet` and `@cobuilders/safenet-subgraph-gnosis`.
 
 Specific commands, only where they apply:
 
@@ -48,6 +48,7 @@ Specific commands, only where they apply:
 | `pnpm verify:abis:deep` | `packages/core` | Every signature, including rare events, scanned from each deploy block | needs the archive `MAINNET_RPC_URL` from `pnpm env:pull` |
 | `pnpm metrics` | `packages/core` | The 24 metrics, computed against live chains and compared with SEF's published JSON. Writes `packages/core/.metrics/`, which is git-ignored | needs an archive node. With public RPC only, it stopped on a failed Mainnet log range when this file was written |
 | `pnpm check:browser` | root | `apps/web/src` reads no `process.env`, and a built bundle contains no value from `.env.local` | works, part of `check` |
+| `pnpm test:smoke` | root, `packages/cli` | Each of the six commands runs against Mainnet through the real entry point | needs the archive `MAINNET_RPC_URL`; runs nightly. Skipped, with the reason, everywhere else |
 | `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. 83 Playwright tests in 14 spec files | runs; one navigation test is intermittently flaky |
 | `pnpm test:fork` | `apps/web` | The staking flows execute against the real contracts on an Anvil Mainnet fork at a pinned block, each checked by reading the chain. 4 Playwright tests and 1 skipped, about 1.5 minutes | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
 | `pnpm test:parity` | subgraphs | Our numbers match SEF's published JSON | **fails on purpose: no subgraph package implements it yet** |
@@ -73,7 +74,7 @@ passes `E2E_PORT` and `WEB_PORT` through Turborepo's strict environment mode, an
 
 ## Layout
 
-The target layout has nine packages. **Four exist on `main`.** The rest are listed so the shape is
+The target layout has nine packages. **Five exist on `main`.** The rest are listed so the shape is
 known, not to suggest they are there:
 
 ```
@@ -82,6 +83,8 @@ apps/web                    EXISTS   the fork of safe-fndn/safenet-staking-ui, u
 packages/core               EXISTS   addresses, start blocks, ABIs. The only source of constants.
 packages/subgraph-mainnet   EXISTS   staking, withdrawals and rewards on Ethereum Mainnet
 packages/subgraph-gnosis    EXISTS   consensus and signing on Gnosis Chain
+packages/cli                EXISTS   safenet-cli: the `safenet` binary, six read-only commands,
+                                     over a library in src/lib/ that the MCP server will import
 tools/                      EXISTS   edit hook, task guard, browser-safety check, metrics report
 scripts/setup.sh            EXISTS   what `pnpm bootstrap` runs
 docker-compose.yml          EXISTS   local graph-node, postgres and ipfs
@@ -90,14 +93,13 @@ graph-node.toml             EXISTS   graph-node config for two chains at once
 
 apps/api                    planned  REST wrapper, Cloudflare Workers
 apps/alerts                 planned  alerts service, Supabase
-packages/cli                planned  safenet-cli
 packages/mcp                planned  MCP server. Calls the shared library, not the CLI binary.
 packages/testing            planned  shared fixtures: anvil, RPC mocks, Playwright helpers
 ```
 
 Do not infer that a planned package exists because this file names it. Check.
 
-`packages/core` and `apps/web` each own a `CLAUDE.md`; the subgraph packages do not. Read the one
+`packages/core`, `packages/cli` and `apps/web` each own a `CLAUDE.md`; the subgraph packages do not. Read the one
 for the package you are in, not all of them. `apps/web/CLAUDE.md` came with the fork and names
 `yarn`. This repository uses pnpm, so run its scripts as
 `pnpm --filter @cobuilders/safenet-web <script>`.
@@ -119,9 +121,10 @@ Docker Compose, with ports from `.env.ports` and the archive RPC from `.env.loca
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs four jobs on every pull request and on every push to `main`:
-`check`, `test`, `e2e` and `verify-abis`. `nightly.yml` runs the deep ABI scan, the unit tests
-and the fork suite daily; the deep scan and the fork suite need the `MAINNET_RPC_URL` secret. The
-fork suite stays out of per-PR CI because every run reads from the archive node. `security.yml` runs a
+`check`, `test`, `e2e` and `verify-abis`. `nightly.yml` runs the deep ABI scan, the unit tests,
+the fork suite and the CLI smoke tests daily; all but the unit tests need the `MAINNET_RPC_URL`
+secret, and fail without it. The fork suite stays out of per-PR CI because every run reads from
+the archive node. `security.yml` runs a
 dependency review on pull requests, skipped until the repository is public, and `pnpm audit`
 weekly.
 

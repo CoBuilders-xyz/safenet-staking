@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { parseAbiItem, toEventSelector, type AbiEvent } from "viem"
-import { INDEXED_EVENTS } from "./abis.js"
+import { INDEXED_EVENTS, indexedEvent, stakingAbi } from "./abis.js"
 import { CONTRACTS } from "./contracts.js"
 
 // These prove the registry is well formed. Whether the chain still emits each signature is
@@ -26,4 +26,23 @@ test("topic0 is unique across the registry", () => {
     assert.ok(!seen.has(topic0), `${ev.signature} has the same topic0 as ${seen.get(topic0)}`)
     seen.set(topic0, ev.signature)
   }
+})
+
+test("indexedEvent returns the registered signature for every entry", () => {
+  for (const ev of INDEXED_EVENTS) {
+    const item = parseAbiItem(ev.signature) as AbiEvent
+    // The name is only known at runtime here, so the literal-type check is bypassed on purpose.
+    const found = indexedEvent(ev.contract, item.name as never) as AbiEvent
+    assert.equal(toEventSelector(found), toEventSelector(item), ev.signature)
+  }
+})
+
+test("indexedEvent refuses an event that is not registered on that contract", () => {
+  assert.throws(() => indexedEvent("merkleDrop", "StakeIncreased" as never))
+})
+
+test("the staking read ABI declares getPendingWithdrawals as a view", () => {
+  const fn = stakingAbi.find((i) => i.type === "function" && i.name === "getPendingWithdrawals")
+  assert.ok(fn && fn.type === "function")
+  assert.equal(fn.stateMutability, "view")
 })
