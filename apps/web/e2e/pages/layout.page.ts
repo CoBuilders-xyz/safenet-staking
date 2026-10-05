@@ -37,13 +37,6 @@ export class LayoutPage {
     await this.page.goto(path)
   }
 
-  async getActiveNavItem(): Promise<string | null> {
-    const links = this.page.locator("header nav a[aria-current='page']")
-    const count = await links.count()
-    if (count === 0) return null
-    return links.first().textContent()
-  }
-
   async isDarkMode(): Promise<boolean> {
     return this.page.locator("html").evaluate((el) => el.classList.contains("dark"))
   }

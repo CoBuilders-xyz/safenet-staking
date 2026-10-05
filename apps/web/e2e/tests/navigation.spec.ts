@@ -17,10 +17,7 @@ test.describe("Navigation", () => {
     const layout = new LayoutPage(page)
     await layout.goto("/")
 
-    // Wait for the nav to fully render before checking active state
-    await expect(layout.navDashboard).toBeVisible()
-    const active = await layout.getActiveNavItem()
-    expect(active).toBe("Dashboard")
+    await expect(layout.navDashboard).toHaveAttribute("aria-current", "page")
   })
 
   test("navigates to validators page", async ({ disconnectedPage: page }) => {
@@ -30,8 +27,9 @@ test.describe("Navigation", () => {
     await layout.navValidators.click()
     await expect(page).toHaveURL("/#/validators")
 
-    const active = await layout.getActiveNavItem()
-    expect(active).toBe("Validators")
+    // A retrying assertion: the URL can change a render before aria-current does.
+    await expect(layout.navValidators).toHaveAttribute("aria-current", "page")
+    await expect(layout.navDashboard).not.toHaveAttribute("aria-current")
   })
 
   test("navigates to withdrawals page", async ({ disconnectedPage: page }) => {
@@ -41,8 +39,9 @@ test.describe("Navigation", () => {
     await layout.navWithdrawals.click()
     await expect(page).toHaveURL("/#/withdrawals")
 
-    const active = await layout.getActiveNavItem()
-    expect(active).toBe("Withdrawals")
+    // A retrying assertion: the URL can change a render before aria-current does.
+    await expect(layout.navWithdrawals).toHaveAttribute("aria-current", "page")
+    await expect(layout.navDashboard).not.toHaveAttribute("aria-current")
   })
 
   test("logo navigates back to dashboard", async ({ disconnectedPage: page }) => {
