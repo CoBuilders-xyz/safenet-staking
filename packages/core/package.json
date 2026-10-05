@@ -19,7 +19,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "viem": "2.46.2"
+    "viem": "2.57.2"
   },
   "devDependencies": {
     "@types/node": "22.19.2",
