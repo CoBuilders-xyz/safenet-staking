@@ -272,13 +272,29 @@ describe("ClaimAndStakeDialog", () => {
       expect(amount).toBeEnabled()
       expect(amount).toHaveValue("60")
       expect(screen.queryByText(/do not have enough SAFE/)).not.toBeInTheDocument()
+      await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
+      expect(screen.getByRole("button", { name: "Stake" })).toBeEnabled()
 
       // The next poll reaches a node that has.
       m.balance = 60n * SAFE
       view.rerenderOpen()
       expect(screen.getByLabelText("Amount")).toBeEnabled()
+      expect(screen.getByRole("button", { name: "Stake" })).toBeEnabled()
+    })
+
+    it("drops that floor once a read includes the claim, so a later lower balance is believed", async () => {
+      claimed(60n * SAFE)
+      m.balance = 60n * SAFE
+      const view = renderDialog()
       await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
       expect(screen.getByRole("button", { name: "Stake" })).toBeEnabled()
+
+      // 50 SAFE leave the wallet elsewhere.
+      m.balance = 10n * SAFE
+      view.rerenderOpen()
+
+      expect(screen.getByText("You do not have enough SAFE to stake this amount.")).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: "Stake" })).toBeDisabled()
     })
 
     it("asks for the amount when the receipt did not show it", () => {

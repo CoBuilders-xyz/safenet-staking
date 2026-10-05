@@ -87,10 +87,15 @@ export function useStakeForm({
   const { toast } = useToast()
 
   const readBalance = typeof balance === "bigint" ? balance : undefined
+  // The floor covers reads from before the claim only. A read that reaches it includes the claim,
+  // and from then on the reads are the truth, including a lower one after spending elsewhere.
+  const [caughtUpTo, setCaughtUpTo] = useState<bigint | undefined>()
+  const floorActive = availableAtLeast !== undefined && caughtUpTo !== availableAtLeast
+  if (floorActive && readBalance !== undefined && readBalance >= availableAtLeast) {
+    setCaughtUpTo(availableAtLeast)
+  }
   const balanceValue =
-    availableAtLeast !== undefined && (readBalance === undefined || readBalance < availableAtLeast)
-      ? availableAtLeast
-      : readBalance
+    floorActive && (readBalance === undefined || readBalance < availableAtLeast) ? availableAtLeast : readBalance
   const hasZeroBalance = balanceValue !== undefined && balanceValue === 0n
   const insufficientBalance = balanceValue !== undefined && parsedAmount > 0n && parsedAmount > balanceValue
   const aboveMax = maxAmount !== undefined && parsedAmount > maxAmount

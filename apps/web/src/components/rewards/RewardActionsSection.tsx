@@ -70,7 +70,7 @@ export function RewardActionsSection(props: RewardActionsSectionProps) {
       {blocker && <SectionNote>{blocker}</SectionNote>}
       {!blocker && !claimDisabled && (
         <SectionNote>
-          Rewards do not compound. Claim &amp; Stake claims them and stakes what arrives, in two transactions.
+          Rewards do not compound. Claim &amp; Stake claims them, then stakes what arrives.
         </SectionNote>
       )}
       {offerStakeBalance && <SectionNote>The SAFE in your wallet earns nothing until you stake it.</SectionNote>}

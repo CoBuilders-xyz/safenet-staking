@@ -55,7 +55,7 @@ test.describe("Claim & Stake", () => {
     expect(mockChainState.balance).toBe(AMOUNTS.userBalance)
   })
 
-  test("without batching: approves, then stakes, as two transactions", async ({ connectedPage: page, mockChainState }) => {
+  test("without batching: approves, then stakes, as separate transactions", async ({ connectedPage: page, mockChainState }) => {
     mockChainState.rewardProof = REWARD_PROOFS.claimable
     mockChainState.allowance = 0n
     const before = stakeOf(mockChainState, VALIDATORS.validatorA)

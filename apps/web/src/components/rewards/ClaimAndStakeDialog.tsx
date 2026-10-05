@@ -184,7 +184,7 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
           <DialogTitle>{restaking ? "Claim & Stake" : "Stake your balance"}</DialogTitle>
           <DialogDescription>
             {restaking
-              ? "Claim your rewards, then stake them with a validator. Two transactions."
+              ? "Claim your rewards, then stake them with a validator. A wallet that cannot batch also asks to approve before staking."
               : "Stake SAFE that is already in your wallet."}
           </DialogDescription>
         </DialogHeader>
