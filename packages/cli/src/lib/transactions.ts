@@ -296,7 +296,16 @@ function liveRunner(ctx: Context, signer: Signer, options: WriteOptions): Runner
         return fail(revertError(c, from, err))
       }
       options.onProgress?.({ type: "sent", contract: c.contract, functionName: c.functionName, hash })
-      const receipt = await ctx.client.waitForTransactionReceipt({ hash })
+      let receipt
+      try {
+        receipt = await ctx.client.waitForTransactionReceipt({ hash })
+      } catch (err) {
+        // The transaction may still land. Sending it again could do the operation twice.
+        return fail(new SafenetError(
+          `${c.contract}.${c.functionName} was sent in ${hash}, but its receipt could not be read ` +
+            `(${err instanceof BaseError ? err.shortMessage : "no answer"}); look the hash up before sending again`,
+        ))
+      }
       const step = stepOf(c, figure(gas, "eth_estimateGas"), {
         hash,
         status: receipt.status,

@@ -4,7 +4,7 @@
  * small number so no file in this package types one out.
  */
 import {
-  ContractFunctionRevertedError, encodeAbiParameters, encodeErrorResult, encodeEventTopics, numberToHex, pad,
+  ContractFunctionRevertedError, WaitForTransactionReceiptTimeoutError, encodeAbiParameters, encodeErrorResult, encodeEventTopics, numberToHex, pad,
   type Abi, type Hex, type PublicClient,
 } from "viem"
 import { CONTRACTS, SEF_DATA, rewardProofUrl, safeTokenEventsAbi } from "@cobuilders/safenet-core"
@@ -46,6 +46,8 @@ export interface FakeOptions {
   readonly allowance?: bigint
   /** The environment the program sees, for the signer options. */
   readonly env?: Readonly<Record<string, string | undefined>>
+  /** Waiting for a receipt times out, as viem reports it. */
+  readonly receiptTimeout?: boolean
   /** The address SEF publishes a proof for. Defaults to STAKER. */
   readonly proofAccount?: Hex
   /** Replaces how the program loads a signer. */
@@ -102,6 +104,12 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
       id === 1n ? [5n * SAFE, BLOCK_TIME - 60n, 0n, 2n] : [2n * SAFE, BLOCK_TIME + 90_000n, 1n, 0n],
   }
   let lastSent: { to: Hex; account: { address: Hex } } | undefined
+  const receiptFor = () => ({
+    status: "success",
+    blockNumber: BLOCK + 1n,
+    gasUsed: 45_000n,
+    logs: lastSent?.to === CONTRACTS.merkleDrop.address ? [transferLog(lastSent.account.address, CLAIMABLE)] : [],
+  })
   /** eth_call: reverts as `o.revert` says, the way viem reports a revert. */
   const simulate = (p: { abi: Abi; functionName: string }) => {
     if (o.revert && o.revert.functionName === p.functionName) {
@@ -147,12 +155,10 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
       return TX_HASH
     },
     // A claim's receipt carries the SAFE transfer it paid, as on chain.
-    waitForTransactionReceipt: async () => ({
-      status: "success",
-      blockNumber: BLOCK + 1n,
-      gasUsed: 45_000n,
-      logs: lastSent?.to === CONTRACTS.merkleDrop.address ? [transferLog(lastSent.account.address, CLAIMABLE)] : [],
-    }),
+    waitForTransactionReceipt: async ({ hash }: { hash: Hex }) => {
+      if (o.receiptTimeout) throw new WaitForTransactionReceiptTimeoutError({ hash })
+      return receiptFor()
+    },
     getBlockNumber: async () => (fail(), BLOCK),
     getBlock: async (p?: { blockNumber?: bigint }) => {
       fail()

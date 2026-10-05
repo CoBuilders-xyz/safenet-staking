@@ -270,6 +270,12 @@ test("a step that fails after another confirmed names the confirmed one", async 
   )
 })
 
+test("a sent transaction whose receipt never comes is reported with its hash, not as a failure to send", async () => {
+  const r = await cli(["unstake", VALIDATOR_A, "0.5", "--private-key-env", "SAFENET_TEST_KEY"], { env: KEY_ENV, receiptTimeout: true })
+  assert.equal(r.code, 1)
+  assert.match(r.err, new RegExp(`error: Staking.initiateWithdrawal was sent in ${TX_HASH}, but its receipt could not be read \\(Timed out .*\\); look the hash up before sending again\\.\n$`))
+})
+
 test("--keystore with --password-env signs as the keystore's account", async () => {
   const path = new URL("./fixtures/keystore-anvil-1.json", import.meta.url).pathname
   const r = await cli(
