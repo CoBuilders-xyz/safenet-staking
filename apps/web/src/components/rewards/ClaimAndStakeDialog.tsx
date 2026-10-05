@@ -90,6 +90,13 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
     })
   }, [claim.isSuccess, claimedAmount, claim.txHash, toast])
 
+  // A claim that confirms after the dialog closed has been reported by the toast above. Clear it,
+  // so the next opening follows the button pressed, not the old claim.
+  const { reset: resetClaim } = claim
+  useEffect(() => {
+    if (!open && claim.isSuccess) resetClaim()
+  }, [open, claim.isSuccess, resetClaim])
+
   const claimError = claim.error
   const rootUpdated = claimError ? revertedErrorName(claimError, merkleDropAbi) === "MerkleRootWasUpdated" : false
   const unstakedClaim = restaking && claim.isSuccess && !staked && !form.isBusy
@@ -122,12 +129,16 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
     })
   }
 
+  // The claim error stays until the fresh proof passes, so a failed reload keeps this action.
   async function reloadAndRetry() {
-    claim.reset()
     setReloadNote(null)
     setReloading(true)
     try {
-      const { proof, root } = await rewards.reload()
+      const { proof, root, error } = await rewards.reload()
+      if (error) {
+        setReloadNote("The proof or the on-chain root could not be loaded again. Try again.")
+        return
+      }
       if (!proof?.proof) {
         setReloadNote("SEF's reward file for this address could not be loaded again. Try again later.")
         return
@@ -138,6 +149,7 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
         )
         return
       }
+      claim.reset()
       void claim.claim({
         cumulativeAmount: BigInt(proof.cumulativeAmount),
         merkleRoot: proof.merkleRoot,

@@ -160,7 +160,7 @@ describe("ClaimAndStakeDialog", () => {
     it("explains a root that moved, then reloads the proof and claims against the new root", async () => {
       m.claimState = { error: rootUpdated() }
       const fresh = { ...PROOF, cumulativeAmount: (150n * SAFE).toString(), merkleRoot: ROOT_B }
-      const data = rewards({ reload: vi.fn().mockResolvedValue({ proof: fresh, root: ROOT_B }) })
+      const data = rewards({ reload: vi.fn().mockResolvedValue({ proof: fresh, root: ROOT_B, error: null }) })
       renderDialog({ rewardsData: data })
 
       expect(screen.getByRole("alert")).toHaveTextContent("The rewards root changed on chain")
@@ -174,13 +174,28 @@ describe("ClaimAndStakeDialog", () => {
 
     it("does not claim when the reloaded proof is still for the old root", async () => {
       m.claimState = { error: rootUpdated() }
-      const data = rewards({ reload: vi.fn().mockResolvedValue({ proof: PROOF, root: ROOT_B }) })
+      const data = rewards({ reload: vi.fn().mockResolvedValue({ proof: PROOF, root: ROOT_B, error: null }) })
       renderDialog({ rewardsData: data })
 
       await userEvent.click(screen.getByRole("button", { name: "Reload proof and retry" }))
 
       expect(m.claim).not.toHaveBeenCalled()
+      expect(m.claimReset).not.toHaveBeenCalled()
       expect(await screen.findByText(/SEF has not published proofs for the new root yet/)).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: "Reload proof and retry" })).toBeEnabled()
+    })
+
+    it("keeps the reload action when the reload itself fails", async () => {
+      m.claimState = { error: rootUpdated() }
+      const data = rewards({ reload: vi.fn().mockResolvedValue({ proof: undefined, root: undefined, error: new Error("503") }) })
+      renderDialog({ rewardsData: data })
+
+      await userEvent.click(screen.getByRole("button", { name: "Reload proof and retry" }))
+
+      expect(m.claim).not.toHaveBeenCalled()
+      expect(m.claimReset).not.toHaveBeenCalled()
+      expect(await screen.findByText(/could not be loaded again/)).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: "Reload proof and retry" })).toBeEnabled()
     })
 
     it("shows other claim errors in plain words, with the claim still available", () => {
@@ -294,6 +309,19 @@ describe("ClaimAndStakeDialog", () => {
 
       await userEvent.keyboard("{Escape}")
       expect(onOpenChange).toHaveBeenCalledWith(false)
+    })
+
+    it("clears a claim that confirmed while closed, once reported, so the next opening follows its button", () => {
+      claimed(60n * SAFE)
+      const view = render(
+        <TooltipProvider>
+          <ClaimAndStakeDialog open={false} onOpenChange={vi.fn()} mode="balance" rewards={rewards()} />
+        </TooltipProvider>,
+      )
+
+      expect(m.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Rewards claimed" }))
+      expect(m.claimReset).toHaveBeenCalled()
+      view.unmount()
     })
 
     it("keeps a claim that is still confirming, so it reports when it lands", async () => {

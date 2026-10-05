@@ -69,7 +69,8 @@ export function useRewards() {
   const reload = async () => {
     const [fresh, root] = await Promise.all([refetchProof(), refetchRoot()])
     if (hasProof) void refetchClaimed()
-    return { proof: fresh.data, root: root.data }
+    // refetch() resolves on failure too, with the error on the result. Pass it on.
+    return { proof: fresh.data, root: root.data, error: fresh.error ?? root.error ?? null }
   }
   // `null` means SEF published no file for this address: it never earned rewards.
   const meta = { isLoading, error, refetch, reload, proof, hasMerkleDrop: !!merkleDrop }
