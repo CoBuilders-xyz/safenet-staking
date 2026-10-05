@@ -4,6 +4,11 @@ import AlertTriangle from "lucide-react/dist/esm/icons/triangle-alert"
 
 interface ErrorBoundaryProps {
   children: ReactNode
+  /**
+   * Rendered instead of the page-level message, for a boundary around one section, so a
+   * section that throws leaves the rest of the page standing. Receives the retry handler.
+   */
+  fallback?: (retry: () => void) => ReactNode
 }
 
 interface ErrorBoundaryState {
@@ -37,6 +42,7 @@ export class ErrorBoundary extends Component<
 
   render() {
     if (this.state.hasError) {
+      if (this.props.fallback) return this.props.fallback(this.handleRetry)
       return (
         <div className="flex flex-col items-center justify-center gap-4 py-24">
           <AlertTriangle

@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/useToast"
 import Loader2 from "lucide-react/dist/esm/icons/loader-2"
 
 const pageImports = {
+  Overview: () => import("@/pages/OverviewPage")
+    .then(m => ({ default: m.OverviewPage })),
   Dashboard: () => import("@/pages/DashboardPage")
     .then(m => ({ default: m.DashboardPage })),
   Validators: () => import("@/pages/ValidatorsPage")
@@ -28,6 +30,7 @@ const pageImports = {
     .then(m => ({ default: m.NotFoundPage })),
 }
 
+const OverviewPage = lazy(pageImports.Overview)
 const DashboardPage = lazy(pageImports.Dashboard)
 const ValidatorsPage = lazy(pageImports.Validators)
 const ValidatorDetailPage = lazy(pageImports.ValidatorDetail)
@@ -116,7 +119,8 @@ function App() {
       <WalletSanctionsGate>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
+            <Route path="/" element={<ErrorBoundary><OverviewPage /></ErrorBoundary>} />
+            <Route path="/dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
             <Route path="/validators" element={<ErrorBoundary><ValidatorsPage /></ErrorBoundary>} />
             <Route path="/validators/:address" element={<ErrorBoundary><ValidatorDetailPage /></ErrorBoundary>} />
             <Route path="/withdrawals" element={<ErrorBoundary><WithdrawalsPage /></ErrorBoundary>} />

@@ -36,8 +36,9 @@ All wagmi hooks, React Query, Radix tooltip context, and toast context are avail
 
 ### Routing (src/App.tsx)
 
-Six routes under a shared `Layout` (header + footer + `<Outlet />`), wrapped in `ErrorBoundary`:
-- `/` → `DashboardPage` (stats, claimable banner, quick actions, rewards, staking section, stake distribution chart)
+Seven routes under a shared `Layout` (header + footer + `<Outlet />`), wrapped in `ErrorBoundary`:
+- `/` → `OverviewPage` (Network Overview, no wallet needed: headline figures, stake distribution with HHI, rewards with the root check, validator table, last 30 days, and a freshness line per subgraph)
+- `/dashboard` → `DashboardPage` (stats, claimable banner, quick actions, rewards, staking section, stake distribution chart)
 - `/validators` → `ValidatorsPage` (validator cards with delegate/undelegate; supports `?delegate=0x...` deep-link to auto-open delegate dialog)
 - `/validators/:address` → `ValidatorDetailPage` (full validator info, delegate/undelegate buttons)
 - `/withdrawals` → `WithdrawalsPage` (pending withdrawal queue with FIFO tooltip, cooldown progress bars, claim)
@@ -60,6 +61,7 @@ App-level guards: `useSanctionsCheck` blocks the entire app if `VITE_SANCTIONS_A
 - **Withdrawals** (`src/hooks/useWithdrawals.ts`): Fetches pending withdrawals for the connected user. Includes `useNextClaimable` for the claimable banner.
 - **Gas estimation** (`src/hooks/useGasEstimate.ts`): Uses `estimateGas` + `getGasPrice` from viem to show estimated gas cost in delegate/undelegate dialogs. Debounced 500ms on amount change.
 - **Rewards** (`src/hooks/useRewards.ts`, `src/hooks/useRewardProof.ts`, `src/hooks/useClaimRewards.ts`, `src/hooks/useProgrammeRewards.ts`): Rewards reading, Merkle proof fetching, claim transaction hooks, and the programme-wide figures (SEF's `latest.json`, the MerkleDrop's root and SAFE balance). Proofs are fetched from `${rewardsBaseUrl}/proofs/<radix>/{address}.json` and the current root/total from `${rewardsBaseUrl}/latest.json`, where `rewardsBaseUrl` is `VITE_REWARDS_BASE_URL` or, by default, SEF's published rewards data (`SEF_DATA.rewardsProofBase` in `@cobuilders/safenet-core`).
+- **Subgraphs** (`src/config/subgraphs.ts`, `src/lib/subgraph.ts`, `src/hooks/useSubgraphQuery.ts`): Typed GraphQL through `graphql-request` and codegen. Documents live in `src/graphql/<chain>/*.graphql`; `pnpm codegen` writes `src/graphql/<chain>/generated.ts` from each subgraph package's `schema.graphql`, and `pnpm check` fails when the committed output is stale. Every query selects `_meta`, so each answer carries its last indexed block and age; an answer older than `SUBGRAPH_STALE_AFTER_SECONDS` (from core) is not shown as current. The overview hooks (`useNetworkTotals`, `useValidatorStakes`, `useRewardsOverview`, `useRecentDays`, `useConsensusFigures`) read the subgraph first and fall back to the contract reads, SEF's files, or the Gnosis snapshot in core. Each figure is a `Figure` (`src/lib/figure.ts`): loading, ready with its source, or unavailable with a reason.
 - **Approval flow** (`src/hooks/useApprovalFlow.ts`): Wraps `useTokenAllowance` with approval type tracking (exact vs unlimited), toast notifications, and a unified API for DelegateDialog.
 - **Transaction toasts** (`src/hooks/useTxToast.ts`): Shared hook for success/error/Safe-queued toast notifications, used by DelegateDialog, UndelegateDialog, and other tx dialogs.
 
@@ -151,6 +153,8 @@ Wagmi config (`src/config/wagmi.ts`) uses `safe()` (auto-detects Safe Wallet ifr
 | `VITE_TERMS_URL` | No | Footer terms link (hidden if unset) |
 | `VITE_PRIVACY_URL` | No | Footer privacy link (hidden if unset) |
 | `VITE_IMPRINT_URL` | No | Footer imprint link (hidden if unset) |
+| `VITE_SUBGRAPH_URL_MAINNET` | No | Mainnet subgraph query URL. Public in the bundle; never a URL with a key. Defaults to the local graph-node in development, none in a production build |
+| `VITE_SUBGRAPH_URL_GNOSIS` | No | Gnosis subgraph query URL. Same rules |
 | `VITE_APP_URL` | No | Canonical app URL for social preview meta tags (`og:image`, `twitter:image`); absolute URLs are required for social crawlers |
 
 ## Adding a New Chain

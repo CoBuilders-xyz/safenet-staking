@@ -4,6 +4,7 @@ export class LayoutPage {
   readonly page: Page
   readonly header: Locator
   readonly footer: Locator
+  readonly navOverview: Locator
   readonly navDashboard: Locator
   readonly navValidators: Locator
   readonly navWithdrawals: Locator
@@ -20,7 +21,8 @@ export class LayoutPage {
     this.page = page
     this.header = page.locator("header")
     this.footer = page.locator("footer")
-    this.navDashboard = page.getByRole("link", { name: "Dashboard" })
+    this.navOverview = page.getByRole("navigation").getByRole("link", { name: "Overview", exact: true })
+    this.navDashboard = page.getByRole("navigation").getByRole("link", { name: "Dashboard", exact: true })
     this.navValidators = page.getByRole("link", { name: "Validators" })
     this.navWithdrawals = page.getByRole("link", { name: "Withdrawals" })
     this.navRewards = page.getByRole("link", { name: "Rewards", exact: true })

@@ -12,7 +12,7 @@ function rewardsRow(page: Page) {
 test.describe("Dashboard rewards banner", () => {
   test("shows zero when the address has no reward proof", async ({ connectedPage: page }) => {
     // Default mockChainState.rewardProof is undefined -> proof endpoint 404s
-    await page.goto("/")
+    await page.goto("/#/dashboard")
 
     const row = rewardsRow(page)
     await expect(row).toBeVisible({ timeout: 10_000 })
@@ -22,7 +22,7 @@ test.describe("Dashboard rewards banner", () => {
   test("shows the claimable amount and links to the Rewards page", async ({ connectedPage: page, mockChainState }) => {
     mockChainState.rewardProof = REWARD_PROOFS.claimable
 
-    await page.goto("/")
+    await page.goto("/#/dashboard")
 
     const row = rewardsRow(page)
     await expect(row.getByText("100", { exact: true })).toBeVisible({ timeout: 10_000 })
@@ -35,7 +35,7 @@ test.describe("Dashboard rewards banner", () => {
   test("shows a compliance note when part of the reward is pending KYC", async ({ connectedPage: page, mockChainState }) => {
     mockChainState.rewardProof = REWARD_PROOFS.partialKyc
 
-    await page.goto("/")
+    await page.goto("/#/dashboard")
 
     await expect(rewardsRow(page)).toBeVisible({ timeout: 10_000 })
     await expect(page.getByText(/pending compliance checks/)).toBeVisible({ timeout: 10_000 })

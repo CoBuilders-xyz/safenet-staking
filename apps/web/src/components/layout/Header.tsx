@@ -10,7 +10,8 @@ import Moon from "lucide-react/dist/esm/icons/moon"
 import { Button } from "@/components/ui/button"
 
 const navItems = [
-  { label: "Dashboard", path: "/" },
+  { label: "Overview", path: "/" },
+  { label: "Dashboard", path: "/dashboard" },
   { label: "Validators", path: "/validators" },
   { label: "Withdrawals", path: "/withdrawals" },
   { label: "Rewards", path: "/rewards" },

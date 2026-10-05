@@ -8,10 +8,10 @@ test.describe("404 Not Found", () => {
     await expect(page.getByText("Page not found")).toBeVisible()
   })
 
-  test("has link back to dashboard", async ({ disconnectedPage: page }) => {
+  test("has link back to the overview", async ({ disconnectedPage: page }) => {
     await page.goto("/#/nonexistent")
 
-    const backLink = page.getByRole("link", { name: "Back to Dashboard" })
+    const backLink = page.getByRole("link", { name: "Back to Overview" })
     await expect(backLink).toBeVisible()
 
     await backLink.click()
