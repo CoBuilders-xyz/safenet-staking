@@ -21,9 +21,11 @@ The deployed Safenet contracts match **neither** published branch of `safe-resea
 - If it fails, the contract was probably redeployed. Recover the real signature from chain data,
   update `src/abis.ts`, and tell the team. Do not guess, and do not read a branch.
 
-Events are tagged `high` or `rare`. High-frequency events are proven by a short recent window and
-run on every pull request. Rare events need `--deep`, which scans from the deploy block and runs
-nightly, because a recent window legitimately contains none of them.
+Events are tagged `high` or `rare`. High-frequency events are proven by a recent window and run
+on every pull request. When an event has no log in that window, the scan widens back in doubling
+steps up to a ceiling per chain, so a quiet weekend does not fail every pull request. Rare events
+need `--deep`, which scans from the deploy block and runs nightly, because even the ceiling
+legitimately contains none of them.
 
 ## Files
 
@@ -39,6 +41,8 @@ nightly, because a recent window legitimately contains none of them.
 - `src/fork.ts` — the Mainnet block the fork suite forks from, pinned together with the commit of
   SEF's data it reads. A test fixture: move the two together.
 - `scripts/verify-abis.ts` — the check itself.
+- `scripts/verify-abis-scan.ts` — the per-event scans, the window and the ceiling, taking the
+  client as an argument so `verify-abis-scan.test.ts` runs them against a mocked `getLogs`.
 
 ## Adding a contract or an event
 
