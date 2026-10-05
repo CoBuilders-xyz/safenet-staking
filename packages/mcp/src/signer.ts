@@ -3,7 +3,8 @@
  * from the environment variable the operator named, or a version 3 keystore decrypted with the
  * password in the variable named for it. This is the only place the server touches a key.
  *
- * It runs for each live write and keeps nothing. No message here prints a key, a password, the
+ * While writes are on, it runs for every write call, dry runs included, because a dry run
+ * simulates from the signer's address. It keeps nothing. No message here prints a key, a password, the
  * value of a variable, the name given for one, or the keystore path.
  */
 import { readFile } from "node:fs/promises"

@@ -157,6 +157,7 @@ jobs:
       # but not when a setup step before both failed.
       - name: Run the MCP server over stdio against Mainnet
         if: ${{ success() || steps.cli-smoke.outcome == 'failure' }}
+        timeout-minutes: 10
         run: pnpm --filter @cobuilders/safenet-mcp test:smoke
       - name: Build the binary and run it
         run: |

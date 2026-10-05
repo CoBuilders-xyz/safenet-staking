@@ -81,6 +81,10 @@ Add the server to `claude_desktop_config.json`. On macOS it is in
 }
 ```
 
+Many RPC providers put the API key in the URL. Do not paste such a URL into the config: start the
+server through a wrapper that sets `MAINNET_RPC_URL` or `SAFENET_MCP_RPC_URL` from a secret
+manager, as described below for the signer, or leave it to the environment the client inherits.
+
 The package is not on npm yet. Until it is, build it from this repository and point `command` at
 the bundle:
 
@@ -127,7 +131,8 @@ project:
 ```
 
 Then open Cursor's MCP settings and check that `safenet` lists eleven tools. The same advice on
-secrets applies: a project's `.cursor/mcp.json` is often committed.
+secrets applies, to an RPC URL that carries a key as to a signer: a project's `.cursor/mcp.json`
+is often committed.
 
 ## Requirements
 

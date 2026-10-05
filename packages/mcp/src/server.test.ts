@@ -266,7 +266,7 @@ test("bad arguments name the argument; unknown ones are listed", async () => {
   assert.match(textOf(await s.call("stake", { amount: "1", from: STAKER })), /^validator: /)
   assert.match(textOf(await s.call("validators_list", { active: true, all: true })), /^active and all cannot both be true$/)
   assert.match(textOf(await s.call("withdrawals_claim", { from: STAKER })), /^Name a withdrawal id, or set all/)
-  assert.match(textOf(await s.call("status", { verbose: true })), /^status takes no argument named verbose; it takes none$/)
+  assert.match(textOf(await s.call("status", { verbose: true })), /^status got 1 argument it does not take; it takes none$/)
   await s.close()
 })
 

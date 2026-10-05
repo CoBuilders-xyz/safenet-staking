@@ -20,12 +20,18 @@ import {
   errorSentence, scrubSecrets,
   type Context, type Progress, type Signer, type WriteMode, type WriteResultBase,
 } from "@cobuilders/safenet-cli/lib"
-import pkg from "../package.json" with { type: "json" }
+import { readFileSync } from "node:fs"
 import type { ServerConfig } from "./config.js"
 import type { Library } from "./library.js"
 import type { LoadSigner } from "./signer.js"
 import { ARCHIVE_ADVICE, writeSummary } from "./summary.js"
 import { inputJsonSchema, TOOLS, type ReadTool, type Tool, type WriteTool } from "./tools.js"
+
+/**
+ * The package's version, read at start. package.json sits one level up from both src/ and dist/,
+ * and npm always ships it, so the bundle does not carry the whole file for one field.
+ */
+const VERSION = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version
 
 export interface Dependencies {
   readonly lib: Library
@@ -82,7 +88,8 @@ function parseArguments(tool: Tool, raw: unknown): unknown {
   }
   if (unknown.length > 0) {
     throw new ToolInputError(
-      `${tool.name} takes no argument named ${unknown.join(", ")}; it takes ${known.length ? known.join(", ") : "none"}`,
+      `${tool.name} got ${unknown.length} argument${unknown.length === 1 ? "" : "s"} it does not take; ` +
+        `it takes ${known.length ? known.join(", ") : "none"}`,
     )
   }
   const result = (tool.input as z.ZodType).safeParse(args)
@@ -130,7 +137,7 @@ function progressLine(tool: string, event: Progress): string {
 
 export function createServer(config: ServerConfig, deps: Dependencies): Server {
   const server = new Server(
-    { name: "safenet-mcp", title: "Safenet Beta", version: pkg.version },
+    { name: "safenet-mcp", title: "Safenet Beta", version: VERSION },
     {
       capabilities: { tools: {} },
       instructions:

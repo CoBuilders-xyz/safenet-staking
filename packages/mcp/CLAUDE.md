@@ -59,7 +59,9 @@ too, and no tool takes one. A new CLI command needs a tool: `src/parity.test.ts`
   to stderr as it is sent and when it confirms.
 - Signing works as in the CLI: a private key from the variable the operator named, or a version 3
   keystore decrypted with the password from the variable named for it. There is no prompt: stdin
-  is the protocol. The key is loaded for each live write and kept nowhere.
+  is the protocol. While writes are on, the key is loaded for every write call, dry runs
+  included, because a dry run simulates from the signer's address; it is kept nowhere between
+  calls. While writes are off, it is never loaded.
 
 ## Rules the server keeps
 
@@ -67,7 +69,8 @@ too, and no tool takes one. A new CLI command needs a tool: `src/parity.test.ts`
   path, any of which could be a secret typed in the wrong place. It names the setting instead.
 - No key or password goes through a tool. A string argument, or an argument name, that holds 64
   hex digits is refused, as is any unknown argument whose name suggests a signer setting. No
-  validation message repeats the value it refuses; each names the argument instead.
+  validation message repeats the value it refuses; each names the argument instead. An unknown
+  argument is counted, never named, and the message lists the arguments the tool takes.
 - A result is structured content, the CLI's `--json` document, plus two text blocks: a one or two
   sentence summary, then the same JSON for clients that pass only text to the model.
 - A failure is a tool error with one sentence: `errorSentence()` from the library, with the
