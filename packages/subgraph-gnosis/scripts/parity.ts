@@ -42,9 +42,10 @@ const TITLE = "Gnosis: participation per validator against SEF's validator-info.
 
 // A ceremony can complete inside the window with its shares emitted just before the start. The
 // subgraph counts a share when its ceremony completes, so it only needs to have indexed those
-// earlier blocks. 200 blocks is metrics-poc.ts's look-back: measured over 2,148 ceremonies on
-// 2026-09-03, the span from first share to completion had a median of 1 block and a max of 10.
-const SHARE_LOOKBACK = 200n
+// earlier blocks. 1,000 blocks is metrics-poc.ts's look-back: over 70,510 ceremonies in the
+// 16 days to block 48,602,160, the span from first winning share to completion had a median of
+// 1 block and a max of 260.
+const SHARE_LOOKBACK = 1_000n
 
 // graph-node caps `first` at 1000. The hours are read in pages of that size.
 const PAGE = 1000
@@ -158,7 +159,7 @@ async function main(): Promise<number> {
   const earliest = meta.signingValidators[0] ? BigInt(meta.signingValidators[0].firstSeenBlock) : undefined
   const coverage = earliest === undefined || earliest > first - SHARE_LOOKBACK
     ? `the deployment's first share is at block ${earliest ?? "none"}, after block ${first - SHARE_LOOKBACK}: ` +
-      `it does not cover SEF's window with ${SHARE_LOOKBACK} blocks of look-back; ${NEEDS_HOURLY_BUCKETS}`
+      `it does not cover SEF's window with ${SHARE_LOOKBACK} blocks of look-back, so it started too late to compare it`
     : undefined
 
   let rows: ParityRow[] = refusals.map((note) => ({
