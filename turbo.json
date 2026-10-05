@@ -59,7 +59,18 @@
       ]
     },
     "test:parity": {
-      "cache": false
+      "cache": false,
+      "passThroughEnv": [
+        "SUBGRAPH_URL_MAINNET",
+        "SUBGRAPH_URL_GNOSIS",
+        "GRAPH_NODE_PORT",
+        "MAINNET_RPC_URL",
+        "GNOSIS_RPC_URL",
+        "GITHUB_TOKEN",
+        "GH_TOKEN",
+        "GITHUB_STEP_SUMMARY",
+        "PARITY_STATE_DIR"
+      ]
     },
     "lint": {},
     "@cobuilders/safenet-subgraph-gnosis#test": {

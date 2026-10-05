@@ -10,7 +10,8 @@
     "test": "pnpm generate --full && graph codegen && graph test -v 0.6.0",
     "check": "eslint . && tsc --noEmit -p tsconfig.check.json",
     "deploy:studio": "pnpm generate --days 16 && graph codegen && graph build && node --env-file-if-exists=../../.env.local ../../tools/deploy-studio.mjs safenet-gnosis",
-    "differential": "node --env-file-if-exists=../../.env.ports --env-file-if-exists=../../.env.local --import tsx scripts/differential.ts"
+    "differential": "node --env-file-if-exists=../../.env.ports --env-file-if-exists=../../.env.local --import tsx scripts/differential.ts",
+    "test:parity": "node --env-file-if-exists=../../.env.ports --env-file-if-exists=../../.env.local --import tsx scripts/parity.ts"
   },
   "dependencies": {
     "@graphprotocol/graph-cli": "0.98.1",

@@ -26,3 +26,21 @@ To check a deployed version against the chain, point the differential at its que
 ```
 SUBGRAPH_URL=<studio query URL> pnpm --filter @cobuilders/safenet-subgraph-mainnet differential
 ```
+
+## Parity with SEF
+
+```
+SUBGRAPH_URL_MAINNET=<studio query URL> pnpm --filter @cobuilders/safenet-subgraph-mainnet test:parity
+```
+
+`scripts/parity.ts` compares the staked total with `total_staked_amount` in SEF's
+`network-info.json`, to the wei, at the commit that last wrote the file. SEF's job reads the
+chain and then commits, so the comparison takes the block before the commit first, and an earlier
+block of that hour only when SEF's figure equals the total there exactly.
+
+It does not query the total `block: { number }` back in time: Studio keeps about 1,000 blocks of
+history, a few hours on Mainnet. It rewinds the current total through the Stake and Withdrawal
+rows after the start of SEF's run instead, which this subgraph keeps for good. Without
+`SUBGRAPH_URL_MAINNET` it reads the local graph-node. `.github/workflows/parity.yml` runs it
+daily; the root `CLAUDE.md` gives the stale rule.
+

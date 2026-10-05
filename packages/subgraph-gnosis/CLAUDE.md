@@ -41,3 +41,35 @@ ORACLE=/tmp/oracle-16d.json ORACLE_DAYS=16 SUBGRAPH_URL=<studio query URL> \
 
 The comparison only holds shortly after a deploy. Once the deployment has indexed past its
 16 days, its counts cover more than the oracle's window.
+
+## Parity with SEF
+
+```
+SUBGRAPH_URL_GNOSIS=<query URL> pnpm --filter @cobuilders/safenet-subgraph-gnosis test:parity
+```
+
+`scripts/parity.ts` compares each validator's participation with `participation_rate_14d` in
+SEF's `validator-info.json`, at the commit that last wrote the file. The window is SEF's: 14 days
+ending at the top of that hour, both ends included, by the block the ceremony completed in. The
+subgraph's `attended` and `attestationCeremonies` counters move in that block, so each counter
+after the window's last block minus the same counter after the block before its first is SEF's
+numerator and denominator. The rate is the same division, and is compared as the identical
+double.
+
+That rests on a premise, not a fact: `SignCompleted` and `TransactionAttested` for a ceremony sit
+in the same block. SEF files a ceremony under the block it completed in, and the subgraph counts
+it in the block where the second of the two events arrives. They agree only when that is one
+block. It was measured once, on 2026-09-29, over 691 attestations in 2,000 blocks, and nothing
+enforces it. A ceremony attested a block later, across a window edge, would fail the run.
+
+That needs `block: { number }` 14 days back. Studio keeps about 1,000 blocks of history, about
+1.4 hours here, so against Studio the run reports NOT COMPARABLE, exits 0, and says why in one
+line. A real difference, when the comparison is possible, still fails. It can pass only against a
+deployment that keeps its history from at least 14 days and 200 blocks back, such as the local
+graph-node after `pnpm generate --days 16` and a full sync. Studio reported `historyBlocks: 1000` on
+2026-10-05, though the manifest sets no `indexerHints`.
+
+The daily buckets cannot stand in for the history. `ValidatorDay` and `ConsensusDay` file a
+ceremony under the day of its first share, while SEF counts it on the day it completed, and
+SEF's window ends on the hour, not at midnight.
+

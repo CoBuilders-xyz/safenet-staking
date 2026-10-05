@@ -1,0 +1,99 @@
+name: Parity with SEF
+
+# Once a day, our deployed subgraphs against the figures SEF publishes in safe-fndn's data
+# repository, each at the instant SEF published it. The comparison table goes to the job
+# summary, and the badge in README.md shows the last result.
+#
+# Not on pull requests: the result depends on SEF's data and on the deployed subgraphs, not on
+# the code under review. The unit tests of the comparison itself run in ci.yml.
+
+on:
+  schedule:
+    # SEF's job writes every three hours, from 00:00 UTC, and commits a few minutes later.
+    # 06:43 lands well after the 06:00 write, and away from the top of the hour, when
+    # scheduled runs queue longest.
+    - cron: "43 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: parity
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  parity:
+    name: parity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # Pin actions to full SHA: mutable tags can be moved to malicious code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      # Each package appends its own table to the job summary. The query URLs are public and
+      # carry no key, so they sit here in plain text. The RPC endpoints are only used to find
+      # the block at an instant; without the secrets the scripts fall back to public endpoints.
+      # GITHUB_TOKEN lifts the GitHub API limit for the two commit lookups. Each run also writes
+      # its state to PARITY_STATE_DIR, for the table in the next step.
+      - name: Compare with SEF's published data
+        env:
+          PARITY_STATE_DIR: ${{ runner.temp }}/parity
+          SUBGRAPH_URL_MAINNET: https://api.studio.thegraph.com/query/1762768/safenet-mainnet/0abe5fb
+          SUBGRAPH_URL_GNOSIS: https://api.studio.thegraph.com/query/1762768/safenet-gnosis/2a0e6b8
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+          GNOSIS_RPC_URL: ${{ secrets.GNOSIS_RPC_URL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "## Parity with SEF"
+            echo
+            echo "Each figure is compared at the instant SEF published it: the commit that last wrote the file."
+            echo
+            echo "- PASS: identical to SEF's figure. Exit 0."
+            echo "- FAIL: a real difference, a broken or lagging subgraph, SEF's data over 24 hours old, or an error. Exit 1."
+            echo "- STALE: SEF's file is over 9 hours old, so nothing is compared. Exit 0."
+            echo "- NOT COMPARABLE: our deployment cannot answer at SEF's instant. Exit 0."
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          pnpm test:parity
+      # Both chains in one table, also when a run failed. A chain with no state file never ran
+      # its comparison, or died before reporting; turbo reports success for a task no package
+      # implements. Either way nothing was proven, so this step fails the job rather than leave
+      # a green badge over a FAIL row. So does any count of state files other than two.
+      - name: Summarise the state of each chain
+        if: always()
+        env:
+          PARITY_STATE_DIR: ${{ runner.temp }}/parity
+        run: |
+          missing=0
+          {
+            echo "### State by chain"
+            echo
+            echo "| Chain | State | Reason |"
+            echo "|---|---|---|"
+            for chain in mainnet gnosis; do
+              if [ -f "$PARITY_STATE_DIR/$chain.md" ]; then
+                cat "$PARITY_STATE_DIR/$chain.md"
+              else
+                echo "| $chain | FAIL | the run wrote no state |"
+                missing=1
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+          count=$(find "$PARITY_STATE_DIR" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$missing" -ne 0 ] || [ "$count" -ne 2 ]; then
+            echo "::error title=Parity state missing::Expected exactly two state files, one for mainnet and one for gnosis; found ${count}. A chain that wrote no state proved nothing."
+            exit 1
+          fi

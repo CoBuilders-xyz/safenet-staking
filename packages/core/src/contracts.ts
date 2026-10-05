@@ -93,9 +93,14 @@ export const SEF_DATA = {
    */
   validatorInfoCommits:
     "https://api.github.com/repos/safe-fndn/safenet-beta-data/commits?path=assets/validator-info.json&per_page=1",
+  /** The last commit that wrote network-info.json. The same cron writes it, in the same commit. */
+  networkInfoCommits:
+    "https://api.github.com/repos/safe-fndn/safenet-beta-data/commits?path=assets/network-info.json&per_page=1",
   /** A file under `assets/` at one commit, so the rates and their window come from one write. */
   assetsAtCommit: (sha: string) =>
     `https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/${sha}/assets`,
   /** Their cron runs every 3 hours. Three missed runs is our staleness threshold. */
   staleAfterMs: 9 * 60 * 60 * 1000,
+  /** Eight missed runs: past this, a parity run fails, because SEF's pipeline has stopped. */
+  expiredAfterMs: 24 * 60 * 60 * 1000,
 } as const

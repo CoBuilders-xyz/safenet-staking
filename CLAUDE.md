@@ -52,14 +52,14 @@ Specific commands, only where they apply:
 | `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. Playwright | runs; one navigation test is intermittently flaky |
 | `pnpm test:fork` | `apps/web`, `packages/cli` | Against the real contracts on an Anvil Mainnet fork at a pinned block, each effect checked by reading the chain. `apps/web`: the staking flows in the interface, in Playwright, about 1.5 minutes. `packages/cli`: the five write commands sent for real, then each with `--dry-run`, which must change nothing, in node:test; one of those tests needs no Anvil and also runs under `pnpm test`; about 20 seconds | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
 | `deploy:studio` | each subgraph package, through `pnpm --filter` | The subgraph builds and Studio accepts it as a new version under its slug. Not that it syncs: watch it by deployment hash, then run `differential` with `SUBGRAPH_URL` | works; needs `GRAPH_DEPLOY_KEY` |
-| `pnpm test:parity` | subgraphs | Our numbers match SEF's published JSON | **fails on purpose: no subgraph package implements it yet** |
+| `pnpm test:parity` | both subgraph packages | Our deployed subgraphs agree with SEF's published JSON at the instant SEF published it, the commit that last wrote each file: the Mainnet staked total to the wei, and each validator's Gnosis participation rate as the identical double. Four states per chain: PASS, exit 0; FAIL, exit 1, for a real difference, a broken or lagging subgraph, SEF's data over 24 hours old, or an error; STALE, exit 0, when SEF's file is over 9 hours old; NOT COMPARABLE, exit 0, when our deployment cannot answer at SEF's instant. Subgraph URLs from `SUBGRAPH_URL_MAINNET` and `SUBGRAPH_URL_GNOSIS`, else the local graph-node | Mainnet passes against Studio. Gnosis is NOT COMPARABLE on Studio: Studio keeps about 1,000 blocks of history and the window starts 14 days back, so hourly buckets with completion semantics are needed to compare it there. Daily in `parity.yml`, which also fails when a chain wrote no state |
 
 `turbo run <task>` with no package implementing the task reports a success while running nothing.
 A green tick over a suite that does not exist is worse than a red one: a failure gets fixed, a
-false pass gets believed. So `test:e2e` and `test:parity` first run `tools/require-task.mjs`,
-which fails unless some package implements the task. `test:e2e` passes the guard because
-`apps/web` implements it. `test:parity` fails until its suite exists. Do not remove a guard
-before the real suite lands.
+false pass gets believed. So `test:e2e` first runs `tools/require-task.mjs`, which fails unless
+some package implements the task; it passes because `apps/web` implements it. Put the same guard
+in front of any new root task before its first suite lands, and remove it only once the real
+suite exists, as `test:parity` did when both subgraph packages implemented it.
 
 `scripts/setup.sh` writes per-worktree ports into `.env.ports` at the repository root, so two
 worktrees can run the same thing at once. The e2e suite starts Vite on `E2E_PORT` and, outside CI,
@@ -133,7 +133,10 @@ secret, and fail without it. The fork suites stay out of per-PR CI because every
 the archive node. `security.yml` runs a
 dependency review on pull requests, skipped until the repository is public, and `pnpm audit`
 weekly. `subgraphs-deploy.yml` runs only by hand: it deploys one or both subgraphs to
-Studio with the `GRAPH_DEPLOY_KEY` secret.
+Studio with the `GRAPH_DEPLOY_KEY` secret. `parity.yml` runs `pnpm test:parity` daily and on
+demand against the Studio query URLs it names, writes the comparison to the job summary, and
+drives the badge in `README.md`. It stays out of per-PR CI because its result depends on SEF's
+data and the deployed subgraphs, not on the code under review.
 
 ## What happens when you edit
 
