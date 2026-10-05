@@ -14,7 +14,8 @@ pnpm env:pull        # pulls the development secrets into .env.local
 run `vercel login`, then run them.
 
 Secrets never live in the repository. They come from Vercel into `.env.local` at the
-repository root, which git ignores.
+repository root, which git ignores. The Node scripts read that file, and so does Vite for
+`pnpm dev` and `pnpm build`. Vite puts only `VITE_` values into the bundle.
 
 ## Commands
 

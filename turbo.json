@@ -4,7 +4,10 @@
   "tasks": {
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": [
+        "WEB_PORT"
+      ]
     },
     "build": {
       "dependsOn": [
@@ -31,7 +34,10 @@
       "dependsOn": [
         "^build"
       ],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": [
+        "E2E_PORT"
+      ]
     },
     "test:fork": {
       "dependsOn": [

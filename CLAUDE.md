@@ -30,7 +30,7 @@ Every package implements the same five. Turborepo fans them out.
 | `pnpm bootstrap` | Runs `scripts/setup.sh`: checks tools, writes `.env.ports`, installs, then links Vercel and pulls `.env.local`. Safe to re-run. **Not `setup`: that is a pnpm builtin that edits your shell rc.** |
 | `pnpm dev` | Starts the web app's Vite dev server, type-watches `packages/core`, and regenerates the subgraph manifests and types. |
 | `pnpm build` | Builds all packages. |
-| `pnpm test` | Unit tests. `apps/web` has 315 Vitest tests in 39 files. The subgraphs have matchstick tests: 20 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has none. |
+| `pnpm test` | Unit tests. `apps/web` has 315 Vitest tests in 39 files. The subgraphs have matchstick tests: 20 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has 22 node:test tests in 4 files, and its script fails when it finds no test file. |
 | `pnpm check` | Lint, the browser-safety check, then types in every package. Run it before every commit. |
 
 The test counts were measured with `pnpm test` when this file was written. Run it for the
@@ -59,12 +59,14 @@ false pass gets believed. So `test:e2e`, `test:fork` and `test:parity` first run
 the guard because `apps/web` implements it. The other two fail until their suites exist. Do not
 remove a guard before the real suite lands.
 
-The e2e suite starts Vite on `E2E_PORT`, or on 5174 when it is unset, and reuses a server already
-listening there. Two worktrees running the suite at once therefore share one server, and one
-run fails when the other stops it. `scripts/setup.sh` writes a per-worktree `E2E_PORT` into
-`.env.ports`, but the e2e suite does not load that file, and Turborepo's strict environment
-mode drops the variable when you go through the root script. To isolate a run, call the package
-directly: `E2E_PORT=<port> pnpm --filter @cobuilders/safenet-web test:e2e`.
+`scripts/setup.sh` writes per-worktree ports into `.env.ports` at the repository root, so two
+worktrees can run the same thing at once. The e2e suite starts Vite on `E2E_PORT` and, outside CI,
+reuses a server already listening there; `apps/web/e2e/playwright.config.ts` reads `E2E_PORT` from
+`.env.ports`, so the port holds from the root and from inside `apps/web`. `pnpm dev` reads
+`WEB_PORT` the same way, in `apps/web/vite.config.ts`, and the subgraph `differential` scripts
+read `GRAPH_NODE_PORT`. A value exported in the shell wins over the file, and `turbo.json`
+passes `E2E_PORT` and `WEB_PORT` through Turborepo's strict environment mode. Without
+`.env.ports`, as in CI, the e2e suite uses 5174 and `pnpm dev` uses Vite's default.
 
 ## Layout
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pulls the Vercel development environment variables into .env.local at the
-# repository root, where the Node scripts read them. Nothing goes to apps/web:
-# Vite needs no secret, and the build must never see one.
+# repository root, where the Node scripts and Vite read them. Vite puts only VITE_
+# values into the bundle, so a secret must never carry that prefix.
 set -euo pipefail
 SCRIPT_TAG="env"
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"

@@ -17,20 +17,24 @@ A web application for delegating SAFE tokens to validators on Ethereum. Built as
 ## Quick Start
 
 ```bash
-cp .env.example .env   # fill in required values
-yarn install
-yarn dev
+pnpm install
+pnpm --filter @cobuilders/safenet-web dev
 ```
 
-The app will be available at `http://localhost:5173`.
+The app will be available at `http://localhost:5173`, or on `WEB_PORT` from the repository-root
+`.env.ports` when `pnpm bootstrap` has written one.
+
+Vite reads env from the repository root, not from this directory: the root `.env`, and the root
+`.env.local` that `pnpm env:pull` writes. Every value is optional. To set one by hand, copy it
+from [`.env.example`](.env.example) into the root `.env`.
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `VITE_CHAIN_ID` | Yes | Target chain ID (`1` for mainnet, `11155111` for Sepolia) |
-| `VITE_RPC_URL` | Yes | JSON-RPC endpoint |
-| `VITE_STAKING_DEPLOY_BLOCK` | Yes | Block number to start scanning validator events from |
+| `VITE_CHAIN_ID` | No | Target chain ID (defaults to Mainnet, from `@cobuilders/safenet-core`) |
+| `VITE_RPC_URL` | No | JSON-RPC endpoint (defaults to the public list in `@cobuilders/safenet-core`) |
+| `VITE_STAKING_DEPLOY_BLOCK` | No | Block number to start scanning validator events from (defaults to the scan floor in `@cobuilders/safenet-core`) |
 | `VITE_WALLETCONNECT_PROJECT_ID` | No | Enables WalletConnect connector |
 | `VITE_MERKLE_DROP_ADDRESS` | No | Merkle drop contract address for rewards claiming |
 | `VITE_SANCTIONS_API_URL` | No | Sanctions check endpoint (HTTP 403 = blocked) |
