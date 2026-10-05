@@ -48,19 +48,23 @@ const SECRET_NAME = /key|pass|secret|mnemonic|seed|keystore|signer|wallet/i
 /** 64 hex digits is what a private key looks like. No tool takes one. */
 const KEY_LIKE = /^(0x)?[0-9a-fA-F]{64}$/
 
-/** The path of the first string, key or value, that looks like a private key. */
+/** Where the first string, name or value, that looks like a private key is. */
 function keyLike(value: unknown, path: string): string | null {
-  if (typeof value === "string") return KEY_LIKE.test(value.trim()) ? path : null
+  if (typeof value === "string") return KEY_LIKE.test(value.trim()) ? `the argument ${path}` : null
   if (value !== null && typeof value === "object") {
     for (const [k, v] of Object.entries(value)) {
-      const here = path ? `${path}.${k}` : k
-      if (KEY_LIKE.test(k)) return path || "a name"
-      const found = keyLike(v, here)
+      if (KEY_LIKE.test(k)) return path ? `a name inside the argument ${path}` : "an argument name"
+      const found = keyLike(v, path ? `${path}.${k}` : k)
       if (found) return found
     }
   }
   return null
 }
+
+/** Each tool's argument names, from the schema a client sees. */
+const ARGUMENTS = new Map(
+  TOOLS.map((t) => [t.name, Object.keys((inputJsonSchema(t).properties ?? {}) as Record<string, unknown>)]),
+)
 
 function parseArguments(tool: Tool, raw: unknown): unknown {
   const args = raw ?? {}
@@ -68,10 +72,10 @@ function parseArguments(tool: Tool, raw: unknown): unknown {
   const found = keyLike(args, "")
   if (found) {
     throw new ToolInputError(
-      `${tool.name} refused the argument ${found}: it holds 64 hex digits, which is what a private key looks like. ${NO_SECRETS}`,
+      `${tool.name} refused ${found}: it holds 64 hex digits, which is what a private key looks like. ${NO_SECRETS}`,
     )
   }
-  const known = Object.keys((inputJsonSchema(tool).properties ?? {}) as Record<string, unknown>)
+  const known = ARGUMENTS.get(tool.name) ?? []
   const unknown = Object.keys(args).filter((k) => !known.includes(k))
   if (unknown.some((k) => SECRET_NAME.test(k))) {
     throw new ToolInputError(`${tool.name} takes no signer argument. ${NO_SECRETS}`)

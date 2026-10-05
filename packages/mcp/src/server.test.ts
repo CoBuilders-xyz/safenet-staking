@@ -255,6 +255,8 @@ test("a signer argument is refused with the reason", async () => {
     "the operator configures the signer when the server starts")
   const k = await s.call("stake", { validator: VALIDATOR, amount: "1", from: KEY_LIKE_VALUE })
   assert.match(textOf(k), /^stake refused the argument from: it holds 64 hex digits/)
+  const n = await s.call("status", { [KEY_LIKE_VALUE]: true })
+  assert.match(textOf(n), /^status refused an argument name: it holds 64 hex digits/)
   await s.close()
 })
 
