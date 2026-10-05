@@ -147,30 +147,32 @@ test.describe("Mainnet fork", () => {
   test("claim rewards with SEF's real proof", async ({ page, connectAs }) => {
     const { account, proof, claimable } = await findRewardsClaimer()
     await impersonate(account)
+    try {
+      const balanceBefore = await safeBalance(account)
+      const dropBefore = await safeBalance(MERKLE_DROP)
 
-    const balanceBefore = await safeBalance(account)
-    const dropBefore = await safeBalance(MERKLE_DROP)
+      await connectAs(account)
+      await page.goto("/#/rewards")
+      const actions = page.getByRole("region", { name: "Actions" })
+      const claim = actions.getByRole("button", { name: "Claim", exact: true })
+      await expect(claim).toBeEnabled()
+      await claim.click()
 
-    await connectAs(account)
-    await page.goto("/#/rewards")
-    const actions = page.getByRole("region", { name: "Actions" })
-    const claim = actions.getByRole("button", { name: "Claim", exact: true })
-    await expect(claim).toBeEnabled()
-    await claim.click()
+      const dialogClaim = page.getByRole("dialog").getByRole("button", { name: "Claim Rewards" })
+      await expect(dialogClaim).toBeEnabled()
+      await dialogClaim.click()
+      await expect(page.getByText("Rewards claimed")).toBeVisible()
 
-    const dialogClaim = page.getByRole("dialog").getByRole("button", { name: "Claim Rewards" })
-    await expect(dialogClaim).toBeEnabled()
-    await dialogClaim.click()
-    await expect(page.getByText("Rewards claimed")).toBeVisible()
-
-    expect(
-      await chain.readContract({ address: MERKLE_DROP, abi: merkleDropAbi, functionName: "cumulativeClaimed", args: [account] }),
-    ).toBe(BigInt(proof.cumulativeAmount))
-    expect(await safeBalance(account)).toBe(balanceBefore + claimable)
-    expect(await safeBalance(MERKLE_DROP)).toBe(dropBefore - claimable)
-    await expect(actions.getByText("Nothing to claim right now.")).toBeVisible()
-
-    await stopImpersonating(account)
+      expect(
+        await chain.readContract({ address: MERKLE_DROP, abi: merkleDropAbi, functionName: "cumulativeClaimed", args: [account] }),
+      ).toBe(BigInt(proof.cumulativeAmount))
+      expect(await safeBalance(account)).toBe(balanceBefore + claimable)
+      expect(await safeBalance(MERKLE_DROP)).toBe(dropBefore - claimable)
+      await expect(actions.getByText("Nothing to claim right now.")).toBeVisible()
+    } finally {
+      // Even on a failed assertion, so the account is not left impersonated for later tests.
+      await stopImpersonating(account)
+    }
   })
 
   // Claim & Stake is not on `main` yet: the Rewards page renders its button disabled, marked

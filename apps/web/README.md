@@ -99,6 +99,9 @@ pnpm test:fork    # from the root, or from apps/web
   data repository from the same moment. Move them together, or the reward proofs stop matching
   the root on chain.
 - **Anvil** starts and stops with the run, pass or fail. Its output is shown with URLs redacted.
+- **The fork URL is on Anvil's command line**, because Anvil 1.8.4 reads it from no environment
+  variable. On a shared machine, anyone who can list processes can read the URL, key included,
+  while the suite runs. On a CI runner this does not matter.
 
 It runs nightly in CI, not on pull requests, because every run reads from the archive node.
 
