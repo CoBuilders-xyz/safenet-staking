@@ -1,8 +1,63 @@
 import type { Command } from "commander"
-import { checkRewards, rewardsHistory, type RewardsCheck, type RewardsHistory } from "../lib/index.js"
+import {
+  checkRewards, claimAndStake, claimRewards, rewardsHistory,
+  type ClaimAndStakeResult, type RewardsCheck, type RewardsClaim, type RewardsClaimResult, type RewardsHistory,
+} from "../lib/index.js"
 import type { CommandRuntime } from "../cli.js"
 import { formatCount, formatSafe, formatTime, renderTable } from "./format.js"
-import { addressSchema, historySchema, parseOptions } from "./options.js"
+import { addressSchema, claimAndStakeSchema, historySchema, parseOptions, writeSchema } from "./options.js"
+import {
+  addWriteOptions, approvalText, figureRow, renderFigures, renderProgress, renderSteps, writeHead, type FigureRow,
+} from "./write.js"
+
+const safe = (a: { wei: bigint }) => formatSafe(a.wei)
+
+function claimRows(c: RewardsClaim): FigureRow[] {
+  const rows: FigureRow[] = [
+    figureRow("Earned to date", c.cumulative, safe),
+    figureRow("Claimed before", c.claimedBefore, safe),
+    figureRow("Claimable", c.claimable, safe),
+    figureRow("Merkle root", c.merkleRoot, String),
+    figureRow("Received", c.received, (a) => (a ? safe(a) : "unknown: no such transfer")),
+  ]
+  if (c.claimedAfter) rows.push(figureRow("Claimed after", c.claimedAfter, safe))
+  return rows
+}
+
+export function renderRewardsClaim(r: RewardsClaimResult): string {
+  return [
+    ...writeHead(r, "Claim rewards"),
+    "",
+    renderFigures(claimRows(r.claim)),
+    "",
+    `Proof: ${r.claim.proofUrl}`,
+    "",
+    renderSteps(r.steps),
+  ].join("\n")
+}
+
+export function renderClaimAndStake(r: ClaimAndStakeResult): string {
+  const rows: FigureRow[] = [...claimRows(r.claim)]
+  if (r.requested) rows.push(["Requested", safe(r.requested), "--amount"])
+  rows.push(
+    ["Staked", safe(r.staked), r.cappedToReceived
+      ? "what arrived, which is less than --amount"
+      : r.requested ? "--amount" : "what arrived"],
+    figureRow("Allowance", r.allowance, safe),
+    ["Approval", approvalText(r.approval), "sent only when the allowance is below the amount"],
+    figureRow("Stake before", r.stakeBefore, safe),
+  )
+  if (r.stakeAfter) rows.push(figureRow("Stake after", r.stakeAfter, safe))
+  return [
+    ...writeHead(r, `Claim rewards and stake them on validator ${r.validator}`),
+    "",
+    renderFigures(rows),
+    "",
+    `Proof: ${r.claim.proofUrl}`,
+    "",
+    renderSteps(r.steps),
+  ].join("\n")
+}
 
 export function renderRewardsCheck(r: RewardsCheck): string {
   const head = `Rewards for ${r.address}, Ethereum Mainnet block ${formatCount(r.block)}`
@@ -88,4 +143,40 @@ export function registerRewards(program: Command, rt: CommandRuntime): void {
       const { limit } = parseOptions(historySchema, options)
       rt.emit(globals, await rewardsHistory(rt.context(globals), addr, { limit }), renderRewardsHistory)
     })
+
+  addWriteOptions(
+    rewards
+      .command("claim")
+      .description("claim the signer's rewards with SEF's published proof, while its root is the root on chain"),
+  ).action(async (options: unknown, command: Command) => {
+    const globals = rt.globals(command)
+    const request = parseOptions(writeSchema, options)
+    const ctx = rt.context(globals)
+    const mode = await rt.writeMode(request, ctx)
+    rt.emit(globals, await claimRewards(ctx, mode, { onProgress: rt.progress(renderProgress) }), renderRewardsClaim)
+  })
+
+  addWriteOptions(
+    rewards
+      .command("claim-and-stake")
+      .description("claim the signer's rewards, then approve and stake what arrived on a validator, one transaction after another")
+      .argument("<validator>", "the validator's address")
+      .option(
+        "--amount <amount>",
+        "stake this much SAFE and leave the rest in the wallet; more than the claimable amount is refused before anything is sent",
+      )
+      .option("--approve <kind>", "when an approval is needed: exact (the amount) or unlimited", "exact"),
+  ).action(async (validator: string, options: unknown, command: Command) => {
+    const globals = rt.globals(command)
+    const request = parseOptions(writeSchema, options)
+    const { approve, amount } = parseOptions(claimAndStakeSchema, options)
+    const input = { validator: parseOptions(addressSchema, validator), amount, approve }
+    const ctx = rt.context(globals)
+    const mode = await rt.writeMode(request, ctx)
+    rt.emit(
+      globals,
+      await claimAndStake(ctx, mode, input, { onProgress: rt.progress(renderProgress) }),
+      renderClaimAndStake,
+    )
+  })
 }

@@ -9,11 +9,15 @@ import { Command, CommanderError } from "commander"
 import { BaseError } from "viem"
 import pkg from "../package.json" with { type: "json" }
 import {
-  createContext, rpcEndpoints, rpcHosts, SafenetError, ScanError, type Context, type ContextOptions,
+  createContext, rpcEndpoints, rpcHosts, SafenetError, ScanError,
+  type Context, type ContextOptions, type Progress, type Signer, type WriteMode,
 } from "./lib/index.js"
 import { ARCHIVE_ADVICE, toJson } from "./commands/format.js"
-import { globalSchema, parseOptions, UsageError, type GlobalOptions } from "./commands/options.js"
+import { globalSchema, parseOptions, UsageError, type GlobalOptions, type WriteRequest } from "./commands/options.js"
+import { terminalPasswordPrompt } from "./commands/prompt.js"
 import { registerRewards } from "./commands/rewards.js"
+import { loadSigner, type SignerRequest } from "./commands/signer.js"
+import { registerStake } from "./commands/stake.js"
 import { registerStatus } from "./commands/status.js"
 import { registerValidators } from "./commands/validators.js"
 import { registerWithdrawals } from "./commands/withdrawals.js"
@@ -29,6 +33,8 @@ export interface Runtime {
   readonly io: Io
   readonly env: Readonly<Record<string, string | undefined>>
   readonly createContext: (options: ContextOptions) => Context
+  /** Turns the signer options into a signer. Tests replace it to inject their own. */
+  readonly loadSigner: (request: SignerRequest, ctx: Context) => Promise<Signer>
 }
 
 /** What a command needs from the program: its global options, a context, and output. */
@@ -38,9 +44,30 @@ export interface CommandRuntime {
   context(globals: GlobalOptions): Context
   /** --json prints the data; otherwise the rendered text. */
   emit<T>(globals: GlobalOptions, data: T, render: (data: T) => string): void
+  /**
+   * The mode the write options ask for: a signer to send with, or the address a dry run
+   * simulates from. A dry run with a signer option loads the signer for its address only.
+   */
+  writeMode(request: WriteRequest, ctx: Context): Promise<WriteMode>
+  /** Reports each transaction of a live write as it lands, on stderr, so --json stays one document. */
+  progress(render: (event: Progress) => string): (event: Progress) => void
 }
 
 const URL_PATTERN = /https?:\/\/[^\s"'<>]+/g
+
+/**
+ * A usage error with anything that may be a secret taken out. A misplaced flag in `--flag=value`
+ * form, such as `--private-key=<key>`, reaches commander as an unknown option and its message
+ * repeats the whole token; a key typed where an argument belongs is repeated by the validation
+ * message. So the value after `=` goes, as do URLs and runs of 64 or more hex digits. A usage
+ * error never needs a transaction hash, so nothing real is lost.
+ */
+export function scrubUsage(text: string): string {
+  return text
+    .replace(/(^|[\s'"])(-{1,2}[A-Za-z0-9][\w-]*)=[^\s'"]*/g, "$1$2=<redacted>")
+    .replace(URL_PATTERN, "<url>")
+    .replace(/(0x)?[0-9a-fA-F]{64,}/g, "<redacted>")
+}
 
 /** One plain sentence for an error, with any URL removed: an RPC URL can carry a key. */
 export function errorSentence(err: unknown): string {
@@ -77,24 +104,44 @@ function commandRuntime(runtime: Runtime): CommandRuntime {
     emit(globals, data, render) {
       runtime.io.out(`${globals.json ? toJson(data) : render(data)}\n`)
     },
+    async writeMode(request, ctx) {
+      if (!request.signer) {
+        // writeSchema allows no signer only for a dry run with --from.
+        return { dryRun: true, from: request.from! }
+      }
+      const signer = await runtime.loadSigner(request.signer, ctx)
+      if (request.from && request.from !== signer.address) {
+        throw new UsageError(`--from ${request.from} is not the signer's address ${signer.address}`)
+      }
+      return request.dryRun ? { dryRun: true, from: signer.address } : { dryRun: false, signer }
+    },
+    progress(render) {
+      return (event) => runtime.io.err(`${render(event)}\n`)
+    },
   }
 }
 
 export function buildProgram(runtime: Runtime): Command {
   const program = new Command("safenet")
     .description(
-      "Read Safenet Beta from Ethereum Mainnet and from the data SEF publishes. Read-only: nothing is signed.",
+      "Read Safenet Beta from Ethereum Mainnet and from the data SEF publishes, and stake, unstake and claim. " +
+        "Every write takes --dry-run, which signs nothing.",
     )
     .version(pkg.version)
     .option("--json", "machine output with the same fields; amounts in wei as decimal strings")
     .option("--rpc-url <url>", "Mainnet RPC endpoint (default: MAINNET_RPC_URL, then public endpoints)")
     .option("-v, --verbose", "print the RPC host in use, never its full URL, to stderr")
     .exitOverride()
-    .configureOutput({ writeOut: runtime.io.out, writeErr: runtime.io.err })
+    .configureOutput({
+      writeOut: runtime.io.out,
+      writeErr: runtime.io.err,
+      outputError: (text, write) => write(scrubUsage(text)),
+    })
     .showHelpAfterError("(run with --help for usage)")
 
   const rt = commandRuntime(runtime)
   registerStatus(program, rt)
+  registerStake(program, rt)
   registerValidators(program, rt)
   registerWithdrawals(program, rt)
   registerRewards(program, rt)
@@ -111,7 +158,7 @@ export async function run(argv: readonly string[], runtime: Runtime): Promise<nu
     // commander has already printed its own message. Help and --version exit 0.
     if (err instanceof CommanderError) return err.exitCode === 0 ? 0 : 2
     if (err instanceof UsageError) {
-      runtime.io.err(`error: ${err.message}\n`)
+      runtime.io.err(`error: ${scrubUsage(err.message)}\n`)
       return 2
     }
     runtime.io.err(`error: ${errorSentence(err)}\n`)
@@ -135,5 +182,7 @@ export function processRuntime(): Runtime {
     },
     env: process.env,
     createContext,
+    loadSigner: (request, ctx) =>
+      loadSigner(request, ctx, { env: process.env, askPassword: terminalPasswordPrompt() }),
   }
 }

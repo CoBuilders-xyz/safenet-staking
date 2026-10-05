@@ -30,7 +30,7 @@ Every package implements the same five. Turborepo fans them out.
 | `pnpm bootstrap` | Runs `scripts/setup.sh`: checks tools, writes `.env.ports`, installs, then links Vercel and pulls `.env.local`. Safe to re-run. **Not `setup`: that is a pnpm builtin that edits your shell rc.** |
 | `pnpm dev` | Starts the web app's Vite dev server, type-watches `packages/core`, and regenerates the subgraph manifests and types. |
 | `pnpm build` | Builds all packages. |
-| `pnpm test` | Unit tests. `apps/web` has 380 Vitest tests in 42 files. The subgraphs have matchstick tests: 20 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has 45 node:test tests in 7 files, under `src` and `scripts`, and its script fails when it finds no test file. `packages/cli` has 49 node:test tests in 4 files, plus 6 Mainnet smoke tests in a fifth that skip here; see `test:smoke`. |
+| `pnpm test` | Unit tests. `apps/web` has 380 Vitest tests in 42 files. The subgraphs have matchstick tests: 21 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has 48 node:test tests in 7 files, under `src` and `scripts`, and its script fails when it finds no test file. `packages/cli` has 76 node:test tests in 7 files, plus 6 Mainnet smoke tests and 10 fork tests that skip here; see `test:smoke` and `test:fork`. |
 | `pnpm check` | Lint, the browser-safety check, then types in every package. Run it before every commit. |
 
 The test counts were measured with `pnpm test` when this file was written. Run it for the
@@ -48,9 +48,9 @@ Specific commands, only where they apply:
 | `pnpm verify:abis:deep` | `packages/core` | Every signature, including rare events, scanned from each deploy block | needs the archive `MAINNET_RPC_URL` from `pnpm env:pull` |
 | `pnpm metrics` | `packages/core` | The 24 metrics, computed against live chains and compared with SEF's published JSON. Writes `packages/core/.metrics/`, which is git-ignored | needs an archive node. With public RPC only, it stopped on a failed Mainnet log range when this file was written |
 | `pnpm check:browser` | root | `apps/web/src` reads no `process.env`, and a built bundle contains no value from `.env.local` | works, part of `check` |
-| `pnpm test:smoke` | root, `packages/cli` | Each of the six commands runs against Mainnet through the real entry point | needs the archive `MAINNET_RPC_URL`; runs nightly. Skipped, with the reason, everywhere else |
+| `pnpm test:smoke` | root, `packages/cli` | Each of the six read commands runs against Mainnet through the real entry point | needs the archive `MAINNET_RPC_URL`; runs nightly. Skipped, with the reason, everywhere else |
 | `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. 83 Playwright tests in 14 spec files | runs; one navigation test is intermittently flaky |
-| `pnpm test:fork` | `apps/web` | The staking flows execute against the real contracts on an Anvil Mainnet fork at a pinned block, each checked by reading the chain. 4 Playwright tests and 1 skipped, about 1.5 minutes | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
+| `pnpm test:fork` | `apps/web`, `packages/cli` | Against the real contracts on an Anvil Mainnet fork at a pinned block, each effect checked by reading the chain. `apps/web`: the staking flows in the interface, 4 Playwright tests and 1 skipped, about 1.5 minutes. `packages/cli`: the five write commands sent for real, then each with `--dry-run`, which must change nothing; 11 node:test tests, one of which needs no Anvil and also runs under `pnpm test`, about 20 seconds | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
 | `deploy:studio` | each subgraph package, through `pnpm --filter` | The subgraph builds and Studio accepts it as a new version under its slug. Not that it syncs: watch it by deployment hash, then run `differential` with `SUBGRAPH_URL` | works; needs `GRAPH_DEPLOY_KEY` |
 | `pnpm test:parity` | subgraphs | Our numbers match SEF's published JSON | **fails on purpose: no subgraph package implements it yet** |
 
@@ -64,14 +64,15 @@ before the real suite lands.
 `scripts/setup.sh` writes per-worktree ports into `.env.ports` at the repository root, so two
 worktrees can run the same thing at once. The e2e suite starts Vite on `E2E_PORT` and, outside CI,
 reuses a server already listening there; `apps/web/e2e/ports.ts` reads `E2E_PORT` from
-`.env.ports`, so the port holds from the root and from inside `apps/web`. The fork suite starts
-Anvil on `ANVIL_PORT` and its own Vite on `FORK_PORT`, and never reuses either. `pnpm dev` reads
+`.env.ports`, so the port holds from the root and from inside `apps/web`. The web fork suite
+starts Anvil on `ANVIL_PORT` and its own Vite on `FORK_PORT`, and never reuses either. The CLI fork
+suite starts its own Anvil on `CLI_ANVIL_PORT`, so both suites can run at once. `pnpm dev` reads
 `WEB_PORT` the same way, in `apps/web/vite.config.ts`, and the subgraph `differential` scripts
 read `GRAPH_NODE_PORT`. A value exported in the shell wins over the file, and `turbo.json`
 passes `E2E_PORT` and `WEB_PORT` through Turborepo's strict environment mode, and `ANVIL_PORT`,
-`FORK_PORT` and `MAINNET_RPC_URL` for `test:fork`. Without
-`.env.ports`, as in CI, the e2e suite uses 5174, the fork suite 5178 and Anvil 8545, and
-`pnpm dev` uses Vite's default.
+`CLI_ANVIL_PORT`, `FORK_PORT` and `MAINNET_RPC_URL` for `test:fork`. Without
+`.env.ports`, as in CI, the e2e suite uses 5174, the web fork suite 5178 and Anvil 8545, the CLI
+fork suite Anvil 8546, and `pnpm dev` uses Vite's default.
 
 ## Layout
 
@@ -84,8 +85,9 @@ apps/web                    EXISTS   the fork of safe-fndn/safenet-staking-ui, u
 packages/core               EXISTS   addresses, start blocks, ABIs. The only source of constants.
 packages/subgraph-mainnet   EXISTS   staking, withdrawals and rewards on Ethereum Mainnet
 packages/subgraph-gnosis    EXISTS   consensus and signing on Gnosis Chain
-packages/cli                EXISTS   safenet-cli: the `safenet` binary, six read-only commands,
-                                     over a library in src/lib/ that the MCP server will import
+packages/cli                EXISTS   safenet-cli: the `safenet` binary, six read commands and five
+                                     writes with --dry-run, over a library in src/lib/ that the MCP
+                                     server will import
 tools/                      EXISTS   edit hook, task guard, browser-safety check, metrics report
 scripts/setup.sh            EXISTS   what `pnpm bootstrap` runs
 docker-compose.yml          EXISTS   local graph-node, postgres and ipfs
@@ -126,8 +128,8 @@ workflow `.github/workflows/subgraphs-deploy.yml`. Its `CLAUDE.md` has the slug 
 
 `.github/workflows/ci.yml` runs four jobs on every pull request and on every push to `main`:
 `check`, `test`, `e2e` and `verify-abis`. `nightly.yml` runs the deep ABI scan, the unit tests,
-the fork suite and the CLI smoke tests daily; all but the unit tests need the `MAINNET_RPC_URL`
-secret, and fail without it. The fork suite stays out of per-PR CI because every run reads from
+both fork suites and the CLI smoke tests daily; all but the unit tests need the `MAINNET_RPC_URL`
+secret, and fail without it. The fork suites stay out of per-PR CI because every run reads from
 the archive node. `security.yml` runs a
 dependency review on pull requests, skipped until the repository is public, and `pnpm audit`
 weekly. `subgraphs-deploy.yml` runs only by hand: it deploys one or both subgraphs to

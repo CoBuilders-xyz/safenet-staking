@@ -1,15 +1,17 @@
 # packages/cli
 
-`safenet`, the command-line interface for Safenet Beta. Read-only: it signs nothing and holds no
-key. Every address, start block and event comes from `@cobuilders/safenet-core`.
+`safenet`, the command-line interface for Safenet Beta: six read commands, and five writes that
+stake, unstake and claim. Every write takes `--dry-run`, which signs nothing. Every address, start
+block, event, function and error comes from `@cobuilders/safenet-core`.
 
 ## Why it is split in two
 
 The MCP server will offer the same operations, and it calls a library, not this binary. So:
 
 - `src/lib/` holds one module per operation. Each takes a `Context` (a Mainnet client and a
-  `fetch`) and returns typed data: amounts as `bigint` wei, every figure with its source. It
-  never prints, reads argv or exits. It is exported as `@cobuilders/safenet-cli/lib`.
+  `fetch`) and returns typed data: amounts as `bigint` wei, every figure with its source. A write
+  also takes a `WriteMode`: a `Signer` to send with, or the address a dry run simulates from. It
+  never prints, reads argv, reads a key or exits. It is exported as `@cobuilders/safenet-cli/lib`.
 - `src/commands/` holds the commander wiring, option validation with zod, and the rendering. No
   chain or SEF read happens there.
 - `src/cli.ts` builds the program and maps failures to exit codes; `src/index.ts` only runs it.
@@ -27,10 +29,47 @@ A new operation goes in `src/lib/` first, with its data type, then gets a comman
 | `safenet rewards check <address>` | SEF's proof file for the address; `cumulativeClaimed()` and `merkleRoot()` on chain |
 | `safenet rewards history <address> [--all]` | `Claimed` logs for the address from the MerkleDrop deploy block, newest 20 unless `--all` |
 
+The writes send what the web interface sends, in the same order:
+
+| Command | Sends |
+|---|---|
+| `safenet stake <validator> <amount> [--approve exact\|unlimited]` | `approve` on the SAFE token only when the allowance is below the amount, exact by default; then `stake(validator, amount)` |
+| `safenet unstake <validator> <amount>` | `initiateWithdrawal(validator, amount)`, which starts the delay |
+| `safenet withdrawals claim <id \| --all>` | `claimWithdrawal()` once per withdrawal. It takes no id and pays the oldest first, so `<id>` claims every one up to it. Only withdrawals past their delay, read from `withdrawalQueues` and `withdrawalNodes`, are claimed; the rest are named |
+| `safenet rewards claim` | `claim` with SEF's proof for the signer, read through core's `rewardProofUrl()`, only while the proof's root is the root on chain; otherwise one sentence and exit 1 |
+| `safenet rewards claim-and-stake <validator> [--amount] [--approve]` | the claim, then the approval if short, then the stake of what the claim's SAFE `Transfer` log says arrived, or of `--amount`. An `--amount` above the proof's claimable amount is refused before anything is sent, as `stake` and `unstake` refuse. Only when the claim pays less than `--amount` is what arrived staked instead, with a line on stderr and `cappedToReceived` in the result. One transaction after another; no EIP-5792 batch |
+
 Global options: `--json`, `--rpc-url <url>`, `--verbose`. Exit codes: 0 success, 1 the operation
 failed (one sentence on stderr), 2 usage error.
 
 Run it from the repository without building: `pnpm --filter @cobuilders/safenet-cli start status`.
+
+## Writes, signing and `--dry-run`
+
+- Every call is simulated with `eth_call` and estimated with `eth_estimateGas` before it is sent,
+  so a revert is decoded first: core's custom errors (`MerkleRootWasUpdated`, the staking errors)
+  read as a sentence, and a reason string is quoted. A failure exits 1. When a later transaction
+  fails, the sentence names the ones already confirmed, which stay on chain.
+- `--dry-run` does the same reads and simulations and prints what would be sent: contract,
+  function, every argument, the gas and where it came from. A call that depends on an earlier one
+  in the same command, such as a stake after its approval, cannot be estimated with
+  `eth_estimateGas`, which sees mined state only; it is simulated with `eth_simulateV1` after the
+  calls before it, and its gas is the gas the simulation used. A dry run has no signer: the
+  library is given an address, not a key.
+- Signing is a local key only: `--private-key-env <NAME>` reads it from the environment variable
+  NAME, never from a flag value; `--keystore <path>` decrypts a version 3 keystore, asking for the
+  password without echo or reading it from `--password-env <NAME>`. A value passed where a variable
+  name belongs is refused without being repeated, and no message repeats the name given for a
+  variable, which could be the secret typed in its place. Without `--dry-run` and without a signer
+  option, a write exits 2. `--from <address>` sets the address of a dry run without a signer.
+  Wallets and compliance flags are not here.
+- A live write first checks that the endpoint is on chain 1. Each transaction's hash goes to
+  stderr the moment it is sent, and its receipt when it confirms, so `--json` stays one document
+  on stdout. A hash whose receipt cannot be read is reported as sent, with the hash, and is not
+  retried. The hash is computed from the signed bytes before the broadcast, so a broadcast that
+  fails is reported with it too: the node may have taken the transaction anyway.
+- Amounts are typed in SAFE, exactly, up to 18 decimals. Results carry each amount as both
+  `wei` and `safe`.
 
 ## Rules the output keeps
 
@@ -47,6 +86,10 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   decimal strings.
 - An RPC URL can carry a key. It is never printed: `--verbose` shows the host only, and error
   messages have URLs removed.
+- A usage error repeats nothing that may be a secret: `scrubUsage()` in `src/cli.ts` removes the
+  value of any `--flag=value`, which commander would repeat for an unknown option such as
+  `--private-key=<key>`, and URLs and runs of 64 or more hex digits, which a key typed as an
+  argument would leave in the validation message.
 - A log scan never skips a range. It shrinks the range when refused and fails when the smallest
   range is still refused. The library's error says what failed; the advice about
   `MAINNET_RPC_URL` and `--rpc-url` is added in the command layer, because the MCP server has no
@@ -57,12 +100,27 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
 ## Tests
 
 `pnpm test` runs the unit tests in `src/`, against a fake chain and fake SEF files in
-`src/test-support.ts`. No network.
+`src/test-support.ts`. No network. `src/writes.test.ts` runs every write with `--dry-run` and a
+signer whose `signTransaction` throws, and fails if it is reached. `src/fork/redaction.test.ts`
+also runs here: it makes the fork suite's archive read fail and checks that its error carries no
+part of the URL.
 
 `pnpm test:smoke` runs `src/smoke/`: one test per command, against Mainnet, through the real
 entry point. It reads `MAINNET_RPC_URL` from `.env.local` and skips each test, with the reason,
 when it is not set. Turborepo's strict environment mode hides the variable from the root
 `pnpm test`, so the smoke tests always skip there. The nightly workflow runs them with the secret.
+
+`pnpm test:fork` runs `src/fork/`: Anvil forks Mainnet at core's `MAINNET_FORK` block on
+`CLI_ANVIL_PORT` from `.env.ports` (8546 without it), and the five writes are sent for real and
+checked by reading the chain: the stake delta and the allowance, the pending withdrawal, the claim
+after a clock warp past the delay, `cumulativeClaimed` for a real address with a published proof,
+and claim-and-stake end to end. Then every write runs again with `--dry-run` and a signer whose
+`signTransaction` throws, and the chain must not change. Stake, unstake and the withdrawal claims
+sign with a key from the environment through the CLI's own signer; the rewards claims are signed
+by Anvil for the impersonated claimer, whose key nobody has, and read SEF's proofs at the commit
+pinned next to the block. It needs `anvil` and the archive `MAINNET_RPC_URL`, fails without them,
+stops only its own Anvil when it ends, and runs nightly. Under `pnpm test` it is skipped with the
+reason.
 
 `pnpm build` bundles `dist/index.js` with tsup. Core is bundled in, because it ships TypeScript
 source; `commander`, `viem` and `zod` stay external.

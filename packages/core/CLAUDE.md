@@ -21,6 +21,11 @@ The deployed Safenet contracts match **neither** published branch of `safe-resea
 - If it fails, the contract was probably redeployed. Recover the real signature from chain data,
   update `src/abis.ts`, and tell the team. Do not guess, and do not read a branch.
 
+Custom errors and functions emit no log, so they are proven differently: every run checks that
+the 4-byte selector of each error in `DECODED_ERRORS` and of each function in the staking,
+MerkleDrop, ERC-20 and sanctions ABIs is in the deployed bytecode. `src/abis.ts` also records the
+`eth_call` or fork run that proved each error and each newer read.
+
 Events are tagged `high` or `rare`. High-frequency events are proven by a recent window and run
 on every pull request. When an event has no log in that window, the scan widens back in doubling
 steps up to a ceiling per chain, so a quiet weekend does not fail every pull request. Rare events
@@ -33,12 +38,12 @@ legitimately contains none of them.
   the reference interface reads the chain through one hardcoded URL and goes blank when it fails.
 - `src/contracts.ts` — addresses, deploy blocks, and where SEF publishes the data our numbers must
   match.
-- `src/abis.ts` — the indexed event registry, `indexedEvent()` to look one up by name, and the
-  read-call ABIs.
+- `src/abis.ts` — the indexed event registry, `indexedEvent()` to look one up by name, the
+  decoded error registry, and the ABIs built from them.
 - `src/sef.ts` — the shapes of SEF's published files, the URL of an address's reward proof, and
   the window a published participation rate covers.
 - `src/deployments.ts` — what the interface needs per chain, derived from `src/contracts.ts`.
-- `src/fork.ts` — the Mainnet block the fork suite forks from, pinned together with the commit of
+- `src/fork.ts` — the Mainnet block both fork suites fork from, pinned together with the commit of
   SEF's data it reads. A test fixture: move the two together.
 - `scripts/verify-abis.ts` — the check itself.
 - `scripts/verify-abis-scan.ts` — the per-event scans, the window and the ceiling, taking the

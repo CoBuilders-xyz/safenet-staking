@@ -47,6 +47,7 @@
       "passThroughEnv": [
         "MAINNET_RPC_URL",
         "ANVIL_PORT",
+        "CLI_ANVIL_PORT",
         "FORK_PORT",
         "GITHUB_TOKEN"
       ]

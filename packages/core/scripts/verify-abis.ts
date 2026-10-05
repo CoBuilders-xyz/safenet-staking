@@ -16,11 +16,27 @@
  *              only when the ceiling holds no log of the event: NO MATCH when the contract
  *              emitted other logs in that span, NO ACTIVITY when it emitted none at all.
  *   --deep     every event from its deploy block. Slow. Nightly. The real proof.
+ *
+ * Custom errors and functions emit no log. For those, both modes check that the 4-byte
+ * selector is in the deployed bytecode. That needs one eth_getCode per contract, so it runs
+ * every time.
  */
-import { createPublicClient, fallback, http, parseAbiItem, toEventSelector, type AbiEvent } from "viem"
+import {
+  createPublicClient,
+  encodeErrorResult,
+  fallback,
+  http,
+  parseAbiItem,
+  toEventSelector,
+  toFunctionSelector,
+  type Abi,
+  type AbiEvent,
+} from "viem"
 import { CHAINS, RPC_URLS } from "../src/chains.js"
-import { CONTRACTS } from "../src/contracts.js"
-import { INDEXED_EVENTS } from "../src/abis.js"
+import { CONTRACTS, type ContractName } from "../src/contracts.js"
+import {
+  DECODED_ERRORS, INDEXED_EVENTS, erc20Abi, merkleDropAbi, sanctionsOracleAbi, stakingAbi,
+} from "../src/abis.js"
 import { CEILING, WINDOW, scanFromDeploy, scanRecent, type Status } from "./verify-abis-scan.js"
 
 const deep = process.argv.includes("--deep")
@@ -88,14 +104,76 @@ async function verify(): Promise<Result[]> {
   return results
 }
 
-const results = await verify()
+/** Deployed bytecode, lower case, fetched once per contract. */
+const code = new Map<ContractName, string>()
+async function bytecodeOf(contract: ContractName): Promise<string> {
+  const cached = code.get(contract)
+  if (cached !== undefined) return cached
+  const ref = CONTRACTS[contract]
+  const bytecode = ((await clients[ref.chain].getCode({ address: ref.address })) ?? "0x").toLowerCase()
+  code.set(contract, bytecode)
+  return bytecode
+}
+
+/**
+ * A selector in the bytecode is weaker proof than a log: it shows the contract can revert with
+ * it, not that it does under the conditions we expect. abis.ts records the reverts we observed.
+ */
+async function verifyErrors(): Promise<Result[]> {
+  const results: Result[] = []
+  for (const err of DECODED_ERRORS) {
+    const item = parseAbiItem(err.signature)
+    const selector = encodeErrorResult({ abi: [item], errorName: item.name })
+    const found = (await bytecodeOf(err.contract)).includes(selector.slice(2).toLowerCase())
+    results.push({
+      signature: item.name,
+      contract: err.contract,
+      topic0: selector,
+      logs: found ? 1 : 0,
+      seen: "bytecode",
+      checked: "bytecode",
+      status: found ? "match" : "NO MATCH",
+    })
+  }
+  return results
+}
+
+/**
+ * The function ABIs, by the contract they are called on. The Solidity dispatcher compares the
+ * calldata against each function's 4-byte selector, so a function the contract has puts its
+ * selector in the bytecode, and a signature with a wrong name or argument type does not.
+ */
+const CALLED: readonly [ContractName, Abi][] = [
+  ["staking", stakingAbi],
+  ["merkleDrop", merkleDropAbi],
+  ["safeToken", erc20Abi],
+  ["sanctionsList", sanctionsOracleAbi],
+]
+
+async function verifyFunctions(): Promise<Result[]> {
+  const results: Result[] = []
+  for (const [contract, abi] of CALLED) {
+    for (const item of abi) {
+      if (item.type !== "function") continue
+      const selector = toFunctionSelector(item)
+      const found = (await bytecodeOf(contract)).includes(selector.slice(2).toLowerCase())
+      results.push({
+        signature: item.name, contract, topic0: selector, logs: found ? 1 : 0,
+        seen: "bytecode", checked: "bytecode", status: found ? "match" : "NO MATCH",
+      })
+    }
+  }
+  return results
+}
+
+const results = [...(await verify()), ...(await verifyErrors()), ...(await verifyFunctions())]
 
 const pad = (s: string, n: number) => s.padEnd(n)
 console.log(`\n  verify:abis  ${deep ? "deep scan from deploy block" : "recent window, widened when quiet, high-frequency events"}\n`)
 console.log(`  ${pad("EVENT", 24)}${pad("CONTRACT", 18)}${pad("TOPIC0", 14)}${pad("LOGS", 8)}${pad(deep ? "FIRST SEEN" : "LAST SEEN", 22)}RESULT`)
 for (const r of results) {
   console.log(
-    `  ${pad(r.signature, 24)}${pad(r.contract, 18)}${pad(r.topic0.slice(0, 10) + "…", 14)}${pad(String(r.logs), 8)}${pad(r.seen, 22)}${r.status}`,
+    `  ${pad(r.signature, 24)}${pad(r.contract, 18)}${pad(r.topic0.slice(0, 10) + "…", 14)}${pad(r.checked === "bytecode" ? "code" : String(r.logs), 8)}${pad(r.seen, 22)}${r.status}`,
   )
 }
 
@@ -104,15 +182,16 @@ const noActivity = results.filter((r) => r.status === "NO ACTIVITY")
 if (noMatch.length > 0) {
   console.error(
     deep
-      ? `\n  ${noMatch.length} signature(s) produced no logs.\n` +
+      ? `\n  ${noMatch.length} signature(s) produced no logs, or a selector is not in the bytecode.\n` +
         `  The contract may have been redeployed. Do NOT edit the signature by reading a\n` +
         `  git branch: neither published branch matches what is deployed. Recover the real\n` +
         `  signature from the chain, then update packages/core/src/abis.ts.\n`
-      : `\n  NO MATCH: ${noMatch.length} signature(s) produced no logs back to the ceiling, while\n` +
-        `  the contract emitted other logs in that span. The signature in packages/core/src/abis.ts\n` +
-        `  is probably wrong, or the event is not high-frequency. Do NOT edit the signature by\n` +
-        `  reading a git branch: neither published branch matches what is deployed. Recover the\n` +
-        `  real signature from the chain, and prove a rare event with --deep.\n`,
+      : `\n  NO MATCH: ${noMatch.length} signature(s) produced no logs back to the ceiling while the\n` +
+        `  contract emitted other logs in that span, or a selector is not in the bytecode.\n` +
+        `  The signature in packages/core/src/abis.ts is probably wrong, or the event is not\n` +
+        `  high-frequency. Do NOT edit the signature by reading a git branch: neither published\n` +
+        `  branch matches what is deployed. Recover the real signature from the chain, and prove\n` +
+        `  a rare event with --deep.\n`,
   )
 }
 if (noActivity.length > 0) {

@@ -100,7 +100,67 @@ export function indexedEvent<C extends ContractName, N extends IndexedEventName<
   return parseAbiItem(entry.signature) as ParseAbiItem<SignatureOf<C, N>>
 }
 
-/** Read-only calls the interface and the CLI both make. */
+/**
+ * Custom errors the interface decodes from a revert.
+ *
+ * A revert emits no log, so `verify:abis` cannot prove these the way it proves events. It
+ * checks instead that each 4-byte selector is in the contract's deployed bytecode.
+ *
+ * Each one was also proven by the revert itself on 2026-10-04, with `eth_call` on `claim`:
+ *  - MerkleRootWasUpdated: any account, with an `expectedMerkleRoot` other than the current root.
+ *  - InvalidProof: any account, with the current root and an empty proof.
+ *  - NothingToClaim: an account that had claimed everything, with its live proof from SEF.
+ *
+ * The staking errors were proven the same way on 2026-10-05, by `eth_call` on Mainnet from a
+ * staker with stake on a registered validator, unless noted:
+ *  - InvalidAmount: `stake(validator, 0)`, and `initiateWithdrawal(validator, 0)`.
+ *  - NotValidator: `stake` to an address that is not a registered validator.
+ *  - InvalidAddress: `stake` to the zero address.
+ *  - InsufficientStake: `initiateWithdrawal` of more than the staker has on the validator.
+ *  - WithdrawalQueueEmpty: `claimWithdrawal()` from an address with no withdrawal.
+ *  - NoClaimableWithdrawal: `claimWithdrawal()` with only a withdrawal still in its delay. Every
+ *    pending withdrawal on Mainnet was past its delay that day, so this one was proven on an
+ *    Anvil fork, where the CLI's fork suite checks it on every run.
+ */
+export interface DecodedError {
+  readonly contract: ContractName
+  readonly signature: string
+}
+
+export const DECODED_ERRORS = [
+  { contract: "merkleDrop", signature: "error MerkleRootWasUpdated()" },
+  { contract: "merkleDrop", signature: "error InvalidProof()" },
+  { contract: "merkleDrop", signature: "error NothingToClaim()" },
+  { contract: "staking", signature: "error InvalidAmount()" },
+  { contract: "staking", signature: "error NotValidator()" },
+  { contract: "staking", signature: "error InvalidAddress()" },
+  { contract: "staking", signature: "error InsufficientStake()" },
+  { contract: "staking", signature: "error WithdrawalQueueEmpty()" },
+  { contract: "staking", signature: "error NoClaimableWithdrawal()" },
+] as const satisfies readonly DecodedError[]
+
+type Registered = (typeof INDEXED_EVENTS)[number] | (typeof DECODED_ERRORS)[number]
+type RegisteredSignatureOf<C extends ContractName, N extends string> = Extract<
+  Registered,
+  { contract: C; signature: `${"event" | "error"} ${N}(${string}` }
+>["signature"]
+
+/**
+ * A signature from the registries above, by contract and name. ABIs below are built from it, so
+ * every event and error is written once, in the entry `verify:abis` proves.
+ */
+function signatureOf<C extends ContractName, N extends string>(contract: C, name: N): RegisteredSignatureOf<C, N> {
+  const entry = [...INDEXED_EVENTS, ...DECODED_ERRORS].find(
+    (e) => e.contract === contract && /^(event|error) (\w+)\(/.exec(e.signature)?.[2] === name,
+  )
+  if (!entry) throw new Error(`No registered signature for ${contract}.${name}`)
+  return entry.signature as RegisteredSignatureOf<C, N>
+}
+
+/**
+ * The staking contract's calls and errors. `verify:abis` checks that every function selector
+ * here is in the deployed bytecode; the errors come from DECODED_ERRORS above.
+ */
 export const stakingAbi = parseAbi([
   "function totalStakedAmount() view returns (uint256)",
   "function totalPendingWithdrawals() view returns (uint256)",
@@ -111,22 +171,51 @@ export const stakingAbi = parseAbi([
   "function totalStakerStakes(address staker) view returns (uint256)",
   "function totalValidatorStakes(address validator) view returns (uint256)",
   "function isValidator(address validator) view returns (bool)",
+  // Verified 2026-10-05 by eth_call on Mainnet: 172,800, two days in seconds.
+  "function withdrawDelay() view returns (uint128)",
+  // A staker's pending withdrawals are a linked list, oldest first. Verified 2026-10-05 by
+  // eth_call on Mainnet: for a staker with four open withdrawals, walking `next` from head
+  // reached tail in four nodes, the tail's `next` was 0, and the amounts and times equal
+  // getPendingWithdrawals() in order.
+  "function withdrawalQueues(address staker) view returns (uint64 head, uint64 tail)",
+  "function withdrawalNodes(address staker, uint64 withdrawalId) view returns (uint256 amount, uint128 claimableAt, uint64 previous, uint64 next)",
   "function stake(address validator, uint256 amount)",
   "function initiateWithdrawal(address validator, uint256 amount)",
+  // Takes no id. It pays the head of the caller's queue: proven on an Anvil fork on 2026-10-05,
+  // where with withdrawals 89 and 90 open and 89 past its delay, the call paid 89.
   "function claimWithdrawal()",
+  signatureOf("staking", "InvalidAmount"),
+  signatureOf("staking", "NotValidator"),
+  signatureOf("staking", "InvalidAddress"),
+  signatureOf("staking", "InsufficientStake"),
+  signatureOf("staking", "WithdrawalQueueEmpty"),
+  signatureOf("staking", "NoClaimableWithdrawal"),
 ])
 
 export const merkleDropAbi = parseAbi([
   "function merkleRoot() view returns (bytes32)",
   "function cumulativeClaimed(address account) view returns (uint256)",
   "function claim(address account, uint256 cumulativeAmount, bytes32 expectedMerkleRoot, bytes32[] merkleProof)",
+  signatureOf("merkleDrop", "Claimed"),
+  signatureOf("merkleDrop", "MerkleRootWasUpdated"),
+  signatureOf("merkleDrop", "InvalidProof"),
+  signatureOf("merkleDrop", "NothingToClaim"),
 ])
 
 export const sanctionsOracleAbi = parseAbi([
   "function isSanctioned(address addr) view returns (bool)",
 ])
 
-/** The one ERC-20 read we make: the SAFE balance held by the MerkleDrop. Standard ERC-20. */
+/**
+ * The SAFE token calls we make: balances, and the approval a stake needs. Standard ERC-20.
+ * A failed transfer reverts with a reason string, such as "ERC20: insufficient allowance", not
+ * a custom error.
+ */
 export const erc20Abi = parseAbi([
   "function balanceOf(address account) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
 ])
+
+/** The SAFE `Transfer` event, to read from a receipt what a claim paid out. */
+export const safeTokenEventsAbi = parseAbi([signatureOf("safeToken", "Transfer")])

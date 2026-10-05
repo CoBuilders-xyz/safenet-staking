@@ -39,7 +39,8 @@ fi
 # --- 2. per-worktree ports ---------------------------------------------------
 # Several worktrees run at once, so ports must not collide. FORK_PORT, the fork suite's
 # own web server, ends in 8 where WEB_PORT and E2E_PORT end in 3, so no offset makes it
-# land on another worktree's web port.
+# land on another worktree's web port. CLI_ANVIL_PORT, the CLI fork suite's Anvil, ends in 6
+# where ANVIL_PORT ends in 5, for the same reason, so both fork suites can run at once.
 WT="$(basename "$ROOT")"
 OFFSET=$(( $(printf '%s' "$WT" | cksum | cut -d' ' -f1) % 40 * 10 ))
 cat > .env.ports <<PORTS
@@ -49,6 +50,7 @@ WEB_PORT=$((5173 + OFFSET))
 E2E_PORT=$((5273 + OFFSET))
 FORK_PORT=$((5178 + OFFSET))
 ANVIL_PORT=$((8545 + OFFSET))
+CLI_ANVIL_PORT=$((8546 + OFFSET))
 GRAPH_NODE_PORT=$((8000 + OFFSET))
 GRAPH_WS_PORT=$((8100 + OFFSET))
 GRAPH_ADMIN_PORT=$((8020 + OFFSET))
