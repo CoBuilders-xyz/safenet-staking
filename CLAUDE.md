@@ -30,7 +30,7 @@ Every package implements the same five. Turborepo fans them out.
 | `pnpm bootstrap` | Runs `scripts/setup.sh`: checks tools, writes `.env.ports`, installs, then links Vercel and pulls `.env.local`. Safe to re-run. **Not `setup`: that is a pnpm builtin that edits your shell rc.** |
 | `pnpm dev` | Starts the web app's Vite dev server, type-watches `packages/core`, and regenerates the subgraph manifests and types. |
 | `pnpm build` | Builds all packages. |
-| `pnpm test` | Unit tests: Vitest in `apps/web`, matchstick in both subgraphs, node:test in `packages/core` and `packages/cli`. The `packages/core` tests live under `src` and `scripts`, and its script fails when it finds no test file. `packages/cli` also has Mainnet smoke tests and fork tests that skip here; see `test:smoke` and `test:fork`. |
+| `pnpm test` | Unit tests: Vitest in `apps/web`, matchstick in both subgraphs, node:test in `packages/core` and `packages/cli`, and node:test for the root `tools/` through `test:tools`. The `packages/core` tests live under `src` and `scripts`, and its script fails when it finds no test file. `packages/cli` also has Mainnet smoke tests and fork tests that skip here; see `test:smoke` and `test:fork`. |
 | `pnpm check` | Lint, the browser-safety check, then types in every package. Run it before every commit. |
 
 This file gives no test counts, because they change with every pull request. Run the suite for
@@ -155,4 +155,6 @@ fix it rather than working around it.
 Secrets live in the Vercel project. `pnpm env:pull` writes them to `.env.local` at the repository
 root. `pnpm bootstrap` runs it when the Vercel CLI is signed in. Git ignores the file. If you
 need a credential, read it from the environment. Never print one, and never write one into a file
-that is not `.env.local`.
+that is not `.env.local`. Never give a secret a `VITE_` name: Vite inlines every `VITE_` value
+into the public bundle, and `pnpm check:browser` treats those values as public and does not flag
+them.
