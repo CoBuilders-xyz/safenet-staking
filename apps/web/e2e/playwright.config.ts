@@ -1,33 +1,23 @@
-import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
-import { parseEnv } from "node:util"
-import { defineConfig } from "@playwright/test"
+import { defineConfig, type PlaywrightTestConfig } from "@playwright/test"
+import { MAINNET_FORK, MAINNET_FORK_SEF_DATA } from "@cobuilders/safenet-core"
+import { ANVIL_PORT, E2E_PORT, FORK_PORT } from "./ports"
 
-// One port per worktree, so several worktrees can run the suite at once.
-// scripts/setup.sh writes one into .env.ports at the repository root. Read it here rather
-// than in a package script, so the port holds from the root, from apps/web, and from an
-// editor. An exported E2E_PORT wins. Without either, the reference's own port.
-const portsFile = resolve(import.meta.dirname, "../../../.env.ports")
-const ports = existsSync(portsFile) ? parseEnv(readFileSync(portsFile, "utf8")) : {}
-const E2E_PORT = process.env.E2E_PORT ?? ports.E2E_PORT ?? "5174"
+// Two suites share this file and the page objects, but never a run.
+//
+//   pnpm test:e2e    project `chromium`, tests/, against mocked RPC. Every pull request.
+//   pnpm test:fork   project `fork`, fork/, against Anvil on a pinned Mainnet fork. Nightly.
+//
+// The fork suite's script sets E2E_SUITE=fork. It needs its own web servers, built with other
+// env, and Playwright's webServer is per config rather than per project, so the switch is here.
+const fork = process.env.E2E_SUITE === "fork"
 
-export default defineConfig({
-  testDir: "./tests",
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: "html",
-  timeout: 30_000,
-  use: {
-    baseURL: `http://localhost:${E2E_PORT}`,
-    trace: "on-first-retry",
-    screenshot: "only-on-failure",
-  },
+const mocked: Pick<PlaywrightTestConfig, "projects" | "webServer"> = {
   projects: [
     {
       name: "chromium",
-      use: { browserName: "chromium" },
+      testDir: "./tests",
+      use: { browserName: "chromium", baseURL: `http://localhost:${E2E_PORT}` },
     },
   ],
   webServer: {
@@ -44,4 +34,63 @@ export default defineConfig({
       VITE_REWARDS_BASE_URL: "https://mock-rewards.test",
     },
   },
+}
+
+const forked: Pick<PlaywrightTestConfig, "projects" | "webServer"> = {
+  projects: [
+    {
+      name: "fork",
+      testDir: "./fork",
+      // One Anvil, one chain: tests run one at a time, each inside its own snapshot.
+      fullyParallel: false,
+      // Reads that miss Anvil's cache go to the archive node, so the first ones are slow.
+      timeout: 120_000,
+      expect: { timeout: 20_000 },
+      use: { browserName: "chromium", baseURL: `http://localhost:${FORK_PORT}` },
+    },
+  ],
+  webServer: [
+    {
+      // Never reused: a leftover Anvil holds state from another run.
+      command: "node --env-file-if-exists=../../.env.local --import tsx e2e/fork/anvil.ts",
+      cwd: resolve(import.meta.dirname, ".."),
+      port: Number(ANVIL_PORT),
+      reuseExistingServer: false,
+      timeout: 120_000,
+      // SIGTERM first, so the launcher passes it on and Anvil exits cleanly. SIGKILL to the
+      // whole process group after the timeout, regardless.
+      gracefulShutdown: { signal: "SIGTERM", timeout: 10_000 },
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      // Never reused: a server on this port may be built for the mocks.
+      command: `pnpm dev --port ${FORK_PORT} --strictPort`,
+      port: Number(FORK_PORT),
+      reuseExistingServer: false,
+      env: {
+        VITE_RPC_URL: `http://127.0.0.1:${ANVIL_PORT}`,
+        // SEF's files as they stood at the fork block, not as they stand today.
+        VITE_VALIDATOR_INFO_URL: MAINNET_FORK_SEF_DATA.validatorInfo,
+        VITE_REWARDS_BASE_URL: MAINNET_FORK_SEF_DATA.rewardsProofBase,
+        // The test accounts hold no history before the fork, so scans start there. Earlier
+        // blocks would be fetched from the archive node for nothing.
+        VITE_STAKING_DEPLOY_BLOCK: MAINNET_FORK.blockNumber.toString(),
+      },
+    },
+  ],
+}
+
+export default defineConfig({
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: fork || process.env.CI ? 1 : undefined,
+  reporter: "html",
+  timeout: 30_000,
+  use: {
+    trace: "on-first-retry",
+    screenshot: "only-on-failure",
+  },
+  ...(fork ? forked : mocked),
 })

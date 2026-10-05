@@ -67,14 +67,7 @@ async function setupPage(page: Page, options: SetupPageOptions, state: MockChain
         supportsBatching,
       })
     )
-    // Seed wagmi localStorage so it auto-reconnects to the injected connector.
-    // wagmi v3 stores:
-    //   wagmi.recentConnectorId = JSON.stringify("injected")
-    //   wagmi.injected.connected = JSON.stringify(true)
-    await page.addInitScript(() => {
-      localStorage.setItem("wagmi.recentConnectorId", JSON.stringify("injected"))
-      localStorage.setItem("wagmi.injected.connected", JSON.stringify(true))
-    })
+    await seedInjectedConnection(page)
   } else {
     await page.addInitScript(createDisconnectedProviderScript(chainIdHex))
   }
@@ -115,7 +108,26 @@ async function setupPage(page: Page, options: SetupPageOptions, state: MockChain
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(proof) })
   })
 
-  // Mock geo-check APIs so the app renders instead of showing RestrictedScreen
+  await stubGeoCheck(page)
+
+  return page
+}
+
+/**
+ * Seed wagmi localStorage so it auto-reconnects to the injected connector.
+ * wagmi v3 stores:
+ *   wagmi.recentConnectorId = JSON.stringify("injected")
+ *   wagmi.injected.connected = JSON.stringify(true)
+ */
+export async function seedInjectedConnection(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    localStorage.setItem("wagmi.recentConnectorId", JSON.stringify("injected"))
+    localStorage.setItem("wagmi.injected.connected", JSON.stringify(true))
+  })
+}
+
+/** Mock geo-check APIs so the app renders instead of showing RestrictedScreen. */
+export async function stubGeoCheck(page: Page): Promise<void> {
   await page.route("**/api.country.is**", async (route) => {
     await route.fulfill({
       status: 200,
@@ -126,8 +138,6 @@ async function setupPage(page: Page, options: SetupPageOptions, state: MockChain
   await page.route("**/ipapi.co/**", async (route) => {
     await route.fulfill({ status: 200, contentType: "text/plain", body: "US" })
   })
-
-  return page
 }
 
 export const test = base.extend<TestFixtures>({

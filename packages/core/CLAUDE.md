@@ -32,6 +32,8 @@ nightly, because a recent window legitimately contains none of them.
 - `src/contracts.ts` — addresses, deploy blocks, and where SEF publishes the data our numbers must
   match.
 - `src/abis.ts` — the indexed event registry and the read-call ABIs.
+- `src/fork.ts` — the Mainnet block the fork suite forks from, pinned together with the commit of
+  SEF's data it reads. A test fixture: move the two together.
 - `scripts/verify-abis.ts` — the check itself.
 
 ## Adding a contract or an event
