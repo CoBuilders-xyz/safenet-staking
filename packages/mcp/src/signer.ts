@@ -4,7 +4,7 @@
  * password in the variable named for it. This is the only place the server touches a key.
  *
  * It runs for each live write and keeps nothing. No message here prints a key, a password, the
- * value of a variable, or the name given for one.
+ * value of a variable, the name given for one, or the keystore path.
  */
 import { readFile } from "node:fs/promises"
 import { privateKeyToAccount } from "viem/accounts"
@@ -29,7 +29,7 @@ async function keystoreKey(request: Extract<SignerRequest, { kind: "keystore" }>
   try {
     json = JSON.parse(await readFile(request.path, "utf8"))
   } catch {
-    throw new SafenetError(`Could not read the keystore file ${request.path} as JSON`)
+    throw new SafenetError("Could not read the keystore file named by SAFENET_MCP_KEYSTORE as JSON")
   }
   const password = env[request.passwordEnv]
   if (password === undefined) throw new SafenetError("The environment variable named by SAFENET_MCP_PASSWORD_ENV is not set")

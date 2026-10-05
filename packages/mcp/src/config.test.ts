@@ -77,7 +77,7 @@ test("signer settings that do not fit together, or point at nothing, stop the se
   refused({ SAFENET_MCP_ALLOW_WRITES: "1", SAFENET_MCP_PRIVATE_KEY_ENV: "UNSET_KEY" }, /^The environment variable named by SAFENET_MCP_PRIVATE_KEY_ENV is not set$/)
   refused(
     { SAFENET_MCP_ALLOW_WRITES: "1", SAFENET_MCP_KEYSTORE: "/nonexistent/keystore.json", SAFENET_MCP_PASSWORD_ENV: "PW", PW: "x" },
-    /does not exist/,
+    /^The keystore file named by SAFENET_MCP_KEYSTORE does not exist$/,
   )
   refused({ SAFENET_MCP_ALLOW_WRITES: "1", SAFENET_MCP_KEYSTORE: KEYSTORE, SAFENET_MCP_PASSWORD_ENV: "UNSET_PW" }, /PASSWORD_ENV is not set/)
 })

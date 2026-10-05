@@ -5,7 +5,8 @@
  * signer options name where the key is, never the key: `SAFENET_MCP_PRIVATE_KEY_ENV` names a
  * variable that holds it, `SAFENET_MCP_KEYSTORE` is a keystore path and
  * `SAFENET_MCP_PASSWORD_ENV` names the variable that holds its password. No message here repeats
- * a value or the name given for a variable, which could be the secret typed in its place.
+ * a value, a keystore path or the name given for a variable, any of which could be the secret
+ * typed in its place.
  */
 import { existsSync } from "node:fs"
 
@@ -78,7 +79,7 @@ export function readConfig(env: Env): ServerConfig {
       throw new ConfigError("The environment variable named by SAFENET_MCP_PRIVATE_KEY_ENV is not set")
     }
     if (signer.kind === "keystore") {
-      if (!existsSync(signer.path)) throw new ConfigError(`The keystore file ${signer.path} does not exist`)
+      if (!existsSync(signer.path)) throw new ConfigError("The keystore file named by SAFENET_MCP_KEYSTORE does not exist")
       if (env[signer.passwordEnv] === undefined) {
         throw new ConfigError("The environment variable named by SAFENET_MCP_PASSWORD_ENV is not set")
       }

@@ -21,7 +21,10 @@ let server: Awaited<ReturnType<typeof connectStdio>> | undefined
 
 before(async () => {
   if (skip) return
-  server = await connectStdio(process.env)
+  // The server's own settings are cleared, so a shell that sets an RPC endpoint or allows writes
+  // runs the test as it runs in CI: reads through MAINNET_RPC_URL, writes off.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("SAFENET_MCP_")))
+  server = await connectStdio(env)
 }, { timeout: TIMEOUT })
 
 after(async () => {

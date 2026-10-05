@@ -63,6 +63,8 @@ too, and no tool takes one. A new CLI command needs a tool: `src/parity.test.ts`
 
 ## Rules the server keeps
 
+- No message repeats a setting's value: not a key, a password, a variable name or a keystore
+  path, any of which could be a secret typed in the wrong place. It names the setting instead.
 - No key or password goes through a tool. A string argument, or an argument name, that holds 64
   hex digits is refused, as is any unknown argument whose name suggests a signer setting. No
   validation message repeats the value it refuses; each names the argument instead.
