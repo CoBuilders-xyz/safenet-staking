@@ -4,7 +4,7 @@
  * small number so no file in this package types one out.
  */
 import {
-  ContractFunctionRevertedError, WaitForTransactionReceiptTimeoutError, encodeAbiParameters, encodeErrorResult, encodeEventTopics, numberToHex, pad,
+  ContractFunctionRevertedError, HttpRequestError, WaitForTransactionReceiptTimeoutError, encodeAbiParameters, encodeErrorResult, encodeEventTopics, numberToHex, pad,
   type Abi, type Hex, type PublicClient,
 } from "viem"
 import { CONTRACTS, SEF_DATA, rewardProofUrl, safeTokenEventsAbi } from "@cobuilders/safenet-core"
@@ -46,6 +46,8 @@ export interface FakeOptions {
   readonly allowance?: bigint
   /** The environment the program sees, for the signer options. */
   readonly env?: Readonly<Record<string, string | undefined>>
+  /** eth_sendRawTransaction fails, as when the node's answer is lost. */
+  readonly broadcastError?: boolean
   /** Waiting for a receipt times out, as viem reports it. */
   readonly receiptTimeout?: boolean
   /** The address SEF publishes a proof for. Defaults to STAKER. */
@@ -152,6 +154,7 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
     },
     sendRawTransaction: async () => {
       sends.broadcast++
+      if (o.broadcastError) throw new HttpRequestError({ url: "https://archive.invalid/v2/not-a-real-key", status: 504 })
       return TX_HASH
     },
     // A claim's receipt carries the SAFE transfer it paid, as on chain.

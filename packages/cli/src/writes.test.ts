@@ -210,8 +210,8 @@ test("signer and amount options are checked before anything is read, exit 2", as
   const cases: [string[], RegExp, FakeOptions?][] = [
     [["stake", VALIDATOR_A, "1", "--private-key-env", TEST_KEY], /takes the name of an environment variable/],
     [["stake", VALIDATOR_A, "1", "--private-key-env", bare], /takes the name of an environment variable/],
-    [["stake", VALIDATOR_A, "1", "--private-key-env", "NOT_SET"], /The environment variable NOT_SET is not set/],
-    [["stake", VALIDATOR_A, "1", "--private-key-env", "BAD"], /BAD does not hold a private key/, { env: { BAD: "0x1234" } }],
+    [["stake", VALIDATOR_A, "1", "--private-key-env", "NOT_SET"], /The environment variable named by --private-key-env is not set/],
+    [["stake", VALIDATOR_A, "1", "--private-key-env", "BAD"], /The variable named by --private-key-env does not hold a private key/, { env: { BAD: "0x1234" } }],
     [["stake", VALIDATOR_A, "1", "--private-key-env", "K", "--keystore", "k.json"], /cannot be used together/],
     [["stake", VALIDATOR_A, "1", "--from", STAKER], /--from only works with --dry-run/],
     [["stake", VALIDATOR_A, "1", "--dry-run"], /A dry run needs an address to simulate from/],
@@ -268,6 +268,26 @@ test("a step that fails after another confirmed names the confirmed one", async 
     r.err,
     new RegExp(`error: Staking.stake would revert with NotValidator: .*; already confirmed, and not undone: MerkleDrop.claim in ${TX_HASH}, SAFE token.approve in ${TX_HASH}\\.\n$`),
   )
+})
+
+test("a name given for a secret's variable is never printed back, even when it is the secret", async () => {
+  const path = new URL("./fixtures/keystore-anvil-1.json", import.meta.url).pathname
+  for (const argv of [
+    ["stake", VALIDATOR_A, "1", "--keystore", path, "--password-env", "Hunter2_safe"],
+    ["stake", VALIDATOR_A, "1", "--private-key-env", "Hunter2_safe"],
+    ["stake", VALIDATOR_A, "1", "--private-key-env", "Hunter2_safe", "--dry-run"],
+  ]) {
+    const r = await cli(argv, { env: argv.includes("--dry-run") ? { Hunter2_safe: "not a key" } : {} })
+    assert.equal(r.code, 2, argv.join(" "))
+    assert.ok(!r.err.includes("Hunter2_safe") && !r.out.includes("Hunter2_safe"), r.err)
+  }
+})
+
+test("a broadcast that fails names the hash of the signed transaction, which may still land", async () => {
+  const r = await cli(["unstake", VALIDATOR_A, "0.5", "--private-key-env", "SAFENET_TEST_KEY"], { env: KEY_ENV, broadcastError: true })
+  assert.equal(r.code, 1)
+  assert.match(r.err, /^error: The transaction 0x[0-9a-f]{64} was signed, but broadcasting it failed \(HTTP request failed\.\); it may still reach the network, so look the hash up before sending again\.\n$/)
+  assert.ok(!r.err.includes("not-a-real-key"))
 })
 
 test("a sent transaction whose receipt never comes is reported with its hash, not as a failure to send", async () => {

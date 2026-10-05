@@ -58,14 +58,16 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   library is given an address, not a key.
 - Signing is a local key only: `--private-key-env <NAME>` reads it from the environment variable
   NAME, never from a flag value; `--keystore <path>` decrypts a version 3 keystore, asking for the
-  password without echo or reading it from `--password-env <NAME>`. A value passed where a
-  variable name belongs is refused without being repeated. Without `--dry-run` and without a
-  signer option, a write exits 2. `--from <address>` sets the address of a dry run without a
-  signer. Wallets and compliance flags are not here.
+  password without echo or reading it from `--password-env <NAME>`. A value passed where a variable
+  name belongs is refused without being repeated, and no message repeats the name given for a
+  variable, which could be the secret typed in its place. Without `--dry-run` and without a signer
+  option, a write exits 2. `--from <address>` sets the address of a dry run without a signer.
+  Wallets and compliance flags are not here.
 - A live write first checks that the endpoint is on chain 1. Each transaction's hash goes to
   stderr the moment it is sent, and its receipt when it confirms, so `--json` stays one document
   on stdout. A hash whose receipt cannot be read is reported as sent, with the hash, and is not
-  retried.
+  retried. The hash is computed from the signed bytes before the broadcast, so a broadcast that
+  fails is reported with it too: the node may have taken the transaction anyway.
 - Amounts are typed in SAFE, exactly, up to 18 decimals. Results carry each amount as both
   `wei` and `safe`.
 

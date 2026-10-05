@@ -6,7 +6,8 @@
  * - `--keystore <path>` decrypts a version 3 keystore file. The password comes from a prompt
  *   that does not echo, or from the variable named by `--password-env`.
  *
- * No message here prints a key, a password, or the value of a variable.
+ * No message here prints a key, a password, the value of a variable, or the name given for one:
+ * a user who types the secret where its variable's name belongs must not see it echoed.
  */
 import { readFile } from "node:fs/promises"
 import { privateKeyToAccount } from "viem/accounts"
@@ -24,10 +25,10 @@ export interface SignerSources {
   readonly askPassword: ((prompt: string) => Promise<string>) | undefined
 }
 
-function privateKeyFrom(value: string, name: string): Hex {
+function privateKeyFrom(value: string): Hex {
   const key = value.trim()
   if (!/^(0x)?[0-9a-fA-F]{64}$/.test(key)) {
-    throw new UsageError(`${name} does not hold a private key: expected 64 hex digits, with or without 0x`)
+    throw new UsageError("The variable named by --private-key-env does not hold a private key: expected 64 hex digits, with or without 0x")
   }
   return (key.startsWith("0x") ? key : `0x${key}`) as Hex
 }
@@ -48,7 +49,7 @@ async function keystoreKey(request: Extract<SignerRequest, { kind: "keystore" }>
   let password: string
   if (request.passwordEnv) {
     const value = sources.env[request.passwordEnv]
-    if (value === undefined) throw new UsageError(`The environment variable ${request.passwordEnv} is not set`)
+    if (value === undefined) throw new UsageError("The environment variable named by --password-env is not set")
     password = value
   } else if (sources.askPassword) {
     password = await sources.askPassword(`Password for ${request.path}: `)
@@ -62,8 +63,10 @@ export async function loadSigner(request: SignerRequest, ctx: Context, sources: 
   let key: Hex
   if (request.kind === "private-key-env") {
     const value = sources.env[request.name]
-    if (value === undefined || value === "") throw new UsageError(`The environment variable ${request.name} is not set`)
-    key = privateKeyFrom(value, request.name)
+    if (value === undefined || value === "") {
+      throw new UsageError("The environment variable named by --private-key-env is not set")
+    }
+    key = privateKeyFrom(value)
   } else {
     key = await keystoreKey(request, sources)
   }
