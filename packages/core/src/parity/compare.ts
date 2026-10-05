@@ -7,7 +7,34 @@
 import { SEF_DATA } from "../contracts.js"
 import type { SefValidator } from "../sef.js"
 
-export type Verdict = "PASS" | "FAIL" | "NOT COMPARED"
+/**
+ * One row's verdict. NOT COMPARABLE: our deployment cannot answer at SEF's instant, which is a
+ * known limit and not a disagreement. NOT COMPARED: a figure SEF publishes that we do not hold.
+ */
+export type Verdict = "PASS" | "FAIL" | "NOT COMPARABLE" | "NOT COMPARED"
+
+/**
+ * The result of one chain's run, and the only states it can end in.
+ *
+ *   PASS            every compared figure is identical to SEF's                    exit 0
+ *   FAIL            a figure differs, the subgraph is broken or behind, SEF's
+ *                   data is over 24 hours old, or the run hit an error            exit 1
+ *   STALE           SEF's file is over 9 hours old, so nothing is compared         exit 0
+ *   NOT COMPARABLE  our deployment cannot answer at SEF's instant                  exit 0
+ *
+ * Only FAIL exits 1, so the daily job turns red only on something someone can act on.
+ */
+export type ParityState = "PASS" | "FAIL" | "STALE" | "NOT COMPARABLE"
+
+export const EXIT_CODE: Readonly<Record<ParityState, 0 | 1>> = {
+  "PASS": 0,
+  "FAIL": 1,
+  "STALE": 0,
+  "NOT COMPARABLE": 0,
+}
+
+/** The issue that adds the hourly buckets the Gnosis comparison needs on a pruned deployment. */
+export const HOURLY_BUCKETS_ISSUE = "COB-612"
 
 /**
  * How a figure is compared. SEF's participation rates are doubles and its staked total is
@@ -167,9 +194,32 @@ export function compareStakedTotal(
  * The overall result. Any failure fails. So does a run where nothing was compared: a table of
  * NOT COMPARED rows proves nothing, and must not show as a pass.
  */
-export function overall(rows: readonly ParityRow[]): "PASS" | "FAIL" {
+export function overall(rows: readonly ParityRow[]): Exclude<ParityState, "STALE"> {
   if (rows.some((r) => r.verdict === "FAIL")) return "FAIL"
+  if (rows.some((r) => r.verdict === "NOT COMPARABLE")) return "NOT COMPARABLE"
   return rows.some((r) => r.verdict === "PASS") ? "PASS" : "FAIL"
+}
+
+/**
+ * The first block a pruned deployment still answers for, read from graph-node's refusal of an
+ * older `block: { number }`, or undefined when the message is something else. Studio keeps
+ * about 1,000 blocks of history (`historyBlocks` in its indexing status on 2026-10-05), though
+ * our manifests set no `indexerHints`, which graph-node documents as keeping all of it.
+ */
+export function prunedFrom(message: string): bigint | undefined {
+  const m = /only has data starting at block number (\d+)/.exec(message)
+  return m ? BigInt(m[1]!) : undefined
+}
+
+/** The reason line for a deployment that answers from block `kept` when SEF needs `needed`. */
+export function prunedHistoryReason(kept: bigint, needed: bigint): string {
+  return `Studio keeps 1,000 blocks of history; SEF's window starts ${kept - needed} blocks earlier; ` +
+    `the hourly buckets that make this comparable are ${HOURLY_BUCKETS_ISSUE}`
+}
+
+/** A row that says why a figure cannot be compared today. Never a pass, never a failure. */
+export function notComparable(figure: string, reason: string): ParityRow {
+  return { figure, ours: "", sef: "", precision: "", verdict: "NOT COMPARABLE", note: reason }
 }
 
 // ---------------------------------------------------------------------------- the instant
@@ -231,6 +281,28 @@ export function freshness(publishedAt: Date, now: Date): { state: Freshness; age
   if (ageMs > SEF_DATA.expiredAfterMs) return { state: "expired", ageMs }
   if (ageMs > SEF_DATA.staleAfterMs) return { state: "stale", ageMs }
   return { state: "fresh", ageMs }
+}
+
+/**
+ * The state and the one line a run reports when SEF's file is not fresh, or undefined when it
+ * is. `file` names the file in the line.
+ */
+export function staleOutcome(
+  f: { state: Freshness; ageMs: number }, file: string,
+): { state: "STALE" | "FAIL"; line: string } | undefined {
+  if (f.state === "fresh") return undefined
+  if (f.state === "expired") {
+    return {
+      state: "FAIL",
+      line: `FAIL: SEF's data is stale. ${file} was last written ${formatAge(f.ageMs)} ago, more than ` +
+        `${SEF_DATA.expiredAfterMs / 3_600_000} h: SEF's update job has stopped.`,
+    }
+  }
+  return {
+    state: "STALE",
+    line: `STALE: ${file} was last written ${formatAge(f.ageMs)} ago, more than ` +
+      `${SEF_DATA.staleAfterMs / 3_600_000} h. Not compared, and not a failure.`,
+  }
 }
 
 export function formatAge(ms: number): string {

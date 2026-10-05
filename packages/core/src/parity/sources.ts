@@ -5,12 +5,13 @@
  * browser app imports.
  */
 import { execFileSync } from "node:child_process"
-import { appendFileSync } from "node:fs"
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 import { createPublicClient, fallback, http } from "viem"
 import { CHAINS, rpcUrls, type ChainKey } from "../chains.js"
 import { CONTRACTS, SEF_DATA } from "../contracts.js"
 import { blockAtTimestamp } from "./blocks.js"
-import { parseLastCommit, type SefCommit } from "./compare.js"
+import { parseLastCommit, type ParityState, type SefCommit } from "./compare.js"
 
 /** RPC endpoints carry keys in their paths. Every message a run prints goes through this. */
 export function redact(text: string): string {
@@ -88,17 +89,6 @@ export async function querySubgraph<T>(chain: ChainKey, endpoint: string, query:
   return j.data
 }
 
-/**
- * The first block a pruned deployment still answers for, read from graph-node's refusal of an
- * older `block: { number }`, or undefined when the message is something else. Studio keeps
- * about 1,000 blocks of history (`historyBlocks` in its indexing status on 2026-10-05), though
- * our manifests set no `indexerHints`, which graph-node documents as keeping all of it.
- */
-export function prunedFrom(message: string): bigint | undefined {
-  const m = /only has data starting at block number (\d+)/.exec(message)
-  return m ? BigInt(m[1]!) : undefined
-}
-
 /** A reader for block numbers and timestamps on one chain, through the same RPC order as the rest. */
 export function chainReader(chain: ChainKey) {
   const client = createPublicClient({ chain: CHAINS[chain], transport: fallback(rpcUrls(chain).map((u) => http(u))) })
@@ -121,4 +111,16 @@ export function chainReader(chain: ChainKey) {
 export function appendSummary(markdown: string): void {
   const file = process.env.GITHUB_STEP_SUMMARY
   if (file) appendFileSync(file, markdown.endsWith("\n") ? markdown : markdown + "\n")
+}
+
+/**
+ * Records one chain's state as a Markdown table row in `PARITY_STATE_DIR`, so the workflow can
+ * show both chains in one table after both runs. Does nothing when the variable is unset.
+ */
+export function recordState(chain: ChainKey, state: ParityState, reason: string): void {
+  const dir = process.env.PARITY_STATE_DIR
+  if (!dir) return
+  mkdirSync(dir, { recursive: true })
+  const name = chain === "mainnet" ? "Mainnet" : "Gnosis"
+  writeFileSync(join(dir, `${chain}.md`), `| ${name} | ${state} | ${reason.replaceAll("|", "\\|")} |\n`)
 }

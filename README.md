@@ -2,9 +2,8 @@
 
 [![Parity with SEF](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml/badge.svg)](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml)
 
-The badge is the last daily comparison of our deployed subgraphs with the data SEF publishes,
-each figure taken at the instant SEF published it: the staked total to the wei, and each
-validator's participation rate as the identical number.
+Mainnet total staked compared to the wei against SEF's published figure at its publish instant,
+daily. Gnosis participation is not comparable on Studio until the hourly buckets land (COB-612).
 
 ## Setup
 

@@ -18,13 +18,20 @@
  *   pnpm --filter @cobuilders/safenet-subgraph-mainnet test:parity
  *   SUBGRAPH_URL_MAINNET=<query URL> pnpm --filter @cobuilders/safenet-subgraph-mainnet test:parity
  *
- * Exit 0 on PASS and on STALE, 1 on FAIL, on an error, and when SEF's file is a day old.
+ * The states, from ParityState in packages/core:
+ *   PASS            the total is SEF's, to the wei                                 exit 0
+ *   FAIL            the total differs, the subgraph reports indexing errors or is
+ *                   behind SEF's commit, SEF's file is over 24 hours old, or the
+ *                   run hit an error                                               exit 1
+ *   STALE           SEF's file is over 9 hours old; nothing is compared            exit 0
+ *   NOT COMPARABLE  not reachable here: the stored movements rebuild any instant
+ *                   since the deploy, whatever history the deployment keeps
  */
 import { SEF_DATA, parseSefAmount, type SefNetworkInfo } from "@cobuilders/safenet-core"
 import {
-  appendSummary, chainReader, compareStakedTotal, formatAge, freshness, githubToken, lastSefCommit, overall,
-  querySubgraph, redact, renderMarkdown, renderText, sefAsset, sefRunSpan, subgraphEndpoint, totalsBetween,
-  type Movement, type ParityRow,
+  EXIT_CODE, appendSummary, chainReader, compareStakedTotal, formatAge, freshness, githubToken, lastSefCommit,
+  overall, querySubgraph, recordState, redact, renderMarkdown, renderText, sefAsset, sefRunSpan, staleOutcome,
+  subgraphEndpoint, totalsBetween, type Movement, type ParityRow,
 } from "@cobuilders/safenet-core/parity"
 
 const TITLE = "Mainnet: the staked total against SEF's network-info.json"
@@ -49,18 +56,14 @@ async function main(): Promise<number> {
   const published = `${commit.publishedAt.toISOString()} (commit ${commit.sha.slice(0, 7)}), ${formatAge(fresh.ageMs)} ago`
   say(`SEF published  ${published}`)
 
-  if (fresh.state !== "fresh") {
-    const expired = fresh.state === "expired"
-    const line = expired
-      ? `FAIL: SEF's data is stale. network-info.json was last written ${formatAge(fresh.ageMs)} ago, ` +
-        `more than ${SEF_DATA.expiredAfterMs / 3_600_000} h: SEF's update job has stopped.`
-      : `STALE: network-info.json was last written ${formatAge(fresh.ageMs)} ago, more than ` +
-        `${SEF_DATA.staleAfterMs / 3_600_000} h. Not compared, and not a failure.`
+  const stale = staleOutcome(fresh, "network-info.json")
+  if (stale) {
     say()
-    say(line)
+    say(stale.line)
     say()
-    appendSummary(`### ${TITLE}\n\nSEF published ${published}.\n\n**${line}**\n`)
-    return expired ? 1 : 0
+    appendSummary(`### ${TITLE}: ${stale.state}\n\nSEF published ${published}.\n\n**${stale.line}**\n`)
+    recordState("mainnet", stale.state, stale.line)
+    return EXIT_CODE[stale.state]
   }
 
   const network = await sefAsset<SefNetworkInfo>(commit.sha, "network-info.json")
@@ -115,18 +118,20 @@ async function main(): Promise<number> {
   }
 
   const result = overall(rows)
+  const reason = result === "PASS" ? "the staked total is identical to SEF's, to the wei" : "see the rows marked FAIL"
   console.log(renderText(rows))
   say()
-  say(`${result}: ${result === "PASS" ? "the staked total is identical to SEF's, to the wei" : "see the rows marked FAIL"}`)
+  say(`${result}: ${reason}`)
   say()
+  recordState("mainnet", result, reason)
   appendSummary([
-    `### ${TITLE}`, "",
+    `### ${TITLE}: ${result}`, "",
     `SEF published ${published}. SEF's run spans Mainnet blocks ${from} to ${to}. ` +
     `Subgraph deployment \`${d._meta.deployment}\`, indexed to block ${indexed}.`, "",
     "SEF writes the total in SAFE with all 18 decimals, so it is compared exactly, in wei.", "",
     renderMarkdown(rows), "", `**${result}**`, "",
   ].join("\n"))
-  return result === "PASS" ? 0 : 1
+  return EXIT_CODE[result]
 }
 
 main().then(
@@ -134,7 +139,8 @@ main().then(
   (e: unknown) => {
     const message = redact(e instanceof Error ? e.message : String(e))
     console.error(`\n  ERROR: ${message}\n`)
-    appendSummary(`### ${TITLE}\n\n**ERROR:** ${message}\n`)
-    process.exitCode = 1
+    appendSummary(`### ${TITLE}: FAIL\n\n**ERROR:** ${message}\n`)
+    recordState("mainnet", "FAIL", `ERROR: ${message}`)
+    process.exitCode = EXIT_CODE.FAIL
   },
 )

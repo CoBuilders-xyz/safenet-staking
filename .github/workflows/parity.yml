@@ -45,9 +45,11 @@ jobs:
       # Each package appends its own table to the job summary. The query URLs are public and
       # carry no key, so they sit here in plain text. The RPC endpoints are only used to find
       # the block at an instant; without the secrets the scripts fall back to public endpoints.
-      # GITHUB_TOKEN lifts the GitHub API limit for the two commit lookups.
+      # GITHUB_TOKEN lifts the GitHub API limit for the two commit lookups. Each run also writes
+      # its state to PARITY_STATE_DIR, for the table in the next step.
       - name: Compare with SEF's published data
         env:
+          PARITY_STATE_DIR: ${{ runner.temp }}/parity
           SUBGRAPH_URL_MAINNET: https://api.studio.thegraph.com/query/1762768/safenet-mainnet/0abe5fb
           SUBGRAPH_URL_GNOSIS: https://api.studio.thegraph.com/query/1762768/safenet-gnosis/2a0e6b8
           MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
@@ -58,7 +60,31 @@ jobs:
             echo "## Parity with SEF"
             echo
             echo "Each figure is compared at the instant SEF published it: the commit that last wrote the file."
-            echo "STALE means SEF's file is more than 9 hours old, and is not a failure. Past 24 hours the run fails."
+            echo
+            echo "- PASS: identical to SEF's figure. Exit 0."
+            echo "- FAIL: a real difference, a broken or lagging subgraph, SEF's data over 24 hours old, or an error. Exit 1."
+            echo "- STALE: SEF's file is over 9 hours old, so nothing is compared. Exit 0."
+            echo "- NOT COMPARABLE: our deployment cannot answer at SEF's instant. Exit 0."
             echo
           } >> "$GITHUB_STEP_SUMMARY"
           pnpm test:parity
+      # Both chains in one table, also when a run failed. A chain with no state file never
+      # reached the point of writing one, which is itself a failure.
+      - name: Summarise the state of each chain
+        if: always()
+        env:
+          PARITY_STATE_DIR: ${{ runner.temp }}/parity
+        run: |
+          {
+            echo "### State by chain"
+            echo
+            echo "| Chain | State | Reason |"
+            echo "|---|---|---|"
+            for chain in mainnet gnosis; do
+              if [ -f "$PARITY_STATE_DIR/$chain.md" ]; then
+                cat "$PARITY_STATE_DIR/$chain.md"
+              else
+                echo "| $chain | FAIL | the run wrote no state |"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

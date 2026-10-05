@@ -57,7 +57,8 @@ numerator and denominator. The rate is the same division, and is compared as the
 double.
 
 That needs `block: { number }` 14 days back. Studio keeps about 1,000 blocks of history, about
-1.4 hours here, so against Studio the run fails and says so. It can pass only against a
+1.4 hours here, so against Studio the run reports NOT COMPARABLE, exits 0, and says why in one
+line. A real difference, when the comparison is possible, still fails. It can pass only against a
 deployment that keeps its history from at least 14 days and 200 blocks back, such as the local
 graph-node after `pnpm generate --days 16` and a full sync. Studio reported `historyBlocks: 1000` on
 2026-10-05, though the manifest sets no `indexerHints`.

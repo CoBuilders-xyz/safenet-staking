@@ -12,15 +12,26 @@
  * per validator, the ones it shared in, which is SEF's numerator and denominator. The rate is
  * then compared with SEF's double exactly: it is the same division of the same integers.
  *
+ * Studio keeps about 1,000 blocks of history, so it cannot answer 14 days back. That is a known
+ * limit of the deployment, not a disagreement, and the run reports it as NOT COMPARABLE.
+ *
+ * The states, from ParityState in packages/core:
+ *   PASS            every rate is SEF's double                                     exit 0
+ *   FAIL            a rate differs, a validator is missing or extra, the subgraph
+ *                   reports indexing errors or is behind the window, SEF's file is
+ *                   over 24 hours old, or the run hit an error                     exit 1
+ *   STALE           SEF's file is over 9 hours old; nothing is compared            exit 0
+ *   NOT COMPARABLE  the deployment holds no history at the window's start          exit 0
+ *
  *   pnpm --filter @cobuilders/safenet-subgraph-gnosis test:parity
  *   SUBGRAPH_URL_GNOSIS=<query URL> pnpm --filter @cobuilders/safenet-subgraph-gnosis test:parity
  *
- * Exit 0 on PASS and on STALE, 1 on FAIL, on an error, and when SEF's file is a day old.
  */
 import { SEF_DATA, participationWindow, type SefNetworkInfo, type SefValidator } from "@cobuilders/safenet-core"
 import {
-  appendSummary, chainReader, compareParticipation, formatAge, freshness, githubToken, lastSefCommit, overall,
-  prunedFrom, querySubgraph, redact, renderMarkdown, renderText, sefAsset, subgraphEndpoint, type ParityRow,
+  EXIT_CODE, HOURLY_BUCKETS_ISSUE, appendSummary, chainReader, compareParticipation, formatAge, freshness,
+  githubToken, lastSefCommit, notComparable, overall, prunedFrom, prunedHistoryReason, querySubgraph,
+  recordState, redact, renderMarkdown, renderText, sefAsset, staleOutcome, subgraphEndpoint, type ParityRow,
 } from "@cobuilders/safenet-core/parity"
 
 const TITLE = "Gnosis: participation per validator against SEF's validator-info.json"
@@ -44,7 +55,7 @@ interface Counters {
  * The window's counts: each counter after its last block minus the same counter after the block
  * before its first. One query, so both reads come from the same view of the subgraph.
  *
- * Returns a sentence instead when the deployment no longer holds the history: a pruned
+ * Returns the reason line instead when the deployment no longer holds the history: a pruned
  * deployment answers only for its last blocks, and SEF's window starts 14 days back.
  */
 async function windowCounts(
@@ -62,8 +73,7 @@ async function windowCounts(
   } catch (e) {
     const kept = prunedFrom(e instanceof Error ? e.message : "")
     if (kept === undefined) throw e
-    return `the deployment prunes its history and answers from block ${kept} only; ` +
-      `SEF's window needs block ${first - 1n}, ${kept - first + 1n} blocks earlier`
+    return prunedHistoryReason(kept, first - 1n)
   }
   if (q.endValidators.length >= PAGE || q.beforeValidators.length >= PAGE) {
     throw new Error(`signingValidators reached the page limit of ${PAGE}`)
@@ -92,18 +102,14 @@ async function main(): Promise<number> {
   const published = `${commit.publishedAt.toISOString()} (commit ${commit.sha.slice(0, 7)}), ${formatAge(fresh.ageMs)} ago`
   say(`SEF published  ${published}`)
 
-  if (fresh.state !== "fresh") {
-    const expired = fresh.state === "expired"
-    const line = expired
-      ? `FAIL: SEF's data is stale. validator-info.json was last written ${formatAge(fresh.ageMs)} ago, ` +
-        `more than ${SEF_DATA.expiredAfterMs / 3_600_000} h: SEF's update job has stopped.`
-      : `STALE: validator-info.json was last written ${formatAge(fresh.ageMs)} ago, more than ` +
-        `${SEF_DATA.staleAfterMs / 3_600_000} h. Not compared, and not a failure.`
+  const stale = staleOutcome(fresh, "validator-info.json")
+  if (stale) {
     say()
-    say(line)
+    say(stale.line)
     say()
-    appendSummary(`### ${TITLE}\n\nSEF published ${published}.\n\n**${line}**\n`)
-    return expired ? 1 : 0
+    appendSummary(`### ${TITLE}: ${stale.state}\n\nSEF published ${published}.\n\n**${stale.line}**\n`)
+    recordState("gnosis", stale.state, stale.line)
+    return EXIT_CODE[stale.state]
   }
 
   const window = participationWindow(commit.publishedAt)
@@ -133,27 +139,29 @@ async function main(): Promise<number> {
   say(`Subgraph       deployment ${meta._meta.deployment}, indexed to block ${indexed}`)
   say()
 
-  // Refuse before comparing anything a refusal would explain.
+  // Refuse before comparing anything a refusal would explain. A broken or lagging subgraph is
+  // ours to fix, so it fails; a deployment that starts too late is a known limit.
   const refusals: string[] = []
   if (meta._meta.hasIndexingErrors) refusals.push("the subgraph reports indexing errors")
   if (indexed < last) refusals.push(`the subgraph has indexed to block ${indexed}, before the window's last block ${last}`)
   // This deployment starts a fixed number of days before it was deployed; see this package's
   // CLAUDE.md. The window keeps moving forward, so this only fails right after a deploy.
   const earliest = meta.signingValidators[0] ? BigInt(meta.signingValidators[0].firstSeenBlock) : undefined
-  if (earliest === undefined || earliest > first - SHARE_LOOKBACK) {
-    refusals.push(
-      `the subgraph's first share is at block ${earliest ?? "none"}, after block ${first - SHARE_LOOKBACK}: ` +
-      `the deployment does not cover SEF's window with ${SHARE_LOOKBACK} blocks of look-back`,
-    )
-  }
+  const coverage = earliest === undefined || earliest > first - SHARE_LOOKBACK
+    ? `the deployment's first share is at block ${earliest ?? "none"}, after block ${first - SHARE_LOOKBACK}: ` +
+      `it does not cover SEF's window with ${SHARE_LOOKBACK} blocks of look-back; the hourly buckets that ` +
+      `make this comparable are ${HOURLY_BUCKETS_ISSUE}`
+    : undefined
 
   let rows: ParityRow[] = refusals.map((note) => ({
     figure: "subgraph covers the window", ours: "", sef: "", precision: "", verdict: "FAIL", note,
   }))
-  if (refusals.length === 0) {
+  if (refusals.length === 0 && coverage) {
+    rows = [notComparable("participation_rate_14d", coverage)]
+  } else if (refusals.length === 0) {
     const counted = await windowCounts(endpoint, first, last)
     if (typeof counted === "string") {
-      rows = [{ figure: "subgraph answers for the window", ours: "", sef: "", precision: "", verdict: "FAIL", note: counted }]
+      rows = [notComparable("participation_rate_14d", counted)]
     } else {
       say(`Ceremonies     ${counted.ceremonies} attestation ceremonies completed in the window`)
       say()
@@ -170,18 +178,24 @@ async function main(): Promise<number> {
   })
 
   const result = overall(rows)
+  const reason = result === "PASS"
+    ? "every rate is identical to SEF's published double"
+    : result === "NOT COMPARABLE"
+      ? rows.find((r) => r.verdict === "NOT COMPARABLE")!.note!
+      : "see the rows marked FAIL"
   console.log(renderText(rows))
   say()
-  say(`${result}: ${result === "PASS" ? "every rate is identical to SEF's published double" : "see the rows marked FAIL"}`)
+  say(`${result}: ${reason}`)
   say()
+  recordState("gnosis", result, reason)
   appendSummary([
-    `### ${TITLE}`, "",
+    `### ${TITLE}: ${result}`, "",
     `SEF published ${published}. Window ${window.start.toISOString()} to ${window.end.toISOString()}, ` +
     `Gnosis blocks ${first} to ${last}. Subgraph deployment \`${meta._meta.deployment}\`, indexed to block ${indexed}.`, "",
     "Rates are compared exactly: SEF publishes the double, and ours is the same division of the same integers.", "",
     renderMarkdown(rows), "", `**${result}**`, "",
   ].join("\n"))
-  return result === "PASS" ? 0 : 1
+  return EXIT_CODE[result]
 }
 
 main().then(
@@ -189,7 +203,8 @@ main().then(
   (e: unknown) => {
     const message = redact(e instanceof Error ? e.message : String(e))
     console.error(`\n  ERROR: ${message}\n`)
-    appendSummary(`### ${TITLE}\n\n**ERROR:** ${message}\n`)
-    process.exitCode = 1
+    appendSummary(`### ${TITLE}: FAIL\n\n**ERROR:** ${message}\n`)
+    recordState("gnosis", "FAIL", `ERROR: ${message}`)
+    process.exitCode = EXIT_CODE.FAIL
   },
 )

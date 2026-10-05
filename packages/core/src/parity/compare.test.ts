@@ -2,8 +2,9 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import type { SefValidator } from "../sef.js"
 import {
-  agrees, compareAmount, compareParticipation, compareStakedTotal, formatAge, freshness, overall,
-  parseLastCommit, renderMarkdown, renderText, sefRunSpan, totalsBetween,
+  EXIT_CODE, agrees, compareAmount, compareParticipation, compareStakedTotal, formatAge, freshness,
+  notComparable, overall, parseLastCommit, prunedFrom, prunedHistoryReason, renderMarkdown, renderText,
+  sefRunSpan, staleOutcome, totalsBetween,
 } from "./compare.js"
 
 // Made-up validators. The addresses are test fixtures, not contracts.
@@ -146,6 +147,53 @@ test("10 hours after SEF's publish the data is stale, which is not a failure", (
 
 test("25 hours after SEF's publish the data has expired", () => {
   assert.equal(freshness(PUBLISHED, after(25)).state, "expired")
+})
+
+test("each state has its exit code, and only FAIL exits 1", () => {
+  assert.deepEqual(EXIT_CODE, { "PASS": 0, "FAIL": 1, "STALE": 0, "NOT COMPARABLE": 0 })
+  assert.equal(staleOutcome(freshness(PUBLISHED, after(8)), "f.json"), undefined)
+  const stale = staleOutcome(freshness(PUBLISHED, after(10)), "f.json")!
+  assert.equal(stale.state, "STALE")
+  assert.equal(EXIT_CODE[stale.state], 0)
+  assert.match(stale.line, /^STALE: f\.json was last written 10 h 0 min ago, more than 9 h/)
+  const expired = staleOutcome(freshness(PUBLISHED, after(25)), "f.json")!
+  assert.equal(expired.state, "FAIL")
+  assert.equal(EXIT_CODE[expired.state], 1)
+  assert.match(expired.line, /^FAIL: SEF's data is stale\./)
+})
+
+// graph-node's answer to a `block: { number }` a pruned deployment no longer holds, as Studio
+// returned it on 2026-10-05, deployment hash shortened.
+const PRUNED = "Failed to decode `block.number` value: `subgraph QmRMgc only has data starting at block " +
+  "number 48599400 and data for block number 48363900 is therefore not available`"
+
+test("pruned history is NOT COMPARABLE, exits 0, and says why in one line", () => {
+  const kept = prunedFrom(PRUNED)
+  assert.equal(kept, 48_599_400n)
+  const rows = [
+    notComparable("participation_rate_14d", prunedHistoryReason(kept!, 48_363_900n)),
+    { figure: "total_transactions_checked", ours: "", sef: "980515", precision: "", verdict: "NOT COMPARED" as const },
+  ]
+  const state = overall(rows)
+  assert.equal(state, "NOT COMPARABLE")
+  assert.equal(EXIT_CODE[state], 0)
+  assert.equal(
+    rows[0]!.note,
+    "Studio keeps 1,000 blocks of history; SEF's window starts 235500 blocks earlier; " +
+      "the hourly buckets that make this comparable are COB-612",
+  )
+  assert.notEqual(state, "PASS")
+})
+
+test("another subgraph error is not mistaken for pruned history", () => {
+  assert.equal(prunedFrom("the gnosis subgraph answered HTTP 502; check SUBGRAPH_URL_GNOSIS"), undefined)
+})
+
+test("a real mismatch still fails next to a figure that is not comparable", () => {
+  const mismatch = compareAmount("total_staked_amount, wei", 2n, 1n)
+  const state = overall([notComparable("x", "y"), mismatch])
+  assert.equal(state, "FAIL")
+  assert.equal(EXIT_CODE[state], 1)
 })
 
 test("the thresholds sit at exactly 9 and 24 hours", () => {

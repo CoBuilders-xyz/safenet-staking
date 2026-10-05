@@ -68,7 +68,8 @@
         "GNOSIS_RPC_URL",
         "GITHUB_TOKEN",
         "GH_TOKEN",
-        "GITHUB_STEP_SUMMARY"
+        "GITHUB_STEP_SUMMARY",
+        "PARITY_STATE_DIR"
       ]
     },
     "lint": {},
