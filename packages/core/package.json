@@ -23,8 +23,8 @@
     "viem": "2.46.2"
   },
   "devDependencies": {
-    "@types/node": "22.19.2",
-    "tsx": "4.21.0",
-    "typescript": "5.9.3"
+    "@types/node": "26.6.4",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
   }
 }

@@ -31,9 +31,9 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@types/node": "22.19.2",
+    "@types/node": "26.6.4",
     "tsup": "8.5.1",
-    "tsx": "4.21.0",
-    "typescript": "5.9.3"
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
   }
 }
