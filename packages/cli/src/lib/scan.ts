@@ -63,8 +63,7 @@ export async function scanLogs<E extends AbiEvent>(
       if (attemptsAtMin >= ATTEMPTS_AT_MIN) {
         throw new ScanError(
           `The RPC endpoint refused ${request.event.name} logs for blocks ${from} to ${to}, so the ` +
-            `scan stopped rather than skip them; the public endpoints refuse historical log scans, ` +
-            `so set MAINNET_RPC_URL or pass --rpc-url with an archive endpoint`,
+            `scan stopped rather than skip them`,
         )
       }
       await sleep((ctx.retryDelayMs ?? 1_000) * attemptsAtMin)

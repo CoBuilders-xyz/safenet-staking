@@ -4,7 +4,7 @@ import {
   type Validator, type ValidatorDetail, type ValidatorList,
 } from "../lib/index.js"
 import type { CommandRuntime } from "../cli.js"
-import { formatCount, formatPercent, formatSafe, renderTable, windowSentence } from "./format.js"
+import { ARCHIVE_ADVICE, formatCount, formatPercent, formatSafe, renderTable, windowSentence } from "./format.js"
 import { addressSchema, parseOptions, validatorsListSchema } from "./options.js"
 
 const yesNo = (b: boolean | null) => (b === null ? "not listed" : b ? "yes" : "no")
@@ -75,7 +75,9 @@ export function renderValidatorDetail(d: ValidatorDetail): string {
     renderTable([{ header: "FIELD" }, { header: "VALUE" }, { header: "SOURCE" }], rows),
     "",
     `Participation: ${windowSentence(d.window)}.`,
-    ...(d.delegators.unavailableBecause ? [`Delegators: ${d.delegators.unavailableBecause}.`] : []),
+    ...(d.delegators.unavailableBecause
+      ? [`Delegators: ${d.delegators.unavailableBecause}; ${ARCHIVE_ADVICE}.`]
+      : []),
   ].join("\n")
 }
 

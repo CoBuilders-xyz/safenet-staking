@@ -96,6 +96,7 @@ test("status prints every figure with its source and a root line", async () => {
   assert.match(r.out, /SAFE staked\s+300 SAFE\s+chain: Staking\.totalStakedAmount\(\)/)
   assert.match(r.out, /Rewards allocated\s+50 SAFE\s+SEF: rewards\/latest\.json tokenTotal/)
   assert.match(r.out, /Rewards unclaimed\s+40 SAFE\s+chain: SAFE\.balanceOf\(MerkleDrop\)/)
+  assert.match(r.out, /SAFE held by MerkleDrop\s+40 SAFE\s+chain: SAFE\.balanceOf\(MerkleDrop\)$/m)
   assert.match(r.out, /Registered validators\s+2 of 2 listed/)
   assert.match(r.out, /Merkle root: match\./)
 })
@@ -103,6 +104,22 @@ test("status prints every figure with its source and a root line", async () => {
 test("status says differs when the chain root is not the published one", async () => {
   const r = await cli(["status"], { chainRoot: fakeRoot(0x2) })
   assert.match(r.out, /Merkle root: differs\./)
+})
+
+test("allocated and unclaimed are not derived while the roots differ; the balance still shows", async () => {
+  const r = await cli(["status"], { chainRoot: fakeRoot(0x2) })
+  assert.match(r.out, /Rewards allocated\s+not derivable: the root on chain differs from the published one/)
+  assert.match(r.out, /Rewards unclaimed\s+not derivable: the root on chain differs from the published one/)
+  assert.match(r.out, /SAFE held by MerkleDrop\s+40 SAFE/)
+  const s = JSON.parse((await cli(["status", "--json"], { chainRoot: fakeRoot(0x2) })).out)
+  for (const key of ["rewardsAllocated", "rewardsUnclaimed"]) {
+    assert.equal(s[key].value, null, key)
+    assert.equal(s[key].reason, "the root on chain differs from the published one", key)
+  }
+  assert.equal(s.merkleDropBalance.value, "40000000000000000000")
+  const matching = JSON.parse((await cli(["status", "--json"])).out)
+  assert.equal(matching.rewardsUnclaimed.value, "40000000000000000000")
+  assert.equal(matching.rewardsUnclaimed.reason, undefined)
 })
 
 test("status --json carries the same figures, amounts in wei as strings", async () => {
@@ -155,16 +172,18 @@ test("validators show still prints when the endpoint refuses the delegators scan
   const r = await cli(["validators", "show", VALIDATOR_A], { logsRefused: true })
   assert.equal(r.code, 0)
   assert.match(r.out, /Delegators\s+unavailable, see below/)
-  assert.match(r.out, /^Delegators: The RPC endpoint refused StakeIncreased logs/m)
+  assert.match(r.out, /^Delegators: The RPC endpoint refused StakeIncreased logs.*pass --rpc-url\.$/m)
   const j = JSON.parse((await cli(["validators", "show", VALIDATOR_A, "--json"], { logsRefused: true })).out)
   assert.equal(j.delegators.value, null)
-  assert.match(j.delegators.unavailableBecause, /archive endpoint/)
+  // The library says what failed. Which flag to use is the CLI's advice, not the library's.
+  assert.match(j.delegators.unavailableBecause, /refused StakeIncreased logs/)
+  assert.doesNotMatch(j.delegators.unavailableBecause, /--rpc-url|MAINNET_RPC_URL/)
 })
 
 test("a refused scan elsewhere fails the command with one sentence", async () => {
   const r = await cli(["rewards", "history", STAKER], { logsRefused: true })
   assert.equal(r.code, 1)
-  assert.match(r.err, /^error: The RPC endpoint refused Claimed logs .* archive endpoint\.\n$/)
+  assert.match(r.err, /^error: The RPC endpoint refused Claimed logs .*; historical log scans need an archive endpoint, .* pass --rpc-url\.\n$/)
 })
 
 test("withdrawals list without an address gives the network total, count and a check", async () => {
@@ -172,6 +191,10 @@ test("withdrawals list without an address gives the network total, count and a c
   assert.match(r.out, /Total pending\s+7 SAFE/)
   assert.match(r.out, /Count pending\s+1\s/)
   assert.match(r.out, /Check: the 1 open withdrawals in the logs sum to the total on chain\./)
+  // Another staker's withdrawal with an id someone else already claimed stays open.
+  const shared = JSON.parse((await cli(["withdrawals", "list", "--json"], { sharedWithdrawalId: true })).out)
+  assert.equal(shared.count.value, 2)
+  assert.equal(shared.logsMatchChain, true)
   const j = JSON.parse((await cli(["withdrawals", "list", "--json"])).out)
   assert.equal(j.scope, "network")
   assert.equal(j.logsMatchChain, true)
@@ -189,6 +212,8 @@ test("rewards check gives claimable, claimed and kycAmount, and a matching root"
   assert.match(r.out, /Earned to date\s+12 SAFE/)
   assert.match(r.out, /Claimed\s+10 SAFE/)
   assert.match(r.out, /Claimable\s+2 SAFE/)
+  assert.match(r.out, /Can claim\s+yes/)
+  assert.equal(JSON.parse((await cli(["rewards", "check", STAKER, "--json"])).out).canClaim.value, true)
   assert.match(r.out, /kycAmount\s+0 SAFE/)
   assert.match(r.out, /Proof: match\./)
 })
@@ -198,6 +223,8 @@ test("rewards check says stale proof when the proof's root is not on chain", asy
   assert.match(r.out, /Proof: stale proof\./)
   const j = JSON.parse((await cli(["rewards", "check", STAKER, "--json"], { chainRoot: fakeRoot(0x2) })).out)
   assert.equal(j.root.status, "stale proof")
+  assert.equal(j.canClaim.value, false)
+  assert.match(r.out, /Can claim\s+no/)
 })
 
 test("rewards check reports held amounts until the address passes the checks", async () => {
@@ -211,7 +238,9 @@ test("rewards check says plainly when an address never earned", async () => {
   const r = await cli(["rewards", "check", STAKER], { proof: null })
   assert.equal(r.code, 0)
   assert.match(r.out, /Never earned: SEF published no reward proof for this address/)
-  assert.equal(JSON.parse((await cli(["rewards", "check", STAKER, "--json"], { proof: null })).out).earned, false)
+  const never = JSON.parse((await cli(["rewards", "check", STAKER, "--json"], { proof: null })).out)
+  assert.equal(never.earned, false)
+  assert.equal(never.canClaim.value, false)
 })
 
 test("rewards history lists claims newest first and checks them against the chain", async () => {

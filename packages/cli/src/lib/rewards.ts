@@ -21,6 +21,8 @@ export interface RewardsCheck {
   readonly kycAmount: Figure<bigint | null>
   /** SEF's kyc flag. Null when the file omits it, or when there is no proof. */
   readonly kycPassed: Figure<boolean | null>
+  /** claimable > 0 and the proof's root is the root on chain. False when there is no proof. */
+  readonly canClaim: Figure<boolean>
   /**
    * The part held until compliance checks pass: kycAmount, unless kyc is true. The same rule
    * as heldPendingCompliance() in apps/web.
@@ -48,6 +50,8 @@ export async function checkRewards(ctx: Context, address: Address): Promise<Rewa
   const cumulative = proof ? parseWei(proof.cumulativeAmount, "the proof's cumulativeAmount") : null
   const kycAmount = proof?.kycAmount != null ? parseWei(proof.kycAmount, "the proof's kycAmount") : null
   const kycPassed = proof?.kyc ?? null
+  const claimable = cumulative === null ? null : cumulative > claimed ? cumulative - claimed : 0n
+  const rootMatches = proof !== null && sameHex(onChainRoot, proof.merkleRoot)
 
   return {
     block: blockNumber,
@@ -56,9 +60,10 @@ export async function checkRewards(ctx: Context, address: Address): Promise<Rewa
     proofUrl: url,
     cumulative: figure(cumulative, `${proofSource}, cumulativeAmount`),
     claimed: figure(claimed, "chain: MerkleDrop.cumulativeClaimed(address)"),
-    claimable: figure(
-      cumulative === null ? null : cumulative > claimed ? cumulative - claimed : 0n,
-      "cumulativeAmount minus cumulativeClaimed",
+    claimable: figure(claimable, "cumulativeAmount minus cumulativeClaimed"),
+    canClaim: figure(
+      claimable !== null && claimable > 0n && rootMatches,
+      "claimable > 0 and the proof's root is the root on chain",
     ),
     kycAmount: figure(kycAmount, `${proofSource}, kycAmount`),
     kycPassed: figure(kycPassed, `${proofSource}, kyc`),
@@ -67,7 +72,7 @@ export async function checkRewards(ctx: Context, address: Address): Promise<Rewa
       ? {
           onChain: figure(onChainRoot, "chain: MerkleDrop.merkleRoot()"),
           proof: figure(proof.merkleRoot, `${proofSource}, merkleRoot`),
-          status: sameHex(onChainRoot, proof.merkleRoot) ? "match" : "stale proof",
+          status: rootMatches ? "match" : "stale proof",
         }
       : null,
   }

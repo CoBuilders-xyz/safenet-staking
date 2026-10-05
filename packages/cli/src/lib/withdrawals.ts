@@ -48,8 +48,12 @@ export async function networkWithdrawals(ctx: Context): Promise<NetworkWithdrawa
     scanLogs(ctx, { address: staking, event: indexedEvent("staking", "WithdrawalInitiated"), fromBlock: from, toBlock: block }),
     scanLogs(ctx, { address: staking, event: indexedEvent("staking", "WithdrawalClaimed"), fromBlock: from, toBlock: block }),
   ])
-  const claimedIds = new Set(claimed.map((l) => String(l.args.withdrawalId)))
-  const open = initiated.filter((l) => !claimedIds.has(String(l.args.withdrawalId)))
+  // Keyed by staker and id. Ids come from one global counter today, but the pair cannot
+  // collide even if that changes.
+  const key = (l: { args: { staker?: string | undefined; withdrawalId?: bigint | undefined } }) =>
+    `${l.args.staker?.toLowerCase()}:${l.args.withdrawalId}`
+  const claimedKeys = new Set(claimed.map(key))
+  const open = initiated.filter((l) => !claimedKeys.has(key(l)))
   const openSum = open.reduce((a, l) => a + (l.args.amount ?? 0n), 0n)
   return {
     scope: "network",
@@ -57,7 +61,7 @@ export async function networkWithdrawals(ctx: Context): Promise<NetworkWithdrawa
     total: figure(total, "chain: Staking.totalPendingWithdrawals()"),
     count: figure(
       open.length,
-      `chain: WithdrawalInitiated logs without a WithdrawalClaimed for the same id, from block ${from}`,
+      `chain: WithdrawalInitiated logs without a WithdrawalClaimed for the same staker and id, from block ${from}`,
     ),
     initiated: initiated.length,
     claimed: claimed.length,

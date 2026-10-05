@@ -8,8 +8,10 @@
 import { Command, CommanderError } from "commander"
 import { BaseError } from "viem"
 import pkg from "../package.json" with { type: "json" }
-import { createContext, rpcEndpoints, rpcHosts, SafenetError, type Context, type ContextOptions } from "./lib/index.js"
-import { toJson } from "./commands/format.js"
+import {
+  createContext, rpcEndpoints, rpcHosts, SafenetError, ScanError, type Context, type ContextOptions,
+} from "./lib/index.js"
+import { ARCHIVE_ADVICE, toJson } from "./commands/format.js"
 import { globalSchema, parseOptions, UsageError, type GlobalOptions } from "./commands/options.js"
 import { registerRewards } from "./commands/rewards.js"
 import { registerStatus } from "./commands/status.js"
@@ -43,7 +45,8 @@ const URL_PATTERN = /https?:\/\/[^\s"'<>]+/g
 /** One plain sentence for an error, with any URL removed: an RPC URL can carry a key. */
 export function errorSentence(err: unknown): string {
   let text: string
-  if (err instanceof SafenetError) text = err.message
+  if (err instanceof ScanError) text = `${err.message}; ${ARCHIVE_ADVICE}`
+  else if (err instanceof SafenetError) text = err.message
   else if (err instanceof BaseError) text = `The Mainnet RPC request failed: ${err.shortMessage}`
   else if (err instanceof Error) text = err.message
   else text = String(err)

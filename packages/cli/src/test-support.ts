@@ -14,6 +14,7 @@ export const fakeRoot = (n: number) => pad(numberToHex(n), { size: 32 })
 export const VALIDATOR_A = fakeAddress(0xa1)
 export const VALIDATOR_B = fakeAddress(0xb2)
 export const STAKER = fakeAddress(0x5)
+export const OTHER_STAKER = fakeAddress(0x6)
 export const ROOT = fakeRoot(0x1)
 export const BLOCK = 26_000_000n
 export const BLOCK_TIME = 1_790_000_000n
@@ -30,6 +31,8 @@ export interface FakeOptions {
   /** Replaces SEF's rewards/latest.json or network-info.json, to test a changed shape. */
   readonly rewardsLatest?: object
   readonly networkInfo?: object
+  /** A second staker opens a withdrawal with the id the first staker already claimed. */
+  readonly sharedWithdrawalId?: boolean
 }
 
 function fakeClient(o: FakeOptions): PublicClient {
@@ -38,7 +41,7 @@ function fakeClient(o: FakeOptions): PublicClient {
   }
   const reads: Record<string, (args: readonly unknown[]) => unknown> = {
     totalStakedAmount: () => 300n * SAFE,
-    totalPendingWithdrawals: () => 7n * SAFE,
+    totalPendingWithdrawals: () => (o.sharedWithdrawalId ? 11n : 7n) * SAFE,
     merkleRoot: () => o.chainRoot ?? ROOT,
     balanceOf: () => 40n * SAFE,
     isValidator: ([a]) => a === VALIDATOR_A || a === VALIDATOR_B,
@@ -77,6 +80,9 @@ function fakeClient(o: FakeOptions): PublicClient {
         case "WithdrawalInitiated": return [
           log({ staker: STAKER, validator: VALIDATOR_A, withdrawalId: 1n, amount: 7n * SAFE }, 1),
           log({ staker: STAKER, validator: VALIDATOR_A, withdrawalId: 2n, amount: 3n * SAFE }, 2),
+          ...(o.sharedWithdrawalId
+            ? [log({ staker: OTHER_STAKER, validator: VALIDATOR_A, withdrawalId: 2n, amount: 4n * SAFE }, 6)]
+            : []),
         ]
         case "WithdrawalClaimed": return [log({ staker: STAKER, withdrawalId: 2n, amount: 3n * SAFE }, 3)]
         case "Claimed": return [log({ account: STAKER, amount: 4n * SAFE }, 4), log({ account: STAKER, amount: 6n * SAFE }, 5)]

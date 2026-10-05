@@ -7,6 +7,14 @@
 import { formatUnits } from "viem"
 import type { ParticipationWindow } from "../lib/index.js"
 
+/**
+ * What to do about a refused log scan. The library reports what failed; which flag to use is
+ * the CLI's business, so this text lives here.
+ */
+export const ARCHIVE_ADVICE =
+  "historical log scans need an archive endpoint, which the public endpoints are not, " +
+  "so set MAINNET_RPC_URL or pass --rpc-url"
+
 /** An 18-decimal amount in SAFE, exact, grouped in thousands, trailing zeros dropped. */
 export function formatSafe(wei: bigint): string {
   const negative = wei < 0n

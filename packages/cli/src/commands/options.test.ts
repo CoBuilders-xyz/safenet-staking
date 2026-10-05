@@ -57,3 +57,12 @@ test("a bad --rpc-url is a usage error that does not repeat the value", () => {
   assert.equal(parseOptions(globalSchema, { rpcUrl: "https://archive.invalid/x" }).rpcUrl, "https://archive.invalid/x")
   assert.deepEqual(parseOptions(globalSchema, {}), { json: false, verbose: false })
 })
+
+test("--rpc-url takes any host, so a local Anvil fork works", () => {
+  for (const url of ["http://127.0.0.1:8545", "http://localhost:8545", "http://[::1]:8545", "http://anvil:8545"]) {
+    assert.equal(parseOptions(globalSchema, { rpcUrl: url }).rpcUrl, url)
+  }
+  for (const url of ["ftp://127.0.0.1:8545", "javascript:alert(1)", "localhost:8545"]) {
+    assert.throws(() => parseOptions(globalSchema, { rpcUrl: url }), UsageError, url)
+  }
+})

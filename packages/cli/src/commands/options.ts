@@ -32,8 +32,9 @@ export const addressSchema = z
 export const globalSchema = z.object({
   json: z.boolean().default(false),
   verbose: z.boolean().default(false),
+  // Any host, so an Anvil fork on localhost, 127.0.0.1, [::1] or a container name works.
   // The message does not repeat the value: an RPC URL can carry a key.
-  rpcUrl: z.httpUrl({ error: "--rpc-url must be an http or https URL" }).optional(),
+  rpcUrl: z.url({ protocol: /^https?$/, error: "--rpc-url must be an http or https URL" }).optional(),
 })
 export type GlobalOptions = z.output<typeof globalSchema>
 

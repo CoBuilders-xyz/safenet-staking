@@ -19,6 +19,7 @@ export function renderRewardsCheck(r: RewardsCheck): string {
     ["Earned to date", formatSafe(r.cumulative.value ?? 0n), r.cumulative.source],
     ["Claimed", formatSafe(r.claimed.value), r.claimed.source],
     ["Claimable", formatSafe(r.claimable.value ?? 0n), r.claimable.source],
+    ["Can claim", r.canClaim.value ? "yes" : "no", r.canClaim.source],
   ]
   if (r.kycAmount.value !== null) {
     rows.push(["kycAmount", formatSafe(r.kycAmount.value), r.kycAmount.source])

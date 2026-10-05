@@ -13,16 +13,30 @@ export interface NetworkStatus {
   readonly activeValidators: Figure<number>
   readonly registeredValidators: Figure<{ registered: number; listed: number }>
   readonly pendingWithdrawals: Figure<bigint>
-  readonly rewardsAllocated: Figure<bigint>
+  /**
+   * tokenTotal, the allocation behind the published root. Null, with `reason`, when the root on
+   * chain differs: then the contract does not pay out that allocation yet.
+   */
+  readonly rewardsAllocated: DerivedFigure
   readonly rewardsEpoch: Figure<{ epoch: number; rewardsUntil: string; updatedAt: string }>
-  /** What the MerkleDrop still holds: allocated and not yet claimed. */
-  readonly rewardsUnclaimed: Figure<bigint>
+  /**
+   * Allocated and not yet claimed: the MerkleDrop balance, but only while the root on chain is
+   * the published one. Otherwise the balance still funds the old root and is not this figure.
+   */
+  readonly rewardsUnclaimed: DerivedFigure
+  /** The raw balance, whatever root it funds. */
+  readonly merkleDropBalance: Figure<bigint>
   readonly merkleRoot: {
     readonly onChain: Figure<Hex>
     readonly published: Figure<string>
     readonly match: boolean
   }
 }
+
+/** A figure that holds only while the chain root is the published one. */
+export type DerivedFigure = Figure<bigint | null> & { readonly reason?: string }
+
+export const ROOT_DIFFERS = "the root on chain differs from the published one"
 
 export async function getStatus(ctx: Context): Promise<NetworkStatus> {
   const { client } = ctx
@@ -35,7 +49,7 @@ export async function getStatus(ctx: Context): Promise<NetworkStatus> {
     fetchRewardsLatest(ctx),
     fetchNetworkInfo(ctx),
   ])
-  const [totalStaked, pending, root, unclaimed, registered] = await Promise.all([
+  const [totalStaked, pending, root, balance, registered] = await Promise.all([
     client.readContract({ address: staking, abi: stakingAbi, functionName: "totalStakedAmount", blockNumber }),
     client.readContract({ address: staking, abi: stakingAbi, functionName: "totalPendingWithdrawals", blockNumber }),
     client.readContract({ address: merkleDrop, abi: merkleDropAbi, functionName: "merkleRoot", blockNumber }),
@@ -50,6 +64,11 @@ export async function getStatus(ctx: Context): Promise<NetworkStatus> {
       ),
     ),
   ])
+
+  // tokenTotal is the allocation behind the published root, so it and the balance describe the
+  // programme only while the contract holds that root. The same rule as useProgrammeRewards().
+  const rootMatches = sameHex(root, latest.merkleRoot)
+  const allocated = parseWei(latest.tokenTotal, "SEF's tokenTotal")
 
   return {
     block: blockNumber,
@@ -67,16 +86,21 @@ export async function getStatus(ctx: Context): Promise<NetworkStatus> {
       "chain: Staking.isValidator() for each address in SEF's validator-info.json",
     ),
     pendingWithdrawals: figure(pending, "chain: Staking.totalPendingWithdrawals()"),
-    rewardsAllocated: figure(parseWei(latest.tokenTotal, "SEF's tokenTotal"), "SEF: rewards/latest.json tokenTotal"),
+    rewardsAllocated: rootMatches
+      ? figure(allocated, "SEF: rewards/latest.json tokenTotal")
+      : { ...figure(null, "SEF: rewards/latest.json tokenTotal"), reason: ROOT_DIFFERS },
     rewardsEpoch: figure(
       { epoch: latest.epoch, rewardsUntil: latest.rewardsUntil, updatedAt: latest.updatedAt },
       "SEF: rewards/latest.json epoch, rewardsUntil, updatedAt",
     ),
-    rewardsUnclaimed: figure(unclaimed, "chain: SAFE.balanceOf(MerkleDrop)"),
+    rewardsUnclaimed: rootMatches
+      ? figure(balance, "chain: SAFE.balanceOf(MerkleDrop), while its root is the published one")
+      : { ...figure(null, "chain: SAFE.balanceOf(MerkleDrop), while its root is the published one"), reason: ROOT_DIFFERS },
+    merkleDropBalance: figure(balance, "chain: SAFE.balanceOf(MerkleDrop)"),
     merkleRoot: {
       onChain: figure(root, "chain: MerkleDrop.merkleRoot()"),
       published: figure(latest.merkleRoot, "SEF: rewards/latest.json merkleRoot"),
-      match: sameHex(root, latest.merkleRoot),
+      match: rootMatches,
     },
   }
 }

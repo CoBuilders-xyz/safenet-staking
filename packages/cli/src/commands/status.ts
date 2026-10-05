@@ -1,7 +1,10 @@
 import type { Command } from "commander"
-import { getStatus, type NetworkStatus } from "../lib/index.js"
+import { getStatus, type DerivedFigure, type NetworkStatus } from "../lib/index.js"
 import type { CommandRuntime } from "../cli.js"
 import { formatCount, formatSafe, formatTime, renderTable } from "./format.js"
+
+const derived = (f: DerivedFigure) =>
+  f.value === null ? `not derivable: ${f.reason ?? "no value"}` : formatSafe(f.value)
 
 export function renderStatus(s: NetworkStatus): string {
   const epoch = s.rewardsEpoch.value
@@ -15,13 +18,14 @@ export function renderStatus(s: NetworkStatus): string {
       s.registeredValidators.source,
     ],
     ["Pending withdrawals", formatSafe(s.pendingWithdrawals.value), s.pendingWithdrawals.source],
-    ["Rewards allocated", formatSafe(s.rewardsAllocated.value), s.rewardsAllocated.source],
+    ["Rewards allocated", derived(s.rewardsAllocated), s.rewardsAllocated.source],
     [
       "Rewards period",
       `epoch ${epoch.epoch}, rewards until ${formatTime(new Date(epoch.rewardsUntil))}`,
       s.rewardsEpoch.source,
     ],
-    ["Rewards unclaimed", formatSafe(s.rewardsUnclaimed.value), s.rewardsUnclaimed.source],
+    ["Rewards unclaimed", derived(s.rewardsUnclaimed), s.rewardsUnclaimed.source],
+    ["SAFE held by MerkleDrop", formatSafe(s.merkleDropBalance.value), s.merkleDropBalance.source],
     ["Merkle root, chain", s.merkleRoot.onChain.value, s.merkleRoot.onChain.source],
     ["Merkle root, published", s.merkleRoot.published.value, s.merkleRoot.published.source],
   ]

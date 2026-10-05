@@ -39,13 +39,18 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   `validator-info.json`, floored to the hour, by `participationWindow()` in core; the file is read
   at that commit. When the GitHub API does not answer, the window is reported unknown, never
   guessed. `GITHUB_TOKEN` or `GH_TOKEN` raises its limit.
+- Rewards allocated and unclaimed are derived only while the Merkle root on chain is the one in
+  SEF's `latest.json`, the same rule as `useProgrammeRewards()` in the web app. Otherwise the
+  balance still funds the old root, so both are null with a `reason`, and the raw balance shows
+  as "SAFE held by MerkleDrop".
 - Amounts print exactly, to the last wei. `--json` gives the same fields, with amounts as wei in
   decimal strings.
 - An RPC URL can carry a key. It is never printed: `--verbose` shows the host only, and error
   messages have URLs removed.
 - A log scan never skips a range. It shrinks the range when refused and fails when the smallest
-  range is still refused. The public endpoints in core refuse historical log scans, so
-  `validators show` (delegators), `withdrawals list` without `--address`, and `rewards history`
+  range is still refused. The library's error says what failed; the advice about
+  `MAINNET_RPC_URL` and `--rpc-url` is added in the command layer, because the MCP server has no
+  flags. The public endpoints in core refuse historical log scans, so `validators show` (delegators), `withdrawals list` without `--address`, and `rewards history`
   need an archive endpoint in `MAINNET_RPC_URL` or `--rpc-url`. `validators show` still prints
   without one and marks the delegators count unavailable.
 
