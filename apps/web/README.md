@@ -24,6 +24,10 @@ pnpm --filter @cobuilders/safenet-web dev
 The app will be available at `http://localhost:5173`, or on `WEB_PORT` from the repository-root
 `.env.ports` when `pnpm bootstrap` has written one.
 
+Vite reads env from the repository root, not from this directory: the root `.env`, and the root
+`.env.local` that `pnpm env:pull` writes. Every value is optional. To set one by hand, copy it
+from [`.env.example`](.env.example) into the root `.env`.
+
 ## Environment Variables
 
 | Variable | Required | Description |

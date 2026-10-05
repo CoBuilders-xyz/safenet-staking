@@ -50,6 +50,10 @@ const webPort =
 
 export default defineConfig({
   base: './',
+  // Env lives at the repository root, where `pnpm env:pull` writes .env.local, so dev and
+  // build read the same file as the Node scripts. Vite still exposes only VITE_ values to the
+  // bundle; `pnpm check:browser` fails if a value from .env.local reaches dist.
+  envDir: repoRoot,
   plugins: [
     react(),
     tailwindcss(),
