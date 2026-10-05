@@ -100,14 +100,15 @@ jobs:
       # Playwright starts Anvil and the web server, and stops both when the run ends. The token
       # lets the one GitHub API request, listing SEF's proof files, skip the anonymous limit.
       - name: Fork tests, web
+        id: web-fork
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: pnpm --filter @cobuilders/safenet-web test:fork
       # The five CLI writes, sent for real, then each with --dry-run. The suite starts its own
-      # Anvil on 8546 and stops it when it ends. It runs even when the web suite failed, so one
-      # failure does not hide the other.
+      # Anvil on 8546 and stops it when it ends. It also runs when the web suite failed, so one
+      # failure does not hide the other, but not when a setup step before both failed.
       - name: Fork tests, CLI
-        if: ${{ !cancelled() }}
+        if: ${{ success() || steps.web-fork.outcome == 'failure' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: pnpm --filter @cobuilders/safenet-cli test:fork

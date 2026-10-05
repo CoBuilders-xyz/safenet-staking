@@ -46,6 +46,8 @@ export interface FakeOptions {
   readonly allowance?: bigint
   /** The environment the program sees, for the signer options. */
   readonly env?: Readonly<Record<string, string | undefined>>
+  /** What a claim's SAFE transfer pays. Defaults to CLAIMABLE, the proof's claimable amount. */
+  readonly paid?: bigint
   /** eth_sendRawTransaction fails, as when the node's answer is lost. */
   readonly broadcastError?: boolean
   /** Waiting for a receipt times out, as viem reports it. */
@@ -110,7 +112,7 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
     status: "success",
     blockNumber: BLOCK + 1n,
     gasUsed: 45_000n,
-    logs: lastSent?.to === CONTRACTS.merkleDrop.address ? [transferLog(lastSent.account.address, CLAIMABLE)] : [],
+    logs: lastSent?.to === CONTRACTS.merkleDrop.address ? [transferLog(lastSent.account.address, o.paid ?? CLAIMABLE)] : [],
   })
   /** eth_call: reverts as `o.revert` says, the way viem reports a revert. */
   const simulate = (p: { abi: Abi; functionName: string }) => {
@@ -139,7 +141,7 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
           } catch (error) {
             return { status: "failure", gasUsed: 21_000n, logs: [], error }
           }
-          const logs = c.functionName === "claim" ? [transferLog(c.account, CLAIMABLE)] : []
+          const logs = c.functionName === "claim" ? [transferLog(c.account, o.paid ?? CLAIMABLE)] : []
           return { status: "success", gasUsed: 60_000n, logs }
         }),
       }]

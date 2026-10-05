@@ -8,6 +8,7 @@
  * the fork block.
  */
 import {
+  BaseError,
   createPublicClient,
   createTestClient,
   createWalletClient,
@@ -134,9 +135,10 @@ export interface RewardsClaimer {
  * can be throttled into stalling.
  */
 export async function findRewardsClaimer(archiveUrl: string): Promise<RewardsClaimer> {
-  const archive = createPublicClient({ chain: mainnet, transport: http(archiveUrl), batch: { multicall: true } })
+  const archive = createPublicClient({ chain: mainnet, transport: http(archiveUrl, { retryCount: 2 }), batch: { multicall: true } })
   const blockNumber = MAINNET_FORK.blockNumber
-  const root = await archive.readContract({ address: MERKLE_DROP, abi: merkleDropAbi, functionName: "merkleRoot", blockNumber })
+  const root = await fromArchive("the MerkleDrop root", () =>
+    archive.readContract({ address: MERKLE_DROP, abi: merkleDropAbi, functionName: "merkleRoot", blockNumber }))
   const token = process.env.GITHUB_TOKEN
   const tree = (await fetchJson(MAINNET_FORK_SEF_DATA.proofTree, token ? { authorization: `Bearer ${token}` } : {})) as {
     truncated: boolean
@@ -157,12 +159,12 @@ export async function findRewardsClaimer(archiveUrl: string): Promise<RewardsCla
     }))
     proofs.push(...batch.filter((p) => p !== null))
   }
-  const claimedSoFar = await Promise.all(proofs.map((p) =>
-    archive.readContract({ address: MERKLE_DROP, abi: merkleDropAbi, functionName: "cumulativeClaimed", args: [p.account], blockNumber })))
+  const claimedSoFar = await fromArchive("what each address has claimed", () => Promise.all(proofs.map((p) =>
+    archive.readContract({ address: MERKLE_DROP, abi: merkleDropAbi, functionName: "cumulativeClaimed", args: [p.account], blockNumber }))))
   for (const [i, p] of proofs.entries()) {
     const claimable = p.cumulative - claimedSoFar[i]!
     if (claimable <= 0n) continue
-    if (await archive.getCode({ address: p.account, blockNumber })) continue
+    if (await fromArchive("an address's code", () => archive.getCode({ address: p.account, blockNumber }))) continue
     return { account: p.account, claimable }
   }
   throw new Error(
@@ -170,6 +172,22 @@ export async function findRewardsClaimer(archiveUrl: string): Promise<RewardsCla
       "MAINNET_FORK in packages/core pins the block and the commit together; move them together.",
   )
 }
+
+/**
+ * A read from the archive endpoint, whose URL carries a key. viem puts the URL in its error's
+ * message, its `url`, its `metaMessages` and its cause chain, and a test reporter prints them all.
+ * So a failure becomes a new error with the URLs removed from one line of text and no cause.
+ */
+export async function fromArchive<T>(what: string, read: () => Promise<T>): Promise<T> {
+  try {
+    return await read()
+  } catch (err) {
+    const why = err instanceof BaseError ? err.shortMessage : err instanceof Error ? err.message : String(err)
+    throw new Error(`reading ${what} from the archive endpoint failed: ${redactUrls(why.split("\n")[0] ?? "")}`)
+  }
+}
+
+export const redactUrls = (text: string): string => text.replace(/https?:\/\/\S+/g, "<redacted-url>")
 
 async function fetchJson(url: string, headers: Record<string, string> = {}): Promise<unknown> {
   const res = await fetch(url, { headers })

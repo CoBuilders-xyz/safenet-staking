@@ -37,7 +37,7 @@ The writes send what the web interface sends, in the same order:
 | `safenet unstake <validator> <amount>` | `initiateWithdrawal(validator, amount)`, which starts the delay |
 | `safenet withdrawals claim <id \| --all>` | `claimWithdrawal()` once per withdrawal. It takes no id and pays the oldest first, so `<id>` claims every one up to it. Only withdrawals past their delay, read from `withdrawalQueues` and `withdrawalNodes`, are claimed; the rest are named |
 | `safenet rewards claim` | `claim` with SEF's proof for the signer, read through core's `rewardProofUrl()`, only while the proof's root is the root on chain; otherwise one sentence and exit 1 |
-| `safenet rewards claim-and-stake <validator> [--amount] [--approve]` | the claim, then the approval if short, then the stake of what the claim's SAFE `Transfer` log says arrived, or `--amount` when lower. One transaction after another; no EIP-5792 batch |
+| `safenet rewards claim-and-stake <validator> [--amount] [--approve]` | the claim, then the approval if short, then the stake of what the claim's SAFE `Transfer` log says arrived, or of `--amount`. An `--amount` above the proof's claimable amount is refused before anything is sent, as `stake` and `unstake` refuse. Only when the claim pays less than `--amount` is what arrived staked instead, with a line on stderr and `cappedToReceived` in the result. One transaction after another; no EIP-5792 batch |
 
 Global options: `--json`, `--rpc-url <url>`, `--verbose`. Exit codes: 0 success, 1 the operation
 failed (one sentence on stderr), 2 usage error.
@@ -86,6 +86,10 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   decimal strings.
 - An RPC URL can carry a key. It is never printed: `--verbose` shows the host only, and error
   messages have URLs removed.
+- A usage error repeats nothing that may be a secret: `scrubUsage()` in `src/cli.ts` removes the
+  value of any `--flag=value`, which commander would repeat for an unknown option such as
+  `--private-key=<key>`, and URLs and runs of 64 or more hex digits, which a key typed as an
+  argument would leave in the validation message.
 - A log scan never skips a range. It shrinks the range when refused and fails when the smallest
   range is still refused. The library's error says what failed; the advice about
   `MAINNET_RPC_URL` and `--rpc-url` is added in the command layer, because the MCP server has no
@@ -97,7 +101,9 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
 
 `pnpm test` runs the unit tests in `src/`, against a fake chain and fake SEF files in
 `src/test-support.ts`. No network. `src/writes.test.ts` runs every write with `--dry-run` and a
-signer whose `signTransaction` throws, and fails if it is reached.
+signer whose `signTransaction` throws, and fails if it is reached. `src/fork/redaction.test.ts`
+also runs here: it makes the fork suite's archive read fail and checks that its error carries no
+part of the URL.
 
 `pnpm test:smoke` runs `src/smoke/`: one test per command, against Mainnet, through the real
 entry point. It reads `MAINNET_RPC_URL` from `.env.local` and skips each test, with the reason,

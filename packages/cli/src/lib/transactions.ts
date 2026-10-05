@@ -80,11 +80,16 @@ export interface Step {
   readonly transaction: SentTransaction | null
 }
 
-/** What a live run reports while it runs, so a caller can show each hash as it lands. */
+/**
+ * What a run reports while it runs, so a caller can show each hash as it lands. Only a live run
+ * sends, so "sent", "confirmed" and "received" come from live runs; "capped" from either.
+ */
 export type Progress =
   | { readonly type: "sent"; readonly contract: string; readonly functionName: string; readonly hash: Hash }
   | { readonly type: "confirmed"; readonly step: Step }
   | { readonly type: "received"; readonly amount: Amount; readonly source: string }
+  /** Claim & Stake: the claim paid less than the amount asked to stake, so what arrived is staked. */
+  | { readonly type: "capped"; readonly requested: Amount; readonly received: Amount }
 
 /** How an operation runs: simulated from an address, or sent by a signer. */
 export type WriteMode =

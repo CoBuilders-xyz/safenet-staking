@@ -86,5 +86,8 @@ export function renderProgress(event: Progress): string {
     }
     case "received":
       return `received ${formatSafe(event.amount.wei)} (${event.amount.wei} wei), from ${event.source}`
+    case "capped":
+      return `staking ${formatSafe(event.received.wei)} instead of the requested ${formatSafe(event.requested.wei)}: ` +
+        "the claim paid less than the proof's claimable amount"
   }
 }

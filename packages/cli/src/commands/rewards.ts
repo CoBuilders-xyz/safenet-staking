@@ -40,7 +40,9 @@ export function renderClaimAndStake(r: ClaimAndStakeResult): string {
   const rows: FigureRow[] = [...claimRows(r.claim)]
   if (r.requested) rows.push(["Requested", safe(r.requested), "--amount"])
   rows.push(
-    ["Staked", safe(r.staked), r.requested ? "what arrived, or --amount when lower" : "what arrived"],
+    ["Staked", safe(r.staked), r.cappedToReceived
+      ? "what arrived, which is less than --amount"
+      : r.requested ? "--amount" : "what arrived"],
     figureRow("Allowance", r.allowance, safe),
     ["Approval", approvalText(r.approval), "sent only when the allowance is below the amount"],
     figureRow("Stake before", r.stakeBefore, safe),
@@ -159,7 +161,10 @@ export function registerRewards(program: Command, rt: CommandRuntime): void {
       .command("claim-and-stake")
       .description("claim the signer's rewards, then approve and stake what arrived on a validator, one transaction after another")
       .argument("<validator>", "the validator's address")
-      .option("--amount <amount>", "stake at most this much SAFE; the rest stays in the wallet")
+      .option(
+        "--amount <amount>",
+        "stake this much SAFE and leave the rest in the wallet; more than the claimable amount is refused before anything is sent",
+      )
       .option("--approve <kind>", "when an approval is needed: exact (the amount) or unlimited", "exact"),
   ).action(async (validator: string, options: unknown, command: Command) => {
     const globals = rt.globals(command)

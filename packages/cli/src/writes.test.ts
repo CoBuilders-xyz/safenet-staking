@@ -149,8 +149,34 @@ test("claim-and-stake stakes what arrived, or --amount when it is lower", async 
   assert.deepEqual(all.steps.map((s: { function: string }) => s.function.split("(")[0]), ["claim", "approve", "stake"])
   const less = JSON.parse((await cli(["rewards", "claim-and-stake", VALIDATOR_A, "--amount", "0.25", "--dry-run", "--from", STAKER, "--json"])).out)
   assert.equal(less.staked.wei, String(SAFE / 4n))
-  const more = JSON.parse((await cli(["rewards", "claim-and-stake", VALIDATOR_A, "--amount", "500", "--dry-run", "--from", STAKER, "--json"])).out)
-  assert.equal(more.staked.wei, String(CLAIMABLE))
+  assert.equal(less.cappedToReceived, false)
+})
+
+test("claim-and-stake refuses --amount above the claimable amount before anything is sent", async () => {
+  const expected = /^error: The amount to stake, 500 SAFE, is more than the 2 SAFE 0x[0-9a-fA-F]{40} can claim, so nothing was claimed or staked\.\n$/
+  const dry = await cli(["rewards", "claim-and-stake", VALIDATOR_A, "--amount", "500", "--dry-run", "--from", STAKER])
+  assert.equal(dry.code, 1)
+  assert.equal(dry.out, "")
+  assert.match(dry.err, expected)
+  const live = await cli(
+    ["rewards", "claim-and-stake", VALIDATOR_A, "--amount", "500", "--private-key-env", "SAFENET_TEST_KEY"],
+    { env: KEY_ENV, proofAccount: testAccount.address },
+  )
+  assert.equal(live.code, 1)
+  assert.match(live.err, expected)
+  assert.deepEqual(live.sends, { prepared: 0, broadcast: 0 })
+})
+
+test("claim-and-stake stakes what arrived, and says so, when the claim pays less than --amount", async () => {
+  const r = await cli(
+    ["rewards", "claim-and-stake", VALIDATOR_A, "--amount", "2", "--private-key-env", "SAFENET_TEST_KEY", "--json"],
+    { env: KEY_ENV, proofAccount: testAccount.address, paid: SAFE / 2n },
+  )
+  assert.equal(r.code, 0, r.err)
+  const data = JSON.parse(r.out)
+  assert.equal(data.staked.wei, String(SAFE / 2n))
+  assert.equal(data.cappedToReceived, true)
+  assert.match(r.err, /^staking 0\.5 SAFE instead of the requested 2 SAFE: the claim paid less than the proof's claimable amount$/m)
 })
 
 // --- refusals and decoded reverts --------------------------------------------------
@@ -280,6 +306,26 @@ test("a name given for a secret's variable is never printed back, even when it i
     const r = await cli(argv, { env: argv.includes("--dry-run") ? { Hunter2_safe: "not a key" } : {} })
     assert.equal(r.code, 2, argv.join(" "))
     assert.ok(!r.err.includes("Hunter2_safe") && !r.out.includes("Hunter2_safe"), r.err)
+  }
+})
+
+test("a secret in a misplaced --flag=value, or typed as an argument, is not echoed by the usage error", async () => {
+  const fakeKey = "ab".repeat(32)
+  for (const argv of [
+    ["stake", VALIDATOR_A, "1", "--private-key=Hunter2_safe"],
+    ["--private-key-env=Hunter2_safe", "stake", VALIDATOR_A, "1"],
+    ["stake", VALIDATOR_A, "1", "--password=Hunter2_safe"],
+    ["--rpc=https://archive.invalid/v2/Hunter2_safe", "status"],
+    ["stake", VALIDATOR_A, "1", "--dry-run", "--from", STAKER, "--keystore-password=Hunter2_safe"],
+    ["stake", `0x${fakeKey}`, "1", "--dry-run", "--from", STAKER],
+    ["stake", fakeKey, "1", "--dry-run", "--from", STAKER],
+  ]) {
+    const r = await cli(argv)
+    assert.equal(r.code, 2, argv.join(" "))
+    for (const text of [r.out, r.err]) {
+      assert.ok(!text.includes("Hunter2_safe") && !text.includes(fakeKey), `${argv.join(" ")} echoed it: ${text}`)
+    }
+    assert.match(r.err, /^error: /, argv.join(" "))
   }
 })
 

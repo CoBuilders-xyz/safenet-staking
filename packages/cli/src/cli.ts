@@ -55,6 +55,20 @@ export interface CommandRuntime {
 
 const URL_PATTERN = /https?:\/\/[^\s"'<>]+/g
 
+/**
+ * A usage error with anything that may be a secret taken out. A misplaced flag in `--flag=value`
+ * form, such as `--private-key=<key>`, reaches commander as an unknown option and its message
+ * repeats the whole token; a key typed where an argument belongs is repeated by the validation
+ * message. So the value after `=` goes, as do URLs and runs of 64 or more hex digits. A usage
+ * error never needs a transaction hash, so nothing real is lost.
+ */
+export function scrubUsage(text: string): string {
+  return text
+    .replace(/(^|[\s'"])(-{1,2}[A-Za-z0-9][\w-]*)=[^\s'"]*/g, "$1$2=<redacted>")
+    .replace(URL_PATTERN, "<url>")
+    .replace(/(0x)?[0-9a-fA-F]{64,}/g, "<redacted>")
+}
+
 /** One plain sentence for an error, with any URL removed: an RPC URL can carry a key. */
 export function errorSentence(err: unknown): string {
   let text: string
@@ -118,7 +132,11 @@ export function buildProgram(runtime: Runtime): Command {
     .option("--rpc-url <url>", "Mainnet RPC endpoint (default: MAINNET_RPC_URL, then public endpoints)")
     .option("-v, --verbose", "print the RPC host in use, never its full URL, to stderr")
     .exitOverride()
-    .configureOutput({ writeOut: runtime.io.out, writeErr: runtime.io.err })
+    .configureOutput({
+      writeOut: runtime.io.out,
+      writeErr: runtime.io.err,
+      outputError: (text, write) => write(scrubUsage(text)),
+    })
     .showHelpAfterError("(run with --help for usage)")
 
   const rt = commandRuntime(runtime)
@@ -140,7 +158,7 @@ export async function run(argv: readonly string[], runtime: Runtime): Promise<nu
     // commander has already printed its own message. Help and --version exit 0.
     if (err instanceof CommanderError) return err.exitCode === 0 ? 0 : 2
     if (err instanceof UsageError) {
-      runtime.io.err(`error: ${err.message}\n`)
+      runtime.io.err(`error: ${scrubUsage(err.message)}\n`)
       return 2
     }
     runtime.io.err(`error: ${errorSentence(err)}\n`)

@@ -27,7 +27,7 @@ import { TEST_MNEMONIC } from "../test-support.js"
 import { cliAnvilPort, startAnvil, type Anvil } from "./anvil.js"
 import {
   STAKING, activeValidator, allowance, claimed, findRewardsClaimer, forkClients, fundSafe, impersonate,
-  impersonatedSigner, pending, pinnedFetch, safeBalance, stakeOf, warp, withdrawDelay,
+  impersonatedSigner, pending, pinnedFetch, redactUrls, safeBalance, stakeOf, warp, withdrawDelay,
   type ForkClients, type RewardsClaimer,
 } from "./chain.js"
 
@@ -60,7 +60,8 @@ before(async () => {
   } catch (err) {
     // Anvil's own log, URLs removed, says which request to the archive endpoint it was waiting on.
     process.stderr.write(`Anvil's last output:\n${anvil.logTail()}\n`)
-    throw err
+    // A fresh error, without viem's fields and cause chain, any of which can carry the fork URL.
+    throw new Error(redactUrls(err instanceof Error ? err.message.split("\n")[0] ?? "" : String(err)))
   }
 }, { timeout: TIMEOUT })
 
@@ -131,9 +132,14 @@ test("stake --approve unlimited approves 2^256 - 1, and the next stake sends no 
   const first = ok(await safenet(["stake", validator, "10", "--approve", "unlimited"]), "stake --approve unlimited")
   assert.deepEqual(fns(first.steps), ["approve", "stake"])
   assert.equal(first.steps[0]!.args.amount, String(maxUint256))
+  // The chain, not the output: the allowance is 2^256 - 1, or that less the 10 SAFE staked if the
+  // token spends from an unlimited allowance too.
+  const unlimited = await allowance(c, user.address)
+  assert.ok(unlimited === maxUint256 || unlimited === maxUint256 - parseEther("10"), `allowance ${unlimited}`)
   const second = ok(await safenet(["stake", validator, "5"]), "stake with the allowance in place")
   assert.deepEqual(fns(second.steps), ["stake"])
   assert.equal(await stakeOf(c, user.address, validator) - before, parseEther("15"))
+  assert.ok(await allowance(c, user.address) <= unlimited, "no second approval raised the allowance")
 })
 
 // --- unstake and the withdrawal claims --------------------------------------------
@@ -154,6 +160,13 @@ test("unstake opens a pending withdrawal for the amount and lowers the stake", {
 })
 
 test("withdrawals claim refuses inside the delay, where the contract reverts with NoClaimableWithdrawal", { skip, timeout: TIMEOUT }, async () => {
+  const state = async () => ({
+    nonce: await c.chain.getTransactionCount({ address: user.address }),
+    safe: await safeBalance(c, user.address),
+    pending: (await pending(c, user.address)).map((w) => `${w.amount}@${w.claimableAt}`),
+    block: await c.chain.getBlockNumber(),
+  })
+  const before = await state()
   const r = await safenet(["withdrawals", "claim", "--all"])
   assert.equal(r.code, 1)
   assert.match(r.err, /^error: None of .*'s 1 pending withdrawal is claimable yet; the oldest, id \d+, is claimable at .* UTC\.\n$/)
@@ -162,6 +175,7 @@ test("withdrawals claim refuses inside the delay, where the contract reverts wit
     c.chain.simulateContract({ account: user.address, address: STAKING, abi: stakingAbi, functionName: "claimWithdrawal" }),
     (err: Error) => /NoClaimableWithdrawal/.test(err.message),
   )
+  assert.deepEqual(await state(), before, "the refusal changed the chain")
 })
 
 test("after the delay, claim --all pays what is past it and names what is not", { skip, timeout: TIMEOUT }, async () => {
@@ -230,12 +244,22 @@ test("claim-and-stake --amount stakes that much when it is lower, and the rest s
   await isolated(async () => {
     await impersonate(c, claimer.account)
     const part = claimer.claimable / 3n
+    // More than the claim can pay is refused before anything is sent.
+    const claimedBefore = await claimed(c, claimer.account)
+    const over = await safenet(
+      ["rewards", "claim-and-stake", validator, "--amount", formatUnits(claimer.claimable + 1n, 18)],
+      impersonatedSigner(c, claimer.account),
+    )
+    assert.equal(over.code, 1)
+    assert.match(over.err, /^error: The amount to stake, .* SAFE, is more than the .* SAFE .* can claim, so nothing was claimed or staked\.\n$/)
+    assert.equal(await claimed(c, claimer.account), claimedBefore)
     const [stakeBefore, safeBefore] = [await stakeOf(c, claimer.account, validator), await safeBalance(c, claimer.account)]
     const r = ok(
       await safenet(["rewards", "claim-and-stake", validator, "--amount", formatUnits(part, 18)], impersonatedSigner(c, claimer.account)),
       "rewards claim-and-stake --amount",
     )
     assert.equal((r.staked as { wei: string }).wei, String(part))
+    assert.equal(r.cappedToReceived, false)
     assert.equal(await stakeOf(c, claimer.account, validator) - stakeBefore, part)
     assert.equal(await safeBalance(c, claimer.account) - safeBefore, claimer.claimable - part)
   })

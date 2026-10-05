@@ -151,10 +151,19 @@ export interface ClaimAndStakeResult extends WriteResultBase {
   readonly operation: "rewards claim-and-stake"
   readonly validator: Address
   readonly claim: RewardsClaim
-  /** --amount, when given. */
+  /**
+   * The amount asked to stake, when one was given. More than the proof's claimable amount is
+   * refused before anything is sent.
+   */
   readonly requested: Amount | null
-  /** What was staked: what arrived, or the requested amount when that is lower. */
+  /**
+   * What was staked: the requested amount, or what arrived when none was asked. Lower than the
+   * request only when the claim paid less than the proof's claimable amount; then
+   * `cappedToReceived` is true.
+   */
   readonly staked: Amount
+  /** The claim paid less than the requested amount, so what arrived was staked instead. */
+  readonly cappedToReceived: boolean
   readonly allowance: Figure<Amount>
   readonly approval: Approval | null
   readonly stakeBefore: Figure<Amount>
@@ -175,6 +184,13 @@ export async function claimAndStake(
     prepareClaim(ctx, from, block),
     readStake(ctx, from, input.validator, block),
   ])
+  const claimable = prepared.figures.claimable.value
+  if (input.amount !== undefined && input.amount > claimable.wei) {
+    throw new SafenetError(
+      `The amount to stake, ${amount(input.amount).safe} SAFE, is more than the ${claimable.safe} SAFE ${from} ` +
+        "can claim, so nothing was claimed or staked",
+    )
+  }
   const runner = await createRunner(ctx, mode, options)
   const { received, source } = await runClaim(runner, prepared)
   if (received === undefined) {
@@ -186,7 +202,12 @@ export async function claimAndStake(
   }
   if (!mode.dryRun) options.onProgress?.({ type: "received", amount: amount(received), source })
 
-  const staked = input.amount !== undefined && input.amount < received ? input.amount : received
+  // Below the request only when the claim paid less than the proof said it could.
+  const cappedToReceived = input.amount !== undefined && input.amount > received
+  const staked = input.amount !== undefined && !cappedToReceived ? input.amount : received
+  if (cappedToReceived) {
+    options.onProgress?.({ type: "capped", requested: amount(input.amount!), received: amount(received) })
+  }
   const { allowance, approval } = await runStake(ctx, runner, {
     validator: input.validator,
     amount: staked,
@@ -208,6 +229,7 @@ export async function claimAndStake(
     },
     requested: input.amount === undefined ? null : amount(input.amount),
     staked: amount(staked),
+    cappedToReceived,
     allowance,
     approval,
     stakeBefore,
