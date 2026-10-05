@@ -26,6 +26,12 @@
         "coverage/**"
       ]
     },
+    "//#test:tools": {
+      "inputs": [
+        "tools/**"
+      ],
+      "outputs": []
+    },
     "check": {},
     "verify:abis": {
       "cache": false
@@ -63,6 +69,21 @@
       ],
       "outputs": [
         "coverage/**"
+      ]
+    },
+    "@cobuilders/safenet-web#build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.env",
+        "$TURBO_ROOT$/.env.local",
+        "$TURBO_ROOT$/.env.production",
+        "$TURBO_ROOT$/.env.production.local"
+      ],
+      "outputs": [
+        "dist/**"
       ]
     },
     "@cobuilders/safenet-core#build": {

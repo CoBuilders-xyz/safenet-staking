@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Watch mode:** `yarn test:watch`
 - **Coverage:** `yarn test:coverage`
 - **E2E tests:** `yarn test:e2e` (Playwright)
-- **Generate Merkle proofs:** `yarn generate:proofs` (reads `scripts/merkle-config.json`, writes to `public/rewards/`)
+- **Generate Merkle proofs:** `pnpm generate:proofs [--out <dir>]` (reads `scripts/merkle-config.json`, writes to the git-ignored `.rewards/` by default)
 
 ## Pre-push Checklist
 
@@ -59,7 +59,7 @@ App-level guards: `useSanctionsCheck` blocks the entire app if `VITE_SANCTIONS_A
 - **Validator discovery** (`src/hooks/useValidators.ts`): Fetches validator data from a remote JSON endpoint (`VITE_VALIDATOR_INFO_URL`, defaults to GitHub raw URL). Returns `ValidatorInfo[]` with `{ address, isActive, label, commission, participationRate }`. Cached with React Query (5 min staleTime). Also exports `findValidator()` helper for synchronous address lookup.
 - **Withdrawals** (`src/hooks/useWithdrawals.ts`): Fetches pending withdrawals for the connected user. Includes `useNextClaimable` for the claimable banner.
 - **Gas estimation** (`src/hooks/useGasEstimate.ts`): Uses `estimateGas` + `getGasPrice` from viem to show estimated gas cost in delegate/undelegate dialogs. Debounced 500ms on amount change.
-- **Rewards** (`src/hooks/useRewards.ts`, `src/hooks/useRewardProof.ts`, `src/hooks/useClaimRewards.ts`, `src/hooks/useProgrammeRewards.ts`): Rewards reading, Merkle proof fetching, claim transaction hooks, and the programme-wide figures (SEF's `latest.json`, the MerkleDrop's root and SAFE balance). Proofs are served from `public/rewards/proofs/{address}.json` and the current root/total from `public/rewards/latest.json`.
+- **Rewards** (`src/hooks/useRewards.ts`, `src/hooks/useRewardProof.ts`, `src/hooks/useClaimRewards.ts`, `src/hooks/useProgrammeRewards.ts`): Rewards reading, Merkle proof fetching, claim transaction hooks, and the programme-wide figures (SEF's `latest.json`, the MerkleDrop's root and SAFE balance). Proofs are fetched from `${rewardsBaseUrl}/proofs/<radix>/{address}.json` and the current root/total from `${rewardsBaseUrl}/latest.json`, where `rewardsBaseUrl` is `VITE_REWARDS_BASE_URL` or, by default, SEF's published rewards data (`SEF_DATA.rewardsProofBase` in `@cobuilders/safenet-core`).
 - **Approval flow** (`src/hooks/useApprovalFlow.ts`): Wraps `useTokenAllowance` with approval type tracking (exact vs unlimited), toast notifications, and a unified API for DelegateDialog.
 - **Transaction toasts** (`src/hooks/useTxToast.ts`): Shared hook for success/error/Safe-queued toast notifications, used by DelegateDialog, UndelegateDialog, and other tx dialogs.
 
@@ -167,18 +167,19 @@ Off-chain tooling for generating Merkle proofs compatible with the MerkleDrop co
 
 - `scripts/merkle-tree.ts` — Pure Merkle tree logic (no I/O). Exports `encodeLeaf`, `buildMerkleTree`, `verifyProof`. Uses sorted-pair hashing (OpenZeppelin convention).
 - `scripts/generate-merkle-tree.ts` — CLI entry point. Reads config, builds tree, writes output files.
-- `scripts/merkle-config.json` — Input config with epoch number and address → cumulative amount mapping.
+- `scripts/merkle-config.json` — Input config with epoch number and address → cumulative amount mapping, plus optional `rewardsUntil` and `unpaidAmount`.
 - `scripts/__tests__/merkle-tree.test.ts` — Unit tests for encoding, tree construction, and proof verification.
+- `scripts/__tests__/generate-merkle-tree.test.ts` — Parses the generated `latest.json` with the app's own `parseRewardsLatest`.
 
 ### Workflow
 
 1. Edit `scripts/merkle-config.json` with wallet addresses and cumulative amounts (in wei)
-2. Run `yarn generate:proofs`
-3. Output files:
-   - `public/rewards/proofs/{lowercase_address}.json` — per-address proof file (`{ cumulativeAmount, merkleRoot, proof }`)
-   - `public/rewards/latest.json` — root, tokenTotal, epoch, updatedAt
-4. Set the Merkle root on-chain via the admin panel (see below)
-5. The frontend `useRewardProof` hook fetches proofs from `public/rewards/proofs/`
+2. Run `pnpm generate:proofs`. It writes to `.rewards/`, which git ignores, or to the directory `--out <dir>` names
+3. Output files, in the shape SEF publishes:
+   - `proofs/<radix>/{lowercase_address}.json` — per-address proof file (`{ cumulativeAmount, merkleRoot, proof }`)
+   - `latest.json` — `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal`, `unpaidAmount`, `updatedAt`
+4. Serve the output directory and point `VITE_REWARDS_BASE_URL` at it. `useRewardProof` fetches each proof from `${VITE_REWARDS_BASE_URL}/proofs/<radix>/{lowercase_address}.json`, and `useProgrammeRewards` reads `${VITE_REWARDS_BASE_URL}/latest.json`.
+5. Only then set the Merkle root on-chain via the admin panel (see below). In the other order the app still serves the old proofs against the new root, and `useRewards` disables Claim because the roots differ.
 
 ### Config Format
 
@@ -188,7 +189,9 @@ Off-chain tooling for generating Merkle proofs compatible with the MerkleDrop co
   "entries": {
     "0xAddress1": "1000000000000000000000",
     "0xAddress2": "500000000000000000000"
-  }
+  },
+  "rewardsUntil": "2026-09-22T00:00:00.000Z",
+  "unpaidAmount": "0"
 }
 ```
 

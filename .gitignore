@@ -26,6 +26,5 @@ storybook-static/
 
 .DS_Store
 
-# Working notes, drafts and client correspondence. Never committed: this repository
-# ships MIT and public. They live on the host only.
-docs/
+# per-machine instructions for Claude Code
+CLAUDE.local.md
