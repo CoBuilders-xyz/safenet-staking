@@ -5,6 +5,7 @@ import {
   SUBGRAPH_ENDPOINTS,
   SUBGRAPH_NAMES,
   SUBGRAPH_STALE_AFTER_SECONDS,
+  isLocalSubgraphUrl,
   localSubgraphUrl,
   subgraphEndpoints,
 } from "./subgraphs.js"
@@ -29,6 +30,18 @@ test("an override replaces one chain only, and an empty override counts as unset
     mainnet: studio,
     gnosis: SUBGRAPH_ENDPOINTS.gnosis,
   })
+})
+
+test("a build that disallows local endpoints gets none while the defaults are local", () => {
+  assert.deepEqual(subgraphEndpoints({ allowLocal: false }), { mainnet: undefined, gnosis: undefined })
+  const studio = "https://api.studio.thegraph.test/query/1/safenet-gnosis/version/latest"
+  assert.deepEqual(subgraphEndpoints({ allowLocal: false, overrides: { gnosis: studio } }), { mainnet: undefined, gnosis: studio })
+})
+
+test("local URLs are recognised on any port, deployed ones are not", () => {
+  assert.equal(isLocalSubgraphUrl(localSubgraphUrl("mainnet", 8160)), true)
+  assert.equal(isLocalSubgraphUrl("http://localhost:8000/subgraphs/name/safenet/mainnet"), true)
+  assert.equal(isLocalSubgraphUrl("https://api.studio.thegraph.test/query/1/safenet-mainnet/version/latest"), false)
 })
 
 test("every chain has a subgraph name", () => {

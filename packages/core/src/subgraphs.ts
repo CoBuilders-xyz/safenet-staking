@@ -27,26 +27,47 @@ export function localSubgraphUrl(chain: ChainKey, port: number | string = DEFAUL
   return `http://127.0.0.1:${port}/subgraphs/name/${SUBGRAPH_NAMES[chain]}`
 }
 
-/** The default endpoint per chain: the local graph-node on its default port. */
+/**
+ * The default endpoint per chain. ONE LINE PER CHAIN: to make a deployed subgraph the default,
+ * replace that chain's value with its query URL. Everything downstream follows.
+ *
+ * Today both point at the local graph-node, because neither subgraph is deployed yet. A local
+ * default is used only where the caller allows it (development); a deployed default is used
+ * everywhere. A query URL is public by nature, so a default must never carry an API key.
+ */
 export const SUBGRAPH_ENDPOINTS: Record<ChainKey, string> = {
   mainnet: localSubgraphUrl("mainnet"),
   gnosis: localSubgraphUrl("gnosis"),
 }
 
+/** True for a URL on the local graph-node, whatever its port. */
+export function isLocalSubgraphUrl(url: string): boolean {
+  return /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//.test(url)
+}
+
 /**
- * Resolve the endpoint per chain. An override wins; an empty override counts as unset.
+ * Resolve the endpoint per chain, in this order:
  *
- * A query URL is public by nature: whoever loads a page that queries it can read it. So an
- * override must never carry an API key. A gateway URL with a key in its path belongs behind a
- * proxy, not in a browser bundle.
+ *   an override, when set and not empty
+ *   the default in SUBGRAPH_ENDPOINTS, when it is a deployed URL
+ *   the default, when it is the local graph-node and `allowLocal` is true, moved to `graphNodePort`
+ *   undefined: no endpoint
+ *
+ * A production browser build passes `allowLocal: false`, so it never sends visitors' browsers to
+ * their own 127.0.0.1. An override must never carry an API key, for the same reason as a default.
  */
 export function subgraphEndpoints(options: {
   graphNodePort?: number | string
   overrides?: Partial<Record<ChainKey, string | undefined>>
-} = {}): Record<ChainKey, string> {
-  const pick = (chain: ChainKey): string => {
-    const o = options.overrides?.[chain]
-    return o && o.length > 0 ? o : localSubgraphUrl(chain, options.graphNodePort)
+  allowLocal?: boolean
+} = {}): Record<ChainKey, string | undefined> {
+  const { graphNodePort, overrides, allowLocal = true } = options
+  const pick = (chain: ChainKey): string | undefined => {
+    const o = overrides?.[chain]
+    if (o && o.length > 0) return o
+    const d = SUBGRAPH_ENDPOINTS[chain]
+    if (!isLocalSubgraphUrl(d)) return d
+    return allowLocal ? localSubgraphUrl(chain, graphNodePort) : undefined
   }
   return { mainnet: pick("mainnet"), gnosis: pick("gnosis") }
 }

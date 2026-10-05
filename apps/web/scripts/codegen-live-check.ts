@@ -25,7 +25,9 @@ const endpoints = subgraphEndpoints({
 
 let failures = 0
 for (const chain of ["mainnet", "gnosis"] as ChainKey[]) {
-  const res = await fetch(endpoints[chain], {
+  const url = endpoints[chain]
+  if (!url) throw new Error(`${chain}: no endpoint`)
+  const res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query: getIntrospectionQuery() }),
