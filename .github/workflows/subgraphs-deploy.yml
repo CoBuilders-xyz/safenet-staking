@@ -58,4 +58,5 @@ jobs:
           GRAPH_DEPLOY_KEY: ${{ secrets.GRAPH_DEPLOY_KEY }}
           GNOSIS_RPC_URL: ${{ secrets.GNOSIS_RPC_URL }}
           PACKAGE: "@cobuilders/safenet-subgraph-${{ matrix.network }}"
-        run: pnpm --filter "${PACKAGE}" deploy:studio
+        # pnpm exits 0 when a filter matches no package; refuse that instead of deploying nothing.
+        run: pnpm --filter "${PACKAGE}" --fail-if-no-match deploy:studio

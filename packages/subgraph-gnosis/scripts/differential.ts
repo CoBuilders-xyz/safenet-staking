@@ -58,6 +58,14 @@ interface SubgraphState {
   signingValidators: { id: string; attended: string }[]
 }
 
+// Studio answers an unknown slug or version with HTTP 200 and {"message":"Not found"}, and a
+// gateway failure with an HTML page. Either is a wrong endpoint, not a disagreement, so it gets one
+// sentence and no stack. The URL stays out of it.
+function unreachable(answer: string): never {
+  console.error(`\n  the subgraph endpoint answered ${answer}; check SUBGRAPH_URL and that the version exists\n`)
+  process.exit(1)
+}
+
 async function query(): Promise<SubgraphState> {
   const r = await fetch(ENDPOINT, {
     method: "POST",
@@ -73,9 +81,13 @@ async function query(): Promise<SubgraphState> {
       }`,
     }),
   })
-  const j = (await r.json()) as { data?: SubgraphState; errors?: { message: string }[] }
+  if (!r.ok) unreachable(`HTTP ${r.status}`)
+  const j = (await r.json().catch(() => ({}))) as { data?: SubgraphState; errors?: { message: string }[]; message?: string }
   if (j.errors) throw new Error(j.errors.map((e) => e.message).join("; "))
-  if (!j.data) throw new Error("no data")
+  if (!j.data) {
+    if (j.message) unreachable(`"${j.message}"`)
+    throw new Error("no data")
+  }
   return j.data
 }
 

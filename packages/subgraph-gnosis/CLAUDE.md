@@ -15,11 +15,11 @@ is the short git SHA, with `-dirty` when the tree has uncommitted changes; set `
 override it.
 
 Why 16 days and not the full history: the full history is about 15 million logs, which takes an
-indexer far longer to sync. The Network Overview reads a 14-day window and drops the partial
-first day, so 16 days covers it with a day to spare. The start block is fixed when the manifest
-is generated, so the deployment keeps every block from then on; it does not roll. A windowed
-deployment cannot answer validator registration history or the epoch record. Those need
-`--full`, as a separate deployment.
+indexer far longer to sync. The Network Overview, when it lands, is expected to read a 14-day
+window and drop the partial first day, so 16 days would cover it with a day to spare. The start
+block is fixed when the manifest is generated, so the deployment keeps every block from then on;
+it does not roll. A windowed deployment cannot answer validator registration history or the epoch
+record. Those need `--full`, as a separate deployment.
 
 The deploy key is `GRAPH_DEPLOY_KEY`. Locally it comes from `.env.local` (`pnpm env:pull`), which
 the script reads itself. In CI it is the secret of the same name, and

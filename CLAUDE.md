@@ -51,6 +51,7 @@ Specific commands, only where they apply:
 | `pnpm test:smoke` | root, `packages/cli` | Each of the six commands runs against Mainnet through the real entry point | needs the archive `MAINNET_RPC_URL`; runs nightly. Skipped, with the reason, everywhere else |
 | `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. 83 Playwright tests in 14 spec files | runs; one navigation test is intermittently flaky |
 | `pnpm test:fork` | `apps/web` | The staking flows execute against the real contracts on an Anvil Mainnet fork at a pinned block, each checked by reading the chain. 4 Playwright tests and 1 skipped, about 1.5 minutes | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
+| `deploy:studio` | each subgraph package, through `pnpm --filter` | The subgraph builds and Studio accepts it as a new version under its slug. Not that it syncs: watch it by deployment hash, then run `differential` with `SUBGRAPH_URL` | works; needs `GRAPH_DEPLOY_KEY` |
 | `pnpm test:parity` | subgraphs | Our numbers match SEF's published JSON | **fails on purpose: no subgraph package implements it yet** |
 
 `turbo run <task>` with no package implementing the task reports a success while running nothing.
