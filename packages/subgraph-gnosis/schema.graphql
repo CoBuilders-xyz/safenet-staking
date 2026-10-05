@@ -26,9 +26,10 @@ Counting needs two facts that arrive in separate events:
   TransactionAttested  says the ceremony was a transaction attestation. 1 ceremony in 400
                        is not, and the oracle excludes those.
 
-Measured on 2026-09-29: all 691 attestations in a 2,000 block window sat in the SAME BLOCK
-as their SignCompleted, so log order within the block decides which handler runs first. The
-handlers therefore do not depend on the order: whichever arrives second does the counting.
+Measured over 16 days to block 48,602,061: all 70,524 attestations sat in the SAME
+TRANSACTION as their SignCompleted, after it. Nothing in the contract is known to enforce
+that, so the handlers do not depend on the order: whichever arrives second does the counting,
+and the ceremony is filed under the attestation's block either way.
 
 Removed once counted. Without that, this table would grow by about 4,600 rows a day forever.
 """
@@ -58,7 +59,33 @@ type Ceremony @entity(immutable: false) {
   roots: [Bytes!]!
 
   firstSeenBlock: BigInt!
-  timestamp: BigInt!
+
+  """
+  The block of the TransactionAttested that named this sid, and its timestamp. Null until
+  then. The ceremony is filed under this block in every bucket, hourly and daily, whichever
+  handler does the counting: SEF counts a ceremony in the window its attestation falls in.
+  """
+  attestedAtBlock: BigInt
+  attestedAtTimestamp: BigInt
+}
+
+"""
+A ceremony that was counted, kept for a while after its Ceremony row is removed.
+
+A late SignShared, or a second TransactionAttested, for a counted sid would otherwise create a
+new Ceremony that nothing ever completes, and openCeremonies would count it forever. The
+handlers look the sid up here first and ignore the event.
+
+Kept for COUNTED_HORIZON blocks, then removed, oldest first: the rows form a queue from
+Consensus.countedOldest through `next`, so the table holds a few hundred rows, not one per
+ceremony ever counted.
+"""
+type CountedCeremony @entity(immutable: false) {
+  "The signature id, sid."
+  id: ID!
+  countedAtBlock: BigInt!
+  "The sid counted after this one. Null for the newest."
+  next: String
 }
 
 """
@@ -119,6 +146,16 @@ type Consensus @entity(immutable: false) {
 
   "Ceremonies still waiting to be counted. Should stay small; a rising number means a leak."
   openCeremonies: Int!
+
+  """
+  Every signing validator seen, in the order first seen. A counted attestation ceremony is a
+  miss for each of these that did not share for its winning root; see ValidatorHour.
+  """
+  validators: [SigningValidator!]!
+
+  "The oldest and the newest CountedCeremony. Null when none is kept."
+  countedOldest: String
+  countedNewest: String
 }
 
 "A validator on this chain, identified by its signing address."
@@ -146,9 +183,12 @@ type SigningValidator @entity(immutable: false) {
   attended: BigInt!
 
   firstSeenBlock: BigInt!
+
+  "The latest block this validator was seen in. Never moves backwards."
   lastSeenBlock: BigInt!
 
   days: [ValidatorDay!]! @derivedFrom(field: "validator")
+  hours: [ValidatorHour!]! @derivedFrom(field: "validator")
 }
 
 """
@@ -156,6 +196,8 @@ Per validator, per UTC day.
 
 This is what makes participation over 7, 30 or all days a query rather than a scan, which is
 the window selector the validator detail screen is meant to offer.
+
+Filed by the day of the block the ceremony was attested in, the same rule as ValidatorHour.
 """
 type ValidatorDay @entity(immutable: false) {
   "validator address, a dash, the UTC day start as a unix timestamp."
@@ -172,6 +214,9 @@ Per UTC day, network-wide.
 
 Attestations per day is promised as a bar chart. Latency is promised as a median and a p95,
 which a sum cannot give, so the samples are bucketed by block distance instead.
+
+Every figure is filed by the day of its TransactionAttested block: an attestation ceremony
+under the day it was attested in, the same rule as ConsensusHour.
 """
 type ConsensusDay @entity(immutable: false) {
   "The UTC day start as a unix timestamp, as a string."
@@ -192,4 +237,62 @@ type ConsensusDay @entity(immutable: false) {
   latencyBuckets: [BigInt!]!
   latencyOverflow: BigInt!
   latencySamples: BigInt!
+}
+
+# -----------------------------------------------------------------------------------------
+# Hourly buckets, for SEF's window
+# -----------------------------------------------------------------------------------------
+#
+# SEF publishes participation_rate_14d over 14 days that end at the top of an hour, both ends
+# included, and counts a ceremony in the window its attestation block falls in. These rows let
+# that window be summed from a current query, with no `block: { number }` back in time, which a
+# pruned deployment cannot answer.
+#
+# A row for hour H counts the ceremonies attested in blocks with a timestamp from H up to, not
+# including, H + 1 hour. The `OnTheHour` fields count the subset attested in a block whose
+# timestamp is exactly H. Gnosis slots are 5 seconds and an hour is 720 of them, so most hours
+# start with such a block. SEF's window from S to E, both on the hour, is then:
+#
+#   the sum of each field over the hours S, S + 1h, ..., E - 1h,
+#   plus the `OnTheHour` field of hour E.
+
+"""
+Per hour, network-wide: the participation denominator.
+"""
+type ConsensusHour @entity(immutable: false) {
+  "The hour start as a unix timestamp, as a string."
+  id: ID!
+  hour: Int!
+
+  "Attestation ceremonies attested in this hour."
+  attestationCeremonies: Int!
+
+  "Of those, the ones attested in a block exactly on the hour."
+  attestationCeremoniesOnTheHour: Int!
+}
+
+"""
+Per validator, per hour: the participation numerator, and the misses beside it.
+
+For each attestation ceremony counted in the hour, every validator in Consensus.validators at
+that moment gets one ceremony, and either one attended, when it shared for the winning root,
+or one missed. So `ceremonies` is always `attended + missed`; the three are written together.
+
+A validator first seen after a ceremony was counted is not given a miss for it. SEF's
+denominator is the network's: use ConsensusHour, not `ceremonies`, for a rate.
+"""
+type ValidatorHour @entity(immutable: false) {
+  "validator address, a dash, the hour start as a unix timestamp."
+  id: ID!
+  validator: SigningValidator!
+  hour: Int!
+
+  ceremonies: Int!
+  attended: Int!
+  missed: Int!
+
+  "The same three, for the ceremonies attested in a block exactly on the hour."
+  ceremoniesOnTheHour: Int!
+  attendedOnTheHour: Int!
+  missedOnTheHour: Int!
 }
