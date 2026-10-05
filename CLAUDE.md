@@ -51,6 +51,7 @@ Specific commands, only where they apply:
 | `pnpm test:smoke` | root, `packages/cli` | Each of the six commands runs against Mainnet through the real entry point | needs the archive `MAINNET_RPC_URL`; runs nightly. Skipped, with the reason, everywhere else |
 | `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. 83 Playwright tests in 14 spec files | runs; one navigation test is intermittently flaky |
 | `pnpm test:fork` | `apps/web` | The staking flows execute against the real contracts on an Anvil Mainnet fork at a pinned block, each checked by reading the chain. 4 Playwright tests and 1 skipped, about 1.5 minutes | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
+| `deploy:studio` | each subgraph package, through `pnpm --filter` | The subgraph builds and Studio accepts it as a new version under its slug. Not that it syncs: watch it by deployment hash, then run `differential` with `SUBGRAPH_URL` | works; needs `GRAPH_DEPLOY_KEY` |
 | `pnpm test:parity` | subgraphs | Our numbers match SEF's published JSON | **fails on purpose: no subgraph package implements it yet** |
 
 `turbo run <task>` with no package implementing the task reports a success while running nothing.
@@ -99,9 +100,9 @@ packages/testing            planned  shared fixtures: anvil, RPC mocks, Playwrig
 
 Do not infer that a planned package exists because this file names it. Check.
 
-`packages/core`, `packages/cli` and `apps/web` each own a `CLAUDE.md`; the subgraph packages do not. Read the one
-for the package you are in, not all of them. `apps/web/CLAUDE.md` came with the fork and names
-`yarn`. This repository uses pnpm, so run its scripts as
+`packages/core`, `packages/cli`, `apps/web` and both subgraph packages each own a `CLAUDE.md`.
+Read the one for the package you are in, not all of them. `apps/web/CLAUDE.md` came with the fork
+and names `yarn`. This repository uses pnpm, so run its scripts as
 `pnpm --filter @cobuilders/safenet-web <script>`.
 
 ## Subgraphs
@@ -114,9 +115,12 @@ signatures. So neither is written by hand. `pnpm generate` in each subgraph pack
 `pnpm test` runs the matchstick tests, which feed hand-built events to the handlers and need no
 chain. Each package also has a `differential` script. The Mainnet one compares a locally indexed
 subgraph with the contracts read directly; the Gnosis one compares it with a `pnpm metrics` run.
-Both need a running graph-node: `pnpm graph:up` starts graph-node, postgres and ipfs through
-Docker Compose, with ports from `.env.ports` and the archive RPC from `.env.local`.
-`pnpm graph:down` stops them and discards the indexed data.
+Both query a local graph-node by default, or the URL in `SUBGRAPH_URL`. `pnpm graph:up` starts
+graph-node, postgres and ipfs through Docker Compose, with ports from `.env.ports` and the archive
+RPC from `.env.local`. `pnpm graph:down` stops them and discards the indexed data.
+
+Each package deploys to Subgraph Studio with `deploy:studio`, locally or through the manual
+workflow `.github/workflows/subgraphs-deploy.yml`. Its `CLAUDE.md` has the slug and the steps.
 
 ## Continuous integration
 
@@ -126,7 +130,8 @@ the fork suite and the CLI smoke tests daily; all but the unit tests need the `M
 secret, and fail without it. The fork suite stays out of per-PR CI because every run reads from
 the archive node. `security.yml` runs a
 dependency review on pull requests, skipped until the repository is public, and `pnpm audit`
-weekly.
+weekly. `subgraphs-deploy.yml` runs only by hand: it deploys one or both subgraphs to
+Studio with the `GRAPH_DEPLOY_KEY` secret.
 
 ## What happens when you edit
 

@@ -19,8 +19,10 @@ import { createPublicClient, fallback, http } from "viem"
 import { mainnet } from "viem/chains"
 import { CONTRACTS, SEF_DATA, erc20Abi, merkleDropAbi, rpcUrls, stakingAbi } from "@cobuilders/safenet-core"
 
+// The local graph-node by default. SUBGRAPH_URL points the same checks at a deployed subgraph,
+// such as a Studio query URL pinned to one version.
 const PORT = process.env.GRAPH_NODE_PORT ?? "8000"
-const ENDPOINT = `http://localhost:${PORT}/subgraphs/name/safenet/mainnet`
+const ENDPOINT = process.env.SUBGRAPH_URL || `http://localhost:${PORT}/subgraphs/name/safenet/mainnet`
 
 const client = createPublicClient({
   chain: mainnet,
@@ -31,15 +33,27 @@ const client = createPublicClient({
 // the cap, so a list that outgrows it fails loudly instead of being summed short.
 const PAGE = 1000
 
+// Studio answers an unknown slug or version with HTTP 200 and {"message":"Not found"}, and a
+// gateway failure with an HTML page. Either is a wrong endpoint, not a disagreement, so it gets one
+// sentence and no stack. The URL stays out of it.
+function unreachable(answer: string): never {
+  console.error(`\n  the subgraph endpoint answered ${answer}; check SUBGRAPH_URL and that the version exists\n`)
+  process.exit(1)
+}
+
 async function query<T>(gql: string): Promise<T> {
   const r = await fetch(ENDPOINT, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query: gql }),
   })
-  const j = (await r.json()) as { data?: T; errors?: { message: string }[] }
+  if (!r.ok) unreachable(`HTTP ${r.status}`)
+  const j = (await r.json().catch(() => ({}))) as { data?: T; errors?: { message: string }[]; message?: string }
   if (j.errors) throw new Error(j.errors.map((e) => e.message).join("; "))
-  if (!j.data) throw new Error("no data in response")
+  if (!j.data) {
+    if (j.message) unreachable(`"${j.message}"`)
+    throw new Error("no data in response")
+  }
   return j.data
 }
 

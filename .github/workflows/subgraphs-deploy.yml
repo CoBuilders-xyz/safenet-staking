@@ -1,0 +1,62 @@
+name: Deploy subgraphs to Studio
+
+# Manual only. A deploy creates a new Studio version, and Studio starts indexing it from its
+# start block, so it should follow a decision, not every push.
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: Which subgraph to deploy
+        type: choice
+        options: [both, mainnet, gnosis]
+        default: both
+
+concurrency:
+  group: subgraphs-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  deploy:
+    name: deploy ${{ matrix.network }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        network: ${{ fromJSON(inputs.network == 'both' && '["mainnet","gnosis"]' || format('["{0}"]', inputs.network)) }}
+    steps:
+      # Pin actions to full SHA: mutable tags can be moved to malicious code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Require the deploy key
+        env:
+          GRAPH_DEPLOY_KEY: ${{ secrets.GRAPH_DEPLOY_KEY }}
+        run: |
+          if [ -z "${GRAPH_DEPLOY_KEY}" ]; then
+            echo "::error title=GRAPH_DEPLOY_KEY is not set::Add the Subgraph Studio deploy key as the secret GRAPH_DEPLOY_KEY."
+            exit 1
+          fi
+      # deploy:studio builds first (generate, codegen, build), then deploys with the short SHA as
+      # the version label. The Gnosis build reads the chain head to place its window; without
+      # GNOSIS_RPC_URL it falls back to the public endpoints in packages/core.
+      - name: Build and deploy
+        env:
+          GRAPH_DEPLOY_KEY: ${{ secrets.GRAPH_DEPLOY_KEY }}
+          GNOSIS_RPC_URL: ${{ secrets.GNOSIS_RPC_URL }}
+          PACKAGE: "@cobuilders/safenet-subgraph-${{ matrix.network }}"
+        # pnpm exits 0 when a filter matches no package; refuse that instead of deploying nothing.
+        run: pnpm --filter "${PACKAGE}" --fail-if-no-match deploy:studio
