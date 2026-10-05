@@ -18,12 +18,14 @@ if (hits) {
   failed = true
 }
 
-// 2. build: no secret from .env.local may appear in dist
+// 2. build: no secret from .env.local may appear in dist. VITE_ values are skipped: Vite puts
+// every one of them into the bundle by design, so they are public by definition.
 const envPath = join(ROOT, ".env.local")
 const distDir = join(ROOT, "apps/web/dist/assets")
 if (existsSync(envPath) && existsSync(distDir)) {
   const secrets = readFileSync(envPath, "utf8")
     .split("\n")
+    .filter((l) => !l.trim().startsWith("VITE_"))
     .map((l) => l.split("=").slice(1).join("=").trim())
     .filter((v) => v.length > 12)
   const bundle = readdirSync(distDir)
