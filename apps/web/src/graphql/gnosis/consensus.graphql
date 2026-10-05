@@ -1,0 +1,32 @@
+# Gnosis subgraph query for the Network Overview: the daily consensus counters of a window.
+
+fragment GnosisFreshness on _Meta_ {
+  block {
+    number
+    timestamp
+  }
+  hasIndexingErrors
+}
+
+query ConsensusWindow($since: Int!) {
+  _meta {
+    ...GnosisFreshness
+  }
+  # The first day the subgraph indexed. It started during that day, so the day is partial.
+  firstDay: consensusDays(first: 1, orderBy: date, orderDirection: asc) {
+    date
+  }
+  consensusDays(first: 1000, where: { date_gte: $since }, orderBy: date, orderDirection: asc) {
+    date
+    attestations
+    attestationCeremonies
+    latencyBuckets
+  }
+  validatorDays(first: 1000, where: { date_gte: $since }, orderBy: date, orderDirection: asc) {
+    date
+    attended
+    validator {
+      id
+    }
+  }
+}

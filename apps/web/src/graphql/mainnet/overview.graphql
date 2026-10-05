@@ -1,0 +1,50 @@
+# Mainnet subgraph queries for the Network Overview. Every query carries `_meta`, so each answer
+# says how current it is.
+
+fragment MainnetFreshness on _Meta_ {
+  block {
+    number
+    timestamp
+  }
+  hasIndexingErrors
+}
+
+query NetworkTotals {
+  _meta {
+    ...MainnetFreshness
+  }
+  network(id: "1") {
+    totalStaked
+    activeValidators
+    stakersCurrent
+    rewardsClaimed
+    currentRoot
+  }
+}
+
+# Six validators are registered during Beta, far below graph-node's page of 1000.
+query ValidatorStakes {
+  _meta {
+    ...MainnetFreshness
+  }
+  validators(first: 1000, where: { isRegistered: true }, orderBy: totalStaked, orderDirection: desc) {
+    id
+    totalStaked
+    stakersCurrent
+  }
+}
+
+query RecentDays($since: Int!) {
+  _meta {
+    ...MainnetFreshness
+  }
+  dayDatas(first: 1000, where: { date_gte: $since }, orderBy: date, orderDirection: asc) {
+    date
+    totalStaked
+    stakedIn
+    withdrawnOut
+    rewardsClaimed
+    stakeCount
+    withdrawalCount
+  }
+}
