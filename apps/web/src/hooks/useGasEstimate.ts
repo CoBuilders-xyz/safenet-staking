@@ -14,7 +14,7 @@ interface GasEstimateResult {
 
 export function useGasEstimate(
   functionName: "stake" | "initiateWithdrawal",
-  validator: Address,
+  validator: Address | undefined,
   amount: bigint,
 ): GasEstimateResult {
   const client = usePublicClient()
@@ -26,7 +26,7 @@ export function useGasEstimate(
   useEffect(() => {
     setEstimatedCost(null)
 
-    if (!client || !address || amount <= 0n) {
+    if (!client || !address || !validator || amount <= 0n) {
       setIsLoading(false)
       return
     }

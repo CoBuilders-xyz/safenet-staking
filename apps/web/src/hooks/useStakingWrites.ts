@@ -7,6 +7,7 @@ import { getContractAddresses } from "@/config/contracts"
 import { activeChain } from "@/config/chains"
 import { queryClient } from "@/config/queryClient"
 import { isSafeApp } from "@/lib/safe"
+import { supportsAtomicBatch } from "@/lib/batching"
 
 const addresses = getContractAddresses(activeChain.id)
 
@@ -53,6 +54,17 @@ export function useInvalidateOnSuccess(
   }, [isSuccess, functionNames, extraKeys])
 }
 
+/**
+ * Whether the connected wallet batches calls atomically on the active chain (EIP-5792).
+ * A Safe does; most EOA wallets do not, and throw on the request, which reads as false.
+ */
+export function useAtomicBatchSupport(): boolean {
+  const { data: capabilities, isError } = useCapabilities({
+    query: { retry: false },
+  })
+  return !isError && supportsAtomicBatch(capabilities?.[activeChain.id])
+}
+
 /** Contract function names to invalidate after any staking transaction. */
 const STAKING_FN_NAMES = [
   "totalStakedAmount",
@@ -93,14 +105,7 @@ export function useStake() {
 }
 
 export function useBatchStake() {
-  const { data: capabilities, isError: capabilitiesError } = useCapabilities({
-    query: { retry: false },
-  })
-  const chainId = activeChain.id
-
-  const supportsBatching =
-    !capabilitiesError &&
-    capabilities?.[chainId]?.atomicBatch?.supported === true
+  const supportsBatching = useAtomicBatchSupport()
 
   const {
     mutate: sendCalls,
@@ -208,14 +213,7 @@ export function useClaimWithdrawal() {
 }
 
 export function useBatchClaimWithdrawals() {
-  const { data: capabilities, isError: capabilitiesError } = useCapabilities({
-    query: { retry: false },
-  })
-  const chainId = activeChain.id
-
-  const supportsBatching =
-    !capabilitiesError &&
-    capabilities?.[chainId]?.atomicBatch?.supported === true
+  const supportsBatching = useAtomicBatchSupport()
 
   const {
     mutate: sendCalls,

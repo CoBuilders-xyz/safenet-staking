@@ -1,3 +1,5 @@
+import { BaseError, ContractFunctionRevertedError, decodeErrorResult, type Abi } from "viem"
+
 const CUSTOM_ERROR_MESSAGES: Record<string, string> = {
   InvalidAmount: "Amount must be greater than zero",
   NotValidator: "This validator is not registered",
@@ -61,4 +63,31 @@ export function formatContractError(error: Error): string {
 
   // 6. Fallback — generic message (avoid leaking RPC URLs or internal state)
   return "An unexpected error occurred. Please try again."
+}
+
+/**
+ * The custom error a contract reverted with, by name, or undefined when there is none to find.
+ *
+ * Two routes. viem decodes the revert itself when it simulated or estimated the call with the
+ * ABI. A revert that arrives undecoded, such as wagmi replaying a transaction that reverted on
+ * chain, still carries the 4-byte selector in its message, so that is matched against `abi`.
+ */
+export function revertedErrorName(error: unknown, abi: Abi): string | undefined {
+  if (error instanceof BaseError) {
+    const reverted = error.walk((e) => e instanceof ContractFunctionRevertedError)
+    if (reverted instanceof ContractFunctionRevertedError && reverted.data?.errorName) {
+      return reverted.data.errorName
+    }
+  }
+
+  let text = ""
+  for (let e: unknown = error; e instanceof Error; e = e.cause) text += ` ${e.message}`
+  for (const [selector] of text.matchAll(/0x[0-9a-fA-F]{8}(?![0-9a-fA-F])/g)) {
+    try {
+      return decodeErrorResult({ abi, data: selector as `0x${string}` }).errorName
+    } catch {
+      // Not one of this ABI's errors. Keep looking.
+    }
+  }
+  return undefined
 }

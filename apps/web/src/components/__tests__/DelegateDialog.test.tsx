@@ -262,6 +262,15 @@ describe("DelegateDialog", () => {
     expect(mockResetBatch).toHaveBeenCalled()
   })
 
+  it("keeps a stake that is still confirming when the dialog closes, so its toast still shows", () => {
+    mockUseStake.isConfirmingTx = true
+    const { rerender } = render(<TooltipProvider><DelegateDialog {...defaultProps} /></TooltipProvider>)
+
+    rerender(<TooltipProvider><DelegateDialog {...defaultProps} open={false} /></TooltipProvider>)
+
+    expect(mockResetStake).not.toHaveBeenCalled()
+  })
+
   it("shows zero balance message", async () => {
     const mod = await import("@/hooks/useTokenBalance")
     vi.mocked(mod.useTokenBalance).mockReturnValue({ data: 0n } as ReturnType<typeof mod.useTokenBalance>)

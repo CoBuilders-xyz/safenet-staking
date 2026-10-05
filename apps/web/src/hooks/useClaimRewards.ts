@@ -9,8 +9,27 @@ import type { Address, Hex } from "viem"
 const { merkleDrop } = getContractAddresses(activeChain.id)
 
 /** Contract function names to invalidate after claiming rewards. */
-const REWARD_FN_NAMES = ["cumulativeClaimed", "balanceOf"]
-const REWARD_EXTRA_KEYS = [["rewardProof"]]
+export const REWARD_FN_NAMES = ["cumulativeClaimed", "balanceOf"]
+export const REWARD_EXTRA_KEYS = [["rewardProof"]]
+
+/**
+ * The MerkleDrop claim, as both the plain Claim and Claim & Stake send it.
+ * Undefined when this network has no MerkleDrop.
+ */
+export function claimCall(
+  account: Address,
+  cumulativeAmount: bigint,
+  expectedMerkleRoot: Hex,
+  merkleProof: Hex[],
+) {
+  if (!merkleDrop) return undefined
+  return {
+    address: merkleDrop,
+    abi: merkleDropAbi,
+    functionName: "claim",
+    args: [getAddress(account), cumulativeAmount, expectedMerkleRoot, merkleProof],
+  } as const
+}
 
 export function useClaimRewards() {
   const { writeContract, data: txHash, isPending, reset, error: writeError } = useWriteContract()
@@ -25,14 +44,9 @@ export function useClaimRewards() {
     expectedMerkleRoot: Hex,
     merkleProof: Hex[],
   ) {
-    if (!merkleDrop) return
-    const normalizedAccount = getAddress(account)
-    writeContract({
-      address: merkleDrop,
-      abi: merkleDropAbi,
-      functionName: "claim",
-      args: [normalizedAccount, cumulativeAmount, expectedMerkleRoot, merkleProof],
-    })
+    const call = claimCall(account, cumulativeAmount, expectedMerkleRoot, merkleProof)
+    if (!call) return
+    writeContract(call)
   }
 
   return {

@@ -106,11 +106,13 @@ export function createEthereumProviderScript(config: MockProviderConfig): string
               }
               // Report the submitted call back to the Node-side mock chain state
               // (see mock-chain-state.ts) so subsequent reads reflect the "transaction".
+              // A transaction whose receipt carries logs (a claim) comes back with its own hash.
+              let txHash;
               if (window.__mockTx && params[0] && params[0].data) {
-                await window.__mockTx(params[0].data);
+                txHash = await window.__mockTx(params[0].data);
               }
-              // Return a deterministic mock tx hash
-              return '${`0x${"a".repeat(64)}`}';
+              // Otherwise a deterministic mock tx hash
+              return txHash || '${`0x${"a".repeat(64)}`}';
             case 'personal_sign':
               return '0x' + 'ab'.repeat(65);
             case 'eth_getBalance':
@@ -129,10 +131,12 @@ export function createEthereumProviderScript(config: MockProviderConfig): string
               return { [config.chainIdHex]: { atomicBatch: { supported: true } } };
             case 'wallet_sendCalls': {
               const calls = (params[0] && params[0].calls) || [];
+              // The batch id doubles as the executed transaction's hash in wallet_getCallsStatus.
+              let batchHash;
               for (const call of calls) {
-                if (window.__mockTx && call.data) await window.__mockTx(call.data);
+                if (window.__mockTx && call.data) batchHash = (await window.__mockTx(call.data)) || batchHash;
               }
-              return '${`0x${"5".repeat(64)}`}';
+              return batchHash || '${`0x${"5".repeat(64)}`}';
             }
             case 'wallet_getCallsStatus':
               return {
@@ -146,7 +150,7 @@ export function createEthereumProviderScript(config: MockProviderConfig): string
                   blockHash: '0x' + 'bb'.repeat(32),
                   blockNumber: '0x6000000',
                   gasUsed: '0x30d40',
-                  transactionHash: '${`0x${"5".repeat(64)}`}',
+                  transactionHash: params[0],
                 }],
               };
             default:

@@ -4,10 +4,19 @@
  */
 
 import type { Route } from "@playwright/test"
-import { CHAIN_ID, CHAIN_ID_HEX, BLOCK_NUMBER, GAS, MOCK_TX_HASH, STAKING_CONTRACT, TOKEN_CONTRACT } from "../fixtures/test-data"
+import {
+  CHAIN_ID,
+  CHAIN_ID_HEX,
+  BLOCK_NUMBER,
+  GAS,
+  MOCK_TX_HASH,
+  STAKING_CONTRACT,
+  TOKEN_CONTRACT,
+  MERKLE_DROP_CONTRACT,
+} from "../fixtures/test-data"
 import { buildCallResponses } from "./rpc-responses"
 import { matchGetLogs } from "./event-logs"
-import type { MockChainState } from "./mock-chain-state"
+import { claimRevert, TX_SELECTORS, type MockChainState } from "./mock-chain-state"
 
 /** Multicall3 contract address (same on all chains) */
 const MULTICALL3 = "0xca11bde05977b3631167028862be2a173976ca11"
@@ -25,7 +34,7 @@ interface JsonRpcResponse {
   jsonrpc: string
   id: number | string
   result?: unknown
-  error?: { code: number; message: string }
+  error?: { code: number; message: string; data?: string }
 }
 
 /**
@@ -171,6 +180,14 @@ export function createRpcHandler(userAddress: string, state: MockChainState) {
           return { ...base, result: handleMulticall3(data, callResponses) }
         }
 
+        // The interface simulates a claim before sending it. Revert the way a node does.
+        if (contractAddr === MERKLE_DROP_CONTRACT && selector === TX_SELECTORS.claim) {
+          const revert = claimRevert(state, data)
+          return revert
+            ? { ...base, error: { code: 3, message: "execution reverted", data: revert } }
+            : { ...base, result: "0x" }
+        }
+
         const responseKey = `${contractAddr}:${selector}`
         const handler = callResponses.get(responseKey)
 
@@ -218,11 +235,12 @@ export function createRpcHandler(userAddress: string, state: MockChainState) {
       case "eth_sendRawTransaction":
         return { ...base, result: MOCK_TX_HASH }
 
-      case "eth_getTransactionReceipt":
+      case "eth_getTransactionReceipt": {
+        const hash = ((req.params?.[0] as string | undefined) ?? MOCK_TX_HASH).toLowerCase()
         return {
           ...base,
           result: {
-            transactionHash: MOCK_TX_HASH,
+            transactionHash: hash,
             blockHash: "0x" + "bb".repeat(32),
             blockNumber: BLOCK_NUMBER,
             contractAddress: null,
@@ -230,7 +248,7 @@ export function createRpcHandler(userAddress: string, state: MockChainState) {
             effectiveGasPrice: "0x3b9aca00",
             from: "0x" + "11".repeat(20),
             gasUsed: "0x30d40",
-            logs: [],
+            logs: state.receiptLogs.get(hash) ?? [],
             logsBloom: "0x" + "00".repeat(256),
             status: "0x1", // success
             to: "0x" + STAKING_CONTRACT.replace("0x", ""),
@@ -238,12 +256,13 @@ export function createRpcHandler(userAddress: string, state: MockChainState) {
             type: "0x2",
           },
         }
+      }
 
       case "eth_getTransactionByHash":
         return {
           ...base,
           result: {
-            hash: MOCK_TX_HASH,
+            hash: (req.params?.[0] as string | undefined) ?? MOCK_TX_HASH,
             blockHash: "0x" + "bb".repeat(32),
             blockNumber: BLOCK_NUMBER,
             from: "0x" + "11".repeat(20),

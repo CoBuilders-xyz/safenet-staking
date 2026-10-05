@@ -7,12 +7,21 @@ interface AmountInputProps {
   onChange: (value: string) => void
   maxAmount?: bigint
   label?: string
+  /** What `maxAmount` is, in front of its value. */
+  maxLabel?: string
   disabled?: boolean
 }
 
 const PERCENTAGES = [25, 50, 75, 100] as const
 
-export function AmountInput({ value, onChange, maxAmount, label = "Amount", disabled }: AmountInputProps) {
+export function AmountInput({
+  value,
+  onChange,
+  maxAmount,
+  label = "Amount",
+  maxLabel = "SAFE Balance",
+  disabled,
+}: AmountInputProps) {
   function setPercentage(pct: number) {
     if (maxAmount === undefined) return
     if (pct === 100) {
@@ -29,7 +38,7 @@ export function AmountInput({ value, onChange, maxAmount, label = "Amount", disa
         <label htmlFor="amount-input" className="text-sm font-medium">{label}</label>
         {maxAmount !== undefined && (
           <span className="text-xs text-muted-foreground">
-            SAFE Balance: {formatTokenAmount(maxAmount)}
+            {maxLabel}: {formatTokenAmount(maxAmount)}
           </span>
         )}
       </div>

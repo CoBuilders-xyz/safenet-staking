@@ -41,7 +41,7 @@ Six routes under a shared `Layout` (header + footer + `<Outlet />`), wrapped in 
 - `/validators` → `ValidatorsPage` (validator cards with delegate/undelegate; supports `?delegate=0x...` deep-link to auto-open delegate dialog)
 - `/validators/:address` → `ValidatorDetailPage` (full validator info, delegate/undelegate buttons)
 - `/withdrawals` → `WithdrawalsPage` (pending withdrawal queue with FIFO tooltip, cooldown progress bars, claim)
-- `/rewards` → `RewardsPage` (your rewards, claim, programme totals, and the on-chain root checked against SEF's published one)
+- `/rewards` → `RewardsPage` (your rewards, Claim & Stake, claim, programme totals, and the on-chain root checked against SEF's published one)
 - `*` → `NotFoundPage` (404 catch-all)
 
 All pages are lazy-loaded with `React.lazy()` and preloaded via `requestIdleCallback` in a `useEffect` with cleanup.
@@ -51,7 +51,7 @@ App-level guards: `useSanctionsCheck` blocks the entire app if `VITE_SANCTIONS_A
 ### Contract Integration
 
 - **Config layer:** `src/config/chains.ts` resolves chain from `VITE_CHAIN_ID`, `src/config/contracts.ts` maps chain IDs to staking/token/merkleDrop contract addresses.
-- **ABIs:** `src/abi/stakingAbi.ts` (staking contract) and `src/abi/erc20Abi.ts` (SAFE token). ABIs use viem's `parseAbi` with human-readable signatures.
+- **ABIs:** `src/abi/stakingAbi.ts` (staking contract) and `src/abi/erc20Abi.ts` (SAFE token). ABIs use viem's `parseAbi` with human-readable signatures. `src/abi/merkleDropAbi.ts` re-exports the MerkleDrop ABI from `@cobuilders/safenet-core`, whose events and errors `verify:abis` proves against the chain.
 - **Read hooks** (`src/hooks/useStakingReads.ts`): Thin wrappers around wagmi's `useReadContract`/`useReadContracts`. Per-user hooks guard with `query: { enabled: !!address }`. All hooks poll every 15 seconds via `refetchInterval: 15_000`.
 - **Write hooks** (`src/hooks/useStakingWrites.ts`): Each write hook (`useStake`, `useInitiateWithdrawal`, `useClaimWithdrawal`) combines `useWriteContract` + `useWaitForTransactionReceipt` and returns a unified `{ action, isPending, isSuccess, error, reset, txHash }` interface. Cache invalidation uses targeted `predicate`-based queries via `useInvalidateOnSuccess`.
 - **QueryClient** (`src/config/queryClient.ts`): Shared singleton with `staleTime: 30_000` and `refetchOnWindowFocus: false` defaults.
@@ -61,6 +61,8 @@ App-level guards: `useSanctionsCheck` blocks the entire app if `VITE_SANCTIONS_A
 - **Gas estimation** (`src/hooks/useGasEstimate.ts`): Uses `estimateGas` + `getGasPrice` from viem to show estimated gas cost in delegate/undelegate dialogs. Debounced 500ms on amount change.
 - **Rewards** (`src/hooks/useRewards.ts`, `src/hooks/useRewardProof.ts`, `src/hooks/useClaimRewards.ts`, `src/hooks/useProgrammeRewards.ts`): Rewards reading, Merkle proof fetching, claim transaction hooks, and the programme-wide figures (SEF's `latest.json`, the MerkleDrop's root and SAFE balance). Proofs are fetched from `${rewardsBaseUrl}/proofs/<radix>/{address}.json` and the current root/total from `${rewardsBaseUrl}/latest.json`, where `rewardsBaseUrl` is `VITE_REWARDS_BASE_URL` or, by default, SEF's published rewards data (`SEF_DATA.rewardsProofBase` in `@cobuilders/safenet-core`).
 - **Approval flow** (`src/hooks/useApprovalFlow.ts`): Wraps `useTokenAllowance` with approval type tracking (exact vs unlimited), toast notifications, and a unified API for DelegateDialog.
+- **Stake form** (`src/hooks/useStakeForm.ts`): Amount, approval, stake and the approve-and-stake batch behind `StakeForm`. DelegateDialog and Claim & Stake both run on it. Batching is detected by `useAtomicBatchSupport` (`useStakingWrites.ts`), which accepts EIP-5792's `atomic.status: "supported"` and the earlier draft's `atomicBatch.supported`.
+- **Claim step** (`src/hooks/useClaimStep.ts`): The claim inside Claim & Stake. Simulates first, sends through `wallet_sendCalls` in a wallet that batches, and reads the claimed amount from the SAFE `Transfer` in the receipt (`src/lib/claimReceipt.ts`).
 - **Transaction toasts** (`src/hooks/useTxToast.ts`): Shared hook for success/error/Safe-queued toast notifications, used by DelegateDialog, UndelegateDialog, and other tx dialogs.
 
 ### Terminology
@@ -89,7 +91,7 @@ Key UI components:
 - `tabs.tsx` — Radix Tabs (used in staking section)
 - `tooltip.tsx` — Radix Tooltip (used for FIFO queue info, etc.)
 - `progress.tsx` — Progress bar with size (default, sm, lg) and variant (default, success, warning) props
-- `stepper.tsx` — Horizontal step indicator with circles + connecting lines (used in DelegateDialog for Approve → Delegate → Done flow)
+- `stepper.tsx` — Horizontal step indicator with circles + connecting lines (used in ClaimAndStakeDialog for Claim → Stake → Done)
 - `SafeTokenBadge.tsx` — SAFE token icon badge
 - `ErrorBoundary.tsx` — React error boundary wrapping route elements
 - `badge.tsx`, `input.tsx`, `skeleton.tsx` — Standard primitives
@@ -98,7 +100,7 @@ Key UI components:
 
 - `src/lib/utils.ts` — `cn()` for class merging (clsx + tailwind-merge)
 - `src/lib/format.ts` — `formatTokenAmount`, `truncateAddress`, `formatCountdown`
-- `src/lib/errorFormat.ts` — `formatContractError` for user-friendly contract error messages
+- `src/lib/errorFormat.ts` — `formatContractError` for user-friendly contract error messages, `revertedErrorName` for the custom error a revert carries
 - `src/lib/clipboard.ts` — `copyToClipboard()` with navigator.clipboard API + textarea fallback
 
 ### Dashboard Components
@@ -118,8 +120,14 @@ Key UI components:
 ### Staking Components
 
 - `AmountInput` — Input with 25%/50%/75%/MAX percentage shortcut buttons
-- `DelegateDialog` — Multi-step dialog with stepper (Approve → Delegate → Done), gas estimation, uses `useApprovalFlow` hook and `TxButton`
+- `DelegateDialog` — Stake dialog for one validator: `useStakeForm` rendered by `StakeForm`
+- `StakeForm` — Amount, gas estimate, unstaking period, and the approve/stake buttons (batched in a wallet that supports it)
+- `ValidatorSelect` — Picker over the active validators; chooses nothing for the user
 - `UndelegateDialog` — Withdrawal initiation dialog with gas estimation, uses `useTxToast` and `TxButton`
+
+### Rewards Components
+
+- `ClaimAndStakeDialog` — Claim → Stake → Done. Stakes exactly what the claim paid; the user picks a validator and may lower the amount. A `MerkleRootWasUpdated` revert offers to reload the proof and retry. Closing after a claim says the SAFE is in the wallet, unstaked. Opened as "Stake your balance" once there is nothing left to claim.
 
 ### Withdrawal Components
 
