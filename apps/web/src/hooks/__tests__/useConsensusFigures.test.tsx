@@ -75,7 +75,7 @@ describe("useConsensusFigures", () => {
   it("shows the snapshot when the subgraph fails", async () => {
     answerOperations({ ConsensusWindow: new Error("down") })
     const { result } = render()
-    await waitFor(() => expect(result.current.attestations.state).toBe("ready"), { timeout: 4000 })
+    await waitFor(() => expect(result.current.attestations.state).toBe("ready"))
     expect(result.current.attestations.state === "ready" && result.current.attestations.source).toBe("snapshot")
     expect(result.current.snapshotReason).toBe("The subgraph could not be queried.")
   })

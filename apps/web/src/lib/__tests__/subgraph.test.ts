@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { SUBGRAPH_STALE_AFTER_SECONDS } from "@cobuilders/safenet-core"
 import { NetworkTotalsDocument } from "@/graphql/mainnet/generated"
 import { mockRequest } from "@/__tests__/subgraph-mocks"
 import {
   assessFreshness,
   describeDegradation,
+  SUBGRAPH_TIMEOUT_MS,
   fetchSubgraph,
   formatAge,
   readFreshness,
@@ -87,6 +88,27 @@ describe("fetchSubgraph", () => {
     expect(mockRequest).toHaveBeenCalledWith(
       expect.objectContaining({ url: "https://subgraph.test", document: NetworkTotalsDocument, signal: expect.any(AbortSignal) }),
     )
+  })
+
+  describe("with a node that never answers", () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it("gives up after SUBGRAPH_TIMEOUT_MS, so the page can fall back", async () => {
+      mockRequest.mockImplementation(
+        ({ signal }: { signal: AbortSignal }) =>
+          new Promise((_, reject) => signal.addEventListener("abort", () => reject(signal.reason))),
+      )
+      const pending = fetchSubgraph("https://subgraph.test", NetworkTotalsDocument, undefined)
+      const outcome = expect(pending).rejects.toThrow(`no answer within ${SUBGRAPH_TIMEOUT_MS} ms`)
+      await vi.advanceTimersByTimeAsync(SUBGRAPH_TIMEOUT_MS - 1)
+      await vi.advanceTimersByTimeAsync(1)
+      await outcome
+    })
   })
 
   it("refuses an answer without _meta, because nothing then says how current it is", async () => {

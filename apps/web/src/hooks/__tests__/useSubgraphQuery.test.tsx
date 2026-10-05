@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderHook, waitFor } from "@testing-library/react"
 import { NetworkTotalsDocument } from "@/graphql/mainnet/generated"
-import { STALE_AGE, answerOperations, meta, mockRequest, queryWrapper } from "@/__tests__/subgraph-mocks"
+import { STALE_AGE, answerOperations, meta, mockRequest, queryClientAndWrapper, queryWrapper } from "@/__tests__/subgraph-mocks"
 import { selectLive, useSubgraphQuery } from "../useSubgraphQuery"
 
 vi.mock("graphql-request", () => ({ request: (o: unknown) => mockRequest(o) }))
@@ -52,8 +52,36 @@ describe("useSubgraphQuery", () => {
   it("degrades as failed when the request fails", async () => {
     answerOperations({ NetworkTotals: new Error("connection refused") })
     const { result } = render()
-    await waitFor(() => expect(result.current.status).toBe("degraded"), { timeout: 4000 })
+    await waitFor(() => expect(result.current.status).toBe("degraded"))
     expect(result.current.status === "degraded" && result.current.degradation).toEqual({ kind: "failed", message: "connection refused" })
+  })
+
+  it("stays degraded while a failed endpoint is asked again, never loading in between", async () => {
+    answerOperations({ NetworkTotals: new Error("connection refused") })
+    const { client, Wrapper } = queryClientAndWrapper()
+    const seen: string[] = []
+    const { result } = renderHook(
+      () => {
+        const r = useSubgraphQuery("mainnet", "network", NetworkTotalsDocument)
+        seen.push(r.status)
+        return r
+      },
+      { wrapper: Wrapper },
+    )
+    await waitFor(() => expect(result.current.status).toBe("degraded"))
+    const firstDegraded = seen.indexOf("degraded")
+
+    // The next scheduled refetch, 60 s later, fails again after a while in flight.
+    let fail!: (e: Error) => void
+    mockRequest.mockImplementation(() => new Promise((_, reject) => (fail = reject)))
+    const refetch = client.refetchQueries({ queryKey: ["subgraph", "mainnet", "network"] })
+    await waitFor(() => expect(mockRequest).toHaveBeenCalledTimes(2))
+    expect(result.current.status).toBe("degraded")
+    fail(new Error("still refused"))
+    await refetch
+
+    await waitFor(() => expect(result.current.status === "degraded" && result.current.degradation).toEqual({ kind: "failed", message: "still refused" }))
+    expect(seen.slice(firstDegraded)).not.toContain("loading")
   })
 
   it("degrades as unconfigured, without a request, when the build has no endpoint", () => {

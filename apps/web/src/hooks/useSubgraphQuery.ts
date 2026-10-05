@@ -8,8 +8,11 @@ import {
   fetchSubgraph,
   type Degradation,
   type Freshness,
+  type SubgraphAnswer,
   type SubgraphMeta,
 } from "@/lib/subgraph"
+
+type Outcome<T> = { ok: true; answer: SubgraphAnswer<T> } | { ok: false; message: string }
 
 /** How often a subgraph is asked again. Both chains produce several blocks in this time. */
 const REFETCH_MS = 60_000
@@ -39,25 +42,29 @@ export function useSubgraphQuery<T extends { _meta: SubgraphMeta | null }, V ext
   variables?: () => V,
 ): SubgraphResult<T> {
   const url = SUBGRAPH_URLS[chain]
+  // The query function never throws: a failure is returned as data. TanStack Query clears the
+  // error of a query that has no data each time it refetches, so a thrown failure would read as
+  // "loading" for the length of every refetch, and the contract fallbacks would switch off with
+  // it. Returned as data, the last outcome stays until the next one replaces it. It also means
+  // no retry: a subgraph that does not answer in SUBGRAPH_TIMEOUT_MS degrades at once.
   const query = useQuery({
     queryKey: ["subgraph", chain, name, url],
-    queryFn: ({ signal }) => fetchSubgraph(url as string, document, variables?.(), signal),
+    queryFn: async ({ signal }): Promise<Outcome<T>> => {
+      try {
+        return { ok: true, answer: await fetchSubgraph(url as string, document, variables?.(), signal) }
+      } catch (e) {
+        return { ok: false, message: e instanceof Error ? e.message : String(e) }
+      }
+    },
     enabled: url !== undefined,
     refetchInterval: REFETCH_MS,
-    retry: 1,
+    retry: false,
   })
 
   if (url === undefined) return { status: "degraded", degradation: { kind: "unconfigured" } }
-  if (query.error) {
-    return {
-      status: "degraded",
-      degradation: { kind: "failed", message: query.error.message },
-      data: query.data?.data,
-      freshness: query.data?.freshness,
-    }
-  }
   if (!query.data) return { status: "loading" }
-  const { data, freshness } = query.data
+  if (!query.data.ok) return { status: "degraded", degradation: { kind: "failed", message: query.data.message } }
+  const { data, freshness } = query.data.answer
   const degradation = assessFreshness(freshness)
   return degradation ? { status: "degraded", degradation, data, freshness } : { status: "live", data, freshness }
 }

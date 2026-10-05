@@ -60,7 +60,7 @@ describe("useRewardsOverview", () => {
   it("falls back to the MerkleDrop balance when the subgraph fails", async () => {
     answerOperations({ NetworkTotals: new Error("down") })
     const { result } = render()
-    await waitFor(() => expect(result.current.claimed.state).toBe("ready"), { timeout: 4000 })
+    await waitFor(() => expect(result.current.claimed.state).toBe("ready"))
     expect(result.current.claimed).toEqual({ state: "ready", value: 600n * SAFE, source: "contract" })
     expect(result.current.unclaimed).toEqual({ state: "ready", value: 400n * SAFE, source: "contract" })
   })
@@ -69,7 +69,7 @@ describe("useRewardsOverview", () => {
     mockProgramme.mockReturnValue(programme({ dropBalance: read(undefined, new Error("rpc")), totals: undefined }))
     answerOperations({ NetworkTotals: new Error("down") })
     const { result } = render()
-    await waitFor(() => expect(result.current.claimed.state).toBe("unavailable"), { timeout: 4000 })
+    await waitFor(() => expect(result.current.claimed.state).toBe("unavailable"))
     expect(result.current.claimed).toEqual({ state: "unavailable", reason: MESSAGES.contractReadFailed })
     expect(result.current.unclaimed).toEqual({ state: "unavailable", reason: MESSAGES.contractReadFailed })
   })

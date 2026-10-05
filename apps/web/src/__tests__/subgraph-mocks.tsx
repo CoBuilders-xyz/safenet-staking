@@ -37,12 +37,17 @@ export function meta(ageSeconds = 30, block = 25_000_000, hasIndexingErrors = fa
 /** Old enough to fail the freshness rule. */
 export const STALE_AGE = SUBGRAPH_STALE_AFTER_SECONDS + 60
 
-/** A fresh QueryClient per test, so no answer leaks between tests. */
-export function queryWrapper() {
+/** A fresh QueryClient per test, so no answer leaks between tests, and the client to drive it. */
+export function queryClientAndWrapper() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return function Wrapper({ children }: { children: ReactNode }) {
+  function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>
   }
+  return { client, Wrapper }
+}
+
+export function queryWrapper() {
+  return queryClientAndWrapper().Wrapper
 }
 
 /** A wagmi-like read result. */

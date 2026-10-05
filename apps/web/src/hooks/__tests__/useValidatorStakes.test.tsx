@@ -54,7 +54,7 @@ describe("useValidatorStakes", () => {
   it("falls back to one contract read per SEF validator when the subgraph fails", async () => {
     answerOperations({ ValidatorStakes: new Error("down") })
     const { result } = render()
-    await waitFor(() => expect(result.current.rows.state).toBe("ready"), { timeout: 4000 })
+    await waitFor(() => expect(result.current.rows.state).toBe("ready"))
     if (result.current.rows.state !== "ready") throw new Error("not ready")
 
     expect(mockStakes).toHaveBeenLastCalledWith([TEST_ACCOUNTS.validator1, TEST_ACCOUNTS.validator2], { enabled: true })
@@ -69,7 +69,7 @@ describe("useValidatorStakes", () => {
     answerOperations({ ValidatorStakes: new Error("down") })
     mockStakes.mockReturnValue({ data: [ok(100n * SAFE), { status: "failure", error: new Error("x") }], error: null })
     const { result } = render()
-    await waitFor(() => expect(result.current.rows.state).toBe("unavailable"), { timeout: 4000 })
+    await waitFor(() => expect(result.current.rows.state).toBe("unavailable"))
     expect(result.current.rows).toEqual({
       state: "unavailable",
       reason: "1 of 2 validator stakes could not be read, so shares would be wrong.",
@@ -80,6 +80,6 @@ describe("useValidatorStakes", () => {
     answerOperations({ ValidatorStakes: new Error("down") })
     mockValidators.mockReturnValue({ data: undefined, error: new Error("404") })
     const { result } = render()
-    await waitFor(() => expect(result.current.rows.state).toBe("unavailable"), { timeout: 4000 })
+    await waitFor(() => expect(result.current.rows.state).toBe("unavailable"))
   })
 })

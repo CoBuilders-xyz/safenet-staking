@@ -66,6 +66,6 @@ describe("useRecentDays", () => {
   it("is unavailable when the subgraph fails", async () => {
     answerOperations({ RecentDays: new Error("down") })
     const { result } = render()
-    await waitFor(() => expect(result.current.activity.state).toBe("unavailable"), { timeout: 4000 })
+    await waitFor(() => expect(result.current.activity.state).toBe("unavailable"))
   })
 })

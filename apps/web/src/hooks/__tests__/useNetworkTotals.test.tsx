@@ -38,7 +38,7 @@ describe("useNetworkTotals", () => {
   it("falls back to the contract and SEF's list when the subgraph fails; stakers is unavailable", async () => {
     answerOperations({ NetworkTotals: new Error("down") })
     const { result } = render()
-    await waitFor(() => expect(result.current.totalStaked.state).toBe("ready"), { timeout: 4000 })
+    await waitFor(() => expect(result.current.totalStaked.state).toBe("ready"))
 
     expect(mockTotalStaked).toHaveBeenLastCalledWith({ enabled: true })
     expect(result.current.totalStaked).toEqual({ state: "ready", value: 1000n * SAFE, source: "contract" })
@@ -68,7 +68,7 @@ describe("useNetworkTotals", () => {
     mockTotalStaked.mockReturnValue(read(undefined, new Error("rpc down")))
     mockValidators.mockReturnValue({ data: undefined, error: new Error("404") })
     const { result } = render()
-    await waitFor(() => expect(result.current.totalStaked.state).toBe("unavailable"), { timeout: 4000 })
+    await waitFor(() => expect(result.current.totalStaked.state).toBe("unavailable"))
     expect(result.current.totalStaked).toEqual({ state: "unavailable", reason: NETWORK_MESSAGES.stakingReadFailed })
     expect(result.current.activeValidators).toEqual({ state: "unavailable", reason: NETWORK_MESSAGES.validatorListFailed })
   })
