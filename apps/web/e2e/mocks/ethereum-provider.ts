@@ -1,6 +1,12 @@
 /**
  * Mock EIP-1193 Ethereum provider injected via page.addInitScript().
  * This script runs in the browser context before the app loads.
+ *
+ * Two modes. Without `rpcUrl`, it answers wallet calls itself and fakes transactions into the
+ * Node-side mock chain state. With `rpcUrl`, as in the fork suite, it answers only the calls
+ * that describe the wallet (accounts, chain, permissions) and forwards everything else to that
+ * endpoint, transactions included. Anvil signs them for its unlocked and impersonated accounts,
+ * so no private key ever reaches the page.
  */
 
 interface MockProviderConfig {
@@ -8,6 +14,8 @@ interface MockProviderConfig {
   accounts: string[]
   /** Advertise EIP-5792 atomicBatch support (wallet_getCapabilities/sendCalls/getCallsStatus). */
   supportsBatching?: boolean
+  /** Forward every non-wallet call, `eth_sendTransaction` included, to this JSON-RPC endpoint. */
+  rpcUrl?: string
 }
 
 export function createEthereumProviderScript(config: MockProviderConfig): string {
@@ -15,6 +23,30 @@ export function createEthereumProviderScript(config: MockProviderConfig): string
     (() => {
       const config = ${JSON.stringify(config)};
       const listeners = {};
+
+      // Answered by the wallet itself even when forwarding: they describe the wallet, not the chain.
+      const WALLET_METHODS = [
+        'eth_requestAccounts', 'eth_accounts', 'eth_chainId', 'net_version',
+        'wallet_switchEthereumChain', 'wallet_getPermissions', 'wallet_requestPermissions',
+        'wallet_getCapabilities',
+      ];
+      let rpcId = 0;
+      async function forward(method, params) {
+        const res = await fetch(config.rpcUrl, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params: params || [] }),
+        });
+        const body = await res.json();
+        if (body.error) {
+          // Keep code and data, so viem can decode a revert reason.
+          const err = new Error(body.error.message);
+          err.code = body.error.code;
+          err.data = body.error.data;
+          throw err;
+        }
+        return body.result;
+      }
 
       const provider = {
         isMetaMask: true,
@@ -54,6 +86,7 @@ export function createEthereumProviderScript(config: MockProviderConfig): string
         },
 
         async request({ method, params }) {
+          if (config.rpcUrl && !WALLET_METHODS.includes(method)) return forward(method, params);
           switch (method) {
             case 'eth_requestAccounts':
             case 'eth_accounts':

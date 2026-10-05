@@ -30,7 +30,7 @@ Every package implements the same five. Turborepo fans them out.
 | `pnpm bootstrap` | Runs `scripts/setup.sh`: checks tools, writes `.env.ports`, installs, then links Vercel and pulls `.env.local`. Safe to re-run. **Not `setup`: that is a pnpm builtin that edits your shell rc.** |
 | `pnpm dev` | Starts the web app's Vite dev server, type-watches `packages/core`, and regenerates the subgraph manifests and types. |
 | `pnpm build` | Builds all packages. |
-| `pnpm test` | Unit tests. `apps/web` has 315 Vitest tests in 39 files. The subgraphs have matchstick tests: 20 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has 22 node:test tests in 4 files, and its script fails when it finds no test file. |
+| `pnpm test` | Unit tests. `apps/web` has 380 Vitest tests in 42 files. The subgraphs have matchstick tests: 20 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has 25 node:test tests in 5 files, and its script fails when it finds no test file. |
 | `pnpm check` | Lint, the browser-safety check, then types in every package. Run it before every commit. |
 
 The test counts were measured with `pnpm test` when this file was written. Run it for the
@@ -48,25 +48,28 @@ Specific commands, only where they apply:
 | `pnpm verify:abis:deep` | `packages/core` | Every signature, including rare events, scanned from each deploy block | needs the archive `MAINNET_RPC_URL` from `pnpm env:pull` |
 | `pnpm metrics` | `packages/core` | The 24 metrics, computed against live chains and compared with SEF's published JSON. Writes `packages/core/.metrics/`, which is git-ignored | needs an archive node. With public RPC only, it stopped on a failed Mainnet log range when this file was written |
 | `pnpm check:browser` | root | `apps/web/src` reads no `process.env`, and a built bundle contains no value from `.env.local` | works, part of `check` |
-| `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. 73 Playwright tests in 13 spec files | runs; one navigation test is intermittently flaky |
-| `pnpm test:fork` | `apps/web`, `packages/cli` | Transactions execute against real contracts on Anvil | **fails on purpose: no suite** |
+| `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. 83 Playwright tests in 14 spec files | runs; one navigation test is intermittently flaky |
+| `pnpm test:fork` | `apps/web` | The staking flows execute against the real contracts on an Anvil Mainnet fork at a pinned block, each checked by reading the chain. 4 Playwright tests and 1 skipped, about 1.5 minutes | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
 | `pnpm test:parity` | subgraphs | Our numbers match SEF's published JSON | **fails on purpose: no subgraph package implements it yet** |
 
 `turbo run <task>` with no package implementing the task reports a success while running nothing.
 A green tick over a suite that does not exist is worse than a red one: a failure gets fixed, a
-false pass gets believed. So `test:e2e`, `test:fork` and `test:parity` first run
-`tools/require-task.mjs`, which fails unless some package implements the task. `test:e2e` passes
-the guard because `apps/web` implements it. The other two fail until their suites exist. Do not
-remove a guard before the real suite lands.
+false pass gets believed. So `test:e2e` and `test:parity` first run `tools/require-task.mjs`,
+which fails unless some package implements the task. `test:e2e` passes the guard because
+`apps/web` implements it. `test:parity` fails until its suite exists. Do not remove a guard
+before the real suite lands.
 
 `scripts/setup.sh` writes per-worktree ports into `.env.ports` at the repository root, so two
 worktrees can run the same thing at once. The e2e suite starts Vite on `E2E_PORT` and, outside CI,
-reuses a server already listening there; `apps/web/e2e/playwright.config.ts` reads `E2E_PORT` from
-`.env.ports`, so the port holds from the root and from inside `apps/web`. `pnpm dev` reads
+reuses a server already listening there; `apps/web/e2e/ports.ts` reads `E2E_PORT` from
+`.env.ports`, so the port holds from the root and from inside `apps/web`. The fork suite starts
+Anvil on `ANVIL_PORT` and its own Vite on `FORK_PORT`, and never reuses either. `pnpm dev` reads
 `WEB_PORT` the same way, in `apps/web/vite.config.ts`, and the subgraph `differential` scripts
 read `GRAPH_NODE_PORT`. A value exported in the shell wins over the file, and `turbo.json`
-passes `E2E_PORT` and `WEB_PORT` through Turborepo's strict environment mode. Without
-`.env.ports`, as in CI, the e2e suite uses 5174 and `pnpm dev` uses Vite's default.
+passes `E2E_PORT` and `WEB_PORT` through Turborepo's strict environment mode, and `ANVIL_PORT`,
+`FORK_PORT` and `MAINNET_RPC_URL` for `test:fork`. Without
+`.env.ports`, as in CI, the e2e suite uses 5174, the fork suite 5178 and Anvil 8545, and
+`pnpm dev` uses Vite's default.
 
 ## Layout
 
@@ -116,8 +119,9 @@ Docker Compose, with ports from `.env.ports` and the archive RPC from `.env.loca
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs four jobs on every pull request and on every push to `main`:
-`check`, `test`, `e2e` and `verify-abis`. `nightly.yml` runs the deep ABI scan and the unit tests
-daily; the deep scan needs the `MAINNET_RPC_URL` secret. `security.yml` runs a
+`check`, `test`, `e2e` and `verify-abis`. `nightly.yml` runs the deep ABI scan, the unit tests
+and the fork suite daily; the deep scan and the fork suite need the `MAINNET_RPC_URL` secret. The
+fork suite stays out of per-PR CI because every run reads from the archive node. `security.yml` runs a
 dependency review on pull requests, skipped until the repository is public, and `pnpm audit`
 weekly.
 

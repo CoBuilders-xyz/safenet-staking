@@ -64,11 +64,46 @@ See [`.env.example`](.env.example) for a template.
 | `yarn test:watch` | Run tests in watch mode |
 | `yarn test:coverage` | Run tests with coverage report |
 | `yarn test:e2e` | Run Playwright end-to-end tests |
+| `pnpm test:fork` | Run the staking flows against real contracts on an Anvil Mainnet fork (see below) |
 | `yarn deploy:ipfs` | Deploy build to IPFS via Pinata |
 | `yarn generate:proofs` | Generate Merkle proofs for reward distribution |
 
 See [`MANUAL_TESTING.md`](./MANUAL_TESTING.md) for the pre-release manual QA checklist
 (covers scenarios not automated by the e2e suite, e.g. WalletConnect and Safe App flows).
+
+## Fork suite
+
+`pnpm test:e2e` mocks every RPC call. It proves the interface behaves, not that a transaction
+works. `pnpm test:fork` drives the same interface against the real contracts: Anvil forks
+Mainnet at a pinned block, the injected test wallet forwards every call to Anvil, and each test
+reads the chain after the UI action to prove the transaction did what the screen says.
+
+It covers approve then stake, initiating a withdrawal, claiming one after the cooldown (the
+chain's clock is moved forward, and the page's clock with it), and claiming rewards with SEF's
+real proof as an impersonated address. Each test runs inside an Anvil snapshot that is reverted
+after it.
+
+Run it locally:
+
+```bash
+pnpm env:pull     # once: writes MAINNET_RPC_URL to the root .env.local
+pnpm test:fork    # from the root, or from apps/web
+```
+
+- **Needs** Foundry (`anvil` on the `PATH`) and `MAINNET_RPC_URL`, an archive endpoint, in the
+  environment or the root `.env.local`. Public endpoints are not a fallback: they cannot serve
+  state at a pinned block.
+- **Ports** come from the root `.env.ports`: `ANVIL_PORT` for Anvil, `FORK_PORT` for the web
+  server. Without the file, 8545 and 5178.
+- **The pin** is `MAINNET_FORK` in `packages/core/src/fork.ts`: a block and the commit of SEF's
+  data repository from the same moment. Move them together, or the reward proofs stop matching
+  the root on chain.
+- **Anvil** starts and stops with the run, pass or fail. Its output is shown with URLs redacted.
+- **The fork URL is on Anvil's command line**, because Anvil 1.8.4 reads it from no environment
+  variable. On a shared machine, anyone who can list processes can read the URL, key included,
+  while the suite runs. On a CI runner this does not matter.
+
+It runs nightly in CI, not on pull requests, because every run reads from the archive node.
 
 ## Tech Stack
 
@@ -99,7 +134,7 @@ src/
 ├── hooks/          # Contract reads, writes, gas estimation, rewards
 ├── lib/            # Utilities (formatting, error handling, clipboard)
 └── pages/          # Route components
-e2e/                # Playwright end-to-end tests
+e2e/                # Playwright suites: tests/ against mocked RPC, fork/ against an Anvil Mainnet fork
 scripts/            # Off-chain tooling (Merkle proof generation)
 admin/              # Admin panel (validator proposals, contract management)
 ```

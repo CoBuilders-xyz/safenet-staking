@@ -43,7 +43,13 @@
       "dependsOn": [
         "^build"
       ],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": [
+        "MAINNET_RPC_URL",
+        "ANVIL_PORT",
+        "FORK_PORT",
+        "GITHUB_TOKEN"
+      ]
     },
     "test:parity": {
       "cache": false
