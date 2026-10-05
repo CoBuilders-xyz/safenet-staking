@@ -3,8 +3,8 @@ import assert from "node:assert/strict"
 import type { SefValidator } from "../sef.js"
 import {
   EXIT_CODE, agrees, compareAmount, compareParticipation, compareStakedTotal, formatAge, freshness,
-  notComparable, overall, parseLastCommit, prunedFrom, prunedHistoryReason, renderMarkdown, renderText,
-  sefRunSpan, staleOutcome, totalsBetween,
+  NEEDS_HOURLY_BUCKETS, lacksHourlyBuckets, notComparable, overall, parseLastCommit, participationFromHours,
+  renderMarkdown, renderText, sefRunSpan, staleOutcome, totalsBetween,
 } from "./compare.js"
 
 // Made-up validators. The addresses are test fixtures, not contracts.
@@ -162,31 +162,82 @@ test("each state has its exit code, and only FAIL exits 1", () => {
   assert.match(expired.line, /^FAIL: SEF's data is stale\./)
 })
 
-// graph-node's answer to a `block: { number }` a pruned deployment no longer holds, as Studio
-// returned it on 2026-10-05, deployment hash shortened.
-const PRUNED = "Failed to decode `block.number` value: `subgraph QmRMgc only has data starting at block " +
-  "number 48599400 and data for block number 48363900 is therefore not available`"
+// graph-node's answer to a query for a field the schema lacks, as the Gnosis deployment
+// 2a0e6b8, built before the hourly buckets, answered it on 2026-10-05.
+const NO_BUCKETS = "Type `Query` has no field `consensusHours`"
 
-test("pruned history is NOT COMPARABLE, exits 0, and says why in one line", () => {
-  const kept = prunedFrom(PRUNED)
-  assert.equal(kept, 48_599_400n)
+test("a deployment without hourly buckets is NOT COMPARABLE, exits 0, and says why in one line", () => {
+  assert.equal(lacksHourlyBuckets(`the gnosis subgraph: ${NO_BUCKETS}`), true)
   const rows = [
-    notComparable("participation_rate_14d", prunedHistoryReason({ indexed: 48_601_462n, kept: kept!, needed: 48_363_900n })),
+    notComparable("participation_rate_14d", `this deployment has no hourly buckets; ${NEEDS_HOURLY_BUCKETS}`),
     { figure: "total_transactions_checked", ours: "", sef: "980515", precision: "", verdict: "NOT COMPARED" as const },
   ]
   const state = overall(rows)
   assert.equal(state, "NOT COMPARABLE")
   assert.equal(EXIT_CODE[state], 0)
-  assert.equal(
-    rows[0]!.note,
-    "the deployment keeps 2062 blocks of history; SEF's window starts 235500 blocks earlier; " +
-      "hourly buckets with completion semantics are needed to compare this window",
-  )
-  assert.notEqual(state, "PASS")
 })
 
-test("another subgraph error is not mistaken for pruned history", () => {
-  assert.equal(prunedFrom("the gnosis subgraph answered HTTP 502; check SUBGRAPH_URL_GNOSIS"), undefined)
+test("another subgraph error is not mistaken for missing buckets", () => {
+  assert.equal(lacksHourlyBuckets("the gnosis subgraph answered HTTP 502; check SUBGRAPH_URL_GNOSIS"), false)
+  assert.equal(lacksHourlyBuckets("Type `Query` has no field `validatorHourz`"), false)
+})
+
+// ------------------------------------------------------------------------- hourly buckets
+
+// A window of two hours, from 03:00 to 05:00 on 2026-04-02, both ends included.
+const H = Date.UTC(2026, 3, 2, 3) / 1000
+const TWO_HOURS = { start: new Date(H * 1000), end: new Date((H + 7200) * 1000) }
+const hour = (h: number, whole: number, onTheHour = 0) =>
+  ({ hour: h, attestationCeremonies: whole, attestationCeremoniesOnTheHour: onTheHour })
+const vhour = (validator: string, h: number, attended: number, onTheHour = 0) =>
+  ({ validator, hour: h, attended, attendedOnTheHour: onTheHour })
+
+test("the window is the whole hours before its end plus the block exactly at the end", () => {
+  const { ceremonies, attended } = participationFromHours({
+    window: TWO_HOURS,
+    consensus: [
+      hour(H - 3600, 100, 1), // before the window
+      hour(H, 300, 2), // whole: its block on the hour is the window's first
+      hour(H + 3600, 290, 1),
+      hour(H + 7200, 310, 1), // only the block on the hour: the window's last
+      hour(H + 10800, 305, 0), // after the window
+    ],
+    validators: [
+      vhour(A, H - 3600, 99, 1), vhour(A, H, 299, 2), vhour(A, H + 3600, 290, 1), vhour(A, H + 7200, 300, 1),
+      vhour(B.toUpperCase().replace("0X", "0x"), H, 250, 0), vhour(B, H + 7200, 310, 0),
+    ],
+  })
+  assert.equal(ceremonies, 300n + 290n + 1n)
+  assert.equal(attended.get(A), 299n + 290n + 1n)
+  // Ids are compared lower-case; B attended nothing in the end block itself.
+  assert.equal(attended.get(B), 250n)
+})
+
+test("an hour with no row counted nothing", () => {
+  const { ceremonies, attended } = participationFromHours({ window: TWO_HOURS, consensus: [hour(H + 3600, 5)], validators: [] })
+  assert.equal(ceremonies, 5n)
+  assert.equal(attended.size, 0)
+})
+
+test("a window or a row off the hour is refused rather than rounded", () => {
+  const off = { start: new Date((H + 1) * 1000), end: TWO_HOURS.end }
+  assert.throws(() => participationFromHours({ window: off, consensus: [], validators: [] }), /start is not on the hour/)
+  assert.throws(() => participationFromHours({ window: TWO_HOURS, consensus: [hour(H + 5, 1)], validators: [] }), /not on the hour: /)
+  assert.throws(
+    () => participationFromHours({ window: { start: TWO_HOURS.end, end: TWO_HOURS.start }, consensus: [], validators: [] }),
+    /ends before it starts/,
+  )
+})
+
+test("the hourly sum feeds the same exact comparison", () => {
+  const { ceremonies, attended } = participationFromHours({
+    window: TWO_HOURS,
+    consensus: [hour(H, 31_000), hour(H + 3600, 153), hour(H + 7200, 99, 0)],
+    validators: [vhour(A, H, 30_300), vhour(A, H + 3600, 112), vhour(B, H, 30_999), vhour(B, H + 3600, 153)],
+  })
+  const rows = compareParticipation({ sef: SEF, attended, ceremonies })
+  assert.equal(ceremonies, CEREMONIES)
+  assert.deepEqual(rows.map((r) => r.verdict), ["PASS", "PASS"])
 })
 
 test("a real mismatch still fails next to a figure that is not comparable", () => {
