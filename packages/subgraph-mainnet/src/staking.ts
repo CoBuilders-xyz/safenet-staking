@@ -169,6 +169,12 @@ export function handleValidatorUpdated(event: ValidatorUpdated): void {
 
   const was = v.isRegistered
   v.isRegistered = event.params.isRegistered
+  // Only the change to registered sets the block. A repeated `true` is not a new registration,
+  // and a deregistration leaves the block it last registered at.
+  if (!was && event.params.isRegistered) {
+    v.registeredAtBlock = event.block.number
+    v.registeredAtTimestamp = event.block.timestamp
+  }
   v.save()
 
   if (was != event.params.isRegistered) {
