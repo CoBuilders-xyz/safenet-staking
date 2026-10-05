@@ -116,10 +116,54 @@ export const stakingAbi = parseAbi([
   "function claimWithdrawal()",
 ])
 
+/**
+ * Custom errors the interface decodes from a revert.
+ *
+ * A revert emits no log, so `verify:abis` cannot prove these the way it proves events. It
+ * checks instead that each 4-byte selector is in the contract's deployed bytecode.
+ *
+ * Each one was also proven by the revert itself on 2026-10-04, with `eth_call` on `claim`:
+ *  - MerkleRootWasUpdated: any account, with an `expectedMerkleRoot` other than the current root.
+ *  - InvalidProof: any account, with the current root and an empty proof.
+ *  - NothingToClaim: an account that had claimed everything, with its live proof from SEF.
+ */
+export interface DecodedError {
+  readonly contract: ContractName
+  readonly signature: string
+}
+
+export const DECODED_ERRORS = [
+  { contract: "merkleDrop", signature: "error MerkleRootWasUpdated()" },
+  { contract: "merkleDrop", signature: "error InvalidProof()" },
+  { contract: "merkleDrop", signature: "error NothingToClaim()" },
+] as const satisfies readonly DecodedError[]
+
+type Registered = (typeof INDEXED_EVENTS)[number] | (typeof DECODED_ERRORS)[number]
+type RegisteredSignatureOf<C extends ContractName, N extends string> = Extract<
+  Registered,
+  { contract: C; signature: `${"event" | "error"} ${N}(${string}` }
+>["signature"]
+
+/**
+ * A signature from the registries above, by contract and name. ABIs below are built from it, so
+ * every event and error is written once, in the entry `verify:abis` proves.
+ */
+function signatureOf<C extends ContractName, N extends string>(contract: C, name: N): RegisteredSignatureOf<C, N> {
+  const entry = [...INDEXED_EVENTS, ...DECODED_ERRORS].find(
+    (e) => e.contract === contract && /^(event|error) (\w+)\(/.exec(e.signature)?.[2] === name,
+  )
+  if (!entry) throw new Error(`No registered signature for ${contract}.${name}`)
+  return entry.signature as RegisteredSignatureOf<C, N>
+}
+
 export const merkleDropAbi = parseAbi([
   "function merkleRoot() view returns (bytes32)",
   "function cumulativeClaimed(address account) view returns (uint256)",
   "function claim(address account, uint256 cumulativeAmount, bytes32 expectedMerkleRoot, bytes32[] merkleProof)",
+  signatureOf("merkleDrop", "Claimed"),
+  signatureOf("merkleDrop", "MerkleRootWasUpdated"),
+  signatureOf("merkleDrop", "InvalidProof"),
+  signatureOf("merkleDrop", "NothingToClaim"),
 ])
 
 export const sanctionsOracleAbi = parseAbi([
@@ -130,3 +174,6 @@ export const sanctionsOracleAbi = parseAbi([
 export const erc20Abi = parseAbi([
   "function balanceOf(address account) view returns (uint256)",
 ])
+
+/** The SAFE `Transfer` event, to read from a receipt what a claim paid out. */
+export const safeTokenEventsAbi = parseAbi([signatureOf("safeToken", "Transfer")])
