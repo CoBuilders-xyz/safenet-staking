@@ -6,15 +6,24 @@ block, event, function and error comes from `@cobuilders/safenet-core`.
 
 ## Why it is split in two
 
-The MCP server will offer the same operations, and it calls a library, not this binary. So:
+The MCP server in `packages/mcp` offers the same operations, and it calls a library, not this
+binary. So:
 
 - `src/lib/` holds one module per operation. Each takes a `Context` (a Mainnet client and a
   `fetch`) and returns typed data: amounts as `bigint` wei, every figure with its source. A write
   also takes a `WriteMode`: a `Signer` to send with, or the address a dry run simulates from. It
   never prints, reads argv, reads a key or exits. It is exported as `@cobuilders/safenet-cli/lib`.
+  `src/lib/redact.ts` holds the redaction both front ends share: `errorSentence()` and
+  `scrubSecrets()`.
 - `src/commands/` holds the commander wiring, option validation with zod, and the rendering. No
   chain or SEF read happens there.
 - `src/cli.ts` builds the program and maps failures to exit codes; `src/index.ts` only runs it.
+  `buildProgram()` is exported as `@cobuilders/safenet-cli/program`, so the MCP server's tests
+  can check that every command has a tool with the same arguments.
+
+Both exports resolve to `dist/` with declarations, and to the TypeScript in `src/` under the
+`source` condition. `packages/mcp` sets that condition in its `tsconfig.json`, its tsup config and
+its test scripts, so checking and testing it need no build of this package.
 
 A new operation goes in `src/lib/` first, with its data type, then gets a command.
 
@@ -86,10 +95,10 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   decimal strings.
 - An RPC URL can carry a key. It is never printed: `--verbose` shows the host only, and error
   messages have URLs removed.
-- A usage error repeats nothing that may be a secret: `scrubUsage()` in `src/cli.ts` removes the
-  value of any `--flag=value`, which commander would repeat for an unknown option such as
-  `--private-key=<key>`, and URLs and runs of 64 or more hex digits, which a key typed as an
-  argument would leave in the validation message.
+- A usage error repeats nothing that may be a secret: `scrubUsage()` in `src/cli.ts`, which is
+  the library's `scrubSecrets()`, removes the value of any `--flag=value`, which commander would
+  repeat for an unknown option such as `--private-key=<key>`, and URLs and runs of 64 or more hex
+  digits, which a key typed as an argument would leave in the validation message.
 - A log scan never skips a range. It shrinks the range when refused and fails when the smallest
   range is still refused. The library's error says what failed; the advice about
   `MAINNET_RPC_URL` and `--rpc-url` is added in the command layer, because the MCP server has no
@@ -122,5 +131,7 @@ pinned next to the block. It needs `anvil` and the archive `MAINNET_RPC_URL`, fa
 stops only its own Anvil when it ends, and runs nightly. Under `pnpm test` it is skipped with the
 reason.
 
-`pnpm build` bundles `dist/index.js` with tsup. Core is bundled in, because it ships TypeScript
-source; `commander`, `viem` and `zod` stay external.
+`pnpm build` bundles `dist/index.js`, the binary, with tsup, and `dist/lib/index.js` and
+`dist/program.js` with their declarations. Core is bundled in, because it ships TypeScript
+source; `commander`, `viem` and `zod` stay external. The library's declarations still import one
+type from core, which is not published, so a consumer outside this workspace needs core's types.

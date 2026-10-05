@@ -6,10 +6,9 @@
  *   2  usage error: unknown command or option, missing argument, invalid value
  */
 import { Command, CommanderError } from "commander"
-import { BaseError } from "viem"
 import pkg from "../package.json" with { type: "json" }
 import {
-  createContext, rpcEndpoints, rpcHosts, SafenetError, ScanError,
+  createContext, errorSentence as librarySentence, redactUrls, rpcEndpoints, rpcHosts, scrubSecrets, ScanError,
   type Context, type ContextOptions, type Progress, type Signer, type WriteMode,
 } from "./lib/index.js"
 import { ARCHIVE_ADVICE, toJson } from "./commands/format.js"
@@ -53,33 +52,16 @@ export interface CommandRuntime {
   progress(render: (event: Progress) => string): (event: Progress) => void
 }
 
-const URL_PATTERN = /https?:\/\/[^\s"'<>]+/g
-
 /**
- * A usage error with anything that may be a secret taken out. A misplaced flag in `--flag=value`
- * form, such as `--private-key=<key>`, reaches commander as an unknown option and its message
- * repeats the whole token; a key typed where an argument belongs is repeated by the validation
- * message. So the value after `=` goes, as do URLs and runs of 64 or more hex digits. A usage
- * error never needs a transaction hash, so nothing real is lost.
+ * A usage error with anything that may be a secret taken out: the value of a `--flag=value`,
+ * which commander repeats for an unknown option such as `--private-key=<key>`, and URLs and runs
+ * of 64 or more hex digits. See `scrubSecrets()` in the library.
  */
-export function scrubUsage(text: string): string {
-  return text
-    .replace(/(^|[\s'"])(-{1,2}[A-Za-z0-9][\w-]*)=[^\s'"]*/g, "$1$2=<redacted>")
-    .replace(URL_PATTERN, "<url>")
-    .replace(/(0x)?[0-9a-fA-F]{64,}/g, "<redacted>")
-}
+export const scrubUsage = scrubSecrets
 
 /** One plain sentence for an error, with any URL removed: an RPC URL can carry a key. */
 export function errorSentence(err: unknown): string {
-  let text: string
-  if (err instanceof ScanError) text = `${err.message}; ${ARCHIVE_ADVICE}`
-  else if (err instanceof SafenetError) text = err.message
-  else if (err instanceof BaseError) text = `The Mainnet RPC request failed: ${err.shortMessage}`
-  else if (err instanceof Error) text = err.message
-  else text = String(err)
-  const line = (text.split("\n")[0] ?? "").replace(URL_PATTERN, "<url>").trim()
-  if (line.length === 0) return "Something failed without a message."
-  return /[.!?]$/.test(line) ? line : `${line}.`
+  return librarySentence(err, ARCHIVE_ADVICE)
 }
 
 function commandRuntime(runtime: Runtime): CommandRuntime {
@@ -163,11 +145,11 @@ export async function run(argv: readonly string[], runtime: Runtime): Promise<nu
     }
     runtime.io.err(`error: ${errorSentence(err)}\n`)
     if ((argv.includes("--verbose") || argv.includes("-v")) && err instanceof Error && err.stack) {
-      runtime.io.err(`${err.stack.replace(URL_PATTERN, "<url>")}\n`)
+      runtime.io.err(`${redactUrls(err.stack)}\n`)
       // A scan wraps the RPC error that ended it. Show it, with URLs removed like everything else.
       if (err instanceof ScanError && err.cause !== undefined) {
         const cause = err.cause instanceof Error ? (err.cause.stack ?? err.cause.message) : String(err.cause)
-        runtime.io.err(`Caused by: ${cause.replace(URL_PATTERN, "<url>")}\n`)
+        runtime.io.err(`Caused by: ${redactUrls(cause)}\n`)
       }
     }
     return 1
