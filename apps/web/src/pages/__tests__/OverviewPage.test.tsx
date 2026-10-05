@@ -115,6 +115,55 @@ describe("OverviewPage", () => {
     expect(within(screen.getByRole("region", { name: "Last 30 days" })).getByText("884")).toBeInTheDocument()
   })
 
+  it("names the source each section actually used", () => {
+    renderPage()
+    const rewards = screen.getByRole("region", { name: "Rewards" })
+    expect(rewards).toHaveTextContent("Claimed: the Mainnet subgraph's sum of Claimed events")
+    expect(rewards).not.toHaveTextContent("MerkleDrop's live SAFE balance")
+    // 700 of 1,000: the two labels always add up to 100.0.
+    expect(rewards).toHaveTextContent("70.0% claimed")
+    expect(rewards).toHaveTextContent("30.0% unclaimed")
+
+    // Gnosis has a row for Gnosis only: Greenfield falls back to SEF's figure and is marked.
+    const validators = screen.getByRole("region", { name: "Validators" })
+    expect(validators).toHaveTextContent('rows marked "SEF file" use SEF\'s published 14-day figure')
+    expect(within(validators).getAllByText("SEF file")).toHaveLength(1)
+  })
+
+  it("names the MerkleDrop balance when claims come from the contract", () => {
+    mocks.rewards.mockReturnValue({
+      allocated: ready(1000n * SAFE, "sef"),
+      claimed: ready(333n * SAFE, "contract"),
+      unclaimed: ready(667n * SAFE, "contract"),
+      rootMatches: true,
+    })
+    renderPage()
+    const rewards = screen.getByRole("region", { name: "Rewards" })
+    expect(rewards).toHaveTextContent("Claimed and unclaimed: allocated minus the MerkleDrop's live SAFE balance.")
+    expect(rewards).not.toHaveTextContent("sum of Claimed events")
+    expect(rewards).toHaveTextContent("33.3% claimed")
+    expect(rewards).toHaveTextContent("66.7% unclaimed")
+  })
+
+  it("shows why snapshot figures are shown while the Gnosis subgraph is live", () => {
+    mocks.consensus.mockReturnValue({
+      subgraph: LIVE,
+      window: undefined,
+      attestations: ready({ mean: 4510, min: 3093, max: 5908, days: 14 }, "snapshot"),
+      latency: ready({ medianBlocks: 5, seconds: 25 }, "snapshot"),
+      participation: undefined,
+      snapshot: GNOSIS_SNAPSHOT,
+      snapshotReason: "The Gnosis subgraph has not indexed a complete UTC day yet.",
+    })
+    renderPage()
+    for (const name of ["Attestations per day", "Attestation latency"]) {
+      expect(screen.getByRole("group", { name })).toHaveTextContent(
+        "Snapshot measured Tue 29 Sep 2026, 14:41 UTC. The Gnosis subgraph has not indexed a complete UTC day yet.",
+      )
+    }
+    expect(screen.getByRole("region", { name: "Validators" })).toHaveTextContent("Participation: SEF's published 14-day figure.")
+  })
+
   it("shows no APY and no SAFE price", () => {
     renderPage()
     expect(screen.queryByText(/APY|APR|price/i)).not.toBeInTheDocument()
@@ -144,7 +193,9 @@ describe("OverviewPage", () => {
     expect(freshness).toHaveTextContent("read directly from the contracts on Ethereum instead")
     expect(freshness).toHaveTextContent("snapshot measured Tue 29 Sep 2026, 14:41 UTC")
     expect(within(screen.getByRole("group", { name: "Total SAFE staked" })).getByText("Read directly from the contracts on Ethereum")).toBeInTheDocument()
-    expect(within(screen.getByRole("group", { name: "Attestations per day" })).getByText("Snapshot measured Tue 29 Sep 2026, 14:41 UTC")).toBeInTheDocument()
+    expect(screen.getByRole("group", { name: "Attestations per day" })).toHaveTextContent(
+      "Snapshot measured Tue 29 Sep 2026, 14:41 UTC. The subgraph could not be queried.",
+    )
     expect(within(screen.getByRole("region", { name: "Last 30 days" })).getByText(/Unavailable\. No contract read/)).toBeInTheDocument()
   })
 

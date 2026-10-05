@@ -49,6 +49,14 @@ describe("useRewardsOverview", () => {
     expect(result.current.rootMatches).toBe(true)
   })
 
+  it("never shows a negative claimed total from the subgraph", async () => {
+    answerOperations({ NetworkTotals: { _meta: meta(), network: { ...NETWORK, rewardsClaimed: "-5" } } })
+    const { result } = render()
+    await waitFor(() => expect(result.current.claimed.state).toBe("unavailable"))
+    expect(result.current.claimed).toEqual({ state: "unavailable", reason: REWARDS_MESSAGES.negativeClaims })
+    expect(result.current.unclaimed).toEqual({ state: "unavailable", reason: REWARDS_MESSAGES.negativeClaims })
+  })
+
   it("will not derive unclaimed from the subgraph while the roots differ", async () => {
     mockProgramme.mockReturnValue(programme({ rootMatches: false, totals: undefined }))
     answerOperations({ NetworkTotals: { _meta: meta(), network: NETWORK } })

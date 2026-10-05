@@ -1,9 +1,10 @@
 /**
  * Where the subgraphs are queried, and how old their answer may be.
  *
- * Neither subgraph is deployed to The Graph Studio yet. Until it is, the default for each chain
- * is the local graph-node that `pnpm graph:up` starts, under the name its package deploys to.
- * The real endpoint then replaces the default through configuration, not through code.
+ * Both subgraphs are deployed to Subgraph Studio. Until the follow-up that swaps the defaults
+ * below, the default for each chain is the local graph-node that `pnpm graph:up` starts, under the
+ * name its package deploys to, and a build reaches Studio through the VITE_SUBGRAPH_URL_*
+ * overrides. Making Studio the default is one line per chain in SUBGRAPH_ENDPOINTS.
  *
  * Browser safe: reads no environment. The port and the overrides are passed in by the caller.
  */
@@ -31,18 +32,17 @@ export function localSubgraphUrl(chain: ChainKey, port: number | string = DEFAUL
  * The default endpoint per chain. ONE LINE PER CHAIN: to make a deployed subgraph the default,
  * replace that chain's value with its query URL. Everything downstream follows.
  *
- * Today both point at the local graph-node, because neither subgraph is deployed yet. A local
- * default is used only where the caller allows it (development); a deployed default is used
- * everywhere. A query URL is public by nature, so a default must never carry an API key.
+ * Today both point at the local graph-node. A local default is used only where the caller allows
+ * it (development); a deployed default is used everywhere. A query URL is public by nature, so a default must never carry an API key.
  */
 export const SUBGRAPH_ENDPOINTS: Record<ChainKey, string> = {
   mainnet: localSubgraphUrl("mainnet"),
   gnosis: localSubgraphUrl("gnosis"),
 }
 
-/** True for a URL on the local graph-node, whatever its port. */
+/** True for a URL on this machine, whatever its port and path. */
 export function isLocalSubgraphUrl(url: string): boolean {
-  return /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//.test(url)
+  return /^https?:\/\/(127\.0\.0\.1|localhost|0\.0\.0\.0|\[::1\])(:\d+)?(\/|$)/.test(url)
 }
 
 /**

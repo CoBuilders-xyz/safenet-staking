@@ -31,7 +31,7 @@ Every package implements the same five. Turborepo fans them out.
 | `pnpm dev` | Starts the web app's Vite dev server, type-watches `packages/core`, and regenerates the subgraph manifests and types. |
 | `pnpm build` | Builds all packages. |
 | `pnpm test` | Unit tests: Vitest in `apps/web`, matchstick in both subgraphs, node:test in `packages/core`, `packages/cli` and `packages/mcp`, and node:test for the root `tools/` through `test:tools`. The `packages/core` tests live under `src` and `scripts`, and its script fails when it finds no test file. `packages/cli` also has Mainnet smoke tests and fork tests that skip here, and `packages/mcp` Mainnet smoke tests; see `test:smoke` and `test:fork`. |
-| `pnpm check` | Lint, the browser-safety check, then types in every package. Run it before every commit. |
+| `pnpm check` | Lint, the browser-safety check, then each package's check. In `apps/web` that first fails if the committed GraphQL types differ from a fresh `pnpm codegen`, then lints and type-checks. Run it before every commit. |
 
 This file gives no test counts, because they change with every pull request. Run the suite for
 the current count.

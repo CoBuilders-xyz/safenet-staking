@@ -53,6 +53,9 @@ describe("formatAge", () => {
   it.each([
     [42, "42 s"],
     [900, "15 min"],
+    [901, "15 min 1 s"],
+    [959, "15 min 59 s"],
+    [3600, "1 h"],
     [3 * 3600, "3 h"],
     [5 * 86_400, "5 d"],
   ])("%i seconds reads %s", (s, text) => {
@@ -64,6 +67,12 @@ describe("describeDegradation", () => {
   it("gives the block and the age for a stale subgraph", () => {
     expect(describeDegradation({ kind: "stale", freshness: { ...freshness(7200), block: 25_700_259 } })).toBe(
       "The subgraph's last indexed block, 25,700,259, is 2 h old, past the 15 min limit.",
+    )
+  })
+
+  it("never says an age just past the limit equals the limit", () => {
+    expect(describeDegradation({ kind: "stale", freshness: { ...freshness(901), block: 1 } })).toBe(
+      "The subgraph's last indexed block, 1, is 15 min 1 s old, past the 15 min limit.",
     )
   })
 

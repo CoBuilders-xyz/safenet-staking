@@ -10,7 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Type check only:** `npx tsc --noEmit`
 - **Preview production build:** `yarn preview`
 - **Run unit/integration tests:** `yarn test` (vitest run)
-- **Type check only:** `yarn check` (eslint + tsc -b --noEmit, also run in CI)
+- **Check:** `pnpm check` (`codegen:check`, which fails if `src/graphql/<chain>/generated.ts` is stale, then eslint and `tsc -b --noEmit`; also run in CI)
+- **GraphQL types:** `pnpm codegen` regenerates them; `pnpm codegen:live-check` validates the documents against a running graph-node
 - **Watch mode:** `yarn test:watch`
 - **Coverage:** `yarn test:coverage`
 - **E2E tests:** `yarn test:e2e` (Playwright)

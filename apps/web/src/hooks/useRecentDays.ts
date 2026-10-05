@@ -4,6 +4,10 @@ import { describeDegradation } from "@/lib/subgraph"
 import { loading, ready, unavailable, type Figure } from "@/lib/figure"
 import { selectLive, useSubgraphQuery } from "./useSubgraphQuery"
 
+export const RECENT_MESSAGES = {
+  negative: "The subgraph reports a negative daily amount, which cannot be right.",
+} as const
+
 /** The activity window on the overview, in UTC days, today included. */
 export const RECENT_DAYS = 30
 
@@ -36,7 +40,8 @@ export function useRecentDays() {
   let activity: Figure<RecentActivity> = loading()
   if (live.status === "live") {
     const days = live.value
-    activity = ready(
+    const negative = days.some((d) => BigInt(d.stakedIn) < 0n || BigInt(d.withdrawnOut) < 0n || BigInt(d.rewardsClaimed) < 0n)
+    activity = negative ? unavailable(RECENT_MESSAGES.negative) : ready(
       {
         since: windowStart(live.freshness.checkedAt),
         days,

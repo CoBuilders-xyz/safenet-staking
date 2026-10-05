@@ -12,6 +12,7 @@ import { useSubgraphQuery } from "./useSubgraphQuery"
 
 export const CONSENSUS_MESSAGES = {
   noCompleteDay: "The Gnosis subgraph has not indexed a complete UTC day yet.",
+  noLatencySample: "No attestation in the Gnosis subgraph's window could be matched to its proposal.",
 } as const
 
 export interface AttestationRate {
@@ -45,7 +46,8 @@ const SNAPSHOT_LATENCY: Latency = {
  * validator over the last complete UTC days.
  *
  * From the Gnosis subgraph while it is live and holds a complete day. Otherwise attestations and
- * latency come from the dated snapshot in @cobuilders/safenet-core, and `snapshotReason` says why.
+ * latency come from the dated snapshot in @cobuilders/safenet-core, and `snapshotReason` says why;
+ * it is set whenever a figure here comes from the snapshot.
  * Participation has no snapshot fallback here: the overview uses SEF's published figure instead,
  * which their cron refreshes every three hours.
  */
@@ -63,6 +65,7 @@ export function useConsensusFigures() {
 
   if (window) {
     attestations = ready({ ...window.attestationsPerDay, days: window.days }, "subgraph")
+    if (window.latencyMedianBlocks === undefined) snapshotReason = CONSENSUS_MESSAGES.noLatencySample
     latency =
       window.latencyMedianBlocks === undefined
         ? ready(SNAPSHOT_LATENCY, "snapshot")

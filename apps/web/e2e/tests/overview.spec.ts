@@ -82,7 +82,7 @@ test.describe("Network Overview", () => {
     await page.goto("/")
 
     await expect(page.getByRole("status", { name: "Data freshness" })).toContainText(
-      "The subgraph's last indexed block, 25,900,000, is 60 min old, past the 15 min limit.",
+      "The subgraph's last indexed block, 25,900,000, is 1 h old, past the 15 min limit.",
       { timeout: 15_000 },
     )
     await expect(page.getByRole("group", { name: "Total SAFE staked" })).toContainText("10,000")
@@ -107,16 +107,18 @@ test.describe("Dashboard route", () => {
   })
 
   test("every deep link that existed before still lands on its page", async ({ disconnectedPage: page }) => {
-    const links: [string, RegExp | string][] = [
-      ["/#/validators", "Validator A"],
-      [`/#/validators/${VALIDATORS.validatorA}`, "Validator A"],
-      ["/#/withdrawals", /withdraw/i],
-      ["/#/rewards", "Rewards"],
+    // Each check is content only that page renders. The header nav says "Validators", "Withdrawals"
+    // and "Rewards" on every page, the 404 included, so a nav label proves nothing.
+    const links: [string, (p: typeof page) => ReturnType<typeof page.getByRole>][] = [
+      ["/#/validators", (p) => p.getByRole("heading", { name: "Safenet Beta" })],
+      [`/#/validators/${VALIDATORS.validatorA}`, (p) => p.getByRole("link", { name: "Back to Validators" })],
+      ["/#/withdrawals", (p) => p.getByRole("heading", { name: "Withdrawals", exact: true })],
+      ["/#/rewards", (p) => p.getByRole("heading", { name: "Rewards", exact: true })],
     ]
-    for (const [path, text] of links) {
+    for (const [path, unique] of links) {
       await page.goto(path)
+      await expect(unique(page)).toBeVisible({ timeout: 10_000 })
       await expect(page.getByRole("heading", { name: "404" })).toHaveCount(0)
-      await expect(page.getByText(text).first()).toBeVisible({ timeout: 10_000 })
     }
   })
 })

@@ -15,7 +15,7 @@ const CHAINS = ["mainnet", "gnosis"]
 const out = mkdtempSync(join(tmpdir(), "safenet-codegen-"))
 
 try {
-  execFileSync("pnpm", ["exec", "graphql-codegen", "--config", "codegen.ts", "--silent"], {
+  execFileSync("pnpm", ["exec", "graphql-codegen", "--config", "codegen.ts", "--errors-only"], {
     cwd: ROOT,
     env: { ...process.env, CODEGEN_OUT: out },
     stdio: ["ignore", "ignore", "inherit"],

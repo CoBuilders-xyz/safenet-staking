@@ -8,6 +8,7 @@ export const REWARDS_MESSAGES = {
   rootDiffers:
     "The root on chain differs from the one SEF published, so the published allocation does not match what the contract pays out.",
   claimsExceedAllocation: "Claims exceed the published allocation, so the difference does not measure what is unclaimed.",
+  negativeClaims: "The subgraph reports a negative claimed total, which cannot be right.",
   balanceExceedsAllocation:
     "The contract holds more SAFE than the published allocation, so the difference does not measure claims.",
 } as const
@@ -38,8 +39,9 @@ export function useRewardsOverview() {
 
   if (network.status === "live") {
     const sum = BigInt(network.value.rewardsClaimed)
-    claimed = ready(sum, "subgraph")
-    if (allocated.state !== "ready") unclaimed = allocated
+    claimed = sum < 0n ? unavailable(REWARDS_MESSAGES.negativeClaims) : ready(sum, "subgraph")
+    if (sum < 0n) unclaimed = unavailable(REWARDS_MESSAGES.negativeClaims)
+    else if (allocated.state !== "ready") unclaimed = allocated
     else if (onChainRoot.error) unclaimed = unavailable(MESSAGES.contractReadFailed)
     else if (rootMatches === undefined) unclaimed = loading()
     else if (!rootMatches) unclaimed = unavailable(REWARDS_MESSAGES.rootDiffers)

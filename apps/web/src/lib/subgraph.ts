@@ -54,10 +54,17 @@ export function assessFreshness(f: Freshness): Degradation | undefined {
   return undefined
 }
 
-/** "42 s", "12 min", "3 h", "2 d". */
+/**
+ * "42 s", "12 min", "15 min 1 s", "3 h", "2 d". Under an hour the seconds are kept whenever they
+ * are not zero, so an age just past the 15 min limit never reads as "15 min".
+ */
 export function formatAge(seconds: number): string {
   if (seconds < 120) return `${seconds} s`
-  if (seconds < 7200) return `${Math.floor(seconds / 60)} min`
+  if (seconds < 3600) {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return s === 0 ? `${m} min` : `${m} min ${s} s`
+  }
   if (seconds < 172_800) return `${Math.floor(seconds / 3600)} h`
   return `${Math.floor(seconds / 86_400)} d`
 }

@@ -54,11 +54,13 @@ export function FreshnessPanel() {
 
 export function HeadlineStats() {
   const { totalStaked, activeValidators } = useNetworkTotals()
-  const { attestations, latency, window, snapshot } = useConsensusFigures()
+  const { attestations, latency, window, snapshot, snapshotReason } = useConsensusFigures()
+  // A snapshot figure says why it is shown. The freshness panel says so too when the subgraph is
+  // down, but not when it is live and simply has no complete day yet.
   const gnosisSource = (source: FigureSource) =>
     source === "subgraph" && window
       ? `Gnosis subgraph, complete UTC days ${dayOf(window.from)} to ${dayOf(window.to)}`
-      : `Snapshot measured ${formatUtcDateTime(snapshot.runAt)}`
+      : `Snapshot measured ${formatUtcDateTime(snapshot.runAt)}.${snapshotReason ? ` ${snapshotReason}` : ""}`
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -101,16 +103,20 @@ export function DistributionPanel() {
 
 export function RewardsPanel() {
   const { allocated, claimed, unclaimed, rootMatches } = useRewardsOverview()
-  const claimedShare =
+  // Tenths of a percent, rounded once, so the two labels always add up to 100.0.
+  const claimedTenths =
     allocated.state === "ready" && claimed.state === "ready" && allocated.value > 0n && claimed.value <= allocated.value
-      ? Number((claimed.value * 10_000n) / allocated.value) / 100
+      ? Number((claimed.value * 2_000n + allocated.value) / (2n * allocated.value))
       : undefined
+  const claimedSource =
+    claimed.state !== "ready"
+      ? ""
+      : claimed.source === "subgraph"
+        ? " Claimed: the Mainnet subgraph's sum of Claimed events; unclaimed is allocated minus that."
+        : " Claimed and unclaimed: allocated minus the MerkleDrop's live SAFE balance."
 
   return (
-    <OverviewSection
-      title="Rewards"
-      source="Allocated: SEF's published rewards file. Claimed and unclaimed: the Mainnet subgraph, or the MerkleDrop's live balance when the subgraph is not used."
-    >
+    <OverviewSection title="Rewards" source={`Allocated: SEF's published rewards file.${claimedSource}`}>
       <dl>
         <StatRow label="Allocated to date">
           <FigureValue figure={allocated} format={safe} />
@@ -122,12 +128,12 @@ export function RewardsPanel() {
           <FigureValue figure={unclaimed} format={safe} />
         </StatRow>
       </dl>
-      {claimedShare !== undefined && (
+      {claimedTenths !== undefined && (
         <div className="space-y-1.5">
-          <Progress value={claimedShare} aria-label="Share of allocated rewards claimed" />
+          <Progress value={claimedTenths / 10} aria-label="Share of allocated rewards claimed" />
           <div className="flex justify-between font-mono text-xs text-muted-foreground">
-            <span>{claimedShare.toFixed(1)}% claimed</span>
-            <span>{(100 - claimedShare).toFixed(1)}% unclaimed</span>
+            <span>{(claimedTenths / 10).toFixed(1)}% claimed</span>
+            <span>{((1000 - claimedTenths) / 10).toFixed(1)}% unclaimed</span>
           </div>
         </div>
       )}
@@ -157,14 +163,24 @@ export function ValidatorsPanel() {
       return {
         ...r,
         participation: ours ? ours.rate : published ? published.participationRate / 100 : undefined,
+        participationSource: ours ? "subgraph" : published ? "sef" : undefined,
         absences: ours?.absences,
       }
     })
 
+  // The caption names the sources the rows actually use. A validator with no ValidatorDay row in
+  // the window falls back to SEF's figure even while the subgraph is live; such rows are marked.
+  const fromSubgraph = participation && window && rows.state === "ready" && rows.value.some((r) => participation.has(r.address.toLowerCase()))
+  const fromSef = rows.state === "ready" && rows.value.some((r) => !participation?.has(r.address.toLowerCase()))
+  const subgraphWords = window
+    ? `the Gnosis subgraph, attestation ceremonies attended over ${window.days} complete UTC days to ${dayOf(window.to)}`
+    : ""
   const participationSource =
-    participation && window
-      ? `Participation: the Gnosis subgraph, attestation ceremonies attended over ${window.days} complete UTC days to ${dayOf(window.to)}.`
-      : "Participation: SEF's published 14-day figure."
+    fromSubgraph && fromSef
+      ? `Participation: ${subgraphWords}; rows marked "SEF file" use SEF's published 14-day figure.`
+      : fromSubgraph
+        ? `Participation: ${subgraphWords}.`
+        : "Participation: SEF's published 14-day figure."
 
   return (
     <OverviewSection

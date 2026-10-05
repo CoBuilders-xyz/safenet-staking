@@ -11,6 +11,8 @@ export interface ValidatorTableRow {
   stakers: number | undefined
   /** Fraction of attestation ceremonies attended. Undefined when no source has it. */
   participation: number | undefined
+  /** Where this row's participation comes from. */
+  participationSource?: "subgraph" | "sef"
   /** Ceremonies missed in the same window. Only the subgraph counts them. */
   absences: bigint | undefined
 }
@@ -21,6 +23,8 @@ export interface ValidatorTableRow {
  */
 export function Validators({ rows }: { rows: readonly ValidatorTableRow[] }) {
   const showStakers = rows.some((r) => r.stakers !== undefined)
+  // Mark the source per row only when the rows mix sources; otherwise the caption says it.
+  const mixed = new Set(rows.map((r) => r.participationSource).filter(Boolean)).size > 1
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] text-sm">
@@ -60,6 +64,7 @@ export function Validators({ rows }: { rows: readonly ValidatorTableRow[] }) {
                     {v.absences !== undefined && (
                       <div className="text-xs text-faint">{v.absences.toLocaleString("en-US")} missed</div>
                     )}
+                    {mixed && v.participationSource === "sef" && <div className="text-xs text-faint">SEF file</div>}
                   </>
                 )}
               </td>

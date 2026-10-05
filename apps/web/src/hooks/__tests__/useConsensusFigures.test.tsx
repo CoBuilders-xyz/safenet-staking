@@ -60,6 +60,16 @@ describe("useConsensusFigures", () => {
     expect(result.current.participation).toBeUndefined()
   })
 
+  it("falls back to the snapshot latency, with a reason, when no attestation could be matched", async () => {
+    const w = window()
+    answerOperations({ ConsensusWindow: { ...w, consensusDays: w.consensusDays.map((d) => ({ ...d, latencyBuckets: ["0"] })) } })
+    const { result } = render()
+    await waitFor(() => expect(result.current.latency.state).toBe("ready"))
+    expect(result.current.attestations.state === "ready" && result.current.attestations.source).toBe("subgraph")
+    expect(result.current.latency.state === "ready" && result.current.latency.source).toBe("snapshot")
+    expect(result.current.snapshotReason).toBe(CONSENSUS_MESSAGES.noLatencySample)
+  })
+
   it("shows the snapshot when the subgraph is stale", async () => {
     answerOperations({ ConsensusWindow: { ...window(), _meta: meta(STALE_AGE) } })
     const { result } = render()
