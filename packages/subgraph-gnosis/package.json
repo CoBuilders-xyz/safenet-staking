@@ -9,7 +9,7 @@
     "build": "pnpm generate && graph codegen && graph build",
     "test": "pnpm generate --full && graph codegen && graph test -v 0.6.0",
     "check": "eslint . && tsc --noEmit -p tsconfig.check.json",
-    "differential": "tsx scripts/differential.ts"
+    "differential": "node --env-file-if-exists=../../.env.ports --import tsx scripts/differential.ts"
   },
   "dependencies": {
     "@graphprotocol/graph-cli": "0.98.1",

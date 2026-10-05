@@ -17,12 +17,12 @@ A web application for delegating SAFE tokens to validators on Ethereum. Built as
 ## Quick Start
 
 ```bash
-cp .env.example .env   # fill in required values
-yarn install
-yarn dev
+pnpm install
+pnpm --filter @cobuilders/safenet-web dev
 ```
 
-The app will be available at `http://localhost:5173`.
+The app will be available at `http://localhost:5173`, or on `WEB_PORT` from the repository-root
+`.env.ports` when `pnpm bootstrap` has written one.
 
 ## Environment Variables
 

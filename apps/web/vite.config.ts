@@ -1,4 +1,6 @@
+import { existsSync, readFileSync } from "node:fs"
 import path from "path"
+import { parseEnv } from "node:util"
 import { defineConfig, type ViteDevServer, type PreviewServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -36,6 +38,16 @@ function respondToPreflight(server: ViteDevServer | PreviewServer) {
   })
 }
 
+const repoRoot = path.resolve(__dirname, "../..")
+
+// One port per worktree: WEB_PORT from .env.ports at the repository root, which
+// scripts/setup.sh writes. An exported WEB_PORT wins, and `--port` wins over both, which is
+// how the e2e suite runs on its own port. Without either, Vite's default.
+const portsFile = path.join(repoRoot, ".env.ports")
+const webPort =
+  process.env.WEB_PORT ??
+  (existsSync(portsFile) ? parseEnv(readFileSync(portsFile, "utf8")).WEB_PORT : undefined)
+
 export default defineConfig({
   base: './',
   plugins: [
@@ -64,6 +76,7 @@ export default defineConfig({
     // before our headers get set.
     cors: false,
     headers: safeAppHeaders,
+    port: webPort ? Number(webPort) : undefined,
   },
   preview: {
     cors: false,
