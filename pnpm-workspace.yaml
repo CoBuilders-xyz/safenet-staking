@@ -1,3 +1,15 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Advisories with no patched release, all reached only through @graphprotocol/graph-cli 0.98.1.
+# Each entry holds only while graph-cli pins the vulnerable version.
+auditConfig:
+  ignoreCves:
+    # decompress <=4.2.1, path traversal on extraction: graph-cli calls it only in
+    # `graph node install`, which no script here runs.
+    - CVE-2026-53486
+    - CVE-2026-101894
+    # braces <=3.0.3, stack exhaustion on nested patterns: reached through kubo-rpc-client's
+    # it-glob, which expands only the build paths graph-cli passes it.
+    - CVE-2026-93687
