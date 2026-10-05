@@ -27,6 +27,9 @@ export interface FakeOptions {
   readonly rpcError?: Error
   /** eth_getLogs rejects, as the public endpoints do for historical ranges. */
   readonly logsRefused?: boolean
+  /** Replaces SEF's rewards/latest.json or network-info.json, to test a changed shape. */
+  readonly rewardsLatest?: object
+  readonly networkInfo?: object
 }
 
 function fakeClient(o: FakeOptions): PublicClient {
@@ -102,6 +105,8 @@ function fakeFetch(o: FakeOptions): typeof fetch {
       return json([{ sha: "abcdef0123456789", commit: { committer: { date: PUBLISHED_AT } } }])
     }
     if (url === SEF_DATA.validatorInfo || url.endsWith("/validator-info.json")) return json(SEF_VALIDATORS)
+    if (url === SEF_DATA.networkInfo && o.networkInfo) return json(o.networkInfo)
+    if (url === SEF_DATA.rewardsLatest && o.rewardsLatest) return json(o.rewardsLatest)
     if (url === SEF_DATA.networkInfo) return json({ total_staked_amount: "300", total_transactions_checked: 1 })
     if (url === SEF_DATA.rewardsLatest) {
       return json({

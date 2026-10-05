@@ -64,6 +64,15 @@ test("a failed operation exits 1 with one sentence and no URL", async () => {
   assert.ok(!r.err.includes("not-a-real-key"))
 })
 
+test("a SEF file that lost a field exits 1 with a sentence that names the file", async () => {
+  const noRoot = await cli(["status"], { rewardsLatest: { epoch: 0, tokenTotal: "1" } })
+  assert.equal(noRoot.code, 1)
+  assert.equal(noRoot.err, "error: SEF's rewards/latest.json no longer has the shape this tool reads.\n")
+  const noTotal = await cli(["status"], { networkInfo: { total_transactions_checked: 1 } })
+  assert.equal(noTotal.code, 1)
+  assert.equal(noTotal.err, "error: SEF's network-info.json no longer has the shape this tool reads.\n")
+})
+
 test("a validator that SEF does not list and the chain does not know exits 1", async () => {
   const r = await cli(["validators", "show", STAKER])
   assert.equal(r.code, 1)

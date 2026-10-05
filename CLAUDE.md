@@ -30,7 +30,7 @@ Every package implements the same five. Turborepo fans them out.
 | `pnpm bootstrap` | Runs `scripts/setup.sh`: checks tools, writes `.env.ports`, installs, then links Vercel and pulls `.env.local`. Safe to re-run. **Not `setup`: that is a pnpm builtin that edits your shell rc.** |
 | `pnpm dev` | Starts the web app's Vite dev server, type-watches `packages/core`, and regenerates the subgraph manifests and types. |
 | `pnpm build` | Builds all packages. |
-| `pnpm test` | Unit tests. `apps/web` has 380 Vitest tests in 42 files. The subgraphs have matchstick tests: 20 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has 34 node:test tests in 6 files, and its script fails when it finds no test file. `packages/cli` has 46 node:test tests in 4 files, plus 6 Mainnet smoke tests in a fifth that skip here; see `test:smoke`. |
+| `pnpm test` | Unit tests. `apps/web` has 380 Vitest tests in 42 files. The subgraphs have matchstick tests: 20 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has 34 node:test tests in 6 files, and its script fails when it finds no test file. `packages/cli` has 47 node:test tests in 4 files, plus 6 Mainnet smoke tests in a fifth that skip here; see `test:smoke`. |
 | `pnpm check` | Lint, the browser-safety check, then types in every package. Run it before every commit. |
 
 The test counts were measured with `pnpm test` when this file was written. Run it for the

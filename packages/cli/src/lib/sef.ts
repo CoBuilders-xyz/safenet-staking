@@ -154,12 +154,43 @@ export async function fetchValidatorsWithWindow(
   }
 }
 
-export function fetchRewardsLatest(ctx: Context): Promise<SefRewardsLatest> {
-  return fetchSefJson<SefRewardsLatest>(ctx, SEF_DATA.rewardsLatest, "SEF's rewards/latest.json")
+const isRecord = (data: unknown): data is Record<string, unknown> =>
+  typeof data === "object" && data !== null && !Array.isArray(data)
+
+/**
+ * The fields this tool reads, checked before the data is typed. A missing field would otherwise
+ * surface later as a TypeError with no hint that SEF changed its file.
+ */
+function isRewardsLatest(data: unknown): data is SefRewardsLatest {
+  return (
+    isRecord(data) &&
+    typeof data.epoch === "number" &&
+    typeof data.merkleRoot === "string" && /^0x[0-9a-fA-F]{64}$/.test(data.merkleRoot) &&
+    typeof data.rewardsUntil === "string" && !Number.isNaN(Date.parse(data.rewardsUntil)) &&
+    typeof data.tokenTotal === "string" &&
+    typeof data.unpaidAmount === "string" &&
+    typeof data.updatedAt === "string"
+  )
 }
 
-export function fetchNetworkInfo(ctx: Context): Promise<SefNetworkInfo> {
-  return fetchSefJson<SefNetworkInfo>(ctx, SEF_DATA.networkInfo, "SEF's network-info.json")
+function isNetworkInfo(data: unknown): data is SefNetworkInfo {
+  return (
+    isRecord(data) &&
+    typeof data.total_staked_amount === "string" &&
+    typeof data.total_transactions_checked === "number"
+  )
+}
+
+export async function fetchRewardsLatest(ctx: Context): Promise<SefRewardsLatest> {
+  const data = await fetchSefJson<unknown>(ctx, SEF_DATA.rewardsLatest, "SEF's rewards/latest.json")
+  if (!isRewardsLatest(data)) throw new SafenetError("SEF's rewards/latest.json no longer has the shape this tool reads")
+  return data
+}
+
+export async function fetchNetworkInfo(ctx: Context): Promise<SefNetworkInfo> {
+  const data = await fetchSefJson<unknown>(ctx, SEF_DATA.networkInfo, "SEF's network-info.json")
+  if (!isNetworkInfo(data)) throw new SafenetError("SEF's network-info.json no longer has the shape this tool reads")
+  return data
 }
 
 function isProof(data: unknown): data is SefRewardProof {
