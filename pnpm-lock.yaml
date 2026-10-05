@@ -6,6 +6,7 @@ settings:
 
 overrides:
   '@reown/appkit': 1.8.18
+  viem@2.46.2>ws: 8.21.0
 
 importers:
 
@@ -5406,18 +5407,6 @@ packages:
       utf-8-validate:
         optional: true
 
-  ws@8.18.3:
-    resolution: {integrity: sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==}
-    engines: {node: '>=10.0.0'}
-    peerDependencies:
-      bufferutil: ^4.0.1
-      utf-8-validate: '>=5.0.2'
-    peerDependenciesMeta:
-      bufferutil:
-        optional: true
-      utf-8-validate:
-        optional: true
-
   ws@8.21.0:
     resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
     engines: {node: '>=10.0.0'}
@@ -9843,14 +9832,9 @@ snapshots:
     dependencies:
       ws: 7.5.13
 
-  isows@1.0.7(ws@8.18.3):
-    dependencies:
-      ws: 8.18.3
-
   isows@1.0.7(ws@8.21.0):
     dependencies:
       ws: 8.21.0
-    optional: true
 
   istanbul-lib-coverage@3.2.2: {}
 
@@ -11320,9 +11304,9 @@ snapshots:
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
       abitype: 1.2.3(typescript@5.9.3)(zod@3.22.4)
-      isows: 1.0.7(ws@8.18.3)
+      isows: 1.0.7(ws@8.21.0)
       ox: 0.12.4(typescript@5.9.3)(zod@3.22.4)
-      ws: 8.18.3
+      ws: 8.21.0
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -11337,9 +11321,9 @@ snapshots:
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
       abitype: 1.2.3(typescript@5.9.3)(zod@3.25.76)
-      isows: 1.0.7(ws@8.18.3)
+      isows: 1.0.7(ws@8.21.0)
       ox: 0.12.4(typescript@5.9.3)(zod@3.25.76)
-      ws: 8.18.3
+      ws: 8.21.0
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -11354,9 +11338,9 @@ snapshots:
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
       abitype: 1.2.3(typescript@5.9.3)(zod@4.6.5)
-      isows: 1.0.7(ws@8.18.3)
+      isows: 1.0.7(ws@8.21.0)
       ox: 0.12.4(typescript@5.9.3)(zod@4.6.5)
-      ws: 8.18.3
+      ws: 8.21.0
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -11575,10 +11559,7 @@ snapshots:
 
   ws@7.5.13: {}
 
-  ws@8.18.3: {}
-
-  ws@8.21.0:
-    optional: true
+  ws@8.21.0: {}
 
   ws@8.21.3:
     optional: true

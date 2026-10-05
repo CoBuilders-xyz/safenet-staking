@@ -40,7 +40,8 @@
   },
   "pnpm": {
     "overrides": {
-      "@reown/appkit": "1.8.18"
+      "@reown/appkit": "1.8.18",
+      "viem@2.46.2>ws": "8.21.0"
     }
   }
 }
