@@ -30,11 +30,11 @@ Every package implements the same five. Turborepo fans them out.
 | `pnpm bootstrap` | Runs `scripts/setup.sh`: checks tools, writes `.env.ports`, installs, then links Vercel and pulls `.env.local`. Safe to re-run. **Not `setup`: that is a pnpm builtin that edits your shell rc.** |
 | `pnpm dev` | Starts the web app's Vite dev server, type-watches `packages/core`, and regenerates the subgraph manifests and types. |
 | `pnpm build` | Builds all packages. |
-| `pnpm test` | Unit tests. `apps/web` has 380 Vitest tests in 42 files. The subgraphs have matchstick tests: 21 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has 48 node:test tests in 7 files, under `src` and `scripts`, and its script fails when it finds no test file. `packages/cli` has 76 node:test tests in 7 files, plus 6 Mainnet smoke tests and 10 fork tests that skip here; see `test:smoke` and `test:fork`. |
+| `pnpm test` | Unit tests: Vitest in `apps/web`, matchstick in both subgraphs, node:test in `packages/core` and `packages/cli`. The `packages/core` tests live under `src` and `scripts`, and its script fails when it finds no test file. `packages/cli` also has Mainnet smoke tests and fork tests that skip here; see `test:smoke` and `test:fork`. |
 | `pnpm check` | Lint, the browser-safety check, then types in every package. Run it before every commit. |
 
-The test counts were measured with `pnpm test` when this file was written. Run it for the
-current numbers.
+This file gives no test counts, because they change with every pull request. Run the suite for
+the current count.
 
 Scope to one package with `pnpm --filter <name> check`. The names are
 `@cobuilders/safenet-core`, `@cobuilders/safenet-cli`, `@cobuilders/safenet-web`,
@@ -49,8 +49,8 @@ Specific commands, only where they apply:
 | `pnpm metrics` | `packages/core` | The 24 metrics, computed against live chains and compared with SEF's published JSON. Writes `packages/core/.metrics/`, which is git-ignored | needs an archive node. With public RPC only, it stopped on a failed Mainnet log range when this file was written |
 | `pnpm check:browser` | root | `apps/web/src` reads no `process.env`, and a built bundle contains no value from `.env.local` | works, part of `check` |
 | `pnpm test:smoke` | root, `packages/cli` | Each of the six read commands runs against Mainnet through the real entry point | needs the archive `MAINNET_RPC_URL`; runs nightly. Skipped, with the reason, everywhere else |
-| `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. 83 Playwright tests in 14 spec files | runs; one navigation test is intermittently flaky |
-| `pnpm test:fork` | `apps/web`, `packages/cli` | Against the real contracts on an Anvil Mainnet fork at a pinned block, each effect checked by reading the chain. `apps/web`: the staking flows in the interface, 4 Playwright tests and 1 skipped, about 1.5 minutes. `packages/cli`: the five write commands sent for real, then each with `--dry-run`, which must change nothing; 11 node:test tests, one of which needs no Anvil and also runs under `pnpm test`, about 20 seconds | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
+| `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. Playwright | runs; one navigation test is intermittently flaky |
+| `pnpm test:fork` | `apps/web`, `packages/cli` | Against the real contracts on an Anvil Mainnet fork at a pinned block, each effect checked by reading the chain. `apps/web`: the staking flows in the interface, in Playwright, about 1.5 minutes. `packages/cli`: the five write commands sent for real, then each with `--dry-run`, which must change nothing, in node:test; one of those tests needs no Anvil and also runs under `pnpm test`; about 20 seconds | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
 | `deploy:studio` | each subgraph package, through `pnpm --filter` | The subgraph builds and Studio accepts it as a new version under its slug. Not that it syncs: watch it by deployment hash, then run `differential` with `SUBGRAPH_URL` | works; needs `GRAPH_DEPLOY_KEY` |
 | `pnpm test:parity` | subgraphs | Our numbers match SEF's published JSON | **fails on purpose: no subgraph package implements it yet** |
 
