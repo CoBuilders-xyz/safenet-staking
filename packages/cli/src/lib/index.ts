@@ -22,3 +22,21 @@ export {
   checkRewards, rewardsHistory, DEFAULT_HISTORY_LIMIT,
   type Claim, type RewardsCheck, type RewardsHistory,
 } from "./rewards.js"
+
+// Writes. Each takes a WriteMode: a signer to send with, or an address to simulate from.
+export { localSigner, type Signer, type TransactionToSend } from "./signer.js"
+export { decryptKeystore } from "./keystore.js"
+export {
+  amount, createRunner, revertError, WriteError,
+  type Amount, type Progress, type SentTransaction, type Step, type WriteMode, type WriteOptions, type WriteResultBase,
+} from "./transactions.js"
+export {
+  stake, unstake, type Approval, type ApprovalKind, type StakeResult, type UnstakeResult,
+} from "./stake.js"
+export {
+  claimWithdrawals, readQueue, type ClaimedWithdrawal, type ClaimWithdrawalsResult, type QueuedWithdrawal,
+} from "./claim-withdrawals.js"
+export {
+  claimAndStake, claimRewards, receivedFromLogs,
+  type ClaimAndStakeResult, type RewardsClaim, type RewardsClaimResult,
+} from "./claim-rewards.js"

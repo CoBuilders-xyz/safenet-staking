@@ -3,10 +3,15 @@
  * unit tests without a network. Every address and root here is made up, and derived from a
  * small number so no file in this package types one out.
  */
-import { numberToHex, pad, type PublicClient } from "viem"
-import { CONTRACTS, SEF_DATA, rewardProofUrl } from "@cobuilders/safenet-core"
-import type { Context } from "./lib/index.js"
+import {
+  ContractFunctionRevertedError, encodeAbiParameters, encodeErrorResult, encodeEventTopics, numberToHex, pad,
+  type Abi, type Hex, type PublicClient,
+} from "viem"
+import { CONTRACTS, SEF_DATA, rewardProofUrl, safeTokenEventsAbi } from "@cobuilders/safenet-core"
+import type { Context, Signer } from "./lib/index.js"
 import type { Io, Runtime } from "./cli.js"
+import { loadSigner } from "./commands/signer.js"
+import type { SignerRequest } from "./commands/signer.js"
 
 export const fakeAddress = (n: number | bigint) => pad(numberToHex(n), { size: 20 })
 export const fakeRoot = (n: number) => pad(numberToHex(n), { size: 32 })
@@ -35,9 +40,44 @@ export interface FakeOptions {
   readonly networkInfo?: object
   /** A second staker opens a withdrawal with the id the first staker already claimed. */
   readonly sharedWithdrawalId?: boolean
+  /** eth_call of this function reverts with this custom error from the call's ABI. */
+  readonly revert?: { readonly functionName: string; readonly errorName: string }
+  /** The SAFE allowance the staker gave the staking contract. */
+  readonly allowance?: bigint
+  /** The environment the program sees, for the signer options. */
+  readonly env?: Readonly<Record<string, string | undefined>>
+  /** The address SEF publishes a proof for. Defaults to STAKER. */
+  readonly proofAccount?: Hex
+  /** Replaces how the program loads a signer. */
+  readonly loadSigner?: (request: SignerRequest, ctx: Context) => Promise<Signer>
 }
 
-function fakeClient(o: FakeOptions): PublicClient {
+/** What the fake chain was asked to do that a dry run must never ask. */
+export interface SendLog {
+  prepared: number
+  broadcast: number
+}
+
+export const CLAIMABLE = 2n * 10n ** 18n
+export const WITHDRAWAL_DELAY = 172_800n
+export const TX_HASH = fakeRoot(0xfeed)
+
+/**
+ * Anvil's and Hardhat's public test mnemonic. Its keys are published, hold nothing on Mainnet that
+ * matters, and are what every Ethereum test suite signs with.
+ */
+export const TEST_MNEMONIC = "test test test test test test test test test test test junk"
+
+/** The SAFE Transfer a claim emits, shaped as a log, so the code that reads it is tested too. */
+function transferLog(to: Hex, value: bigint) {
+  return {
+    address: CONTRACTS.safeToken.address,
+    topics: encodeEventTopics({ abi: safeTokenEventsAbi, eventName: "Transfer", args: { from: CONTRACTS.merkleDrop.address, to } }),
+    data: encodeAbiParameters([{ type: "uint256" }], [value]),
+  }
+}
+
+function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
   const fail = () => {
     if (o.rpcError) throw o.rpcError
   }
@@ -46,7 +86,7 @@ function fakeClient(o: FakeOptions): PublicClient {
     totalPendingWithdrawals: () => (o.sharedWithdrawalId ? 11n : 7n) * SAFE,
     merkleRoot: () => o.chainRoot ?? ROOT,
     balanceOf: () => 40n * SAFE,
-    isValidator: ([a]) => a === VALIDATOR_A || a === VALIDATOR_B,
+    isValidator: ([a]) => [VALIDATOR_A, VALIDATOR_B].includes(String(a).toLowerCase() as Hex),
     totalValidatorStakes: ([a]) => (a === VALIDATOR_A ? 200n * SAFE : 100n * SAFE),
     stakes: () => 1n * SAFE,
     cumulativeClaimed: () => 10n * SAFE,
@@ -54,11 +94,65 @@ function fakeClient(o: FakeOptions): PublicClient {
       { amount: 5n * SAFE, claimableAt: BLOCK_TIME - 60n },
       { amount: 2n * SAFE, claimableAt: BLOCK_TIME + 90_000n },
     ],
+    allowance: () => o.allowance ?? 0n,
+    withdrawDelay: () => WITHDRAWAL_DELAY,
+    // The same two withdrawals as getPendingWithdrawals, as the linked list the contract keeps.
+    withdrawalQueues: () => [1n, 2n],
+    withdrawalNodes: ([, id]) =>
+      id === 1n ? [5n * SAFE, BLOCK_TIME - 60n, 0n, 2n] : [2n * SAFE, BLOCK_TIME + 90_000n, 1n, 0n],
+  }
+  let lastSent: { to: Hex; account: { address: Hex } } | undefined
+  /** eth_call: reverts as `o.revert` says, the way viem reports a revert. */
+  const simulate = (p: { abi: Abi; functionName: string }) => {
+    if (o.revert && o.revert.functionName === p.functionName) {
+      throw new ContractFunctionRevertedError({
+        abi: p.abi,
+        data: encodeErrorResult({ abi: p.abi, errorName: o.revert.errorName } as never),
+        functionName: p.functionName,
+      })
+    }
   }
   const log = (args: Record<string, unknown>, i: number) => ({
     args, blockNumber: BLOCK - BigInt(i), logIndex: 0, transactionHash: fakeRoot(0x100 + i),
   })
   const client = {
+    chain: { id: 1 },
+    getChainId: async () => 1,
+    simulateContract: async (p: { abi: Abi; functionName: string }) => (fail(), simulate(p), { result: undefined }),
+    estimateContractGas: async () => (fail(), 50_000n),
+    simulateBlocks: async (p: { blocks: { calls: { abi: Abi; functionName: string; account: Hex }[] }[] }) => {
+      fail()
+      return [{
+        calls: p.blocks[0]!.calls.map((c) => {
+          try {
+            simulate(c)
+          } catch (error) {
+            return { status: "failure", gasUsed: 21_000n, logs: [], error }
+          }
+          const logs = c.functionName === "claim" ? [transferLog(c.account, CLAIMABLE)] : []
+          return { status: "success", gasUsed: 60_000n, logs }
+        }),
+      }]
+    },
+    prepareTransactionRequest: async (p: { to: Hex; data: Hex; gas: bigint; account: { address: Hex } }) => {
+      sends.prepared++
+      lastSent = p
+      return {
+        to: p.to, data: p.data, gas: p.gas, chainId: 1, nonce: 0, type: "eip1559",
+        maxFeePerGas: 2_000_000_000n, maxPriorityFeePerGas: 1_000_000_000n,
+      }
+    },
+    sendRawTransaction: async () => {
+      sends.broadcast++
+      return TX_HASH
+    },
+    // A claim's receipt carries the SAFE transfer it paid, as on chain.
+    waitForTransactionReceipt: async () => ({
+      status: "success",
+      blockNumber: BLOCK + 1n,
+      gasUsed: 45_000n,
+      logs: lastSent?.to === CONTRACTS.merkleDrop.address ? [transferLog(lastSent.account.address, CLAIMABLE)] : [],
+    }),
     getBlockNumber: async () => (fail(), BLOCK),
     getBlock: async (p?: { blockNumber?: bigint }) => {
       fail()
@@ -122,7 +216,7 @@ function fakeFetch(o: FakeOptions): typeof fetch {
         tokenTotal: String(50n * SAFE), unpaidAmount: "0", updatedAt: "2026-09-22T08:55:44.268Z",
       })
     }
-    if (url === rewardProofUrl(STAKER)) {
+    if (url === rewardProofUrl(o.proofAccount ?? STAKER)) {
       if (o.proof === null) return new Response("404: Not Found", { status: 404 })
       return json(o.proof ?? { cumulativeAmount: String(12n * SAFE), kycAmount: "0", merkleRoot: ROOT, proof: [] })
     }
@@ -130,20 +224,26 @@ function fakeFetch(o: FakeOptions): typeof fetch {
   }) as typeof fetch
 }
 
-export function fakeContext(o: FakeOptions = {}): Context {
-  return { client: fakeClient(o), fetch: fakeFetch(o), retryDelayMs: 0 }
+export function fakeContext(o: FakeOptions = {}, sends: SendLog = { prepared: 0, broadcast: 0 }): Context {
+  return { client: fakeClient(o, sends), fetch: fakeFetch(o), retryDelayMs: 0 }
 }
 
 /** A runtime that records what the program prints, against the fake chain. */
-export function fakeRuntime(o: FakeOptions = {}): Runtime & { stdout: () => string; stderr: () => string } {
+export function fakeRuntime(
+  o: FakeOptions = {},
+): Runtime & { stdout: () => string; stderr: () => string; sends: SendLog } {
   let out = ""
   let err = ""
   const io: Io = { out: (t) => void (out += t), err: (t) => void (err += t) }
+  const sends: SendLog = { prepared: 0, broadcast: 0 }
+  const env = o.env ?? {}
   return {
     io,
-    env: {},
-    createContext: () => fakeContext(o),
+    env,
+    createContext: () => fakeContext(o, sends),
+    loadSigner: o.loadSigner ?? ((request, ctx) => loadSigner(request, ctx, { env, askPassword: undefined })),
     stdout: () => out,
     stderr: () => err,
+    sends,
   }
 }

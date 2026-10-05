@@ -2,7 +2,7 @@
  * Option validation. commander parses the command line; zod decides whether the values make
  * sense, and turns them into the types the library takes.
  */
-import { getAddress, isAddress } from "viem"
+import { getAddress, isAddress, parseUnits } from "viem"
 import { z } from "zod"
 import { DEFAULT_HISTORY_LIMIT } from "../lib/index.js"
 
@@ -54,3 +54,69 @@ export const withdrawalsListSchema = z.object({ address: addressSchema.optional(
 export const historySchema = z
   .object({ all: z.boolean().optional() })
   .transform((o) => ({ limit: o.all ? null : DEFAULT_HISTORY_LIMIT }))
+
+/** An amount of SAFE as a person types it: "100", "0.5". Exact, up to 18 decimals, above zero. */
+export const safeAmountSchema = z
+  .string()
+  .trim()
+  .refine((s) => /^\d+(\.\d{1,18})?$/.test(s), {
+    error: (issue) => `"${String(issue.input)}" is not a SAFE amount: write a number such as 100 or 0.5, with at most 18 decimals`,
+  })
+  .transform((s) => parseUnits(s, 18))
+  .refine((wei) => wei > 0n, { error: "The amount must be more than zero" })
+
+export const approveSchema = z.enum(["exact", "unlimited"], {
+  error: (issue) => `--approve takes "exact" or "unlimited", not "${String(issue.input)}"`,
+}).default("exact")
+
+/**
+ * The name of an environment variable. A value that looks like a key is refused without being
+ * repeated: the user passed the key itself, and it must not be printed back.
+ */
+const envName = (flag: string) =>
+  z.string().refine((s) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(s) && !/^(0x)?[0-9a-fA-F]{40,}$/.test(s), {
+    error: `${flag} takes the name of an environment variable that holds the secret, never the secret itself`,
+  })
+
+export const writeSchema = z
+  .object({
+    dryRun: z.boolean().default(false),
+    privateKeyEnv: envName("--private-key-env").optional(),
+    keystore: z.string().min(1).optional(),
+    passwordEnv: envName("--password-env").optional(),
+    from: addressSchema.optional(),
+  })
+  .refine((o) => !(o.privateKeyEnv && o.keystore), { error: "--private-key-env and --keystore cannot be used together" })
+  .refine((o) => !o.passwordEnv || o.keystore, { error: "--password-env only works with --keystore" })
+  .refine((o) => !o.from || o.dryRun, {
+    error: "--from only works with --dry-run: a transaction is sent from the signer's address",
+  })
+  .refine((o) => o.dryRun || o.privateKeyEnv || o.keystore, {
+    error: "Sending a transaction needs a signer: pass --private-key-env <NAME> or --keystore <path>, or use --dry-run",
+  })
+  .refine((o) => !o.dryRun || o.from || o.privateKeyEnv || o.keystore, {
+    error: "A dry run needs an address to simulate from: pass --from <address>, or a signer option",
+  })
+  .transform((o) => ({
+    dryRun: o.dryRun,
+    from: o.from ?? null,
+    signer: o.privateKeyEnv
+      ? ({ kind: "private-key-env", name: o.privateKeyEnv } as const)
+      : o.keystore
+        ? ({ kind: "keystore", path: o.keystore, passwordEnv: o.passwordEnv ?? null } as const)
+        : null,
+  }))
+export type WriteRequest = z.output<typeof writeSchema>
+
+export const stakeSchema = z.object({ approve: approveSchema })
+
+export const claimAndStakeSchema = z.object({ approve: approveSchema, amount: safeAmountSchema.optional() })
+
+export const withdrawalClaimSchema = z
+  .object({
+    id: z.string().regex(/^\d+$/, { error: (issue) => `"${String(issue.input)}" is not a withdrawal id: ids are whole numbers` }).optional(),
+    all: z.boolean().optional(),
+  })
+  .refine((o) => !(o.id && o.all), { error: "Name one withdrawal id or pass --all, not both" })
+  .refine((o) => o.id || o.all, { error: "Name a withdrawal id, or pass --all to claim every claimable one" })
+  .transform((o) => (o.all ? ("all" as const) : BigInt(o.id!)))
