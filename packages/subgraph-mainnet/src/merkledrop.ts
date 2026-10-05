@@ -3,12 +3,16 @@ import { RewardClaim, RewardAccount, RewardPeriod } from "../generated/schema"
 import { network, dayData, ZERO } from "./shared"
 
 /**
- * A claim on the CumulativeMerkleDrop.
+ * A claim on the MerkleDrop.
  *
- * The event's `amount` is the account's CUMULATIVE total, not this claim. The contract pays
- * the difference against what the account already claimed. Summing the event field would
- * double count every repeat claimer, so this handler keeps a per-account running total and
- * records the difference as the amount actually paid.
+ * The event's `amount` is what THIS claim paid, not the account's cumulative total. Checked
+ * against the chain on 2026-10-04: one account's seven event amounts rise and fall (18, 8, 8, 15,
+ * 15, 6, 17 SAFE) and sum to `cumulativeClaimed(account)` on the contract, and the amounts of
+ * all 326 claims sum to allocated minus the live MerkleDrop balance. metrics-poc.ts sums them the
+ * same way. Reading the field as cumulative made 141 of those claims negative.
+ *
+ * So the network total is the plain sum, and the per-account running total is kept here to
+ * give each RewardClaim the account's cumulative figure after it.
  *
  * The differential test checks the result: allocated minus claimed equals the live MerkleDrop balance.
  */
@@ -24,20 +28,21 @@ export function handleClaimed(event: Claimed): void {
     a.firstClaimAtTimestamp = event.block.timestamp
   }
 
-  const paid = event.params.amount.minus(a.cumulativeClaimed)
+  const paid = event.params.amount
+  const cumulative = a.cumulativeClaimed.plus(paid)
 
   const c = new RewardClaim(
     event.transaction.hash.toHexString() + "-" + event.logIndex.toString(),
   )
   c.account = event.params.account
-  c.cumulativeAmount = event.params.amount
+  c.cumulativeAmount = cumulative
   c.amount = paid
   c.blockNumber = event.block.number
   c.timestamp = event.block.timestamp
   c.transactionHash = event.transaction.hash
   c.save()
 
-  a.cumulativeClaimed = event.params.amount
+  a.cumulativeClaimed = cumulative
   a.claimCount = a.claimCount + 1
   a.lastClaimAtTimestamp = event.block.timestamp
   a.save()

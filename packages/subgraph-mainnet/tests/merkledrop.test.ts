@@ -9,18 +9,19 @@ const DAY1 = 1775088000
 describe("merkle drop", () => {
   afterEach(() => { clearStore() })
 
-  test("a first claim pays the whole cumulative amount", () => {
+  test("a first claim pays its amount", () => {
     handleClaimed(claimed(ALICE, "500", 1, DAY1))
 
     assert.fieldEquals("Network", "1", "rewardsClaimed", "500")
     assert.fieldEquals("RewardAccount", ALICE, "cumulativeClaimed", "500")
   })
 
-  test("a second claim pays only the difference", () => {
-    // The event carries the account's CUMULATIVE total, not this payment. Summing the field
-    // would report 1,300 paid when the contract paid 800. This is the bug the test guards.
+  test("a second claim adds what it paid", () => {
+    // The event carries what this claim paid, not the account's cumulative total: an account's
+    // event amounts sum to cumulativeClaimed(account) on the contract. Treating the field as
+    // cumulative reported 300 paid here when the contract paid 800.
     handleClaimed(claimed(ALICE, "500", 1, DAY1, 0))
-    handleClaimed(claimed(ALICE, "800", 2, DAY1, 1))
+    handleClaimed(claimed(ALICE, "300", 2, DAY1, 1))
 
     assert.fieldEquals("Network", "1", "rewardsClaimed", "800")
     assert.fieldEquals("RewardAccount", ALICE, "cumulativeClaimed", "800")
@@ -28,12 +29,23 @@ describe("merkle drop", () => {
     assert.entityCount("RewardClaim", 2)
   })
 
-  test("each claim records what it alone paid", () => {
+  test("a smaller later claim is still a payment, never a negative one", () => {
+    // Real claims rise and fall: one account claimed 18, 8, 8, 15, 15, 6 and 17 SAFE.
     handleClaimed(claimed(ALICE, "500", 1, DAY1, 0))
-    handleClaimed(claimed(ALICE, "800", 2, DAY1, 1))
+    handleClaimed(claimed(ALICE, "200", 2, DAY1, 1))
+
+    assert.fieldEquals("Network", "1", "rewardsClaimed", "700")
+    assert.fieldEquals("RewardClaim", "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-1", "amount", "200")
+  })
+
+  test("each claim records what it alone paid and the account's total after it", () => {
+    handleClaimed(claimed(ALICE, "500", 1, DAY1, 0))
+    handleClaimed(claimed(ALICE, "300", 2, DAY1, 1))
 
     assert.fieldEquals("RewardClaim", "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-0", "amount", "500")
+    assert.fieldEquals("RewardClaim", "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-0", "cumulativeAmount", "500")
     assert.fieldEquals("RewardClaim", "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-1", "amount", "300")
+    assert.fieldEquals("RewardClaim", "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-1", "cumulativeAmount", "800")
   })
 
   test("root updates number the periods from one", () => {
