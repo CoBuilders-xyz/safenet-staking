@@ -87,6 +87,15 @@ export const SEF_DATA = {
     "https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/main/assets/rewards/latest.json",
   rewardsProofBase:
     "https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/main/assets/rewards",
+  /**
+   * The last commit that wrote validator-info.json, through the GitHub API. Its time is when
+   * SEF published the participation rates, which fixes the window they cover.
+   */
+  validatorInfoCommits:
+    "https://api.github.com/repos/safe-fndn/safenet-beta-data/commits?path=assets/validator-info.json&per_page=1",
+  /** A file under `assets/` at one commit, so the rates and their window come from one write. */
+  assetsAtCommit: (sha: string) =>
+    `https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/${sha}/assets`,
   /** Their cron runs every 3 hours. Three missed runs is our staleness threshold. */
   staleAfterMs: 9 * 60 * 60 * 1000,
 } as const

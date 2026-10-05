@@ -31,7 +31,11 @@ nightly, because a recent window legitimately contains none of them.
   the reference interface reads the chain through one hardcoded URL and goes blank when it fails.
 - `src/contracts.ts` — addresses, deploy blocks, and where SEF publishes the data our numbers must
   match.
-- `src/abis.ts` — the indexed event registry and the read-call ABIs.
+- `src/abis.ts` — the indexed event registry, `indexedEvent()` to look one up by name, and the
+  read-call ABIs.
+- `src/sef.ts` — the shapes of SEF's published files, the URL of an address's reward proof, and
+  the window a published participation rate covers.
+- `src/deployments.ts` — what the interface needs per chain, derived from `src/contracts.ts`.
 - `src/fork.ts` — the Mainnet block the fork suite forks from, pinned together with the commit of
   SEF's data it reads. A test fixture: move the two together.
 - `scripts/verify-abis.ts` — the check itself.
@@ -41,5 +45,7 @@ nightly, because a recent window legitimately contains none of them.
 1. Add it to `src/contracts.ts` or `src/abis.ts`, with a comment naming where you got it.
 2. Run `pnpm verify:abis`. A new event producing no logs is not verified. Mark it `rare` and prove
    it with `--deep` before anything depends on it.
-3. Keep the export surface to constants and ABIs. No business logic lives here, because every
-   other package imports this one and nothing should import them back.
+3. Keep the export surface to constants, ABIs, and small accessors that only look a constant up
+   or derive a location from it, such as `indexedEvent()` or `rewardProofUrl()`. No business
+   logic lives here, because every other package imports this one and nothing should import them
+   back.

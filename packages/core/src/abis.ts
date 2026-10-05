@@ -10,7 +10,7 @@
  * and the "rare" entries under --deep, which scans from each contract's deploy block.
  * If it fails, the world changed. Do not "fix" the signature by reading a branch.
  */
-import { parseAbi } from "viem"
+import { parseAbi, parseAbiItem, type ParseAbiItem } from "viem"
 import type { ContractName } from "./contracts.js"
 
 /**
@@ -73,10 +73,40 @@ export const INDEXED_EVENTS = [
     signature: "event Transfer(address indexed from, address indexed to, uint256 value)" },
 ] as const satisfies readonly IndexedEvent[]
 
+type IndexedEventEntry = (typeof INDEXED_EVENTS)[number]
+type EventNameOf<S> = S extends `event ${infer N}(${string}` ? N : never
+
+/** The names of the events registered for one contract, as literal types. */
+export type IndexedEventName<C extends ContractName> =
+  EventNameOf<Extract<IndexedEventEntry, { contract: C }>["signature"]>
+
+type SignatureOf<C extends ContractName, N extends string> =
+  Extract<IndexedEventEntry, { contract: C; signature: `event ${N}(${string}` }>["signature"]
+
+/**
+ * One registered event, parsed, looked up by contract and name.
+ *
+ * Code outside this package names the event and never writes its signature, so the only
+ * signature in use is the one verify:abis proves against the chain.
+ */
+export function indexedEvent<C extends ContractName, N extends IndexedEventName<C>>(
+  contract: C,
+  name: N,
+): ParseAbiItem<SignatureOf<C, N>> {
+  const entry = INDEXED_EVENTS.find(
+    (ev) => ev.contract === contract && ev.signature.startsWith(`event ${name}(`),
+  )
+  if (!entry) throw new Error(`no indexed event ${name} on ${contract}`)
+  return parseAbiItem(entry.signature) as ParseAbiItem<SignatureOf<C, N>>
+}
+
 /** Read-only calls the interface and the CLI both make. */
 export const stakingAbi = parseAbi([
   "function totalStakedAmount() view returns (uint256)",
   "function totalPendingWithdrawals() view returns (uint256)",
+  // Verified 2026-10-04 by eth_call on Mainnet: for a staker with one open withdrawal it
+  // returned one (amount, claimableAt) pair whose amount equals that WithdrawalInitiated log.
+  "function getPendingWithdrawals(address staker) view returns ((uint256 amount, uint256 claimableAt)[])",
   "function stakes(address staker, address validator) view returns (uint256)",
   "function totalStakerStakes(address staker) view returns (uint256)",
   "function totalValidatorStakes(address validator) view returns (uint256)",

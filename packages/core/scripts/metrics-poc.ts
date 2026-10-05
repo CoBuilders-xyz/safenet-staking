@@ -24,6 +24,7 @@ import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 import { CHAINS, RPC_URLS } from "../src/chains.js"
 import { CONTRACTS, SEF_DATA } from "../src/contracts.js"
+import { participationWindow } from "../src/sef.js"
 import { stakingAbi, merkleDropAbi } from "../src/abis.js"
 import { execFileSync } from "node:child_process"
 
@@ -231,20 +232,19 @@ async function run() {
     // `||`, not `??`: an empty GITHUB_TOKEN= line in .env.local means unset, not "no token".
     const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || ghCliToken()
     const commits = (await (await fetch(
-      "https://api.github.com/repos/safe-fndn/safenet-beta-data/commits?path=assets/validator-info.json&per_page=1",
+      SEF_DATA.validatorInfoCommits,
       { headers: { accept: "application/vnd.github+json", ...(token ? { authorization: `Bearer ${token}` } : {}) } },
     )).json()) as { sha: string; commit: { committer: { date: string } } }[]
     const c = commits[0]
     if (!c?.sha || !c.commit?.committer?.date) throw new Error("unexpected commits payload")
-    const published = Date.parse(c.commit.committer.date) / 1000
-    endSec = Math.floor(published / 3600) * 3600
+    endSec = participationWindow(new Date(c.commit.committer.date)).end.getTime() / 1000
     // Read the rates at THAT commit, not from main. The API and the raw CDN are separate caches,
     // so for a few minutes after a publish they can disagree by a whole 3-hour period.
     // update-data.yml line 85 stages exactly two files: network-info.json and
     // validator-info.json. Both are pinned. rewards/latest.json is NOT in that workflow; it is
     // written by a separate fortnightly PR, so pinning it to a 3-hourly commit would read a
     // stale root against a live chain read for hours after every rewards merge.
-    const at = `https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/${c.sha}/assets`
+    const at = SEF_DATA.assetsAtCommit(c.sha)
     sefRatesUrl = `${at}/validator-info.json`
     sefNetUrl = `${at}/network-info.json`
     windowSource = `SEF publish ${c.commit.committer.date} (commit ${c.sha.slice(0, 7)}), floored to the hour`
