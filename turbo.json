@@ -26,6 +26,12 @@
         "coverage/**"
       ]
     },
+    "//#test:tools": {
+      "inputs": [
+        "tools/**"
+      ],
+      "outputs": []
+    },
     "check": {},
     "verify:abis": {
       "cache": false
