@@ -1,0 +1,56 @@
+{
+  "name": "@cobuilders/safenet-mcp",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "safenet-mcp, an MCP server for Safenet Beta over stdio: the safenet CLI's reads, and its writes as dry runs unless the operator allows them.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "safenet",
+    "safe",
+    "staking"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CoBuilders-xyz/safenet-staking.git",
+    "directory": "packages/mcp"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "bin": {
+    "safenet-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist/index.js",
+    "dist/index.js.map",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "bootstrap": "echo '@cobuilders/safenet-mcp: nothing to prepare'",
+    "dev": "tsc --noEmit --watch",
+    "build": "tsup",
+    "start": "node --conditions=source --env-file-if-exists=../../.env.local --import tsx src/index.ts",
+    "test": "NODE_OPTIONS=--conditions=source node ../../tools/run-node-tests.mjs src",
+    "test:smoke": "NODE_OPTIONS=--conditions=source node --env-file-if-exists=../../.env.local ../../tools/run-node-tests.mjs src/smoke",
+    "client": "node --conditions=source --env-file-if-exists=../../.env.local --import tsx scripts/client.ts",
+    "check": "pnpm lint && tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "viem": "2.46.2",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@cobuilders/safenet-cli": "workspace:*",
+    "@cobuilders/safenet-core": "workspace:*",
+    "@types/node": "22.19.2",
+    "tsup": "8.5.1",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  }
+}
