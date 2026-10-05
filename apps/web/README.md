@@ -186,9 +186,10 @@ The `scripts/` directory contains tooling for generating Merkle proofs compatibl
 2. Run `pnpm generate:proofs`. It writes to `.rewards/`, which git ignores; `--out <dir>` names
    another directory.
 3. Output, in the shape SEF publishes:
-   - `proofs/<radix>/{address}.json` — per-address proof files
+   - `proofs/<radix>/{lowercase_address}.json` — per-address proof files
    - `latest.json` — `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal`, `unpaidAmount`, `updatedAt`
-4. Set the root on-chain via the admin panel
+4. Serve the output directory and point `VITE_REWARDS_BASE_URL` at it. `useRewardProof` fetches each proof from `${VITE_REWARDS_BASE_URL}/proofs/<radix>/{lowercase_address}.json`, and `useProgrammeRewards` reads `${VITE_REWARDS_BASE_URL}/latest.json`.
+5. Only then set the Merkle root on-chain via the admin panel. In the other order the app still serves the old proofs against the new root, and `useRewards` disables Claim because the roots differ.
 
 The tree uses sorted-pair hashing (OpenZeppelin convention) and viem for encoding.
 

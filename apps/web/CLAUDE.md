@@ -178,8 +178,8 @@ Off-chain tooling for generating Merkle proofs compatible with the MerkleDrop co
 3. Output files, in the shape SEF publishes:
    - `proofs/<radix>/{lowercase_address}.json` — per-address proof file (`{ cumulativeAmount, merkleRoot, proof }`)
    - `latest.json` — `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal`, `unpaidAmount`, `updatedAt`
-4. Set the Merkle root on-chain via the admin panel (see below)
-5. Serve the output directory and point `VITE_REWARDS_BASE_URL` at it: the frontend `useRewardProof` hook fetches proofs from `${VITE_REWARDS_BASE_URL}/proofs/`
+4. Serve the output directory and point `VITE_REWARDS_BASE_URL` at it. `useRewardProof` fetches each proof from `${VITE_REWARDS_BASE_URL}/proofs/<radix>/{lowercase_address}.json`, and `useProgrammeRewards` reads `${VITE_REWARDS_BASE_URL}/latest.json`.
+5. Only then set the Merkle root on-chain via the admin panel (see below). In the other order the app still serves the old proofs against the new root, and `useRewards` disables Claim because the roots differ.
 
 ### Config Format
 

@@ -45,7 +45,7 @@ function loadConfig(): MerkleConfig {
   }
 
   const { rewardsUntil, unpaidAmount } = config as Record<string, unknown>
-  if (rewardsUntil !== undefined && (typeof rewardsUntil !== "string" || Number.isNaN(Date.parse(rewardsUntil)))) {
+  if (rewardsUntil !== undefined && typeof rewardsUntil !== "string") {
     throw new Error("merkle-config.json: rewardsUntil must be an ISO 8601 date")
   }
   if (unpaidAmount !== undefined && (typeof unpaidAmount !== "string" || !/^\d+$/.test(unpaidAmount))) {
@@ -53,6 +53,17 @@ function loadConfig(): MerkleConfig {
   }
 
   return config as MerkleConfig
+}
+
+// `Date.parse` alone also accepts forms such as "09/22/2026", whose meaning depends on the time zone.
+const ISO_8601 = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/
+
+/** Accepts only the ISO 8601 shape, and writes it as `toISOString()` does: UTC, with milliseconds. */
+function toIsoDate(value: string): string {
+  if (!ISO_8601.test(value) || Number.isNaN(Date.parse(value))) {
+    throw new Error(`rewardsUntil must be an ISO 8601 date, got ${JSON.stringify(value)}`)
+  }
+  return new Date(value).toISOString()
 }
 
 /** Build the tree for `config` and write `proofs/` and `latest.json` under `outDir`. */
@@ -114,7 +125,7 @@ export function generateRewards(config: MerkleConfig, outDir: string, now = new 
   const latest: SefRewardsLatest = {
     epoch: config.epoch,
     merkleRoot: tree.root,
-    rewardsUntil: config.rewardsUntil ?? updatedAt,
+    rewardsUntil: config.rewardsUntil === undefined ? updatedAt : toIsoDate(config.rewardsUntil),
     tokenTotal: total.toString(),
     unpaidAmount: config.unpaidAmount ?? "0",
     updatedAt,

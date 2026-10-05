@@ -56,6 +56,14 @@ describe("generateRewards", () => {
     })
   })
 
+  it("rejects a rewardsUntil that is not ISO 8601, and writes a valid one in UTC", () => {
+    expect(() => generateRewards({ ...CONFIG, rewardsUntil: "09/22/2026" }, out)).toThrow(
+      'rewardsUntil must be an ISO 8601 date, got "09/22/2026"',
+    )
+    const latest = generateRewards({ ...CONFIG, rewardsUntil: "2026-09-22T02:00:00+02:00" }, out)
+    expect(latest.rewardsUntil).toBe("2026-09-22T00:00:00.000Z")
+  })
+
   it("writes each proof under the radix path of the lower-case address", () => {
     const { merkleRoot } = generateRewards(CONFIG, out)
     const lower = addr(2).toLowerCase()
