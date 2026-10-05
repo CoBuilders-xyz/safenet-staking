@@ -75,6 +75,10 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
     maxAmount: restaking ? claimedAmount : undefined,
     // A stake that confirms after the dialog closed still toasts, but must not reopen on "Done".
     onStaked: open ? setStaked : undefined,
+    // Right after a claim, a balance read can come from a node behind the claim's block. Poll it,
+    // and count the claimed SAFE as available meanwhile.
+    availableAtLeast: restaking && claim.isSuccess ? claimedAmount : undefined,
+    pollBalance: true,
   })
 
   useEffect(() => {

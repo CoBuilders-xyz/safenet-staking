@@ -26,6 +26,13 @@ interface UseStakeFormOptions {
   maxAmount?: bigint
   /** Called once the stake confirms, after the success toast. */
   onStaked?: (staked: Staked) => void
+  /**
+   * SAFE known to be in the wallet whatever the balance read says, such as what a confirmed claim
+   * just paid. A read from a node that has not seen that block must not lock the form.
+   */
+  availableAtLeast?: bigint
+  /** Poll the balance while the form is active, for a balance that is about to change. */
+  pollBalance?: boolean
 }
 
 /**
@@ -36,11 +43,19 @@ interface UseStakeFormOptions {
  * It lives in the dialog rather than in the form, so that a transaction still confirming when
  * the dialog closes keeps its toast.
  */
-export function useStakeForm({ validator, active, initialAmount, maxAmount, onStaked }: UseStakeFormOptions) {
+export function useStakeForm({
+  validator,
+  active,
+  initialAmount,
+  maxAmount,
+  onStaked,
+  availableAtLeast,
+  pollBalance,
+}: UseStakeFormOptions) {
   // Null until the user types: the amount then follows `initialAmount`.
   const [typedAmount, setTypedAmount] = useState<string | null>(null)
   const amount = typedAmount ?? (initialAmount !== undefined ? formatTokenAmountRaw(initialAmount, 18, 18) : "")
-  const { data: balance } = useTokenBalance()
+  const { data: balance } = useTokenBalance({ refetchInterval: pollBalance && active ? 4_000 : undefined })
 
   const parsedAmount = safeParseEther(amount)
 
@@ -71,7 +86,11 @@ export function useStakeForm({ validator, active, initialAmount, maxAmount, onSt
   const { data: withdrawDelay } = useWithdrawDelay()
   const { toast } = useToast()
 
-  const balanceValue = typeof balance === "bigint" ? balance : undefined
+  const readBalance = typeof balance === "bigint" ? balance : undefined
+  const balanceValue =
+    availableAtLeast !== undefined && (readBalance === undefined || readBalance < availableAtLeast)
+      ? availableAtLeast
+      : readBalance
   const hasZeroBalance = balanceValue !== undefined && balanceValue === 0n
   const insufficientBalance = balanceValue !== undefined && parsedAmount > 0n && parsedAmount > balanceValue
   const aboveMax = maxAmount !== undefined && parsedAmount > maxAmount
@@ -94,11 +113,14 @@ export function useStakeForm({ validator, active, initialAmount, maxAmount, onSt
     onStakedRef.current = onStaked
   })
 
-  // What was sent, not what the input shows when it confirms: the input stays editable meanwhile.
+  // What was sent, not what the input shows when it confirms: the input stays editable meanwhile,
+  // and a dialog closed mid-stake resets it. The ref feeds `onStaked`, the state the toast text.
   const submitted = useRef<Omit<Staked, "txHash"> | undefined>(undefined)
+  const [sent, setSent] = useState<Omit<Staked, "txHash"> | undefined>()
   const submitStake = useCallback(
     (to: Address, value: bigint) => {
       submitted.current = { amount: value, validator: to }
+      setSent(submitted.current)
       stake(to, value)
     },
     [stake],
@@ -106,6 +128,7 @@ export function useStakeForm({ validator, active, initialAmount, maxAmount, onSt
   const submitBatch = useCallback(
     (to: Address, value: bigint) => {
       submitted.current = { amount: value, validator: to }
+      setSent(submitted.current)
       batchApproveAndStake(to, value)
     },
     [batchApproveAndStake],
@@ -118,13 +141,14 @@ export function useStakeForm({ validator, active, initialAmount, maxAmount, onSt
   const onStakeConfirmed = useCallback(() => finish(stakeTxHash), [finish, stakeTxHash])
   const onBatchConfirmed = useCallback(() => finish(batchTxHash), [finish, batchTxHash])
 
-  const target = validator ? truncateAddress(validator) : "a validator"
+  const sentAmount = sent ? formatTokenAmountRaw(sent.amount, 18, 18) : amount
+  const target = sent ? truncateAddress(sent.validator) : validator ? truncateAddress(validator) : "a validator"
 
   // Stake transaction toasts
   useTxToast(
     {
       successTitle: "Delegation successful",
-      successDescription: `Staked ${amount} SAFE to ${target}`,
+      successDescription: `Staked ${sentAmount} SAFE to ${target}`,
       errorTitle: "Delegation failed",
       safeQueuedDescription: "Your delegation has been sent to Safe Wallet for signing.",
     },
@@ -142,7 +166,7 @@ export function useStakeForm({ validator, active, initialAmount, maxAmount, onSt
   useTxToast(
     {
       successTitle: "Delegation successful",
-      successDescription: `Approved and staked ${amount} SAFE to ${target}`,
+      successDescription: `Approved and staked ${sentAmount} SAFE to ${target}`,
       errorTitle: "Delegation failed",
     },
     {

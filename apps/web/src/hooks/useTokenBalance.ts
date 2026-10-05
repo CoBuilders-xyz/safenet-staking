@@ -3,7 +3,8 @@ import { erc20Abi } from "@/abi/erc20Abi"
 import { getContractAddresses } from "@/config/contracts"
 import { activeChain } from "@/config/chains"
 
-export function useTokenBalance() {
+/** `refetchInterval` polls while a caller needs a balance that is about to change, such as after a claim. */
+export function useTokenBalance({ refetchInterval }: { refetchInterval?: number } = {}) {
   const { address } = useAccount()
   const { token } = getContractAddresses(activeChain.id)
 
@@ -12,6 +13,6 @@ export function useTokenBalance() {
     abi: erc20Abi,
     functionName: "balanceOf",
     args: [address!],
-    query: { enabled: !!address },
+    query: { enabled: !!address, refetchInterval },
   })
 }

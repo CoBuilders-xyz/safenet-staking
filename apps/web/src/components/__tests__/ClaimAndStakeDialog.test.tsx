@@ -26,6 +26,8 @@ const m = vi.hoisted(() => ({
   batchState: { supportsBatching: false },
   approval: { needsApproval: false },
   toast: vi.fn(),
+  balance: 0n as bigint | undefined,
+  balanceOptions: vi.fn(),
 }))
 
 vi.mock("wagmi", () => ({ useAccount: () => ({ isConnected: true, address: TEST_ACCOUNTS.user }) }))
@@ -46,7 +48,12 @@ vi.mock("@/hooks/useClaimStep", () => ({
     ...m.claimState,
   }),
 }))
-vi.mock("@/hooks/useTokenBalance", () => ({ useTokenBalance: () => ({ data: AMOUNTS.userBalance }) }))
+vi.mock("@/hooks/useTokenBalance", () => ({
+  useTokenBalance: (options?: { refetchInterval?: number }) => {
+    m.balanceOptions(options)
+    return { data: m.balance }
+  },
+}))
 vi.mock("@/hooks/useValidators", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks/useValidators")>()),
   useValidators: () => ({ data: MOCK_VALIDATORS, isLoading: false, error: null }),
@@ -133,6 +140,7 @@ describe("ClaimAndStakeDialog", () => {
     m.stakeState = { isSuccess: false, txHash: undefined }
     m.batchState = { supportsBatching: false }
     m.approval = { needsApproval: false }
+    m.balance = AMOUNTS.userBalance
   })
 
   describe("claim step", () => {
@@ -253,6 +261,26 @@ describe("ClaimAndStakeDialog", () => {
       expect(m.batchApproveAndStake).toHaveBeenCalledWith(TEST_ACCOUNTS.validator1, 60n * SAFE)
     })
 
+    it("does not lock the form on a balance read from before the claim, and polls until it catches up", async () => {
+      claimed(60n * SAFE)
+      // A node that has not seen the claim's block: the wallet held nothing before claiming.
+      m.balance = 0n
+      const view = renderDialog()
+
+      expect(m.balanceOptions).toHaveBeenCalledWith({ refetchInterval: 4_000 })
+      const amount = screen.getByLabelText("Amount")
+      expect(amount).toBeEnabled()
+      expect(amount).toHaveValue("60")
+      expect(screen.queryByText(/do not have enough SAFE/)).not.toBeInTheDocument()
+
+      // The next poll reaches a node that has.
+      m.balance = 60n * SAFE
+      view.rerenderOpen()
+      expect(screen.getByLabelText("Amount")).toBeEnabled()
+      await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
+      expect(screen.getByRole("button", { name: "Stake" })).toBeEnabled()
+    })
+
     it("asks for the amount when the receipt did not show it", () => {
       claimed(undefined)
       renderDialog()
@@ -322,6 +350,36 @@ describe("ClaimAndStakeDialog", () => {
       expect(m.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Rewards claimed" }))
       expect(m.claimReset).toHaveBeenCalled()
       view.unmount()
+    })
+
+    it("names the amount and validator sent when a stake confirms after the dialog closed", async () => {
+      claimed(60n * SAFE)
+      const onOpenChange = vi.fn()
+      const ui = (open: boolean) => (
+        <TooltipProvider>
+          <ClaimAndStakeDialog open={open} onOpenChange={onOpenChange} mode="claim" rewards={rewards()} />
+        </TooltipProvider>
+      )
+      const view = render(ui(true))
+      const amount = screen.getByLabelText("Amount")
+      await userEvent.clear(amount)
+      await userEvent.type(amount, "50")
+      await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
+      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+
+      // Closed while the stake confirms: the dialog drops its validator and amount.
+      m.stakeState = { isSuccess: false, isConfirmingTx: true, txHash: undefined } as typeof m.stakeState
+      view.rerender(ui(true))
+      await userEvent.keyboard("{Escape}")
+      expect(onOpenChange).toHaveBeenCalledWith(false)
+      view.rerender(ui(false))
+
+      m.stakeState = { isSuccess: true, txHash: `0x${"5a".repeat(32)}` }
+      view.rerender(ui(false))
+
+      expect(m.toast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Delegation successful", description: "Staked 50 SAFE to 0x1234...5678" }),
+      )
     })
 
     it("keeps a claim that is still confirming, so it reports when it lands", async () => {
