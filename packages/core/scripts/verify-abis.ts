@@ -8,17 +8,22 @@
  * Method: compute keccak topic0 for each signature, then ask the chain for logs
  * carrying that topic. A signature that no longer matches produces zero logs.
  *
- *   default    high-frequency events over a recent window. Fast. Every PR.
- *   --deep     every event from its deploy block. Slow. Nightly.
+ *   default    high-frequency events. Fast. Every PR. A tripwire, so it must not depend on
+ *              recent activity: it scans WINDOW blocks back from the head and, when an event
+ *              has no log there, widens backwards in doubling steps up to CEILING (about 11.5
+ *              days on Gnosis, 14 on Mainnet; see verify-abis-scan.ts). It stops at the first
+ *              step with a log and prints how many blocks ago the event was last seen. It fails
+ *              only when the ceiling holds no log of the event: NO MATCH when the contract
+ *              emitted other logs in that span, NO ACTIVITY when it emitted none at all.
+ *   --deep     every event from its deploy block. Slow. Nightly. The real proof.
  */
 import { createPublicClient, fallback, http, parseAbiItem, toEventSelector, type AbiEvent } from "viem"
 import { CHAINS, RPC_URLS } from "../src/chains.js"
 import { CONTRACTS } from "../src/contracts.js"
 import { INDEXED_EVENTS } from "../src/abis.js"
+import { CEILING, WINDOW, scanFromDeploy, scanRecent, type Status } from "./verify-abis-scan.js"
 
 const deep = process.argv.includes("--deep")
-/** Recent-window size per chain. Gnosis blocks are ~5s, Mainnet ~12s. */
-const WINDOW = { mainnet: 5_000n, gnosis: 2_000n } as const
 
 const clients = {
   mainnet: createPublicClient({
@@ -36,8 +41,10 @@ interface Result {
   contract: string
   topic0: `0x${string}`
   logs: number
+  /** Fast mode: "N blocks ago" for the newest log. Deep mode: the block of the first log. */
+  seen: string
   checked: string
-  ok: boolean
+  status: Status
 }
 
 async function verify(): Promise<Result[]> {
@@ -50,45 +57,32 @@ async function verify(): Promise<Result[]> {
     const client = clients[ref.chain]
     const item = parseAbiItem(ev.signature) as AbiEvent
     const topic0 = toEventSelector(item)
+    const signature = ev.signature.replace(/^event /, "").split("(")[0] ?? ev.signature
 
     const latest = await client.getBlockNumber()
-    if (deep && !("startBlock" in ref && ref.startBlock !== undefined)) {
-      throw new Error(
-        `--deep needs a startBlock for ${ev.contract}, and contracts.ts has none. Falling back to a ` +
-        `recent window would report a correct signature as NO MATCH whenever the event is rare.`,
-      )
-    }
-    const from =
-      deep && "startBlock" in ref && ref.startBlock !== undefined
-        ? ref.startBlock
-        : latest - WINDOW[ref.chain]
-
-    // Filtering by `event` makes viem derive topic0 from OUR signature. If the
-    // deployed contract no longer emits it, the result is empty. That is the test.
-    // Chunked, because a deep scan spans millions of blocks and providers cap the range.
-    // A single unchunked request over that span fails, and every rare signature would then
-    // go unproven.
-    let logs: Awaited<ReturnType<typeof client.getLogs>> = []
-    let cursor = from < 0n ? 0n : from
-    let chunk = 50_000n
-    while (cursor <= latest && logs.length === 0) {
-      const to = cursor + chunk - 1n > latest ? latest : cursor + chunk - 1n
-      try {
-        logs = await client.getLogs({ address: ref.address, event: item, fromBlock: cursor, toBlock: to })
-        cursor = to + 1n
-      } catch (err) {
-        if (chunk <= 1_000n) throw err
-        chunk /= 4n
+    if (deep) {
+      if (!("startBlock" in ref && ref.startBlock !== undefined)) {
+        throw new Error(
+          `--deep needs a startBlock for ${ev.contract}, and contracts.ts has none. Falling back to a ` +
+          `recent window would report a correct signature as NO MATCH whenever the event is rare.`,
+        )
       }
+      const scan = await scanFromDeploy(client, ref.address, item, ref.startBlock, latest)
+      results.push({
+        signature, contract: ev.contract, topic0, logs: scan.logs,
+        seen: scan.firstSeen === undefined ? "-" : `block ${scan.firstSeen}`,
+        checked: `${ref.startBlock}..${latest}`,
+        status: scan.logs > 0 ? "match" : "NO MATCH",
+      })
+      continue
     }
 
+    const scan = await scanRecent(client, ref.address, item, latest, WINDOW[ref.chain], CEILING[ref.chain])
     results.push({
-      signature: ev.signature.replace(/^event /, "").split("(")[0] ?? ev.signature,
-      contract: ev.contract,
-      topic0,
-      logs: logs.length,
-      checked: `${from}..${latest}`,
-      ok: logs.length > 0,
+      signature, contract: ev.contract, topic0, logs: scan.logs,
+      seen: scan.lastSeen === undefined ? `none in ${scan.depth} blocks` : `${scan.lastSeen} blocks ago`,
+      checked: `${latest - scan.depth}..${latest}`,
+      status: scan.status,
     })
   }
   return results
@@ -97,22 +91,36 @@ async function verify(): Promise<Result[]> {
 const results = await verify()
 
 const pad = (s: string, n: number) => s.padEnd(n)
-console.log(`\n  verify:abis  ${deep ? "deep scan from deploy block" : "recent window, high-frequency events"}\n`)
-console.log(`  ${pad("EVENT", 24)}${pad("CONTRACT", 18)}${pad("TOPIC0", 14)}${pad("LOGS", 8)}RESULT`)
+console.log(`\n  verify:abis  ${deep ? "deep scan from deploy block" : "recent window, widened when quiet, high-frequency events"}\n`)
+console.log(`  ${pad("EVENT", 24)}${pad("CONTRACT", 18)}${pad("TOPIC0", 14)}${pad("LOGS", 8)}${pad(deep ? "FIRST SEEN" : "LAST SEEN", 22)}RESULT`)
 for (const r of results) {
   console.log(
-    `  ${pad(r.signature, 24)}${pad(r.contract, 18)}${pad(r.topic0.slice(0, 10) + "…", 14)}${pad(String(r.logs), 8)}${r.ok ? "match" : "NO MATCH"}`,
+    `  ${pad(r.signature, 24)}${pad(r.contract, 18)}${pad(r.topic0.slice(0, 10) + "…", 14)}${pad(String(r.logs), 8)}${pad(r.seen, 22)}${r.status}`,
   )
 }
 
-const failed = results.filter((r) => !r.ok)
-if (failed.length > 0) {
+const noMatch = results.filter((r) => r.status === "NO MATCH")
+const noActivity = results.filter((r) => r.status === "NO ACTIVITY")
+if (noMatch.length > 0) {
   console.error(
-    `\n  ${failed.length} signature(s) produced no logs.\n` +
-      `  The contract may have been redeployed. Do NOT edit the signature by reading a\n` +
-      `  git branch: neither published branch matches what is deployed. Recover the real\n` +
-      `  signature from the chain, then update packages/core/src/abis.ts.\n`,
+    deep
+      ? `\n  ${noMatch.length} signature(s) produced no logs.\n` +
+        `  The contract may have been redeployed. Do NOT edit the signature by reading a\n` +
+        `  git branch: neither published branch matches what is deployed. Recover the real\n` +
+        `  signature from the chain, then update packages/core/src/abis.ts.\n`
+      : `\n  NO MATCH: ${noMatch.length} signature(s) produced no logs back to the ceiling, while\n` +
+        `  the contract emitted other logs in that span. The signature in packages/core/src/abis.ts\n` +
+        `  is probably wrong, or the event is not high-frequency. Do NOT edit the signature by\n` +
+        `  reading a git branch: neither published branch matches what is deployed. Recover the\n` +
+        `  real signature from the chain, and prove a rare event with --deep.\n`,
   )
-  process.exit(1)
 }
+if (noActivity.length > 0) {
+  console.error(
+    `\n  NO ACTIVITY: ${noActivity.length} contract event(s) found no log of any kind back to the\n` +
+      `  ceiling. This does not test the signature: the contract is idle, or it was redeployed\n` +
+      `  to a new address. Check the address in packages/core/src/contracts.ts against the chain.\n`,
+  )
+}
+if (noMatch.length + noActivity.length > 0) process.exit(1)
 console.log(`\n  ${results.length} signature(s) verified against the chain.\n`)

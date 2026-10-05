@@ -30,7 +30,7 @@ Every package implements the same five. Turborepo fans them out.
 | `pnpm bootstrap` | Runs `scripts/setup.sh`: checks tools, writes `.env.ports`, installs, then links Vercel and pulls `.env.local`. Safe to re-run. **Not `setup`: that is a pnpm builtin that edits your shell rc.** |
 | `pnpm dev` | Starts the web app's Vite dev server, type-watches `packages/core`, and regenerates the subgraph manifests and types. |
 | `pnpm build` | Builds all packages. |
-| `pnpm test` | Unit tests. `apps/web` has 380 Vitest tests in 42 files. The subgraphs have matchstick tests: 20 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has 34 node:test tests in 6 files, and its script fails when it finds no test file. `packages/cli` has 49 node:test tests in 4 files, plus 6 Mainnet smoke tests in a fifth that skip here; see `test:smoke`. |
+| `pnpm test` | Unit tests. `apps/web` has 380 Vitest tests in 42 files. The subgraphs have matchstick tests: 20 in `subgraph-mainnet`, 11 in `subgraph-gnosis`. `packages/core` has 45 node:test tests in 7 files, under `src` and `scripts`, and its script fails when it finds no test file. `packages/cli` has 49 node:test tests in 4 files, plus 6 Mainnet smoke tests in a fifth that skip here; see `test:smoke`. |
 | `pnpm check` | Lint, the browser-safety check, then types in every package. Run it before every commit. |
 
 The test counts were measured with `pnpm test` when this file was written. Run it for the
@@ -44,7 +44,7 @@ Specific commands, only where they apply:
 
 | Command | Where | What it proves | Today |
 |---|---|---|---|
-| `pnpm verify:abis` | `packages/core` | The high-frequency event signatures still match the chain, over a recent window | works |
+| `pnpm verify:abis` | `packages/core` | The high-frequency event signatures still match the chain. It scans a recent window and, when an event is quiet there, widens back in doubling steps to a ceiling of about 11.5 days on Gnosis and 14 on Mainnet. It prints how many blocks ago each event was last seen, and fails only when the ceiling holds no log of it: NO MATCH when the contract emitted other logs, NO ACTIVITY when it emitted none | works |
 | `pnpm verify:abis:deep` | `packages/core` | Every signature, including rare events, scanned from each deploy block | needs the archive `MAINNET_RPC_URL` from `pnpm env:pull` |
 | `pnpm metrics` | `packages/core` | The 24 metrics, computed against live chains and compared with SEF's published JSON. Writes `packages/core/.metrics/`, which is git-ignored | needs an archive node. With public RPC only, it stopped on a failed Mainnet log range when this file was written |
 | `pnpm check:browser` | root | `apps/web/src` reads no `process.env`, and a built bundle contains no value from `.env.local` | works, part of `check` |
