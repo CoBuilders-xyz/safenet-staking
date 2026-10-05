@@ -113,7 +113,7 @@ export interface ValidatorDetail {
   readonly block: bigint
   readonly window: ParticipationWindow
   readonly validator: Validator
-  /** Null, with the reason, when the endpoint refused the log scan this count needs. */
+  /** Null, with the reason, when the log scan this count needs could not complete. */
   readonly delegators: Figure<{ current: number; ever: number } | null> & { readonly unavailableBecause?: string }
   readonly sources: typeof VALIDATOR_SOURCES
 }

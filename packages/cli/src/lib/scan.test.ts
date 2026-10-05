@@ -41,6 +41,9 @@ test("a scan that the endpoint refuses even at the smallest range fails, never s
   const { ctx } = rangeLimited(MIN_CHUNK - 1n)
   await assert.rejects(
     scanLogs(ctx, { address, event, fromBlock: 1n, toBlock: 10_000n }),
-    (e: unknown) => e instanceof ScanError && /refused Claimed logs for blocks 1 to 1000/.test(e.message),
+    (e: unknown) =>
+      e instanceof ScanError &&
+      /Could not read Claimed logs for blocks 1 to 1000/.test(e.message) &&
+      e.cause instanceof Error && e.cause.message === "range too large",
   )
 })

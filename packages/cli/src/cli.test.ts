@@ -172,18 +172,24 @@ test("validators show still prints when the endpoint refuses the delegators scan
   const r = await cli(["validators", "show", VALIDATOR_A], { logsRefused: true })
   assert.equal(r.code, 0)
   assert.match(r.out, /Delegators\s+unavailable, see below/)
-  assert.match(r.out, /^Delegators: The RPC endpoint refused StakeIncreased logs.*pass --rpc-url\.$/m)
+  assert.match(r.out, /^Delegators: Could not read StakeIncreased logs.*--verbose shows the error\.$/m)
   const j = JSON.parse((await cli(["validators", "show", VALIDATOR_A, "--json"], { logsRefused: true })).out)
   assert.equal(j.delegators.value, null)
   // The library says what failed. Which flag to use is the CLI's advice, not the library's.
-  assert.match(j.delegators.unavailableBecause, /refused StakeIncreased logs/)
+  assert.match(j.delegators.unavailableBecause, /Could not read StakeIncreased logs/)
   assert.doesNotMatch(j.delegators.unavailableBecause, /--rpc-url|MAINNET_RPC_URL/)
 })
 
 test("a refused scan elsewhere fails the command with one sentence", async () => {
   const r = await cli(["rewards", "history", STAKER], { logsRefused: true })
   assert.equal(r.code, 1)
-  assert.match(r.err, /^error: The RPC endpoint refused Claimed logs .*; historical log scans need an archive endpoint, .* pass --rpc-url\.\n$/)
+  assert.match(r.err, /^error: Could not read Claimed logs .*; if the endpoint refused the range, historical log scans need an archive endpoint, .*--verbose shows the error\.\n$/)
+  const verbose = await cli(["rewards", "history", STAKER, "--verbose"], {
+    logsRefused: true,
+    rpcErrorText: "archive requests require a personal token at https://archive.invalid/v2/not-a-real-key",
+  })
+  assert.match(verbose.err, /^Caused by: Error: archive requests require a personal token at <url>/m)
+  assert.ok(!verbose.err.includes("not-a-real-key"))
 })
 
 test("withdrawals list without an address gives the network total, count and a check", async () => {

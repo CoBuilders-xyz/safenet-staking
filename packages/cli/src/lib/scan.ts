@@ -54,16 +54,19 @@ export async function scanLogs<E extends AbiEvent>(
       from = to + 1n
       attemptsAtMin = 0
       if (chunk < startChunk) chunk *= 2n
-    } catch {
+    } catch (error) {
       if (chunk > MIN_CHUNK) {
         chunk = chunk / 4n > MIN_CHUNK ? chunk / 4n : MIN_CHUNK
         continue
       }
       attemptsAtMin++
       if (attemptsAtMin >= ATTEMPTS_AT_MIN) {
+        // Neutral on purpose: the last error may be a refused range, but also DNS or a bad key.
+        // It travels as the cause, for a caller that wants the detail.
         throw new ScanError(
-          `The RPC endpoint refused ${request.event.name} logs for blocks ${from} to ${to}, so the ` +
-            `scan stopped rather than skip them`,
+          `Could not read ${request.event.name} logs for blocks ${from} to ${to}, even in ranges of ` +
+            `${MIN_CHUNK} blocks, so the scan stopped rather than skip them`,
+          { cause: error },
         )
       }
       await sleep((ctx.retryDelayMs ?? 1_000) * attemptsAtMin)

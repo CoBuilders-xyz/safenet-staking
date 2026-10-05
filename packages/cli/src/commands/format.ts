@@ -12,8 +12,8 @@ import type { ParticipationWindow } from "../lib/index.js"
  * the CLI's business, so this text lives here.
  */
 export const ARCHIVE_ADVICE =
-  "historical log scans need an archive endpoint, which the public endpoints are not, " +
-  "so set MAINNET_RPC_URL or pass --rpc-url"
+  "if the endpoint refused the range, historical log scans need an archive endpoint, which the " +
+  "public endpoints are not, so set MAINNET_RPC_URL or pass --rpc-url; --verbose shows the error"
 
 /** An 18-decimal amount in SAFE, exact, grouped in thousands, trailing zeros dropped. */
 export function formatSafe(wei: bigint): string {

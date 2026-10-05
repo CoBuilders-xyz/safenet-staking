@@ -28,6 +28,8 @@ export interface FakeOptions {
   readonly rpcError?: Error
   /** eth_getLogs rejects, as the public endpoints do for historical ranges. */
   readonly logsRefused?: boolean
+  /** The message eth_getLogs rejects with when `logsRefused` is set. */
+  readonly rpcErrorText?: string
   /** Replaces SEF's rewards/latest.json or network-info.json, to test a changed shape. */
   readonly rewardsLatest?: object
   readonly networkInfo?: object
@@ -71,7 +73,7 @@ function fakeClient(o: FakeOptions): PublicClient {
     },
     getLogs: async (p: { event: { name: string }; fromBlock: bigint }) => {
       fail()
-      if (o.logsRefused) throw new Error("archive requests require a personal token")
+      if (o.logsRefused) throw new Error(o.rpcErrorText ?? "archive requests require a personal token")
       // Logs come back for a scan's first range only, which starts at the deploy block, so a
       // scan over many ranges sees each log once.
       if (p.fromBlock !== CONTRACTS.staking.deployBlock && p.fromBlock !== CONTRACTS.merkleDrop.deployBlock) return []

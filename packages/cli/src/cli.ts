@@ -117,6 +117,11 @@ export async function run(argv: readonly string[], runtime: Runtime): Promise<nu
     runtime.io.err(`error: ${errorSentence(err)}\n`)
     if ((argv.includes("--verbose") || argv.includes("-v")) && err instanceof Error && err.stack) {
       runtime.io.err(`${err.stack.replace(URL_PATTERN, "<url>")}\n`)
+      // A scan wraps the RPC error that ended it. Show it, with URLs removed like everything else.
+      if (err instanceof ScanError && err.cause !== undefined) {
+        const cause = err.cause instanceof Error ? (err.cause.stack ?? err.cause.message) : String(err.cause)
+        runtime.io.err(`Caused by: ${cause.replace(URL_PATTERN, "<url>")}\n`)
+      }
     }
     return 1
   }
