@@ -31,3 +31,5 @@ admin/
 todos
 playwright-report/
 test-results/
+# written by `pnpm generate:proofs` unless --out names another directory
+.rewards/

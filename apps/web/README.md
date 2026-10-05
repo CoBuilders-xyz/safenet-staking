@@ -181,10 +181,13 @@ The `scripts/` directory contains tooling for generating Merkle proofs compatibl
      }
    }
    ```
-2. Run `yarn generate:proofs`
-3. Output:
-   - `public/rewards/proofs/{address}.json` — per-address proof files
-   - `public/rewards/latest.json` — current Merkle root, total, and epoch
+   Two optional fields complete `latest.json`: `rewardsUntil` (ISO 8601, defaults to the time
+   of the run) and `unpaidAmount` (wei, defaults to `"0"`).
+2. Run `pnpm generate:proofs`. It writes to `.rewards/`, which git ignores; `--out <dir>` names
+   another directory.
+3. Output, in the shape SEF publishes:
+   - `proofs/<radix>/{address}.json` — per-address proof files
+   - `latest.json` — `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal`, `unpaidAmount`, `updatedAt`
 4. Set the root on-chain via the admin panel
 
 The tree uses sorted-pair hashing (OpenZeppelin convention) and viem for encoding.

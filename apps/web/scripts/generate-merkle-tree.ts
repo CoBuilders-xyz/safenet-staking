@@ -2,26 +2,33 @@
 /**
  * CLI script to generate Merkle proofs from a config file.
  *
- * Reads scripts/merkle-config.json, builds the Merkle tree,
- * and writes proof files to public/rewards/.
+ * Reads scripts/merkle-config.json, builds the Merkle tree, and writes the proof files and
+ * latest.json in the shape SEF publishes. The output goes to .rewards/, which git ignores,
+ * unless --out names another directory.
  *
- * Usage: yarn generate:proofs
+ * Usage: pnpm generate:proofs [--out <dir>]
  */
 import { readFileSync, writeFileSync, mkdirSync } from "fs"
 import { resolve, dirname } from "path"
+import { fileURLToPath, pathToFileURL } from "url"
+import { parseArgs } from "util"
 import { getAddress, type Address } from "viem"
+import type { SefRewardsLatest } from "@cobuilders/safenet-core"
 import { buildMerkleTree, type MerkleEntry } from "./merkle-tree"
 
-interface MerkleConfig {
+export interface MerkleConfig {
   epoch: number
   entries: Record<string, string>
+  /** ISO 8601. The end of the period the amounts cover. Defaults to the time of the run. */
+  rewardsUntil?: string
+  /** Decimal string, in wei. Defaults to "0". */
+  unpaidAmount?: string
 }
 
-const SCRIPT_DIR = dirname(new URL(import.meta.url).pathname)
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = resolve(SCRIPT_DIR, "..")
 const CONFIG_PATH = resolve(SCRIPT_DIR, "merkle-config.json")
-const PROOFS_DIR = resolve(PROJECT_ROOT, "public/rewards/proofs")
-const LATEST_PATH = resolve(PROJECT_ROOT, "public/rewards/latest.json")
+const DEFAULT_OUT = resolve(PROJECT_ROOT, ".rewards")
 
 function loadConfig(): MerkleConfig {
   const raw = readFileSync(CONFIG_PATH, "utf-8")
@@ -37,13 +44,19 @@ function loadConfig(): MerkleConfig {
     throw new Error("Invalid merkle-config.json format")
   }
 
+  const { rewardsUntil, unpaidAmount } = config as Record<string, unknown>
+  if (rewardsUntil !== undefined && (typeof rewardsUntil !== "string" || Number.isNaN(Date.parse(rewardsUntil)))) {
+    throw new Error("merkle-config.json: rewardsUntil must be an ISO 8601 date")
+  }
+  if (unpaidAmount !== undefined && (typeof unpaidAmount !== "string" || !/^\d+$/.test(unpaidAmount))) {
+    throw new Error("merkle-config.json: unpaidAmount must be a decimal string")
+  }
+
   return config as MerkleConfig
 }
 
-function main() {
-  console.log("Reading config from", CONFIG_PATH)
-  const config = loadConfig()
-
+/** Build the tree for `config` and write `proofs/` and `latest.json` under `outDir`. */
+export function generateRewards(config: MerkleConfig, outDir: string, now = new Date()): SefRewardsLatest {
   const entries: MerkleEntry[] = Object.entries(config.entries).map(
     ([addr, amount]) => ({
       address: getAddress(addr) as Address,
@@ -63,7 +76,8 @@ function main() {
   const total = entries.reduce((sum, e) => sum + e.amount, 0n)
 
   // Write individual proof files
-  mkdirSync(PROOFS_DIR, { recursive: true })
+  const proofsDir = resolve(outDir, "proofs")
+  mkdirSync(proofsDir, { recursive: true })
 
   let written = 0
   for (const entry of entries) {
@@ -81,7 +95,7 @@ function main() {
     const lower = entry.address.toLowerCase()
     const hex = lower.slice(2, 10)
     const radixDir = resolve(
-      PROOFS_DIR,
+      proofsDir,
       hex.slice(0, 2),
       hex.slice(2, 4),
       hex.slice(4, 6),
@@ -93,19 +107,34 @@ function main() {
     written++
   }
 
-  console.log(`Wrote ${written} proof files to public/rewards/proofs/`)
+  console.log(`Wrote ${written} proof files to ${proofsDir}`)
 
   // Write latest.json
-  const latest = {
-    merkleRoot: tree.root,
-    tokenTotal: total.toString(),
-    updatedAt: new Date().toISOString(),
+  const updatedAt = now.toISOString()
+  const latest: SefRewardsLatest = {
     epoch: config.epoch,
+    merkleRoot: tree.root,
+    rewardsUntil: config.rewardsUntil ?? updatedAt,
+    tokenTotal: total.toString(),
+    unpaidAmount: config.unpaidAmount ?? "0",
+    updatedAt,
   }
 
-  writeFileSync(LATEST_PATH, JSON.stringify(latest, null, 2) + "\n")
-  console.log("Updated public/rewards/latest.json")
+  const latestPath = resolve(outDir, "latest.json")
+  writeFileSync(latestPath, JSON.stringify(latest, null, 2) + "\n")
+  console.log(`Wrote ${latestPath}`)
+  return latest
+}
+
+function main() {
+  const { values } = parseArgs({ options: { out: { type: "string" } } })
+  const outDir = values.out ? resolve(values.out) : DEFAULT_OUT
+
+  console.log("Reading config from", CONFIG_PATH)
+  generateRewards(loadConfig(), outDir)
   console.log("Done!")
 }
 
-main()
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main()
+}

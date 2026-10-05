@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Watch mode:** `yarn test:watch`
 - **Coverage:** `yarn test:coverage`
 - **E2E tests:** `yarn test:e2e` (Playwright)
-- **Generate Merkle proofs:** `yarn generate:proofs` (reads `scripts/merkle-config.json`, writes to `public/rewards/`)
+- **Generate Merkle proofs:** `pnpm generate:proofs [--out <dir>]` (reads `scripts/merkle-config.json`, writes to the git-ignored `.rewards/` by default)
 
 ## Pre-push Checklist
 
@@ -167,18 +167,19 @@ Off-chain tooling for generating Merkle proofs compatible with the MerkleDrop co
 
 - `scripts/merkle-tree.ts` — Pure Merkle tree logic (no I/O). Exports `encodeLeaf`, `buildMerkleTree`, `verifyProof`. Uses sorted-pair hashing (OpenZeppelin convention).
 - `scripts/generate-merkle-tree.ts` — CLI entry point. Reads config, builds tree, writes output files.
-- `scripts/merkle-config.json` — Input config with epoch number and address → cumulative amount mapping.
+- `scripts/merkle-config.json` — Input config with epoch number and address → cumulative amount mapping, plus optional `rewardsUntil` and `unpaidAmount`.
 - `scripts/__tests__/merkle-tree.test.ts` — Unit tests for encoding, tree construction, and proof verification.
+- `scripts/__tests__/generate-merkle-tree.test.ts` — Parses the generated `latest.json` with the app's own `parseRewardsLatest`.
 
 ### Workflow
 
 1. Edit `scripts/merkle-config.json` with wallet addresses and cumulative amounts (in wei)
-2. Run `yarn generate:proofs`
-3. Output files:
-   - `public/rewards/proofs/{lowercase_address}.json` — per-address proof file (`{ cumulativeAmount, merkleRoot, proof }`)
-   - `public/rewards/latest.json` — root, tokenTotal, epoch, updatedAt
+2. Run `pnpm generate:proofs`. It writes to `.rewards/`, which git ignores, or to the directory `--out <dir>` names
+3. Output files, in the shape SEF publishes:
+   - `proofs/<radix>/{lowercase_address}.json` — per-address proof file (`{ cumulativeAmount, merkleRoot, proof }`)
+   - `latest.json` — `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal`, `unpaidAmount`, `updatedAt`
 4. Set the Merkle root on-chain via the admin panel (see below)
-5. The frontend `useRewardProof` hook fetches proofs from `public/rewards/proofs/`
+5. Serve the output directory and point `VITE_REWARDS_BASE_URL` at it: the frontend `useRewardProof` hook fetches proofs from `${VITE_REWARDS_BASE_URL}/proofs/`
 
 ### Config Format
 
@@ -188,7 +189,9 @@ Off-chain tooling for generating Merkle proofs compatible with the MerkleDrop co
   "entries": {
     "0xAddress1": "1000000000000000000000",
     "0xAddress2": "500000000000000000000"
-  }
+  },
+  "rewardsUntil": "2026-09-22T00:00:00.000Z",
+  "unpaidAmount": "0"
 }
 ```
 
