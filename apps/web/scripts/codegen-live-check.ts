@@ -32,7 +32,10 @@ for (const chain of ["mainnet", "gnosis"] as ChainKey[]) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query: getIntrospectionQuery() }),
   })
-  const body = (await res.json()) as { data?: IntrospectionQuery }
+  // The URL is not printed: an override may carry a key by mistake, and output is no place for it.
+  if (!res.ok) throw new Error(`${chain}: the endpoint answered HTTP ${res.status}`)
+  const body = (await res.json()) as { data?: IntrospectionQuery; errors?: { message: string }[] }
+  if (body.errors?.length) throw new Error(`${chain}: ${body.errors.map((e) => e.message).join("; ")}`)
   if (!body.data) throw new Error(`${chain}: no introspection result`)
   const schema = buildClientSchema(body.data)
   const dir = join(ROOT, "src/graphql", chain)
