@@ -17,8 +17,9 @@
  *              emitted other logs in that span, NO ACTIVITY when it emitted none at all.
  *   --deep     every event from its deploy block. Slow. Nightly. The real proof.
  *
- * Custom errors emit no log. For those, both modes check that the 4-byte selector is in
- * the deployed bytecode. That needs one eth_getCode per contract, so it runs every time.
+ * Custom errors and functions emit no log. For those, both modes check that the 4-byte
+ * selector is in the deployed bytecode. That needs one eth_getCode per contract, so it runs
+ * every time.
  */
 import {
   createPublicClient,
@@ -27,11 +28,15 @@ import {
   http,
   parseAbiItem,
   toEventSelector,
+  toFunctionSelector,
+  type Abi,
   type AbiEvent,
 } from "viem"
 import { CHAINS, RPC_URLS } from "../src/chains.js"
-import { CONTRACTS } from "../src/contracts.js"
-import { DECODED_ERRORS, INDEXED_EVENTS } from "../src/abis.js"
+import { CONTRACTS, type ContractName } from "../src/contracts.js"
+import {
+  DECODED_ERRORS, INDEXED_EVENTS, erc20Abi, merkleDropAbi, sanctionsOracleAbi, stakingAbi,
+} from "../src/abis.js"
 import { CEILING, WINDOW, scanFromDeploy, scanRecent, type Status } from "./verify-abis-scan.js"
 
 const deep = process.argv.includes("--deep")
@@ -99,24 +104,27 @@ async function verify(): Promise<Result[]> {
   return results
 }
 
+/** Deployed bytecode, lower case, fetched once per contract. */
+const code = new Map<ContractName, string>()
+async function bytecodeOf(contract: ContractName): Promise<string> {
+  const cached = code.get(contract)
+  if (cached !== undefined) return cached
+  const ref = CONTRACTS[contract]
+  const bytecode = ((await clients[ref.chain].getCode({ address: ref.address })) ?? "0x").toLowerCase()
+  code.set(contract, bytecode)
+  return bytecode
+}
+
 /**
  * A selector in the bytecode is weaker proof than a log: it shows the contract can revert with
  * it, not that it does under the conditions we expect. abis.ts records the reverts we observed.
  */
 async function verifyErrors(): Promise<Result[]> {
   const results: Result[] = []
-  const code = new Map<string, string>()
-
   for (const err of DECODED_ERRORS) {
-    const ref = CONTRACTS[err.contract]
-    if (!code.has(err.contract)) {
-      const bytecode = await clients[ref.chain].getCode({ address: ref.address })
-      code.set(err.contract, (bytecode ?? "0x").toLowerCase())
-    }
     const item = parseAbiItem(err.signature)
     const selector = encodeErrorResult({ abi: [item], errorName: item.name })
-    const found = code.get(err.contract)!.includes(selector.slice(2).toLowerCase())
-
+    const found = (await bytecodeOf(err.contract)).includes(selector.slice(2).toLowerCase())
     results.push({
       signature: item.name,
       contract: err.contract,
@@ -130,7 +138,35 @@ async function verifyErrors(): Promise<Result[]> {
   return results
 }
 
-const results = [...(await verify()), ...(await verifyErrors())]
+/**
+ * The function ABIs, by the contract they are called on. The Solidity dispatcher compares the
+ * calldata against each function's 4-byte selector, so a function the contract has puts its
+ * selector in the bytecode, and a signature with a wrong name or argument type does not.
+ */
+const CALLED: readonly [ContractName, Abi][] = [
+  ["staking", stakingAbi],
+  ["merkleDrop", merkleDropAbi],
+  ["safeToken", erc20Abi],
+  ["sanctionsList", sanctionsOracleAbi],
+]
+
+async function verifyFunctions(): Promise<Result[]> {
+  const results: Result[] = []
+  for (const [contract, abi] of CALLED) {
+    for (const item of abi) {
+      if (item.type !== "function") continue
+      const selector = toFunctionSelector(item)
+      const found = (await bytecodeOf(contract)).includes(selector.slice(2).toLowerCase())
+      results.push({
+        signature: item.name, contract, topic0: selector, logs: found ? 1 : 0,
+        seen: "bytecode", checked: "bytecode", status: found ? "match" : "NO MATCH",
+      })
+    }
+  }
+  return results
+}
+
+const results = [...(await verify()), ...(await verifyErrors()), ...(await verifyFunctions())]
 
 const pad = (s: string, n: number) => s.padEnd(n)
 console.log(`\n  verify:abis  ${deep ? "deep scan from deploy block" : "recent window, widened when quiet, high-frequency events"}\n`)

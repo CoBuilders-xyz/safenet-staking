@@ -21,8 +21,10 @@ The deployed Safenet contracts match **neither** published branch of `safe-resea
 - If it fails, the contract was probably redeployed. Recover the real signature from chain data,
   update `src/abis.ts`, and tell the team. Do not guess, and do not read a branch.
 
-Custom errors emit no log, so `DECODED_ERRORS` in `src/abis.ts` is proven differently: every
-run checks that each error's 4-byte selector is in the deployed bytecode.
+Custom errors and functions emit no log, so they are proven differently: every run checks that
+the 4-byte selector of each error in `DECODED_ERRORS` and of each function in the staking,
+MerkleDrop, ERC-20 and sanctions ABIs is in the deployed bytecode. `src/abis.ts` also records the
+`eth_call` or fork run that proved each error and each newer read.
 
 Events are tagged `high` or `rare`. High-frequency events are proven by a recent window and run
 on every pull request. When an event has no log in that window, the scan widens back in doubling
