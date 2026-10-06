@@ -74,10 +74,10 @@
     "jsdom": "28.1.0",
     "pinata": "2.5.5",
     "tailwindcss": "4.2.0",
-    "tsx": "4.21.0",
+    "tsx": "4.23.15",
     "typescript": "5.9.3",
     "typescript-eslint": "8.56.0",
-    "vite": "7.3.5",
+    "vite": "7.3.7",
     "vitest": "4.1.11"
   }
 }
