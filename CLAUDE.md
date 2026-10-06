@@ -52,6 +52,7 @@ Specific commands, only where they apply:
 | `pnpm test:smoke` | root, `packages/cli`, `packages/mcp` | Each of the six read commands runs against Mainnet through the real entry point; the MCP server, started over stdio, answers `status` and `validators_list` | needs the archive `MAINNET_RPC_URL`; runs nightly. Skipped, with the reason, everywhere else |
 | `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. Playwright | runs; one navigation test is intermittently flaky |
 | `pnpm test:fork` | `apps/web`, `packages/cli` | Against the real contracts on an Anvil Mainnet fork at a pinned block, each effect checked by reading the chain. `apps/web`: the staking flows in the interface, in Playwright, about 1.5 minutes. `packages/cli`: the five write commands sent for real, then each with `--dry-run`, which must change nothing, in node:test; one of those tests needs no Anvil and also runs under `pnpm test`; about 20 seconds | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
+| `pnpm fork:up`, `pnpm fork:reset`, `pnpm fork:down` | root | The manual QA fork for Claim & Stake: Anvil on a fork of Mainnet at a pinned block, a test account with SAFE in its wallet and a reward to claim under a root built from every real claimer's proof at the SEF data commit core pins, and the interface, the proofs and the RPC served on one loopback origin for a browser and MetaMask. `up` is idempotent, `reset` reverts to the baseline snapshot, `down` stops only what `up` started. The guide is `docs/manual-qa-fork.md` | works; needs `anvil` and the archive `MAINNET_RPC_URL` |
 | `deploy:studio` | each subgraph package, through `pnpm --filter` | The subgraph builds and Studio accepts it as a new version under its slug. Not that it syncs: watch it by deployment hash, then run `differential` with `SUBGRAPH_URL` | works; needs `GRAPH_DEPLOY_KEY` |
 | `pnpm test:parity` | both subgraph packages | Our deployed subgraphs agree with SEF's published JSON at the instant SEF published it, the commit that last wrote each file: the Mainnet staked total to the wei, and each validator's Gnosis participation rate as the identical double. Four states per chain: PASS, exit 0; FAIL, exit 1, for a real difference, a broken or lagging subgraph, SEF's data over 24 hours old, or an error; STALE, exit 0, when SEF's file is over 9 hours old; NOT COMPARABLE, exit 0, when our deployment cannot answer at SEF's instant. Subgraph URLs from `SUBGRAPH_URL_MAINNET` and `SUBGRAPH_URL_GNOSIS`, else the defaults in `packages/core`, the Studio deployment of each chain | Both pass against Studio. Gnosis sums hourly buckets filed by the attestation block from a current query, so Studio keeping about 1,000 blocks of history does not matter; a deployment without the buckets is NOT COMPARABLE. Daily in `parity.yml`, which also fails when a chain wrote no state |
 
@@ -71,9 +72,11 @@ suite starts its own Anvil on `CLI_ANVIL_PORT`, so both suites can run at once. 
 `WEB_PORT` the same way, in `apps/web/vite.config.ts`, and the subgraph `differential` scripts
 read `GRAPH_NODE_PORT`. A value exported in the shell wins over the file, and `turbo.json`
 passes `E2E_PORT` and `WEB_PORT` through Turborepo's strict environment mode, and `ANVIL_PORT`,
-`CLI_ANVIL_PORT`, `FORK_PORT` and `MAINNET_RPC_URL` for `test:fork`. Without
+`CLI_ANVIL_PORT`, `FORK_PORT` and `MAINNET_RPC_URL` for `test:fork`. The manual QA fork reads
+`QA_ANVIL_PORT`, `QA_WEB_PORT` and `QA_PROXY_PORT` the same way, in
+`apps/web/scripts/fork-env/settings.ts`, and runs through `pnpm --filter`, not Turborepo. Without
 `.env.ports`, as in CI, the e2e suite uses 5174, the web fork suite 5178 and Anvil 8545, the CLI
-fork suite Anvil 8546, and `pnpm dev` uses Vite's default.
+fork suite Anvil 8546, the manual QA fork 8547, 5179 and 5180, and `pnpm dev` uses Vite's default.
 
 ## Layout
 
@@ -93,6 +96,7 @@ packages/mcp                EXISTS   safenet-mcp: an MCP server over stdio, one 
                                      Calls the shared library, not the CLI binary. Writes are dry
                                      runs unless the operator allows them at start
 tools/                      EXISTS   edit hook, task guard, browser-safety check, metrics report
+docs/                       EXISTS   the manual QA fork guide
 scripts/setup.sh            EXISTS   what `pnpm bootstrap` runs
 docker-compose.yml          EXISTS   local graph-node, postgres and ipfs
 graph-node.toml             EXISTS   graph-node config for two chains at once

@@ -33,3 +33,5 @@ playwright-report/
 test-results/
 # written by `pnpm generate:proofs` unless --out names another directory
 .rewards/
+# written by `pnpm fork:up`: pids, logs, the generated proofs, the baseline record
+.fork-env/

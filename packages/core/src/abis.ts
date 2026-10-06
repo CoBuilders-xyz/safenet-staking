@@ -196,6 +196,11 @@ export const merkleDropAbi = parseAbi([
   "function merkleRoot() view returns (bytes32)",
   "function cumulativeClaimed(address account) view returns (uint256)",
   "function claim(address account, uint256 cumulativeAmount, bytes32 expectedMerkleRoot, bytes32[] merkleProof)",
+  // The owner's root update. Nothing here sends it on Mainnet: the manual QA fork sends it on
+  // an Anvil fork as the impersonated owner, and verify:abis proves both selectors in the
+  // bytecode like the rest.
+  "function owner() view returns (address)",
+  "function setMerkleRoot(bytes32 merkleRoot)",
   signatureOf("merkleDrop", "Claimed"),
   signatureOf("merkleDrop", "MerkleRootWasUpdated"),
   signatureOf("merkleDrop", "InvalidProof"),
