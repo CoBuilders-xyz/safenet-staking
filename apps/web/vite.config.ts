@@ -47,8 +47,9 @@ const portsFile = path.join(repoRoot, ".env.ports")
 const ports = existsSync(portsFile) ? parseEnv(readFileSync(portsFile, "utf8")) : {}
 const webPort = process.env.WEB_PORT ?? ports.WEB_PORT
 
-// The local graph-node's query port, from the same file. In development, with no
-// VITE_SUBGRAPH_URL_* set, the app queries the subgraphs on this worktree's node.
+// The local graph-node's query port, from the same file. core uses it only for a chain whose
+// default endpoint is the local graph-node. Today both defaults are Studio deployments, and the
+// local node is reached by setting VITE_SUBGRAPH_URL_* to its URL.
 const graphNodePort = process.env.GRAPH_NODE_PORT ?? ports.GRAPH_NODE_PORT ?? ""
 
 export default defineConfig({

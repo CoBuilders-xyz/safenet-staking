@@ -78,6 +78,10 @@ const forked: Pick<PlaywrightTestConfig, "projects" | "webServer"> = {
         // The test accounts hold no history before the fork, so scans start there. Earlier
         // blocks would be fetched from the archive node for nothing.
         VITE_STAKING_DEPLOY_BLOCK: MAINNET_FORK.blockNumber.toString(),
+        // No subgraph mock in this suite. Both chains point at the mock host, so a test that
+        // lands on / asks nothing of Studio, and the overview falls back to the contract reads.
+        VITE_SUBGRAPH_URL_MAINNET: "https://mock-subgraph.test/mainnet",
+        VITE_SUBGRAPH_URL_GNOSIS: "https://mock-subgraph.test/gnosis",
       },
     },
   ],

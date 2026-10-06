@@ -15,11 +15,11 @@ is the short git SHA, with `-dirty` when the tree has uncommitted changes; set `
 override it.
 
 Why 16 days and not the full history: the full history is about 15 million logs, which takes an
-indexer far longer to sync. The Network Overview, when it lands, is expected to read a 14-day
-window and drop the partial first day, so 16 days would cover it with a day to spare. The start
-block is fixed when the manifest is generated, so the deployment keeps every block from then on;
-it does not roll. A windowed deployment cannot answer validator registration history or the epoch
-record. Those need `--full`, as a separate deployment.
+indexer far longer to sync. The Network Overview reads a 14-day window and drops the partial first
+day, so 16 days cover it with a day to spare. The start block is fixed when the manifest is
+generated, so the deployment keeps every block from then on; it does not roll. A windowed
+deployment cannot answer validator registration history or the epoch record. Those need `--full`,
+as a separate deployment.
 
 The deploy key is `GRAPH_DEPLOY_KEY`. Locally it comes from `.env.local` (`pnpm env:pull`), which
 the script reads itself. In CI it is the secret of the same name, and
@@ -27,7 +27,9 @@ the script reads itself. In CI it is the secret of the same name, and
 line or into `~/.graph-cli.json`: `tools/deploy-studio.mjs` explains how.
 
 Check indexing by deployment hash, not by name: the name can still answer from the previous
-version.
+version. A deploy retires older version labels of the slug, so the same change moves this
+chain's default query URL in `packages/core/src/subgraphs.ts`; the web app and the parity run
+read it from there.
 
 To compare a deployed version with the oracle, generate the oracle over the same window and point
 the differential at the query URL:
@@ -69,11 +71,12 @@ Neither was seen in those 16 days; the logs cannot show the contract never emits
 SUBGRAPH_URL_GNOSIS=<query URL> pnpm --filter @cobuilders/safenet-subgraph-gnosis test:parity
 ```
 
-`scripts/parity.ts` compares each validator's participation with `participation_rate_14d` in
-SEF's `validator-info.json`, at the commit that last wrote the file. The window is SEF's: 14 days
-ending at the top of that hour, both ends included, by the block the ceremony was attested in. The
-run sums the hourly rows inside that window from a current query, with
-`participationFromHours` in `packages/core`: SEF's numerator and denominator. The rate is the
+Without `SUBGRAPH_URL_GNOSIS` it reads the default in `packages/core/src/subgraphs.ts`, today the
+Studio deployment. `scripts/parity.ts` compares each validator's participation with
+`participation_rate_14d` in SEF's `validator-info.json`, at the commit that last wrote the file.
+The window is SEF's: 14 days ending at the top of that hour, both ends included, by the block the
+ceremony was attested in. The run sums the hourly rows inside that window from a current query,
+with `participationFromHours` in `packages/core`: SEF's numerator and denominator. The rate is the
 same division, and is compared as the identical double.
 
 No query reaches back in time, so the result does not depend on the history a deployment keeps.

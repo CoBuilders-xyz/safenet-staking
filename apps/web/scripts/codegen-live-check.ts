@@ -3,9 +3,10 @@
  *
  * Codegen checks the documents against a schema derived from each schema.graphql
  * (scripts/subgraph-api-schema.ts). That derivation follows graph-node's rules but is ours, so
- * this checks the same documents against what a node actually serves. Run it after deploying
- * both subgraphs to the local node, or with VITE_SUBGRAPH_URL_MAINNET and
- * VITE_SUBGRAPH_URL_GNOSIS set to deployed endpoints.
+ * this checks the same documents against what a node actually serves. With nothing set it reads
+ * the defaults in packages/core, the Studio deployments. Set VITE_SUBGRAPH_URL_MAINNET and
+ * VITE_SUBGRAPH_URL_GNOSIS to point it at the local node after deploying both subgraphs there,
+ * or at another deployment.
  *
  *   pnpm --filter @cobuilders/safenet-web codegen:live-check
  */
@@ -34,9 +35,15 @@ for (const chain of ["mainnet", "gnosis"] as ChainKey[]) {
   })
   // The URL is not printed: an override may carry a key by mistake, and output is no place for it.
   if (!res.ok) throw new Error(`${chain}: the endpoint answered HTTP ${res.status}`)
-  const body = (await res.json()) as { data?: IntrospectionQuery; errors?: { message: string }[] }
+  const body = (await res.json()) as { data?: IntrospectionQuery; errors?: { message: string }[]; message?: string }
   if (body.errors?.length) throw new Error(`${chain}: ${body.errors.map((e) => e.message).join("; ")}`)
-  if (!body.data) throw new Error(`${chain}: no introspection result`)
+  // Studio answers a retired version label with HTTP 200 and {"message":"Not found"}.
+  if (!body.data) {
+    throw new Error(
+      `${chain}: the endpoint answered "${body.message ?? "no data"}"; check VITE_SUBGRAPH_URL_${chain.toUpperCase()}, ` +
+        "or the default in packages/core/src/subgraphs.ts when it is unset",
+    )
+  }
   const schema = buildClientSchema(body.data)
   const dir = join(ROOT, "src/graphql", chain)
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".graphql"))) {

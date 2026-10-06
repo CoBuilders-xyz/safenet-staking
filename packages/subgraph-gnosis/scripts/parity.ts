@@ -29,6 +29,8 @@
  *   pnpm --filter @cobuilders/safenet-subgraph-gnosis test:parity
  *   SUBGRAPH_URL_GNOSIS=<query URL> pnpm --filter @cobuilders/safenet-subgraph-gnosis test:parity
  *
+ * Without SUBGRAPH_URL_GNOSIS the run reads the default in packages/core, the Studio deployment
+ * of this subgraph: subgraphEndpoint in packages/core resolves it, the same way for both chains.
  */
 import {
   SEF_DATA, SHARE_LOOKBACK_BLOCKS, participationWindow, type SefNetworkInfo, type SefValidator,

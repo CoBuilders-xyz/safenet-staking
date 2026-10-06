@@ -52,8 +52,11 @@ legitimately contains none of them.
   `sources.ts` reads the environment and runs `gh`, and the browser app imports the main entry.
 - `src/fork.ts` — the Mainnet block both fork suites fork from, pinned together with the commit of
   SEF's data it reads. A test fixture: move the two together.
-- `src/subgraphs.ts` — subgraph names, the local graph-node endpoints, and the staleness threshold
-  every subgraph consumer applies.
+- `src/subgraphs.ts` — the default query endpoint per chain, today the Studio deployments, and the
+  only place that knows their URLs; the subgraph names and the local graph-node URL; and the
+  staleness threshold every subgraph consumer applies. A Studio deploy retires older version
+  labels, so a deploy moves that chain's default here in the same change. Studio's query URL is
+  rate-limited to about 3,000 queries a day per subgraph and is not the production read path.
 - `src/gnosis-snapshot.ts` — one dated `pnpm metrics` run of the Gnosis figures, kept here because
   it carries validator addresses. Shown only when the Gnosis subgraph is not live.
 - `scripts/verify-abis.ts` — the check itself.

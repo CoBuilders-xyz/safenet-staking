@@ -19,7 +19,9 @@ the script reads itself. In CI it is the secret of the same name, and
 line or into `~/.graph-cli.json`: `tools/deploy-studio.mjs` explains how.
 
 Studio indexes a new version from the start block in `packages/core`. Check it by deployment
-hash, not by name: the name can still answer from the previous version.
+hash, not by name: the name can still answer from the previous version. A deploy retires older
+version labels of the slug, so the same change moves this chain's default query URL in
+`packages/core/src/subgraphs.ts`; the web app and the parity run read it from there.
 
 To check a deployed version against the chain, point the differential at its query URL:
 
@@ -41,6 +43,6 @@ block of that hour only when SEF's figure equals the total there exactly.
 It does not query the total `block: { number }` back in time: Studio keeps about 1,000 blocks of
 history, a few hours on Mainnet. It rewinds the current total through the Stake and Withdrawal
 rows after the start of SEF's run instead, which this subgraph keeps for good. Without
-`SUBGRAPH_URL_MAINNET` it reads the local graph-node. `.github/workflows/parity.yml` runs it
-daily; the root `CLAUDE.md` gives the stale rule.
+`SUBGRAPH_URL_MAINNET` it reads the default in `packages/core/src/subgraphs.ts`, today the Studio
+deployment. `.github/workflows/parity.yml` runs it daily; the root `CLAUDE.md` gives the stale rule.
 

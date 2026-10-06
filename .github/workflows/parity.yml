@@ -42,19 +42,20 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
-      # Each package appends its own table to the job summary. The query URLs are public and
-      # carry no key, so they sit here in plain text. The RPC endpoints are only used to find
-      # the block at an instant; without the secrets the scripts fall back to public endpoints.
-      # GITHUB_TOKEN lifts the GitHub API limit for the two commit lookups. Each run also writes
-      # its state to PARITY_STATE_DIR, for the table in the next step.
+      # Each package appends its own table to the job summary. The subgraphs queried are the
+      # defaults in packages/core/src/subgraphs.ts, the Studio deployment of each chain, which
+      # SUBGRAPH_URL_MAINNET and SUBGRAPH_URL_GNOSIS would override; neither is set here, so
+      # this run reads the defaults in packages/core; a web build that sets VITE_SUBGRAPH_URL_*
+      # reads elsewhere, and this run does not follow it. A Studio deploy retires older version
+      # labels of its slug: Studio keeps only the newest versions, and 2a0e6b8 answered Not found
+      # once edc2588 was deployed. So a deploy moves the default in core, in the same change, and
+      # this run follows. The RPC endpoints are only used to find the block at an instant;
+      # without the secrets the scripts fall back to public endpoints. GITHUB_TOKEN lifts the
+      # GitHub API limit for the two commit lookups. Each run also writes its state to
+      # PARITY_STATE_DIR, for the table in the next step.
       - name: Compare with SEF's published data
         env:
           PARITY_STATE_DIR: ${{ runner.temp }}/parity
-          # A Studio deploy retires older version labels of its slug: Studio keeps only the
-          # newest versions, and 2a0e6b8 answered Not found once edc2588 was deployed. So a
-          # deploy moves the pin here, and in any preview, in the same change.
-          SUBGRAPH_URL_MAINNET: https://api.studio.thegraph.com/query/1762768/safenet-mainnet/0abe5fb
-          SUBGRAPH_URL_GNOSIS: https://api.studio.thegraph.com/query/1762768/safenet-gnosis/edc2588
           MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
           GNOSIS_RPC_URL: ${{ secrets.GNOSIS_RPC_URL }}
           GITHUB_TOKEN: ${{ github.token }}

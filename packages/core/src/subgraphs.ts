@@ -1,10 +1,11 @@
 /**
  * Where the subgraphs are queried, and how old their answer may be.
  *
- * Both subgraphs are deployed to Subgraph Studio. Until the follow-up that swaps the defaults
- * below, the default for each chain is the local graph-node that `pnpm graph:up` starts, under the
- * name its package deploys to, and a build reaches Studio through the VITE_SUBGRAPH_URL_*
- * overrides. Making Studio the default is one line per chain in SUBGRAPH_ENDPOINTS.
+ * Both subgraphs are deployed to Subgraph Studio, and SUBGRAPH_ENDPOINTS names those deployments
+ * as the default for each chain. Every consumer resolves through this file: the web app, the
+ * parity runs and the live codegen check. The local graph-node that `pnpm graph:up` starts is
+ * reached through the override each caller passes in, VITE_SUBGRAPH_URL_* in the web app and its
+ * live codegen check, SUBGRAPH_URL_* in the parity runs, set to the URL localSubgraphUrl builds.
  *
  * Browser safe: reads no environment. The port and the overrides are passed in by the caller.
  */
@@ -29,15 +30,26 @@ export function localSubgraphUrl(chain: ChainKey, port: number | string = DEFAUL
 }
 
 /**
- * The default endpoint per chain. ONE LINE PER CHAIN: to make a deployed subgraph the default,
- * replace that chain's value with its query URL. Everything downstream follows.
+ * The default endpoint per chain: the Subgraph Studio deployment of each subgraph, under its slug
+ * and the version label the deploy printed, the short git SHA it was built from. ONE LINE PER
+ * CHAIN. This file is the only place that knows these URLs, and every consumer follows.
  *
- * Today both point at the local graph-node. A local default is used only where the caller allows
- * it (development); a deployed default is used everywhere. A query URL is public by nature, so a default must never carry an API key.
+ * A Studio deploy retires older version labels of its slug: Studio keeps only the newest
+ * versions, and a retired label answers "Not found". So the change that deploys a new version
+ * moves that chain's value here, in the same change.
+ *
+ * Studio's query URL is its development endpoint: rate-limited to about 3,000 queries a day per
+ * subgraph, and not the production read path. A query URL is public by nature, so a default must
+ * never carry an API key.
+ *
+ * A deployed default is used everywhere. A local default would be used only where the caller
+ * allows it (development), and the tests in subgraphs.test.ts refuse one: a production build
+ * disallows local endpoints and would then query no subgraph for that chain. So the values here
+ * stay deployed, and the local graph-node is reached through the overrides.
  */
 export const SUBGRAPH_ENDPOINTS: Record<ChainKey, string> = {
-  mainnet: localSubgraphUrl("mainnet"),
-  gnosis: localSubgraphUrl("gnosis"),
+  mainnet: "https://api.studio.thegraph.com/query/1762768/safenet-mainnet/0abe5fb",
+  gnosis: "https://api.studio.thegraph.com/query/1762768/safenet-gnosis/edc2588",
 }
 
 /** True for a URL on this machine, whatever its port and path. */

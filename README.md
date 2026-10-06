@@ -2,9 +2,9 @@
 
 [![Parity with SEF](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml/badge.svg)](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml)
 
-Mainnet total staked compared to the wei against SEF's published figure at its publish instant,
-daily. Gnosis participation is not comparable on Studio until the subgraph keeps hourly buckets
-with completion semantics.
+Each day, the Studio deployments named in `packages/core/src/subgraphs.ts` are compared with
+SEF's published figures at their publish instant: the Mainnet staked total to the wei, and each
+validator's Gnosis participation rate as the identical double.
 
 ## Setup
 

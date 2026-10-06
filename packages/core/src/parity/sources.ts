@@ -10,6 +10,7 @@ import { join } from "node:path"
 import { createPublicClient, fallback, http } from "viem"
 import { CHAINS, rpcUrls, type ChainKey } from "../chains.js"
 import { CONTRACTS, SEF_DATA } from "../contracts.js"
+import { DEFAULT_GRAPH_NODE_PORT, SUBGRAPH_ENDPOINTS, isLocalSubgraphUrl, localSubgraphUrl } from "../subgraphs.js"
 import { blockAtTimestamp } from "./blocks.js"
 import { parseLastCommit, type ParityState, type SefCommit } from "./compare.js"
 
@@ -38,7 +39,7 @@ export function unreachable(family: EndpointFamily, chain: ChainKey, cause: unkn
     subgraph: [
       `the ${chain} subgraph`,
       `${chain === "mainnet" ? "SUBGRAPH_URL_MAINNET" : "SUBGRAPH_URL_GNOSIS"}; when it is unset, ` +
-        "the local graph-node on GRAPH_NODE_PORT is used",
+        "the default in packages/core is used: the deployed subgraph, or the local graph-node on GRAPH_NODE_PORT",
     ],
   }[family]
   return new Error(`could not reach ${what} (${redact((why ?? "no reason given").split("\n")[0]!)}); check ${hint}`)
@@ -99,31 +100,38 @@ export async function sefAsset<T>(chain: ChainKey, sha: string, file: string): P
 }
 
 /**
- * The subgraph a run reads: `SUBGRAPH_URL_MAINNET` or `SUBGRAPH_URL_GNOSIS`, else the local
- * graph-node that `pnpm graph:up` starts. One variable per chain, because `pnpm test:parity`
- * runs both packages from one environment.
+ * The subgraph a run reads: `SUBGRAPH_URL_MAINNET` or `SUBGRAPH_URL_GNOSIS` when set and not
+ * empty, else the default in SUBGRAPH_ENDPOINTS, the Studio deployment of each chain. A chain
+ * whose default is the local graph-node is read on GRAPH_NODE_PORT, the port `pnpm graph:up`
+ * used. The same rule as subgraphEndpoints, over the environment instead of the build. One
+ * variable per chain, because `pnpm test:parity` runs both packages from one environment.
  */
 export function subgraphEndpoint(chain: ChainKey): string {
   const set = chain === "mainnet" ? process.env.SUBGRAPH_URL_MAINNET : process.env.SUBGRAPH_URL_GNOSIS
-  return set || `http://localhost:${process.env.GRAPH_NODE_PORT ?? "8000"}/subgraphs/name/safenet/${chain}`
+  if (set) return set
+  const preset = SUBGRAPH_ENDPOINTS[chain]
+  if (!isLocalSubgraphUrl(preset)) return preset
+  return localSubgraphUrl(chain, process.env.GRAPH_NODE_PORT || DEFAULT_GRAPH_NODE_PORT)
 }
 
 /**
  * One GraphQL query. Studio answers an unknown slug or version with HTTP 200 and
  * {"message":"Not found"}, and a gateway failure with an HTML page; both throw a sentence
- * that names the variable to check and leaves the URL out.
+ * that names what to check and leaves the URL out. A retired Studio version label is the
+ * usual cause of "Not found": a deploy moves the default in packages/core.
  */
 export async function querySubgraph<T>(chain: ChainKey, endpoint: string, query: string): Promise<T> {
   const variable = chain === "mainnet" ? "SUBGRAPH_URL_MAINNET" : "SUBGRAPH_URL_GNOSIS"
+  const hint = `check ${variable}, or the default in packages/core when it is unset`
   const r = await reach("subgraph", chain, () => fetch(endpoint, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query }),
   }))
-  if (!r.ok) throw new Error(`the ${chain} subgraph answered HTTP ${r.status}; check ${variable}`)
+  if (!r.ok) throw new Error(`the ${chain} subgraph answered HTTP ${r.status}; ${hint}`)
   const j = (await r.json().catch(() => ({}))) as { data?: T; errors?: { message: string }[]; message?: string }
   if (j.errors) throw new Error(`the ${chain} subgraph: ${j.errors.map((e) => e.message).join("; ")}`)
-  if (!j.data) throw new Error(`the ${chain} subgraph answered ${j.message ? `"${j.message}"` : "no data"}; check ${variable}`)
+  if (!j.data) throw new Error(`the ${chain} subgraph answered ${j.message ? `"${j.message}"` : "no data"}; ${hint}`)
   return j.data
 }
 
