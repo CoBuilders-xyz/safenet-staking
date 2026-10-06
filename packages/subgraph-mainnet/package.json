@@ -2,6 +2,7 @@
   "name": "@cobuilders/safenet-subgraph-mainnet",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "bootstrap": "echo '@cobuilders/safenet-subgraph-mainnet ready'",
     "generate": "tsx scripts/generate-manifest.ts",

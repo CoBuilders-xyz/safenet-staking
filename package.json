@@ -2,6 +2,7 @@
   "name": "safenet-staking",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "packageManager": "pnpm@10.28.2",
   "engines": {
     "node": ">=22.14.0"

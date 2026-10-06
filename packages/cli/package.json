@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "safenet, a command-line interface for Safenet Beta: reads, and stake, unstake and claims with --dry-run.",
+  "license": "MIT",
   "engines": {
     "node": ">=22.14.0"
   },

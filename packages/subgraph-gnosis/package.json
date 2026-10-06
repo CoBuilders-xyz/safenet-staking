@@ -2,6 +2,7 @@
   "name": "@cobuilders/safenet-subgraph-gnosis",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "bootstrap": "echo '@cobuilders/safenet-subgraph-gnosis ready'",
     "generate": "tsx scripts/generate-manifest.ts",
