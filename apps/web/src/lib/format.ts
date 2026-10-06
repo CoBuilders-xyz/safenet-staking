@@ -30,6 +30,21 @@ export function safeParseEther(amount: string): bigint {
   }
 }
 
+/**
+ * A participation rate for display: a percentage with two decimals.
+ *
+ * Rounded, like any figure, unless the validator missed a ceremony. Then the value is floored,
+ * so a validator that missed 2 of 59,192 reads 99.99% and never 100.00%: only a validator with
+ * no miss reads 100.00%. The rate is taken at nine decimals first, the precision the subgraph
+ * ratio carries, because a bare floor drops a unit on many floats: 3 attended of 10,000 is the
+ * rate 0.0003, and 0.0003 times 10,000 is a hair under 3, which would read 0.02% and not 0.03%.
+ */
+export function formatParticipation(rate: number, absences: bigint | undefined): string {
+  if (absences === undefined || absences === 0n) return `${(rate * 100).toFixed(2)}%`
+  const tenThousandths = Math.floor(Number((rate * 10_000).toFixed(5)))
+  return `${(tenThousandths / 100).toFixed(2)}%`
+}
+
 export function truncateAddress(address: string): string {
   const lower = address.toLowerCase()
   return `${lower.slice(0, 6)}...${lower.slice(-4)}`

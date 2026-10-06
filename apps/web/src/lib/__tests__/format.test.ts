@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { formatTokenAmount, truncateAddress, formatCountdown, formatUtcDateTime } from "../format"
+import { formatParticipation, formatTokenAmount, truncateAddress, formatCountdown, formatUtcDateTime } from "../format"
 
 describe("formatTokenAmount", () => {
   it("formats zero", () => {
@@ -99,5 +99,22 @@ describe("formatUtcDateTime", () => {
 
   it("rolls over the date when the offset crosses midnight", () => {
     expect(formatUtcDateTime("2026-09-21T23:30:00-01:00")).toBe("Tue 22 Sep 2026, 00:30 UTC")
+  })
+})
+
+describe("formatParticipation", () => {
+  it("floors beside a missed count, so 2 missed of 59,192 reads 99.99% and not 100.00%", () => {
+    // The rate as deriveConsensusWindow computes it: attended over ceremonies, at nine decimals.
+    const rate = Number((59_190n * 1_000_000_000n) / 59_192n) / 1_000_000_000
+    expect(formatParticipation(rate, 2n)).toBe("99.99%")
+  })
+
+  it("rounds with nothing missed, so a full record reads 100.00%", () => {
+    expect(formatParticipation(1, 0n)).toBe("100.00%")
+  })
+
+  it("takes the rate at nine decimals before flooring, so 3 attended of 10,000 reads 0.03% and not 0.02%", () => {
+    const rate = Number((3n * 1_000_000_000n) / 10_000n) / 1_000_000_000
+    expect(formatParticipation(rate, 9_997n)).toBe("0.03%")
   })
 })
