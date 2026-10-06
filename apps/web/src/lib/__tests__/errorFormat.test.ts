@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest"
-import { formatContractError } from "../errorFormat"
+import { ContractFunctionExecutionError, ContractFunctionRevertedError, encodeErrorResult } from "viem"
+import { merkleDropAbi } from "@/abi/merkleDropAbi"
+import { TEST_ACCOUNTS } from "@/__tests__/test-data"
+import { formatContractError, revertedErrorName } from "../errorFormat"
 
 describe("formatContractError", () => {
   it("returns 'Transaction rejected' for user rejection", () => {
@@ -96,5 +99,34 @@ describe("formatContractError", () => {
     expect(
       formatContractError(new Error("reverted with custom error 'NoClaimableWithdrawal()'"))
     ).toBe("No withdrawal is ready to claim yet")
+  })
+})
+
+describe("revertedErrorName", () => {
+  const revertData = (errorName: "MerkleRootWasUpdated" | "InvalidProof" | "NothingToClaim") =>
+    encodeErrorResult({ abi: merkleDropAbi, errorName })
+
+  it("names an error viem decoded while simulating", () => {
+    const error = new ContractFunctionExecutionError(
+      new ContractFunctionRevertedError({ abi: merkleDropAbi, data: revertData("MerkleRootWasUpdated"), functionName: "claim" }),
+      { abi: merkleDropAbi, functionName: "claim", args: [TEST_ACCOUNTS.user, 1n, `0x${"ab".repeat(32)}`, []] },
+    )
+    expect(revertedErrorName(error, merkleDropAbi)).toBe("MerkleRootWasUpdated")
+  })
+
+  it("finds the selector in a revert that arrived undecoded", () => {
+    const cause = new Error(`Execution reverted with reason: custom error ${revertData("NothingToClaim")}.`)
+    expect(revertedErrorName(new Error("Transaction failed", { cause }), merkleDropAbi)).toBe("NothingToClaim")
+  })
+
+  it("is undefined when no error of the ABI is in the message", () => {
+    expect(revertedErrorName(new Error("User rejected the request."), merkleDropAbi)).toBeUndefined()
+    expect(revertedErrorName(new Error("reverted: 0xdeadbeef"), merkleDropAbi)).toBeUndefined()
+    expect(revertedErrorName("not an error", merkleDropAbi)).toBeUndefined()
+  })
+
+  it("does not read an address or a hash as a selector", () => {
+    const address = "0x" + revertData("InvalidProof").slice(2) + "00".repeat(16)
+    expect(revertedErrorName(new Error(`from ${address}`), merkleDropAbi)).toBeUndefined()
   })
 })

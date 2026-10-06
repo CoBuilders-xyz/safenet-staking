@@ -44,7 +44,7 @@ export function useRewards() {
     },
   })
 
-  const { data: onChainRoot } = useReadContract({
+  const { data: onChainRoot, refetch: refetchRoot } = useReadContract({
     address: merkleDrop,
     abi: merkleDropAbi,
     functionName: "merkleRoot",
@@ -62,8 +62,18 @@ export function useRewards() {
     void refetchProof()
     if (hasProof) void refetchClaimed()
   }
+  /**
+   * Fetches the proof and the on-chain root again, and returns both. For a claim that reverted
+   * because the root moved: the caller needs the fresh pair at once, not on the next render.
+   */
+  const reload = async () => {
+    const [fresh, root] = await Promise.all([refetchProof(), refetchRoot()])
+    if (hasProof) void refetchClaimed()
+    // refetch() resolves on failure too, with the error on the result. Pass it on.
+    return { proof: fresh.data, root: root.data, error: fresh.error ?? root.error ?? null }
+  }
   // `null` means SEF published no file for this address: it never earned rewards.
-  const meta = { isLoading, error, refetch, proof, hasMerkleDrop: !!merkleDrop }
+  const meta = { isLoading, error, refetch, reload, proof, hasMerkleDrop: !!merkleDrop }
 
   if (!proof || cumulativeClaimed === undefined) {
     return { data: EMPTY, ...meta }

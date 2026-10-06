@@ -12,8 +12,33 @@
  * Stake button, a stake increases "Your Stake", a claim empties the withdrawal queue.
  */
 
-import { AMOUNTS, VALIDATORS, TEST_USER, TEST_MERKLE_ROOT, MERKLE_DROP_BALANCE, REWARDS_LATEST } from "../fixtures/test-data"
+import { encodeAbiParameters, encodeErrorResult, encodeEventTopics, type Hex } from "viem"
+import { merkleDropAbi, safeTokenEventsAbi } from "@cobuilders/safenet-core"
+import {
+  AMOUNTS,
+  VALIDATORS,
+  TEST_USER,
+  TEST_MERKLE_ROOT,
+  MERKLE_DROP_BALANCE,
+  REWARDS_LATEST,
+  MERKLE_DROP_CONTRACT,
+  TOKEN_CONTRACT,
+  BLOCK_NUMBER,
+} from "../fixtures/test-data"
 import type { RewardProof } from "./rpc-responses"
+
+/** A log as eth_getTransactionReceipt returns it. */
+export interface RpcLog {
+  address: string
+  topics: string[]
+  data: string
+  blockNumber: string
+  blockHash: string
+  transactionHash: string
+  transactionIndex: string
+  logIndex: string
+  removed: boolean
+}
 
 export interface PendingWithdrawal {
   amount: bigint
@@ -38,6 +63,10 @@ export interface MockChainState {
   rewardsLatest: typeof REWARDS_LATEST | null
   /** When true, the next eth_sendTransaction simulates the user rejecting the wallet prompt. */
   rejectNextTx: boolean
+  /** Logs of transactions that emitted any, by hash. Every other receipt has none. */
+  receiptLogs: Map<string, RpcLog[]>
+  /** Counts claims, so each gets its own transaction hash and its own receipt. */
+  claims: number
 }
 
 export interface MockChainStateOverrides {
@@ -76,6 +105,8 @@ export function createMockChainState(overrides: MockChainStateOverrides = {}): M
     merkleDropBalance: overrides.merkleDropBalance ?? MERKLE_DROP_BALANCE,
     rewardsLatest: overrides.rewardsLatest === undefined ? { ...REWARDS_LATEST } : overrides.rewardsLatest,
     rejectNextTx: false,
+    receiptLogs: new Map(),
+    claims: 0,
   }
 }
 
@@ -102,11 +133,51 @@ function wordToAddress(params: string, index: number): string {
 }
 
 /**
+ * What the MerkleDrop's `claim` would revert with for this calldata, mirroring the contract's
+ * checks in the order the chain showed them: the root first, then the amount. The proof itself
+ * is not checked; the mock trusts it. Undefined when the claim would succeed.
+ */
+export function claimRevert(state: MockChainState, data: string): Hex | undefined {
+  const params = data.slice(10)
+  const expectedRoot = "0x" + word(params, 2)
+  if (expectedRoot.toLowerCase() !== state.merkleRoot.toLowerCase()) {
+    return encodeErrorResult({ abi: merkleDropAbi, errorName: "MerkleRootWasUpdated" })
+  }
+  if (wordToBigInt(params, 1) <= state.merkleDropClaimed) {
+    return encodeErrorResult({ abi: merkleDropAbi, errorName: "NothingToClaim" })
+  }
+  return undefined
+}
+
+/** The SAFE transfer a claim emits: from the MerkleDrop to the account, for what it paid. */
+function claimTransferLog(txHash: string, to: string, value: bigint): RpcLog {
+  return {
+    address: TOKEN_CONTRACT,
+    // Both indexed arguments are given, so every topic is a single value.
+    topics: encodeEventTopics({
+      abi: safeTokenEventsAbi,
+      eventName: "Transfer",
+      args: { from: MERKLE_DROP_CONTRACT as Hex, to: to as Hex },
+    }) as Hex[],
+    data: encodeAbiParameters([{ type: "uint256" }], [value]),
+    blockNumber: BLOCK_NUMBER,
+    blockHash: "0x" + "bb".repeat(32),
+    transactionHash: txHash,
+    transactionIndex: "0x0",
+    logIndex: "0x0",
+    removed: false,
+  }
+}
+
+/**
  * Mutate `state` to reflect a submitted transaction, mirroring what the real
  * staking/token/MerkleDrop contracts would do. `data` is the full calldata
  * (selector + ABI-encoded params) as sent via eth_sendTransaction.
+ *
+ * Returns a transaction hash for a transaction whose receipt carries logs, so the wallet
+ * mock can hand it out. Undefined for every other one, which keeps the shared mock hash.
  */
-export function applyMockTx(state: MockChainState, data: string, userAddress: string = TEST_USER): void {
+export function applyMockTx(state: MockChainState, data: string, userAddress: string = TEST_USER): string | undefined {
   const selector = data.slice(0, 10).toLowerCase()
   const params = data.slice(10)
 
@@ -139,14 +210,16 @@ export function applyMockTx(state: MockChainState, data: string, userAddress: st
     case TX_SELECTORS.claim: {
       const account = wordToAddress(params, 0).toLowerCase()
       if (account !== userAddress.toLowerCase()) break
+      if (claimRevert(state, data)) break
       const cumulativeAmount = wordToBigInt(params, 1)
       const delta = cumulativeAmount - state.merkleDropClaimed
-      if (delta > 0n) {
-        state.merkleDropClaimed = cumulativeAmount
-        state.balance += delta
-        state.merkleDropBalance -= delta
-      }
-      break
+      state.merkleDropClaimed = cumulativeAmount
+      state.balance += delta
+      state.merkleDropBalance -= delta
+      state.claims += 1
+      const txHash = "0x" + state.claims.toString(16).padStart(4, "0") + "c1".repeat(30)
+      state.receiptLogs.set(txHash, [claimTransferLog(txHash, account, delta)])
+      return txHash
     }
     default:
       break

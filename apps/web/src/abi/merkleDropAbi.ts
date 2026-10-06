@@ -1,11 +1,3 @@
-import { parseAbi } from "viem"
-
-export const merkleDropAbi = parseAbi([
-  "function merkleRoot() view returns (bytes32)",
-  "function cumulativeClaimed(address account) view returns (uint256)",
-  "function claim(address account, uint256 cumulativeAmount, bytes32 expectedMerkleRoot, bytes32[] merkleProof)",
-  "event Claimed(address indexed account, uint256 amount)",
-  "error InvalidProof()",
-  "error NothingToClaim()",
-  "error MerkleRootWasUpdated()",
-])
+// From @cobuilders/safenet-core, where every event and error in it is proven against the chain.
+// The claim's revert errors are decoded from this ABI, so it must be the proven one.
+export { merkleDropAbi } from "@cobuilders/safenet-core"

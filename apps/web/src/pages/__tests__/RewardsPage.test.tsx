@@ -18,11 +18,12 @@ const { merkleDrop } = getContractAddresses(activeChain.id)
 type Rewards = ReturnType<typeof useRewards>
 type Programme = ReturnType<typeof useProgrammeRewards>
 
-const { mockUseAccount, mockUseRewards, mockUseProgramme, mockWrongNetwork } = vi.hoisted(() => ({
+const { mockUseAccount, mockUseRewards, mockUseProgramme, mockWrongNetwork, mockBalance } = vi.hoisted(() => ({
   mockUseAccount: vi.fn(),
   mockUseRewards: vi.fn(),
   mockUseProgramme: vi.fn(),
   mockWrongNetwork: vi.fn(() => false),
+  mockBalance: vi.fn((): bigint | undefined => undefined),
 }))
 
 vi.mock("wagmi", () => ({ useAccount: () => mockUseAccount() }))
@@ -35,8 +36,13 @@ vi.mock("@/hooks/useWrongNetwork", () => ({ useWrongNetwork: () => mockWrongNetw
 vi.mock("@/components/wallet/ConnectButton", () => ({
   ConnectButton: () => <button>Connect Wallet</button>,
 }))
+vi.mock("@/hooks/useTokenBalance", () => ({ useTokenBalance: () => ({ data: mockBalance() }) }))
 vi.mock("@/components/dashboard/ClaimRewardsDialog", () => ({
   ClaimRewardsDialog: ({ open }: { open: boolean }) => (open ? <div role="dialog">Claim dialog</div> : null),
+}))
+vi.mock("@/components/rewards/ClaimAndStakeDialog", () => ({
+  ClaimAndStakeDialog: ({ open, mode }: { open: boolean; mode: string }) =>
+    open ? <div role="dialog">Claim and stake dialog, mode {mode}</div> : null,
 }))
 
 const PROOF: RewardProof = {
@@ -52,6 +58,7 @@ function rewards(overrides: Partial<Omit<Rewards, "data">> & { data?: Partial<Re
     isLoading: false,
     error: null,
     refetch: vi.fn(),
+    reload: vi.fn(),
     proof: PROOF,
     hasMerkleDrop: true,
     ...rest,
@@ -104,6 +111,7 @@ describe("RewardsPage", () => {
     mockUseRewards.mockReturnValue(rewards())
     mockUseProgramme.mockReturnValue(programme())
     mockWrongNetwork.mockReturnValue(false)
+    mockBalance.mockReturnValue(5n * SAFE)
   })
 
   afterEach(() => {
@@ -186,10 +194,42 @@ describe("RewardsPage", () => {
   })
 
   describe("Actions", () => {
-    it("reserves a disabled primary slot for Claim & Stake", () => {
+    it("opens Claim & Stake as the primary action when there is something to claim", async () => {
       renderPage()
 
-      expect(within(section("Actions")).getByRole("button", { name: "Claim & Stake" })).toBeDisabled()
+      const primary = within(section("Actions")).getByRole("button", { name: "Claim & Stake" })
+      expect(primary).toBeEnabled()
+      await userEvent.click(primary)
+      expect(screen.getByRole("dialog")).toHaveTextContent("Claim and stake dialog, mode claim")
+    })
+
+    it("offers to stake the balance once everything is claimed and SAFE sits in the wallet", async () => {
+      mockUseRewards.mockReturnValue(rewards({ data: { claimable: 0n, canClaim: false } }))
+      renderPage()
+
+      const actions = section("Actions")
+      expect(within(actions).queryByRole("button", { name: "Claim & Stake" })).not.toBeInTheDocument()
+      expect(within(actions).getByText("The SAFE in your wallet earns nothing until you stake it.")).toBeInTheDocument()
+      await userEvent.click(within(actions).getByRole("button", { name: "Stake your balance" }))
+      expect(screen.getByRole("dialog")).toHaveTextContent("Claim and stake dialog, mode balance")
+    })
+
+    it.each<[string, () => void]>([
+      ["the wallet is empty", () => mockBalance.mockReturnValue(0n)],
+      ["the address never earned rewards", () => mockUseRewards.mockReturnValue(rewards({ proof: null }))],
+      [
+        "the root is stale",
+        () => mockUseRewards.mockReturnValue(rewards({ data: { claimable: 0n, canClaim: false, rootStale: true } })),
+      ],
+      ["the wallet is on the wrong network", () => mockWrongNetwork.mockReturnValue(true)],
+    ])("keeps Claim & Stake, disabled, with nothing to claim when %s", (_, arrange) => {
+      mockUseRewards.mockReturnValue(rewards({ data: { claimable: 0n, canClaim: false } }))
+      arrange()
+      renderPage()
+
+      const actions = section("Actions")
+      expect(within(actions).queryByRole("button", { name: "Stake your balance" })).not.toBeInTheDocument()
+      expect(within(actions).getByRole("button", { name: "Claim & Stake" })).toBeDisabled()
     })
 
     it("opens the claim dialog when there is something to claim", async () => {
