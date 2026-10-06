@@ -22,7 +22,10 @@ describe("Header", () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByText("Dashboard")).toBeInTheDocument()
+    const links = screen.getAllByRole("link").map((l) => l.textContent)
+    expect(links.indexOf("Overview")).toBeLessThan(links.indexOf("Dashboard"))
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/")
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard")
     expect(screen.getByText("Validators")).toBeInTheDocument()
     expect(screen.getByText("Withdrawals")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Rewards" })).toHaveAttribute("href", "/rewards")

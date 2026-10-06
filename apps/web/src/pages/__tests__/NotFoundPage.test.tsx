@@ -13,6 +13,6 @@ describe("NotFoundPage", () => {
 
     expect(screen.getByText("404")).toBeInTheDocument()
     expect(screen.getByText("Page not found")).toBeInTheDocument()
-    expect(screen.getByText("Back to Dashboard")).toBeInTheDocument()
+    expect(screen.getByText("Back to Overview")).toBeInTheDocument()
   })
 })

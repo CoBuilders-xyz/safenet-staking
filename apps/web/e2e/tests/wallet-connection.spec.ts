@@ -41,8 +41,9 @@ test.describe("Wallet Connection", () => {
   test("shows SAFE balance when connected", async ({ connectedPage: page }) => {
     await page.goto("/")
 
-    // Balance is shown as a number next to the SAFE token icon (no "SAFE" text suffix)
-    await expect(page.getByText("1,000")).toBeVisible({ timeout: 10_000 })
+    // Balance is shown as a number next to the SAFE token icon (no "SAFE" text suffix). Scoped
+    // to the header: the overview at "/" shows its own SAFE figures, one of them "1,000 SAFE".
+    await expect(page.locator("header").getByText("1,000", { exact: true })).toBeVisible({ timeout: 10_000 })
   })
 
   // WalletConnect pairing requires a real relay/wallet and isn't automatable — this only
@@ -62,6 +63,6 @@ test.describe("Wallet Connection", () => {
 
     await expect(page.getByRole("button", { name: "Switch to Ethereum" })).toBeVisible({ timeout: 10_000 })
     // Balance/actions are hidden until the user switches back to the right network
-    await expect(page.getByText("1,000")).not.toBeVisible()
+    await expect(page.locator("header").getByText("1,000", { exact: true })).not.toBeVisible()
   })
 })

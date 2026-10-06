@@ -19,11 +19,12 @@
  * ORDER of validators by participation. Each rate must agree within RATE_TOLERANCE.
  */
 import { readFileSync } from "node:fs"
+import { localSubgraphUrl } from "@cobuilders/safenet-core"
 
 // The local graph-node by default. SUBGRAPH_URL points the same checks at a deployed subgraph,
 // such as a Studio query URL pinned to one version.
 const PORT = process.env.GRAPH_NODE_PORT ?? "8000"
-const ENDPOINT = process.env.SUBGRAPH_URL || `http://localhost:${PORT}/subgraphs/name/safenet/gnosis`
+const ENDPOINT = process.env.SUBGRAPH_URL || localSubgraphUrl("gnosis", PORT)
 const ORACLE = process.env.ORACLE ?? "/tmp/oracle-2d.json"
 
 // The oracle records the chain head at the moment it ran. The subgraph follows the head too, so

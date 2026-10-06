@@ -32,6 +32,8 @@ const mocked: Pick<PlaywrightTestConfig, "projects" | "webServer"> = {
       VITE_WALLETCONNECT_PROJECT_ID: "00000000000000000000000000000000",
       VITE_MERKLE_DROP_ADDRESS: "0x9999999999999999999999999999999999999999",
       VITE_REWARDS_BASE_URL: "https://mock-rewards.test",
+      VITE_SUBGRAPH_URL_MAINNET: "https://mock-subgraph.test/mainnet",
+      VITE_SUBGRAPH_URL_GNOSIS: "https://mock-subgraph.test/gnosis",
     },
   },
 }

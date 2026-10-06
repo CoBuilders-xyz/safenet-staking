@@ -6,11 +6,14 @@ import { test as base, type Page } from "@playwright/test"
 import { createEthereumProviderScript, createDisconnectedProviderScript } from "../mocks/ethereum-provider"
 import { createRpcHandler } from "../mocks/rpc-handler"
 import { createMockChainState, applyMockTx, type MockChainState } from "../mocks/mock-chain-state"
+import { createMockSubgraphState, createSubgraphHandler, type MockSubgraphState } from "../mocks/subgraph-handler"
 import { CHAIN_ID_HEX, WRONG_CHAIN_ID_HEX, TEST_USER, VALIDATORS } from "./test-data"
 
 export type TestFixtures = {
   /** Mutable mock chain state (balances, stakes, withdrawals, rewards) for this test. */
   mockChainState: MockChainState
+  /** Per-chain behaviour of the mocked subgraph endpoints: ok, fail or stale. Set before goto. */
+  mockSubgraph: MockSubgraphState
   /** Page with mock wallet connected (has accounts) */
   connectedPage: Page
   /** Page with mock wallet but no connected accounts */
@@ -44,7 +47,7 @@ const MOCK_VALIDATORS = [
   },
 ]
 
-async function setupPage(page: Page, options: SetupPageOptions, state: MockChainState): Promise<Page> {
+async function setupPage(page: Page, options: SetupPageOptions, state: MockChainState, subgraph: MockSubgraphState): Promise<Page> {
   const { connected, chainIdHex = CHAIN_ID_HEX, supportsBatching } = options
 
   // Bridge eth_sendTransaction (handled entirely inside the injected browser script,
@@ -76,6 +79,9 @@ async function setupPage(page: Page, options: SetupPageOptions, state: MockChain
   const handler = createRpcHandler(TEST_USER, state)
   await page.route("**/mock-rpc.test/**", handler)
   await page.route("**/mock-rpc.test", handler)
+
+  // Both subgraphs (see mocks/subgraph-handler.ts), so the overview never leaves the machine.
+  await page.route("**/mock-subgraph.test/**", createSubgraphHandler(subgraph))
 
   // Intercept validator info endpoint with test data so tests use known addresses
   await page.route("**/mock-validators.test/**", async (route) => {
@@ -145,20 +151,24 @@ export const test = base.extend<TestFixtures>({
   mockChainState: async ({}, use) => {
     await use(createMockChainState()) // eslint-disable-line react-hooks/rules-of-hooks -- Playwright fixture API, not a React hook
   },
-  connectedPage: async ({ page, mockChainState }, use) => {
-    const p = await setupPage(page, { connected: true }, mockChainState)
+  // eslint-disable-next-line no-empty-pattern -- Playwright fixture API requires this signature
+  mockSubgraph: async ({}, use) => {
+    await use(createMockSubgraphState()) // eslint-disable-line react-hooks/rules-of-hooks -- Playwright fixture API, not a React hook
+  },
+  connectedPage: async ({ page, mockChainState, mockSubgraph }, use) => {
+    const p = await setupPage(page, { connected: true }, mockChainState, mockSubgraph)
     await use(p) // eslint-disable-line react-hooks/rules-of-hooks -- Playwright fixture API, not a React hook
   },
-  disconnectedPage: async ({ page, mockChainState }, use) => {
-    const p = await setupPage(page, { connected: false }, mockChainState)
+  disconnectedPage: async ({ page, mockChainState, mockSubgraph }, use) => {
+    const p = await setupPage(page, { connected: false }, mockChainState, mockSubgraph)
     await use(p) // eslint-disable-line react-hooks/rules-of-hooks -- Playwright fixture API, not a React hook
   },
-  wrongNetworkPage: async ({ page, mockChainState }, use) => {
-    const p = await setupPage(page, { connected: true, chainIdHex: WRONG_CHAIN_ID_HEX }, mockChainState)
+  wrongNetworkPage: async ({ page, mockChainState, mockSubgraph }, use) => {
+    const p = await setupPage(page, { connected: true, chainIdHex: WRONG_CHAIN_ID_HEX }, mockChainState, mockSubgraph)
     await use(p) // eslint-disable-line react-hooks/rules-of-hooks -- Playwright fixture API, not a React hook
   },
-  batchingPage: async ({ page, mockChainState }, use) => {
-    const p = await setupPage(page, { connected: true, supportsBatching: true }, mockChainState)
+  batchingPage: async ({ page, mockChainState, mockSubgraph }, use) => {
+    const p = await setupPage(page, { connected: true, supportsBatching: true }, mockChainState, mockSubgraph)
     await use(p) // eslint-disable-line react-hooks/rules-of-hooks -- Playwright fixture API, not a React hook
   },
 })

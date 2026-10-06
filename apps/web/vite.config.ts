@@ -44,9 +44,12 @@ const repoRoot = path.resolve(__dirname, "../..")
 // scripts/setup.sh writes. An exported WEB_PORT wins, and `--port` wins over both, which is
 // how the e2e suite runs on its own port. Without either, Vite's default.
 const portsFile = path.join(repoRoot, ".env.ports")
-const webPort =
-  process.env.WEB_PORT ??
-  (existsSync(portsFile) ? parseEnv(readFileSync(portsFile, "utf8")).WEB_PORT : undefined)
+const ports = existsSync(portsFile) ? parseEnv(readFileSync(portsFile, "utf8")) : {}
+const webPort = process.env.WEB_PORT ?? ports.WEB_PORT
+
+// The local graph-node's query port, from the same file. In development, with no
+// VITE_SUBGRAPH_URL_* set, the app queries the subgraphs on this worktree's node.
+const graphNodePort = process.env.GRAPH_NODE_PORT ?? ports.GRAPH_NODE_PORT ?? ""
 
 export default defineConfig({
   base: './',
@@ -54,6 +57,9 @@ export default defineConfig({
   // build read the same file as the Node scripts. Vite still exposes only VITE_ values to the
   // bundle; `pnpm check:browser` fails if a value from .env.local reaches dist.
   envDir: repoRoot,
+  define: {
+    "import.meta.env.VITE_GRAPH_NODE_PORT": JSON.stringify(graphNodePort),
+  },
   plugins: [
     react(),
     tailwindcss(),

@@ -22,5 +22,11 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts"]
+  "include": [
+    "vite.config.ts",
+    "codegen.ts",
+    "scripts/subgraph-api-schema.ts",
+    "scripts/codegen-check.ts",
+    "scripts/codegen-live-check.ts"
+  ]
 }

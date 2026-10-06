@@ -6,7 +6,8 @@
       "cache": false,
       "persistent": true,
       "passThroughEnv": [
-        "WEB_PORT"
+        "WEB_PORT",
+        "GRAPH_NODE_PORT"
       ]
     },
     "build": {
@@ -102,6 +103,13 @@
     },
     "bootstrap": {
       "cache": false
+    },
+    "@cobuilders/safenet-web#check": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/subgraph-mainnet/schema.graphql",
+        "$TURBO_ROOT$/packages/subgraph-gnosis/schema.graphql"
+      ]
     }
   }
 }

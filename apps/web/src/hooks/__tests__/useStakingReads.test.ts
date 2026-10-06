@@ -42,6 +42,19 @@ describe("useStakingReads", () => {
     })
   })
 
+  describe("useTotalStaked, held", () => {
+    it("passes enabled: false through, so a fallback read waits until it is needed", () => {
+      renderHook(() => useTotalStaked({ enabled: false }))
+
+      expect(mockUseReadContract).toHaveBeenCalledWith(
+        expect.objectContaining({
+          functionName: "totalStakedAmount",
+          query: expect.objectContaining({ enabled: false }),
+        })
+      )
+    })
+  })
+
   describe("useWithdrawDelay", () => {
     it("calls useReadContract with withdrawDelay and no polling", () => {
       renderHook(() => useWithdrawDelay())
@@ -165,6 +178,14 @@ describe("useStakingReads", () => {
   })
 
   describe("useValidatorTotalStakes", () => {
+    it("holds the reads when enabled is false, even with validators", () => {
+      renderHook(() => useValidatorTotalStakes([TEST_ACCOUNTS.validator1], { enabled: false }))
+
+      expect(mockUseReadContracts).toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ enabled: false }) })
+      )
+    })
+
     it("creates contracts array for validators", () => {
       const validators = [TEST_ACCOUNTS.validator1, TEST_ACCOUNTS.validator2]
       renderHook(() => useValidatorTotalStakes(validators))

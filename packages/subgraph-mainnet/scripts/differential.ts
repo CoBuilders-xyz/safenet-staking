@@ -17,12 +17,12 @@
  */
 import { createPublicClient, fallback, http } from "viem"
 import { mainnet } from "viem/chains"
-import { CONTRACTS, SEF_DATA, erc20Abi, merkleDropAbi, rpcUrls, stakingAbi } from "@cobuilders/safenet-core"
+import { CONTRACTS, SEF_DATA, erc20Abi, localSubgraphUrl, merkleDropAbi, rpcUrls, stakingAbi } from "@cobuilders/safenet-core"
 
 // The local graph-node by default. SUBGRAPH_URL points the same checks at a deployed subgraph,
 // such as a Studio query URL pinned to one version.
 const PORT = process.env.GRAPH_NODE_PORT ?? "8000"
-const ENDPOINT = process.env.SUBGRAPH_URL || `http://localhost:${PORT}/subgraphs/name/safenet/mainnet`
+const ENDPOINT = process.env.SUBGRAPH_URL || localSubgraphUrl("mainnet", PORT)
 
 const client = createPublicClient({
   chain: mainnet,

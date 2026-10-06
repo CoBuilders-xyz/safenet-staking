@@ -8,12 +8,13 @@ const addresses = getContractAddresses(activeChain.id)
 
 const POLL_INTERVAL = 30_000
 
-export function useTotalStaked() {
+/** Pass `enabled: false` to hold the read, for a screen that reads it only as a fallback. */
+export function useTotalStaked({ enabled = true }: { enabled?: boolean } = {}) {
   return useReadContract({
     address: addresses.staking,
     abi: stakingAbi,
     functionName: "totalStakedAmount",
-    query: { refetchInterval: POLL_INTERVAL },
+    query: { enabled, refetchInterval: POLL_INTERVAL },
   })
 }
 
@@ -70,7 +71,7 @@ export function useUserStakesOnValidators(validators: Address[]) {
   })
 }
 
-export function useValidatorTotalStakes(validators: Address[]) {
+export function useValidatorTotalStakes(validators: Address[], { enabled = true }: { enabled?: boolean } = {}) {
   return useReadContracts({
     contracts: validators.map((v) => ({
       address: addresses.staking,
@@ -78,6 +79,6 @@ export function useValidatorTotalStakes(validators: Address[]) {
       functionName: "totalValidatorStakes" as const,
       args: [v],
     })),
-    query: { enabled: validators.length > 0, refetchInterval: POLL_INTERVAL },
+    query: { enabled: enabled && validators.length > 0, refetchInterval: POLL_INTERVAL },
   })
 }
