@@ -4,7 +4,7 @@
  * THIS FILE IS THE ONLY PLACE THESE VALUES ARE WRITTEN.
  * Never type a hex address anywhere else in this repository.
  *
- * Source: safe-fndn/safenet-beta-data/config/beta.env, cross-checked against
+ * Source: safe-fndn/safenet-data/config/beta.env, cross-checked against
  * the Security page of SEF's documentation. Verified 2026-08-26.
  */
 import type { Address } from "viem"
@@ -77,28 +77,32 @@ export const CONTRACTS = {
 
 export type ContractName = keyof typeof CONTRACTS
 
+/**
+ * The GitHub repository where SEF publishes its data. It was `safenet-beta-data` until SEF
+ * renamed it. GitHub still answered the old name on 2026-10-06: the raw host served it as if
+ * nothing had changed, and the API answered a 301 to a repository id. That is GitHub's to keep,
+ * not SEF's publication, so nothing here relies on it.
+ */
+export const SEF_DATA_REPO = "safe-fndn/safenet-data"
+
+const SEF_RAW = `https://raw.githubusercontent.com/${SEF_DATA_REPO}`
+const SEF_API = `https://api.github.com/repos/${SEF_DATA_REPO}`
+
 /** Where SEF publishes the data our numbers must match. */
 export const SEF_DATA = {
-  validatorInfo:
-    "https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/main/assets/validator-info.json",
-  networkInfo:
-    "https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/main/assets/network-info.json",
-  rewardsLatest:
-    "https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/main/assets/rewards/latest.json",
-  rewardsProofBase:
-    "https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/main/assets/rewards",
+  validatorInfo: `${SEF_RAW}/main/assets/validator-info.json`,
+  networkInfo: `${SEF_RAW}/main/assets/network-info.json`,
+  rewardsLatest: `${SEF_RAW}/main/assets/rewards/latest.json`,
+  rewardsProofBase: `${SEF_RAW}/main/assets/rewards`,
   /**
    * The last commit that wrote validator-info.json, through the GitHub API. Its time is when
    * SEF published the participation rates, which fixes the window they cover.
    */
-  validatorInfoCommits:
-    "https://api.github.com/repos/safe-fndn/safenet-beta-data/commits?path=assets/validator-info.json&per_page=1",
+  validatorInfoCommits: `${SEF_API}/commits?path=assets/validator-info.json&per_page=1`,
   /** The last commit that wrote network-info.json. The same cron writes it, in the same commit. */
-  networkInfoCommits:
-    "https://api.github.com/repos/safe-fndn/safenet-beta-data/commits?path=assets/network-info.json&per_page=1",
+  networkInfoCommits: `${SEF_API}/commits?path=assets/network-info.json&per_page=1`,
   /** A file under `assets/` at one commit, so the rates and their window come from one write. */
-  assetsAtCommit: (sha: string) =>
-    `https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/${sha}/assets`,
+  assetsAtCommit: (sha: string) => `${SEF_RAW}/${sha}/assets`,
   /** Their cron runs every 3 hours. Three missed runs is our staleness threshold. */
   staleAfterMs: 9 * 60 * 60 * 1000,
   /** Eight missed runs: past this, a parity run fails, because SEF's pipeline has stopped. */

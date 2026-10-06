@@ -1,5 +1,5 @@
 /**
- * Reading the files SEF publishes at safe-fndn/safenet-beta-data.
+ * Reading the files SEF publishes at safe-fndn/safenet-data.
  *
  * Shapes come from packages/core/src/sef.ts, which records when each was read off the live file.
  */

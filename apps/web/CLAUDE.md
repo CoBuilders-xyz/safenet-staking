@@ -58,7 +58,7 @@ App-level guards: `useSanctionsCheck` blocks the entire app if `VITE_SANCTIONS_A
 - **Write hooks** (`src/hooks/useStakingWrites.ts`): Each write hook (`useStake`, `useInitiateWithdrawal`, `useClaimWithdrawal`) combines `useWriteContract` + `useWaitForTransactionReceipt` and returns a unified `{ action, isPending, isSuccess, error, reset, txHash }` interface. Cache invalidation uses targeted `predicate`-based queries via `useInvalidateOnSuccess`.
 - **QueryClient** (`src/config/queryClient.ts`): Shared singleton with `staleTime: 30_000` and `refetchOnWindowFocus: false` defaults.
 - **Safe detection** (`src/lib/safe.ts`): Shared `isSafeApp` constant used by `useAutoConnect`, `useTokenAllowance`, `useStakingWrites`, `useDarkMode`.
-- **Validator discovery** (`src/hooks/useValidators.ts`): Fetches validator data from a remote JSON endpoint (`VITE_VALIDATOR_INFO_URL`, defaults to GitHub raw URL). Returns `ValidatorInfo[]` with `{ address, isActive, label, commission, participationRate }`. Cached with React Query (5 min staleTime). Also exports `findValidator()` helper for synchronous address lookup.
+- **Validator discovery** (`src/hooks/useValidators.ts`): Fetches validator data from `VITE_VALIDATOR_INFO_URL` or, by default, SEF's published `validator-info.json` (`SEF_DATA.validatorInfo` in `@cobuilders/safenet-core`). Returns `ValidatorInfo[]` with `{ address, isActive, label, commission, participationRate }`. Cached with React Query (5 min staleTime). Also exports `findValidator()` helper for synchronous address lookup.
 - **Withdrawals** (`src/hooks/useWithdrawals.ts`): Fetches pending withdrawals for the connected user. Includes `useNextClaimable` for the claimable banner.
 - **Gas estimation** (`src/hooks/useGasEstimate.ts`): Uses `estimateGas` + `getGasPrice` from viem to show estimated gas cost in delegate/undelegate dialogs. Debounced 500ms on amount change.
 - **Rewards** (`src/hooks/useRewards.ts`, `src/hooks/useRewardProof.ts`, `src/hooks/useClaimRewards.ts`, `src/hooks/useProgrammeRewards.ts`): Rewards reading, Merkle proof fetching, claim transaction hooks, and the programme-wide figures (SEF's `latest.json`, the MerkleDrop's root and SAFE balance). Proofs are fetched from `${rewardsBaseUrl}/proofs/<radix>/{address}.json` and the current root/total from `${rewardsBaseUrl}/latest.json`, where `rewardsBaseUrl` is `VITE_REWARDS_BASE_URL` or, by default, SEF's published rewards data (`SEF_DATA.rewardsProofBase` in `@cobuilders/safenet-core`).
@@ -152,11 +152,11 @@ Wagmi config (`src/config/wagmi.ts`) uses `safe()` (auto-detects Safe Wallet ifr
 | `VITE_CHAIN_ID` | Yes | Target chain (1 = mainnet, 11155111 = sepolia) |
 | `VITE_RPC_URL` | Yes | JSON-RPC endpoint |
 | `VITE_STAKING_DEPLOY_BLOCK` | Yes | Block number to start scanning withdrawal events from |
-| `VITE_VALIDATOR_INFO_URL` | No | Validator info JSON endpoint (defaults to GitHub raw URL) |
+| `VITE_VALIDATOR_INFO_URL` | No | Validator info JSON endpoint (defaults to SEF's published file, `SEF_DATA.validatorInfo` in `@cobuilders/safenet-core`) |
 | `VITE_WALLETCONNECT_PROJECT_ID` | No | Enables WalletConnect connector |
 | `VITE_MERKLE_DROP_ADDRESS` | No | Merkle drop contract address for rewards claiming |
 | `VITE_SANCTIONS_API_URL` | No | Sanctions check endpoint (403 = blocked) |
-| `VITE_REWARDS_BASE_URL` | No | Base URL for reward proof files (defaults to GitHub raw URL) |
+| `VITE_REWARDS_BASE_URL` | No | Base URL for reward proof files (defaults to SEF's published rewards data, `SEF_DATA.rewardsProofBase` in `@cobuilders/safenet-core`) |
 | `VITE_GEOBLOCK_CACHE_DAYS` | No | Geo-block cache duration in days (defaults to 7) |
 | `VITE_DOCS_URL` | No | Footer documentation link (defaults to Safe docs) |
 | `VITE_TERMS_URL` | No | Footer terms link (hidden if unset) |

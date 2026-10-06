@@ -1,5 +1,5 @@
 /**
- * The shape of the JSON SEF publishes at `safe-fndn/safenet-beta-data`.
+ * The shape of the JSON SEF publishes at `safe-fndn/safenet-data`.
  *
  * These are not our types to choose. Each one was read off the live file on
  * 2026-09-17 and must be re-checked, not assumed, when `verify:abis` or
