@@ -148,6 +148,43 @@ describe("staking", () => {
     assert.fieldEquals("Validator", VAL_A, "isRegistered", "true")
   })
 
+  test("registeredAtBlock is the registration, not the first stake", () => {
+    // A stake can reach a validator before its ValidatorUpdated is indexed. The row exists from
+    // the stake, but it registered at block 5.
+    handleStakeIncreased(stakeIncreased(ALICE, VAL_A, "100", 1, DAY1, 0))
+    handleValidatorUpdated(validatorUpdated(VAL_A, true, 5, DAY2, 0))
+
+    assert.fieldEquals("Validator", VAL_A, "registeredAtBlock", "5")
+    assert.fieldEquals("Validator", VAL_A, "registeredAtTimestamp", DAY2.toString())
+    assert.fieldEquals("Validator", VAL_A, "firstSeenAtBlock", "1")
+    assert.fieldEquals("Validator", VAL_A, "firstSeenAtTimestamp", DAY1.toString())
+  })
+
+  test("a validator seen only through stakes has no registration block", () => {
+    handleStakeIncreased(stakeIncreased(ALICE, VAL_A, "100", 1, DAY1, 0))
+
+    assert.fieldEquals("Validator", VAL_A, "registeredAtBlock", "null")
+    assert.fieldEquals("Validator", VAL_A, "firstSeenAtBlock", "1")
+  })
+
+  test("a repeated registration keeps the block that registered it", () => {
+    handleValidatorUpdated(validatorUpdated(VAL_A, true, 1, DAY1, 0))
+    handleValidatorUpdated(validatorUpdated(VAL_A, true, 2, DAY1, 1))
+
+    assert.fieldEquals("Validator", VAL_A, "registeredAtBlock", "1")
+  })
+
+  test("a registration after a deregistration moves the registration block", () => {
+    handleValidatorUpdated(validatorUpdated(VAL_A, true, 1, DAY1, 0))
+    handleValidatorUpdated(validatorUpdated(VAL_A, false, 2, DAY1, 0))
+    // Deregistered, the row keeps the block it last registered at.
+    assert.fieldEquals("Validator", VAL_A, "registeredAtBlock", "1")
+    handleValidatorUpdated(validatorUpdated(VAL_A, true, 3, DAY2, 0))
+
+    assert.fieldEquals("Validator", VAL_A, "registeredAtBlock", "3")
+    assert.fieldEquals("Validator", VAL_A, "firstSeenAtBlock", "1")
+  })
+
   test("deregistration lowers the active count", () => {
     handleValidatorUpdated(validatorUpdated(VAL_A, true, 1, DAY1, 0))
     handleValidatorUpdated(validatorUpdated(VAL_A, false, 2, DAY2, 0))

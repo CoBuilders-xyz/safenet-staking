@@ -1,7 +1,7 @@
 import { Bytes } from "@graphprotocol/graph-ts"
 import { SignShared, SignCompleted, KeyGenConfirmed } from "../generated/FROSTCoordinator/FROSTCoordinator"
 import { RootTally } from "../generated/schema"
-import { consensus, ceremony, signingValidator, tryCount, ONE } from "./shared"
+import { consensus, ceremony, signingValidator, tryCount } from "./shared"
 
 /**
  * A participant published their share for one selectionRoot.
@@ -15,7 +15,17 @@ import { consensus, ceremony, signingValidator, tryCount, ONE } from "./shared"
  */
 export function handleSignShared(event: SignShared): void {
   const c = consensus()
-  const cer = ceremony(event.params.sid, event.block.number, event.block.timestamp, c)
+  const who = event.params.participant
+  // Seeing a share is enough to know the validator exists, even before it attends anything.
+  const v = signingValidator(who, event.block.number, c)
+  v.save()
+
+  // A share for a ceremony already counted cannot change the count. It is not opened again.
+  const cer = ceremony(event.params.sid, event.block.number, c)
+  if (cer == null) {
+    c.save()
+    return
+  }
 
   const root = event.params.selectionRoot
   const tallyId = cer.id + "-" + root.toHexString()
@@ -34,7 +44,6 @@ export function handleSignShared(event: SignShared): void {
 
   // A participant could in principle share twice for one root. Counting them twice would
   // overstate attendance, which is the class of error the Mainnet subgraph already produced.
-  const who = event.params.participant
   const seen = t.participants
   let already = false
   for (let i = 0; i < seen.length; i++) {
@@ -46,10 +55,6 @@ export function handleSignShared(event: SignShared): void {
   }
   t.save()
 
-  // Seeing a share is enough to know the validator exists, even before it attends anything.
-  const v = signingValidator(who, event.block.number, c)
-  v.save()
-
   cer.save()
   c.save()
 }
@@ -57,12 +62,13 @@ export function handleSignShared(event: SignShared): void {
 /** The ceremony produced a signature. This names the winning root. */
 export function handleSignCompleted(event: SignCompleted): void {
   const c = consensus()
-  const cer = ceremony(event.params.sid, event.block.number, event.block.timestamp, c)
+  const cer = ceremony(event.params.sid, event.block.number, c)
+  if (cer == null) return
 
   cer.winningRoot = event.params.selectionRoot
   cer.save()
 
-  tryCount(cer, c)
+  tryCount(cer, c, event.block.number)
   c.save()
 }
 

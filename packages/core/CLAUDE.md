@@ -45,7 +45,8 @@ legitimately contains none of them.
 - `src/deployments.ts` — what the interface needs per chain, derived from `src/contracts.ts`.
 - `src/parity/` — the comparison behind `pnpm test:parity`, which both subgraph packages share.
   `compare.ts` holds the rules as pure functions: exact and declared-precision comparison, the
-  stale rule, the publish instant, the staked total rewound through its movements. `blocks.ts`
+  stale rule, the publish instant, the staked total rewound through its movements, and SEF's
+  participation window summed from the Gnosis subgraph's hourly rows. `blocks.ts`
   finds the block at an instant. `sources.ts` reads SEF's files at a commit, the subgraphs and
   the RPC. It is exported as `@cobuilders/safenet-core/parity`, not from the main entry, because
   `sources.ts` reads the environment and runs `gh`, and the browser app imports the main entry.

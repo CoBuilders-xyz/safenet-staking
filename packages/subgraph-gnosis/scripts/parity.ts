@@ -6,22 +6,17 @@
  * its cron ran in. The instant is the commit that last wrote the file; participationWindow in
  * packages/core turns it into the window, and the window into its first and last Gnosis block.
  *
- * The subgraph keeps running counters, and a deployment that keeps its history answers for any
- * block it has indexed. So the window is one subtraction: a counter at the last block of the
- * window minus the same counter at the block before the first. That gives the attestation
- * ceremonies completed in the window and, per validator, the ones it shared in, which is SEF's
- * numerator and denominator. The rate is then compared with SEF's double exactly: it is the
- * same division of the same integers.
+ * The subgraph files each attestation ceremony under the hour of the block it was attested in,
+ * network-wide in ConsensusHour and per validator in ValidatorHour; the package's schema gives
+ * the rules. SEF's window is then a sum of current rows: every hour from its start to the hour
+ * before its end, plus the block exactly at its end, which each row counts apart. That gives
+ * the attestation ceremonies completed in the window and, per validator, the ones it shared in,
+ * which is SEF's numerator and denominator. The rate is then compared with SEF's double
+ * exactly: it is the same division of the same integers.
  *
- * A premise, not a fact: that bit-exactness rests on SignCompleted and TransactionAttested for
- * a ceremony sitting in the same block. SEF files a ceremony under the block it completed in;
- * the subgraph counts it in the block where the second of the two events arrives. They agree
- * only when that is one block. It was measured once, on 2026-09-29, over 691 attestations in
- * 2,000 blocks, and nothing enforces it. A ceremony attested a block later, across a window
- * edge, would move one count and fail the run.
- *
- * Studio keeps about 1,000 blocks of history, so it cannot answer 14 days back. That is a known
- * limit of the deployment, not a disagreement, and the run reports it as NOT COMPARABLE.
+ * No query reaches back in time, so the comparison does not depend on how much history the
+ * deployment keeps. Studio keeps about 1,000 blocks. A deployment built before the hourly
+ * buckets has no rows to sum, and the run reports it as NOT COMPARABLE.
  *
  * The states, from ParityState in packages/core:
  *   PASS            every rate is SEF's double                                     exit 0
@@ -29,69 +24,69 @@
  *                   reports indexing errors or is behind the window, SEF's file is
  *                   over 24 hours old, or the run hit an error                     exit 1
  *   STALE           SEF's file is over 9 hours old; nothing is compared            exit 0
- *   NOT COMPARABLE  the deployment holds no history at the window's start          exit 0
+ *   NOT COMPARABLE  the deployment has no hourly buckets, or starts after the window  exit 0
  *
  *   pnpm --filter @cobuilders/safenet-subgraph-gnosis test:parity
  *   SUBGRAPH_URL_GNOSIS=<query URL> pnpm --filter @cobuilders/safenet-subgraph-gnosis test:parity
  *
  */
-import { SEF_DATA, participationWindow, type SefNetworkInfo, type SefValidator } from "@cobuilders/safenet-core"
+import {
+  SEF_DATA, SHARE_LOOKBACK_BLOCKS, participationWindow, type SefNetworkInfo, type SefValidator,
+} from "@cobuilders/safenet-core"
 import {
   EXIT_CODE, NEEDS_HOURLY_BUCKETS, appendSummary, chainReader, compareParticipation, formatAge, freshness,
-  githubToken, lastSefCommit, notComparable, overall, prunedFrom, prunedHistoryReason, querySubgraph,
-  recordState, redact, renderMarkdown, renderText, sefAsset, staleOutcome, subgraphEndpoint, type ParityRow,
+  githubToken, lacksHourlyBuckets, lastSefCommit, notComparable, overall, participationFromHours, querySubgraph,
+  recordState, redact, renderMarkdown, renderText, sefAsset, staleOutcome, subgraphEndpoint,
+  type ConsensusHourRow, type ParityRow, type ValidatorHourRow,
 } from "@cobuilders/safenet-core/parity"
 
 const TITLE = "Gnosis: participation per validator against SEF's validator-info.json"
 
-// A ceremony can complete inside the window with its shares emitted just before the start. The
-// subgraph counts a share when its ceremony completes, so it only needs to have indexed those
-// earlier blocks. 200 blocks is metrics-poc.ts's look-back: measured over 2,148 ceremonies on
-// 2026-09-03, the span from first share to completion had a median of 1 block and a max of 10.
-const SHARE_LOOKBACK = 200n
-
-// graph-node caps `first` at 1000. The list is asserted below the cap rather than paginated:
-// Safenet has six validators.
+// graph-node caps `first` at 1000. The hours are read in pages of that size.
 const PAGE = 1000
 
-interface Counters {
-  consensus: { attestationCeremonies: string } | null
-  signingValidators: { id: string; attended: string }[]
-}
-
 /**
- * The window's counts: each counter after its last block minus the same counter after the block
- * before its first. One query, so both reads come from the same view of the subgraph.
+ * The window's counts, summed from the hourly rows: see participationFromHours in
+ * packages/core. Every page reads the same block, `indexed`, so the rows come from one view of
+ * the subgraph. That block is the head the deployment reported a moment ago, inside the history
+ * any deployment keeps.
  *
- * Returns the reason line instead when the deployment no longer holds the history: a pruned
- * deployment answers only for its last blocks, and SEF's window starts 14 days back.
+ * Returns the reason line instead when the deployment has no hourly buckets.
  */
 async function windowCounts(
-  endpoint: string, indexed: bigint, first: bigint, last: bigint,
+  endpoint: string, indexed: bigint, window: { start: Date; end: Date },
 ): Promise<{ attended: Map<string, bigint>; ceremonies: bigint } | string> {
-  const counters = (prefix: string, block: bigint) => `
-    ${prefix}Consensus: consensus(id: "1", block: { number: ${block} }) { attestationCeremonies }
-    ${prefix}Validators: signingValidators(first: ${PAGE}, block: { number: ${block} }) { id attended }`
-  let q: {
-    endConsensus: Counters["consensus"]; endValidators: Counters["signingValidators"]
-    beforeConsensus: Counters["consensus"]; beforeValidators: Counters["signingValidators"]
+  const from = window.start.getTime() / 1000
+  const to = window.end.getTime() / 1000
+  const where = (after: string) => `where: { hour_gte: ${from}, hour_lte: ${to}, id_gt: "${after}" }`
+  const page = async <T extends { id: string }>(entity: string, fields: string): Promise<T[]> => {
+    const rows: T[] = []
+    for (let after = ""; ;) {
+      const q = await querySubgraph<Record<string, T[]>>("gnosis", endpoint, `{
+        ${entity}(first: ${PAGE}, orderBy: id, orderDirection: asc, block: { number: ${indexed} }, ${where(after)}) {
+          id ${fields}
+        }
+      }`)
+      const got = q[entity]!
+      rows.push(...got)
+      if (got.length < PAGE) return rows
+      after = got[got.length - 1]!.id
+    }
   }
+  let consensus: (ConsensusHourRow & { id: string })[]
+  let validators: (Omit<ValidatorHourRow, "validator"> & { id: string; validator: { id: string } })[]
   try {
-    q = await querySubgraph("gnosis", endpoint, `{ ${counters("end", last)} ${counters("before", first - 1n)} }`)
+    consensus = await page("consensusHours", "hour attestationCeremonies attestationCeremoniesOnTheHour")
+    validators = await page("validatorHours", "validator { id } hour attended attendedOnTheHour")
   } catch (e) {
-    const kept = prunedFrom(e instanceof Error ? e.message : "")
-    if (kept === undefined) throw e
-    return prunedHistoryReason({ indexed, kept, needed: first - 1n })
+    if (!lacksHourlyBuckets(e instanceof Error ? e.message : "")) throw e
+    return `this deployment has no hourly buckets; ${NEEDS_HOURLY_BUCKETS}`
   }
-  if (q.endValidators.length >= PAGE || q.beforeValidators.length >= PAGE) {
-    throw new Error(`signingValidators reached the page limit of ${PAGE}`)
-  }
-  const before = new Map(q.beforeValidators.map((v) => [v.id, BigInt(v.attended)]))
-  return {
-    attended: new Map(q.endValidators.map((v) => [v.id, BigInt(v.attended) - (before.get(v.id) ?? 0n)])),
-    ceremonies:
-      BigInt(q.endConsensus?.attestationCeremonies ?? "0") - BigInt(q.beforeConsensus?.attestationCeremonies ?? "0"),
-  }
+  return participationFromHours({
+    window,
+    consensus,
+    validators: validators.map((v) => ({ ...v, validator: v.validator.id })),
+  })
 }
 
 function say(line = ""): void {
@@ -154,10 +149,13 @@ async function main(): Promise<number> {
   if (indexed < last) refusals.push(`the subgraph has indexed to block ${indexed}, before the window's last block ${last}`)
   // This deployment starts a fixed number of days before it was deployed; see this package's
   // CLAUDE.md. The window keeps moving forward, so this only stops a run right after a deploy.
+  // A ceremony can complete inside the window with its shares emitted just before the start. The
+  // subgraph counts a share when its ceremony completes, so it only needs to have indexed those
+  // earlier blocks: SHARE_LOOKBACK_BLOCKS in packages/core, the look-back metrics-poc.ts uses.
   const earliest = meta.signingValidators[0] ? BigInt(meta.signingValidators[0].firstSeenBlock) : undefined
-  const coverage = earliest === undefined || earliest > first - SHARE_LOOKBACK
-    ? `the deployment's first share is at block ${earliest ?? "none"}, after block ${first - SHARE_LOOKBACK}: ` +
-      `it does not cover SEF's window with ${SHARE_LOOKBACK} blocks of look-back; ${NEEDS_HOURLY_BUCKETS}`
+  const coverage = earliest === undefined || earliest > first - SHARE_LOOKBACK_BLOCKS
+    ? `the deployment's first sight of a validator is at block ${earliest ?? "none"}, after block ${first - SHARE_LOOKBACK_BLOCKS}: ` +
+      `it does not cover SEF's window with ${SHARE_LOOKBACK_BLOCKS} blocks of look-back, so it started too late to compare it`
     : undefined
 
   let rows: ParityRow[] = refusals.map((note) => ({
@@ -166,7 +164,7 @@ async function main(): Promise<number> {
   if (refusals.length === 0 && coverage) {
     rows = [notComparable("participation_rate_14d", coverage)]
   } else if (refusals.length === 0) {
-    const counted = await windowCounts(endpoint, indexed, first, last)
+    const counted = await windowCounts(endpoint, indexed, window)
     if (typeof counted === "string") {
       rows = [notComparable("participation_rate_14d", counted)]
     } else {
@@ -199,7 +197,8 @@ async function main(): Promise<number> {
     `### ${TITLE}: ${result}`, "",
     `SEF published ${published}. Window ${window.start.toISOString()} to ${window.end.toISOString()}, ` +
     `Gnosis blocks ${first} to ${last}. Subgraph deployment \`${meta._meta.deployment}\`, indexed to block ${indexed}.`, "",
-    "Rates are compared exactly: SEF publishes the double, and ours is the same division of the same integers.", "",
+    "Rates are compared exactly: SEF publishes the double, and ours is the same division of the same integers, " +
+    "summed from the hourly buckets.", "",
     renderMarkdown(rows), "", `**${result}**`, "",
   ].join("\n"))
   return EXIT_CODE[result]

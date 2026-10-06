@@ -24,7 +24,7 @@ import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 import { CHAINS, RPC_URLS } from "../src/chains.js"
 import { CONTRACTS, SEF_DATA } from "../src/contracts.js"
-import { participationWindow } from "../src/sef.js"
+import { SHARE_LOOKBACK_BLOCKS, participationWindow } from "../src/sef.js"
 import { stakingAbi, merkleDropAbi } from "../src/abis.js"
 import { execFileSync } from "node:child_process"
 
@@ -563,11 +563,9 @@ async function run() {
   // start. Scanning shares only over [gFrom, gTo] drops those, which breaks bit-exactness on
   // roughly a quarter of window boundaries. SEF has all history indexed and loses nothing.
   // The membership test is the sid map, so looking back cannot pull in foreign ceremonies.
-  // 200 blocks. Measured span from first share to completion over 2,148 ceremonies on
-  // 2026-09-03: median 1, p99 4, max 10.
-  const SHARE_LOOKBACK = 200n
+  // SHARE_LOOKBACK_BLOCKS in src/sef.ts gives the measured spans.
   const signed = new Map<string, number>()
-  await scan(gnosis, coordinator, E.signShared, gFrom - SHARE_LOOKBACK, gTo, 5_000n, (batch) => {
+  await scan(gnosis, coordinator, E.signShared, gFrom - SHARE_LOOKBACK_BLOCKS, gTo, 5_000n, (batch) => {
     for (const s of batch as unknown as { args: { sid: Hex; selectionRoot: Hex; participant: Address } }[]) {
       const sid = s.args.sid.toLowerCase()
       if (winningRoot.get(sid) !== s.args.selectionRoot.toLowerCase()) continue

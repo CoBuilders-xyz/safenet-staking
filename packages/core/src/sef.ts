@@ -80,6 +80,16 @@ export function rewardProofUrl(address: string): string {
 export const PARTICIPATION_WINDOW_DAYS = 14
 
 /**
+ * How many Gnosis blocks before a participation window its shares are read from. A ceremony
+ * attested at the window's first block counts shares emitted before it.
+ *
+ * Measured span from a ceremony's first winning share to its completion: over 2,148 ceremonies
+ * on 2026-09-03, median 1 block, p99 4, max 10; over 70,510 in the 16 days to block 48,602,160,
+ * median 1, p99 3, max 260, and one ceremony over the 200 used until then.
+ */
+export const SHARE_LOOKBACK_BLOCKS = 1_000n
+
+/**
  * The window a published `participation_rate_14d` covers.
  *
  * SEF's cron computes a rolling window ending at the top of the hour it ran, so the end is

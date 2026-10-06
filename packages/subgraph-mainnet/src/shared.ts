@@ -29,8 +29,8 @@ export function network(): Network {
  *
  * A stake can reach a validator before we have seen a ValidatorUpdated event for it, because
  * the registry event is rare and the contract does not require one first. So this creates the
- * row rather than assuming it exists. isRegistered stays false until the event says otherwise,
- * and activeValidators counts only those the event confirmed.
+ * row rather than assuming it exists. isRegistered stays false and registeredAtBlock null until
+ * the event says otherwise, and activeValidators counts only those the event confirmed.
  */
 export function validator(addr: Bytes, block: ethereum.Block): Validator {
   const id = addr.toHexString()
@@ -42,8 +42,10 @@ export function validator(addr: Bytes, block: ethereum.Block): Validator {
     v.totalStaked = ZERO
     v.stakersCurrent = 0
     v.stakersEver = 0
-    v.registeredAtBlock = block.number
-    v.registeredAtTimestamp = block.timestamp
+    v.firstSeenAtBlock = block.number
+    v.firstSeenAtTimestamp = block.timestamp
+    v.registeredAtBlock = null
+    v.registeredAtTimestamp = null
   }
   v.lastUpdatedAtBlock = block.number
   return v as Validator

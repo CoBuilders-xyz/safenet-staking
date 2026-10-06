@@ -8,6 +8,9 @@
  *
  *   pnpm generate --days 2      a validation window, about 34,000 blocks
  *   pnpm generate --full        from the verified deploy block
+ *   --prune-never               also asks the indexer to keep every block of history, with
+ *                               `indexerHints: prune: never`. Off by default; this package's
+ *                               CLAUDE.md records what Studio did with it.
  *
  * A windowed subgraph answers participation, latency and attestation counts, which need only
  * recent data. It cannot answer validator registration history or the epoch record, which
@@ -28,6 +31,7 @@ const argOf = (flag: string): string | undefined => {
   return i >= 0 ? process.argv[i + 1] : undefined
 }
 const FULL = process.argv.includes("--full")
+const PRUNE_NEVER = process.argv.includes("--prune-never")
 const DAYS = Number(argOf("--days") ?? 2)
 
 const SOURCES = [
@@ -126,18 +130,18 @@ ${handlers.join("\n")}`
 })
 
 writeFileSync(resolve(ROOT, "subgraph.yaml"), `# GENERATED FILE. Do not edit by hand.
-# Produced by: pnpm --filter @cobuilders/safenet-subgraph-gnosis generate${FULL ? " --full" : ` --days ${DAYS}`}
+# Produced by: pnpm --filter @cobuilders/safenet-subgraph-gnosis generate${FULL ? " --full" : ` --days ${DAYS}`}${PRUNE_NEVER ? " --prune-never" : ""}
 # From:        packages/core/src/contracts.ts and packages/core/src/abis.ts
 #
 # startBlock is ${FULL ? "the verified deploy block" : `${DAYS} days back from the chain head at generation time`}.
 ${FULL ? "" : "# A windowed subgraph cannot answer validator registration history or the epoch record.\n"}specVersion: 1.0.0
 description: Safenet Beta consensus and signing on Gnosis Chain. CoBuilders, Track A.
 repository: https://github.com/CoBuilders-xyz/safenet-staking
-schema:
+${PRUNE_NEVER ? "indexerHints:\n  prune: never\n" : ""}schema:
   file: ./schema.graphql
 dataSources:
 ${dataSources.join("\n")}
 `)
 
-console.log(`  wrote subgraph.yaml from block ${from}${FULL ? " (full history)" : ` (${DAYS} days)`}`)
+console.log(`  wrote subgraph.yaml from block ${from}${FULL ? " (full history)" : ` (${DAYS} days)`}${PRUNE_NEVER ? ", prune: never" : ""}`)
 for (const w of written) console.log(`    ${w.name.padEnd(17)} ${w.address}  ${w.events} events`)

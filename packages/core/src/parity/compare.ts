@@ -34,8 +34,8 @@ export const EXIT_CODE: Readonly<Record<ParityState, 0 | 1>> = {
 }
 
 /**
- * What a pruned Gnosis deployment lacks to compare SEF's window: counts filed by the hour a
- * ceremony completed in, so a 14-day window ending on the hour is a sum of stored rows.
+ * Why a Gnosis deployment without hourly buckets is not compared: SEF's window is a sum of the
+ * rows filed by the hour each ceremony was attested in, and an older schema has none.
  */
 export const NEEDS_HOURLY_BUCKETS = "hourly buckets with completion semantics are needed to compare this window"
 
@@ -204,25 +204,67 @@ export function overall(rows: readonly ParityRow[]): Exclude<ParityState, "STALE
 }
 
 /**
- * The first block a pruned deployment still answers for, read from graph-node's refusal of an
- * older `block: { number }`, or undefined when the message is something else. Studio keeps
- * about 1,000 blocks of history (`historyBlocks` in its indexing status on 2026-10-05), though
- * our manifests set no `indexerHints`, which graph-node documents as keeping all of it.
+ * Whether a subgraph error says the schema has no `consensusHours` field: a Gnosis deployment
+ * built before the hourly buckets. graph-node words it "Type `Query` has no field `X`".
  */
-export function prunedFrom(message: string): bigint | undefined {
-  const m = /only has data starting at block number (\d+)/.exec(message)
-  return m ? BigInt(m[1]!) : undefined
+export function lacksHourlyBuckets(message: string): boolean {
+  return /has no field `consensusHours`/.test(message)
 }
 
+/** One ConsensusHour row, as the Gnosis subgraph returns it. See its schema. */
+export interface ConsensusHourRow {
+  hour: number
+  attestationCeremonies: number
+  attestationCeremoniesOnTheHour: number
+}
+
+/** One ValidatorHour row, as the Gnosis subgraph returns it, with the validator's id. */
+export interface ValidatorHourRow {
+  validator: string
+  hour: number
+  attended: number
+  attendedOnTheHour: number
+}
+
+const HOUR_SECONDS = 3600
+
 /**
- * The reason line for a deployment indexed to block `indexed` that answers from block `kept`
- * only, when SEF's window needs block `needed`. The depth printed is the one observed, not the
- * `historyBlocks` setting: graph-node prunes lazily, so it keeps somewhat more.
+ * SEF's numerator and denominator over its window, from the Gnosis subgraph's hourly rows.
+ *
+ * The window runs from `start` to `end`, both on the hour and both included, by the timestamp
+ * of the block each ceremony was attested in. A row for hour H counts the blocks from H up to,
+ * not including, H + 1 hour, and its `OnTheHour` fields count the block exactly at H. So the
+ * window is every row from `start` to the hour before `end`, plus the `OnTheHour` fields of
+ * the row at `end`. Rows outside the window are ignored; an hour with no row counted nothing.
  */
-export function prunedHistoryReason(input: { indexed: bigint; kept: bigint; needed: bigint }): string {
-  const { indexed, kept, needed } = input
-  return `the deployment keeps ${indexed - kept} blocks of history; SEF's window starts ${kept - needed} ` +
-    `blocks earlier; ${NEEDS_HOURLY_BUCKETS}`
+export function participationFromHours(input: {
+  window: { start: Date; end: Date }
+  consensus: readonly ConsensusHourRow[]
+  validators: readonly ValidatorHourRow[]
+}): { ceremonies: bigint; attended: Map<string, bigint> } {
+  const start = input.window.start.getTime() / 1000
+  const end = input.window.end.getTime() / 1000
+  for (const [name, t] of [["start", start], ["end", end]] as const) {
+    if (!Number.isInteger(t) || t % HOUR_SECONDS !== 0) {
+      throw new Error(`the window ${name} is not on the hour: ${new Date(t * 1000).toISOString()}`)
+    }
+  }
+  if (end <= start) throw new Error("the window ends before it starts")
+  const share = (hour: number, whole: number, onTheHour: number): number => {
+    if (!Number.isInteger(hour) || hour % HOUR_SECONDS !== 0) throw new Error(`a row's hour is not on the hour: ${hour}`)
+    if (hour >= start && hour < end) return whole
+    return hour === end ? onTheHour : 0
+  }
+  let ceremonies = 0n
+  for (const r of input.consensus) {
+    ceremonies += BigInt(share(r.hour, r.attestationCeremonies, r.attestationCeremoniesOnTheHour))
+  }
+  const attended = new Map<string, bigint>()
+  for (const r of input.validators) {
+    const id = r.validator.toLowerCase()
+    attended.set(id, (attended.get(id) ?? 0n) + BigInt(share(r.hour, r.attended, r.attendedOnTheHour)))
+  }
+  return { ceremonies, attended }
 }
 
 /** A row that says why a figure cannot be compared today. Never a pass, never a failure. */

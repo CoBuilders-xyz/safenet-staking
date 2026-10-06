@@ -79,8 +79,20 @@ type Validator @entity(immutable: false) {
   "Addresses that have ever staked with this validator. Only ever grows."
   stakersEver: Int!
 
-  registeredAtBlock: BigInt!
-  registeredAtTimestamp: BigInt!
+  """
+  The block of the ValidatorUpdated event that registered this validator, the latest one if it
+  was registered more than once. Null until such an event is seen.
+
+  Not the block of first sight: a stake can reach a validator before its registration is
+  indexed, and that stake creates the row. firstSeenAtBlock holds that block.
+  """
+  registeredAtBlock: BigInt
+  registeredAtTimestamp: BigInt
+
+  "The block of the first event of any kind that named this validator."
+  firstSeenAtBlock: BigInt!
+  firstSeenAtTimestamp: BigInt!
+
   lastUpdatedAtBlock: BigInt!
 
   stakes: [Stake!]! @derivedFrom(field: "validator")

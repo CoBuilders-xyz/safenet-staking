@@ -42,6 +42,27 @@ ORACLE=/tmp/oracle-16d.json ORACLE_DAYS=16 SUBGRAPH_URL=<studio query URL> \
 The comparison only holds shortly after a deploy. Once the deployment has indexed past its
 16 days, its counts cover more than the oracle's window.
 
+## The buckets
+
+Each attestation ceremony is counted once, in the handler that completes the pair of
+`SignCompleted` and `TransactionAttested`, and filed under the block of its `TransactionAttested`
+in every bucket: `ConsensusHour` and `ValidatorHour` by the UTC hour, `ConsensusDay` and
+`ValidatorDay` by the UTC day. A validator attended when it shared for the winning root before
+the count. Every other validator in `Consensus.validators` at the count missed it. The rules are
+`metrics-poc.ts`'s, named in `tryCount` in `src/shared.ts`.
+
+An hourly row also counts apart the ceremonies attested in the block exactly on the hour. SEF's
+window ends on the hour and includes that block; the schema says how to sum a window.
+
+Over 16 days to block 48,602,061, every one of 70,524 `TransactionAttested` logs sat in the same
+transaction as its `SignCompleted`, after it, so filing by the attestation is filing by the
+completion. Until this rule, the daily rows filed a ceremony under the day of its first share. Over
+the same 16 days the two rules differ by at most 2 ceremonies a day out of 3,000 to 5,500.
+
+A counted ceremony is remembered as a `CountedCeremony` for 1,000 blocks, so a late `SignShared`
+or a second `TransactionAttested` for it is ignored rather than opening a row nothing completes.
+Neither was seen in those 16 days; the logs cannot show the contract never emits one.
+
 ## Parity with SEF
 
 ```
@@ -50,26 +71,30 @@ SUBGRAPH_URL_GNOSIS=<query URL> pnpm --filter @cobuilders/safenet-subgraph-gnosi
 
 `scripts/parity.ts` compares each validator's participation with `participation_rate_14d` in
 SEF's `validator-info.json`, at the commit that last wrote the file. The window is SEF's: 14 days
-ending at the top of that hour, both ends included, by the block the ceremony completed in. The
-subgraph's `attended` and `attestationCeremonies` counters move in that block, so each counter
-after the window's last block minus the same counter after the block before its first is SEF's
-numerator and denominator. The rate is the same division, and is compared as the identical
-double.
+ending at the top of that hour, both ends included, by the block the ceremony was attested in. The
+run sums the hourly rows inside that window from a current query, with
+`participationFromHours` in `packages/core`: SEF's numerator and denominator. The rate is the
+same division, and is compared as the identical double.
 
-That rests on a premise, not a fact: `SignCompleted` and `TransactionAttested` for a ceremony sit
-in the same block. SEF files a ceremony under the block it completed in, and the subgraph counts
-it in the block where the second of the two events arrives. They agree only when that is one
-block. It was measured once, on 2026-09-29, over 691 attestations in 2,000 blocks, and nothing
-enforces it. A ceremony attested a block later, across a window edge, would fail the run.
+No query reaches back in time, so the result does not depend on the history a deployment keeps.
+A deployment built before the hourly buckets has no rows to sum, and the run reports NOT
+COMPARABLE, exits 0, and says why in one line. So does a deployment that starts less than 1,000
+blocks before the window: a ceremony attested at the window's first block counts shares from
+before it. A real difference still fails.
 
-That needs `block: { number }` 14 days back. Studio keeps about 1,000 blocks of history, about
-1.4 hours here, so against Studio the run reports NOT COMPARABLE, exits 0, and says why in one
-line. A real difference, when the comparison is possible, still fails. It can pass only against a
-deployment that keeps its history from at least 14 days and 200 blocks back, such as the local
-graph-node after `pnpm generate --days 16` and a full sync. Studio reported `historyBlocks: 1000` on
-2026-10-05, though the manifest sets no `indexerHints`.
+Studio keeps about 1,000 blocks of history: `historyBlocks: 1000` in the indexing status, about
+1.4 hours here. `indexerHints: prune: never` does not change that. Measured on 2026-10-05: version
+`edc2588-prune-never`, built with `pnpm generate --days 16 --prune-never`, synced 16 days and then
+reported `historyBlocks: 1000`, exactly as the same code without the hint did. Both answered from
+block 48,601,562 with the head at 48,602,585, and refused a query at block 48,340,000 inside their
+own range. So the flag stays off, and nothing here may depend on history Studio keeps.
 
-The daily buckets cannot stand in for the history. `ValidatorDay` and `ConsensusDay` file a
-ceremony under the day of its first share, while SEF counts it on the day it completed, and
-SEF's window ends on the hour, not at midnight.
+## Matchstick tests
 
+`tests/events.ts` builds each event's parameters as an array, and the generated bindings read them
+by position. Whether a parameter is `indexed` decides where graph-node looks for it in a real log,
+in the topics or in the data, and no test here passes through that step. So a wrong `indexed` flag
+in the generated manifest passes every matchstick test while the deployed subgraph decodes nothing,
+or the wrong values. `pnpm verify:abis` does not catch it either: topic0 does not encode which
+parameters are indexed. Only real logs do: a local graph-node sync, or a deployment and its
+differential.

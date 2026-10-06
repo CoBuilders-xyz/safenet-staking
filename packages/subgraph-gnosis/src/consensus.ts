@@ -62,11 +62,23 @@ export function handleTransactionAttested(event: TransactionAttested): void {
   }
   day.save()
 
-  const cer = ceremony(event.params.signatureId, event.block.number, event.block.timestamp, c)
+  // A second attestation of a ceremony already counted is still an attestation, counted
+  // above, but it cannot count the ceremony again or open it anew.
+  const cer = ceremony(event.params.signatureId, event.block.number, c)
+  if (cer == null) {
+    c.save()
+    return
+  }
+  // The first attestation names the block the ceremony is filed under. A second one before the
+  // count, which no log has shown, does not move it.
+  if (!cer.isAttestation) {
+    cer.attestedAtBlock = event.block.number
+    cer.attestedAtTimestamp = event.block.timestamp
+  }
   cer.isAttestation = true
   cer.save()
 
-  tryCount(cer, c)
+  tryCount(cer, c, event.block.number)
   c.save()
 }
 
