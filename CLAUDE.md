@@ -30,15 +30,16 @@ Every package implements the same five. Turborepo fans them out.
 | `pnpm bootstrap` | Runs `scripts/setup.sh`: checks tools, writes `.env.ports`, installs, then links Vercel and pulls `.env.local`. Safe to re-run. **Not `setup`: that is a pnpm builtin that edits your shell rc.** |
 | `pnpm dev` | Starts the web app's Vite dev server, type-watches `packages/core`, and regenerates the subgraph manifests and types. |
 | `pnpm build` | Builds all packages. |
-| `pnpm test` | Unit tests: Vitest in `apps/web`, matchstick in both subgraphs, node:test in `packages/core` and `packages/cli`, and node:test for the root `tools/` through `test:tools`. The `packages/core` tests live under `src` and `scripts`, and its script fails when it finds no test file. `packages/cli` also has Mainnet smoke tests and fork tests that skip here; see `test:smoke` and `test:fork`. |
+| `pnpm test` | Unit tests: Vitest in `apps/web`, matchstick in both subgraphs, node:test in `packages/core`, `packages/cli` and `packages/mcp`, and node:test for the root `tools/` through `test:tools`. The `packages/core` tests live under `src` and `scripts`, and its script fails when it finds no test file. `packages/cli` also has Mainnet smoke tests and fork tests that skip here, and `packages/mcp` Mainnet smoke tests; see `test:smoke` and `test:fork`. |
 | `pnpm check` | Lint, the browser-safety check, then types in every package. Run it before every commit. |
 
 This file gives no test counts, because they change with every pull request. Run the suite for
 the current count.
 
 Scope to one package with `pnpm --filter <name> check`. The names are
-`@cobuilders/safenet-core`, `@cobuilders/safenet-cli`, `@cobuilders/safenet-web`,
-`@cobuilders/safenet-subgraph-mainnet` and `@cobuilders/safenet-subgraph-gnosis`.
+`@cobuilders/safenet-core`, `@cobuilders/safenet-cli`, `@cobuilders/safenet-mcp`,
+`@cobuilders/safenet-web`, `@cobuilders/safenet-subgraph-mainnet` and
+`@cobuilders/safenet-subgraph-gnosis`.
 
 Specific commands, only where they apply:
 
@@ -48,7 +49,7 @@ Specific commands, only where they apply:
 | `pnpm verify:abis:deep` | `packages/core` | Every signature, including rare events, scanned from each deploy block | needs the archive `MAINNET_RPC_URL` from `pnpm env:pull` |
 | `pnpm metrics` | `packages/core` | The 24 metrics, computed against live chains and compared with SEF's published JSON. Writes `packages/core/.metrics/`, which is git-ignored | needs an archive node. With public RPC only, it stopped on a failed Mainnet log range when this file was written |
 | `pnpm check:browser` | root | `apps/web/src` reads no `process.env`, and a built bundle contains no value from `.env.local` other than the public `VITE_` ones | works, part of `check` |
-| `pnpm test:smoke` | root, `packages/cli` | Each of the six read commands runs against Mainnet through the real entry point | needs the archive `MAINNET_RPC_URL`; runs nightly. Skipped, with the reason, everywhere else |
+| `pnpm test:smoke` | root, `packages/cli`, `packages/mcp` | Each of the six read commands runs against Mainnet through the real entry point; the MCP server, started over stdio, answers `status` and `validators_list` | needs the archive `MAINNET_RPC_URL`; runs nightly. Skipped, with the reason, everywhere else |
 | `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. Playwright | runs; one navigation test is intermittently flaky |
 | `pnpm test:fork` | `apps/web`, `packages/cli` | Against the real contracts on an Anvil Mainnet fork at a pinned block, each effect checked by reading the chain. `apps/web`: the staking flows in the interface, in Playwright, about 1.5 minutes. `packages/cli`: the five write commands sent for real, then each with `--dry-run`, which must change nothing, in node:test; one of those tests needs no Anvil and also runs under `pnpm test`; about 20 seconds | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
 | `deploy:studio` | each subgraph package, through `pnpm --filter` | The subgraph builds and Studio accepts it as a new version under its slug. Not that it syncs: watch it by deployment hash, then run `differential` with `SUBGRAPH_URL` | works; needs `GRAPH_DEPLOY_KEY` |
@@ -76,7 +77,7 @@ fork suite Anvil 8546, and `pnpm dev` uses Vite's default.
 
 ## Layout
 
-The target layout has nine packages. **Five exist on `main`.** The rest are listed so the shape is
+The target layout has nine packages. **Six exist on `main`.** The rest are listed so the shape is
 known, not to suggest they are there:
 
 ```
@@ -87,7 +88,10 @@ packages/subgraph-mainnet   EXISTS   staking, withdrawals and rewards on Ethereu
 packages/subgraph-gnosis    EXISTS   consensus and signing on Gnosis Chain
 packages/cli                EXISTS   safenet-cli: the `safenet` binary, six read commands and five
                                      writes with --dry-run, over a library in src/lib/ that the MCP
-                                     server will import
+                                     server imports
+packages/mcp                EXISTS   safenet-mcp: an MCP server over stdio, one tool per CLI command.
+                                     Calls the shared library, not the CLI binary. Writes are dry
+                                     runs unless the operator allows them at start
 tools/                      EXISTS   edit hook, task guard, browser-safety check, metrics report
 scripts/setup.sh            EXISTS   what `pnpm bootstrap` runs
 docker-compose.yml          EXISTS   local graph-node, postgres and ipfs
@@ -96,13 +100,13 @@ graph-node.toml             EXISTS   graph-node config for two chains at once
 
 apps/api                    planned  REST wrapper, Cloudflare Workers
 apps/alerts                 planned  alerts service, Supabase
-packages/mcp                planned  MCP server. Calls the shared library, not the CLI binary.
 packages/testing            planned  shared fixtures: anvil, RPC mocks, Playwright helpers
 ```
 
 Do not infer that a planned package exists because this file names it. Check.
 
-`packages/core`, `packages/cli`, `apps/web` and both subgraph packages each own a `CLAUDE.md`.
+`packages/core`, `packages/cli`, `packages/mcp`, `apps/web` and both subgraph packages each own a
+`CLAUDE.md`.
 Read the one for the package you are in, not all of them. `apps/web/CLAUDE.md` came with the fork
 and names `yarn`. This repository uses pnpm, so run its scripts as
 `pnpm --filter @cobuilders/safenet-web <script>`.
@@ -128,7 +132,7 @@ workflow `.github/workflows/subgraphs-deploy.yml`. Its `CLAUDE.md` has the slug 
 
 `.github/workflows/ci.yml` runs four jobs on every pull request and on every push to `main`:
 `check`, `test`, `e2e` and `verify-abis`. `nightly.yml` runs the deep ABI scan, the unit tests,
-both fork suites and the CLI smoke tests daily; all but the unit tests need the `MAINNET_RPC_URL`
+both fork suites and the CLI and MCP smoke tests daily; all but the unit tests need the `MAINNET_RPC_URL`
 secret, and fail without it. The fork suites stay out of per-PR CI because every run reads from
 the archive node. `security.yml` runs a
 dependency review on pull requests, skipped until the repository is public, and `pnpm audit`

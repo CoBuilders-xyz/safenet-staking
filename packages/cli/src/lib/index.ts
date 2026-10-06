@@ -6,6 +6,7 @@
  */
 export { createContext, rpcEndpoints, rpcHosts, type Context, type ContextOptions } from "./context.js"
 export { SafenetError } from "./errors.js"
+export { errorSentence, redactUrls, scrubSecrets } from "./redact.js"
 export { figure, type Figure } from "./figure.js"
 export { ScanError, scanLogs, type ScanRequest } from "./scan.js"
 export { fetchValidatorsWithWindow, type ParticipationWindow } from "./sef.js"

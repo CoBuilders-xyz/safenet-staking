@@ -11,7 +11,16 @@
     "safenet": "./dist/index.js"
   },
   "exports": {
-    "./lib": "./src/lib/index.ts"
+    "./lib": {
+      "source": "./src/lib/index.ts",
+      "types": "./dist/lib/index.d.ts",
+      "import": "./dist/lib/index.js"
+    },
+    "./program": {
+      "source": "./src/cli.ts",
+      "types": "./dist/program.d.ts",
+      "import": "./dist/program.js"
+    }
   },
   "scripts": {
     "bootstrap": "echo '@cobuilders/safenet-cli: nothing to prepare'",

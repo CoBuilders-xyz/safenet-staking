@@ -1,7 +1,10 @@
 import { defineConfig } from "tsup"
 
 export default defineConfig({
-  entry: { index: "src/index.ts" },
+  // The binary, the library the MCP server calls, and the program it checks its tools against.
+  // Each library entry ships with its declarations.
+  entry: { index: "src/index.ts", "lib/index": "src/lib/index.ts", program: "src/cli.ts" },
+  dts: { entry: { "lib/index": "src/lib/index.ts", program: "src/cli.ts" } },
   format: ["esm"],
   platform: "node",
   target: "node22",

@@ -150,7 +150,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Run every CLI command against Mainnet
+        id: cli-smoke
         run: pnpm --filter @cobuilders/safenet-cli test:smoke
+      # The MCP server started over stdio, as a desktop client starts it, and called through the
+      # SDK's client. It also runs when the CLI step failed, so one failure does not hide the other,
+      # but not when a setup step before both failed.
+      - name: Run the MCP server over stdio against Mainnet
+        if: ${{ success() || steps.cli-smoke.outcome == 'failure' }}
+        timeout-minutes: 10
+        run: pnpm --filter @cobuilders/safenet-mcp test:smoke
       - name: Build the binary and run it
         run: |
           pnpm --filter @cobuilders/safenet-cli build

@@ -34,3 +34,13 @@ Every package implements the same five. Turborepo fans them out.
 | `pnpm build` | Builds all packages. |
 | `pnpm test` | Unit tests. |
 | `pnpm check` | Lint and types. |
+
+## MCP server
+
+`packages/mcp` is `safenet-mcp`, an MCP server over stdio that gives an AI client the reads of
+the `safenet` command-line interface, one tool per command. Its write tools return dry runs
+unless the operator allows writes when the server starts.
+
+- [packages/mcp/README.md](packages/mcp/README.md): the tools and their arguments, the settings,
+  and how to add the server to Claude Desktop and Cursor.
+- [packages/mcp/CLAUDE.md](packages/mcp/CLAUDE.md): how it is built and tested.
