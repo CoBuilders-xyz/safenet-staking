@@ -78,6 +78,13 @@ describe("Validators", () => {
     expect(screen.getByText("31 missed")).toBeInTheDocument()
   })
 
+  it("never shows 100.00% beside a missed count", () => {
+    const rate = Number((59_190n * 1_000_000_000n) / 59_192n) / 1_000_000_000
+    render(<MemoryRouter><Validators rows={[{ ...row, participation: rate, absences: 2n }]} /></MemoryRouter>)
+    expect(screen.getByText("99.99%")).toBeInTheDocument()
+    expect(screen.getByText("2 missed")).toBeInTheDocument()
+  })
+
   it("drops the stakers column when no row has it, and says when participation is missing", () => {
     render(<MemoryRouter><Validators rows={[{ ...row, stakers: undefined, participation: undefined, absences: undefined }]} /></MemoryRouter>)
     expect(screen.queryByRole("columnheader", { name: "Stakers" })).not.toBeInTheDocument()

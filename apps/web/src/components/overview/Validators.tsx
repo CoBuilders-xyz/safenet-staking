@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom"
 import type { Address } from "viem"
-import { formatTokenAmount, truncateAddress } from "@/lib/format"
+import { formatParticipation, formatTokenAmount, truncateAddress } from "@/lib/format"
 
 export interface ValidatorTableRow {
   address: Address
@@ -19,7 +19,8 @@ export interface ValidatorTableRow {
 
 /**
  * Validators by stake. Participation shows the rate and, when the subgraph has it, the raw count
- * of missed ceremonies: the count is what a staker can act on.
+ * of missed ceremonies: the count is what a staker can act on. A rate beside a missed count is
+ * floored, so it never reads 100.00% above "2 missed".
  */
 export function Validators({ rows }: { rows: readonly ValidatorTableRow[] }) {
   const showStakers = rows.some((r) => r.stakers !== undefined)
@@ -60,7 +61,7 @@ export function Validators({ rows }: { rows: readonly ValidatorTableRow[] }) {
                   <span className="text-muted-foreground">Not available</span>
                 ) : (
                   <>
-                    {(v.participation * 100).toFixed(2)}%
+                    {formatParticipation(v.participation, v.absences)}
                     {v.absences !== undefined && (
                       <div className="text-xs text-faint">{v.absences.toLocaleString("en-US")} missed</div>
                     )}
