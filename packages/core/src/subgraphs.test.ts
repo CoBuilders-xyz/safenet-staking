@@ -11,24 +11,24 @@ import {
 } from "./subgraphs.js"
 import { GNOSIS_SNAPSHOT } from "./gnosis-snapshot.js"
 
-// These tests hold whatever SUBGRAPH_ENDPOINTS says, so swapping one default for a deployed URL
-// is a one-line change that keeps this suite green.
+// These tests do not pin the deployed URLs: moving a default to a new Studio version keeps this
+// suite green. They do fail when a default is the local graph-node, because a production build
+// disallows local endpoints and would then query no subgraph for that chain.
 const CHAINS = ["mainnet", "gnosis"] as const
-const isLocal = (c: (typeof CHAINS)[number]) => isLocalSubgraphUrl(SUBGRAPH_ENDPOINTS[c])
 
-test("each default is the local graph-node on its default port, or a deployed https URL", () => {
+test("each default is a deployed https URL, never the local graph-node", () => {
   for (const c of CHAINS) {
     const d = SUBGRAPH_ENDPOINTS[c]
-    if (isLocal(c)) assert.equal(d, localSubgraphUrl(c, DEFAULT_GRAPH_NODE_PORT))
-    else assert.match(d, /^https:\/\//)
+    assert.match(d, /^https:\/\//)
+    assert.equal(isLocalSubgraphUrl(d), false)
   }
 })
 
-test("the port moves a local default, for a worktree with its own graph-node, and leaves a deployed one", () => {
+test("the port is for a local default only, so it leaves the deployed defaults as they are", () => {
   const got = subgraphEndpoints({ graphNodePort: "8160" })
-  for (const c of CHAINS) {
-    assert.equal(got[c], isLocal(c) ? `http://127.0.0.1:8160/subgraphs/name/${SUBGRAPH_NAMES[c]}` : SUBGRAPH_ENDPOINTS[c])
-  }
+  for (const c of CHAINS) assert.equal(got[c], SUBGRAPH_ENDPOINTS[c])
+  assert.equal(localSubgraphUrl("mainnet", "8160"), `http://127.0.0.1:8160/subgraphs/name/${SUBGRAPH_NAMES.mainnet}`)
+  assert.equal(localSubgraphUrl("gnosis"), `http://127.0.0.1:${DEFAULT_GRAPH_NODE_PORT}/subgraphs/name/${SUBGRAPH_NAMES.gnosis}`)
 })
 
 test("an override replaces one chain only, and an empty override counts as unset", () => {
@@ -38,11 +38,17 @@ test("an override replaces one chain only, and an empty override counts as unset
   assert.equal(got.gnosis, subgraphEndpoints().gnosis)
 })
 
-test("a build that disallows local endpoints gets no local default, but keeps overrides and deployed defaults", () => {
+test("a build that disallows local endpoints keeps overrides and deployed defaults, so it always has an endpoint", () => {
   const studio = "https://api.studio.thegraph.test/query/1/safenet-gnosis/version/latest"
   const got = subgraphEndpoints({ allowLocal: false, overrides: { gnosis: studio } })
   assert.equal(got.gnosis, studio)
-  assert.equal(got.mainnet, isLocal("mainnet") ? undefined : SUBGRAPH_ENDPOINTS.mainnet)
+  assert.equal(got.mainnet, SUBGRAPH_ENDPOINTS.mainnet)
+  for (const c of CHAINS) assert.notEqual(subgraphEndpoints({ allowLocal: false })[c], undefined)
+})
+
+test("a local override is used as written, so the local graph-node stays reachable", () => {
+  const local = localSubgraphUrl("mainnet", "8160")
+  assert.equal(subgraphEndpoints({ overrides: { mainnet: local } }).mainnet, local)
 })
 
 test("local URLs are recognised on any port and host form, deployed ones are not", () => {

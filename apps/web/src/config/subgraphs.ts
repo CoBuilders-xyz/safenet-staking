@@ -6,6 +6,11 @@
 //   a deployed default in core                             used everywhere
 //   the local graph-node default in core                   development only, on the port in .env.ports
 //
+// Today both defaults are the Studio deployments, so a build with nothing set queries Studio in
+// development and production alike, and the local graph-node is reached through the overrides.
+// Studio's query URL is rate-limited to about 3,000 queries a day per subgraph, and is not the
+// production read path.
+//
 // A production build never falls back to 127.0.0.1: a deployed page would then ask every
 // visitor's own machine for a subgraph. With no endpoint, the overview reads the contracts and
 // says so.

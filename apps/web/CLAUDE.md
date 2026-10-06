@@ -162,7 +162,7 @@ Wagmi config (`src/config/wagmi.ts`) uses `safe()` (auto-detects Safe Wallet ifr
 | `VITE_TERMS_URL` | No | Footer terms link (hidden if unset) |
 | `VITE_PRIVACY_URL` | No | Footer privacy link (hidden if unset) |
 | `VITE_IMPRINT_URL` | No | Footer imprint link (hidden if unset) |
-| `VITE_SUBGRAPH_URL_MAINNET` | No | Mainnet subgraph query URL. Public in the bundle; never a URL with a key. Defaults to the local graph-node in development, none in a production build |
+| `VITE_SUBGRAPH_URL_MAINNET` | No | Mainnet subgraph query URL. Public in the bundle; never a URL with a key. Defaults to the Studio deployment named in `packages/core/src/subgraphs.ts`, in development and production builds alike. That is Studio's development URL, rate-limited to about 3,000 queries a day per subgraph, and not the production read path. Set it to the local graph-node's URL to read `pnpm graph:up` |
 | `VITE_SUBGRAPH_URL_GNOSIS` | No | Gnosis subgraph query URL. Same rules |
 | `VITE_APP_URL` | No | Canonical app URL for social preview meta tags (`og:image`, `twitter:image`); absolute URLs are required for social crawlers |
 

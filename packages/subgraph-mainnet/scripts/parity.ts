@@ -18,6 +18,9 @@
  *   pnpm --filter @cobuilders/safenet-subgraph-mainnet test:parity
  *   SUBGRAPH_URL_MAINNET=<query URL> pnpm --filter @cobuilders/safenet-subgraph-mainnet test:parity
  *
+ * Without SUBGRAPH_URL_MAINNET the run reads the default in packages/core, the Studio deployment
+ * of this subgraph: subgraphEndpoint in packages/core resolves it, the same way for both chains.
+ *
  * The states, from ParityState in packages/core:
  *   PASS            the total is SEF's, to the wei                                 exit 0
  *   FAIL            the total differs, the subgraph reports indexing errors or is
