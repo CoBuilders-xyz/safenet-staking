@@ -79,9 +79,9 @@ export type ContractName = keyof typeof CONTRACTS
 
 /**
  * The GitHub repository where SEF publishes its data. It was `safenet-beta-data` until SEF
- * renamed it. GitHub still answers the old name: the raw host serves it as if nothing had
- * changed, and the API answers a 301 to a repository id. That is GitHub's to keep, not SEF's
- * publication, so nothing here relies on it.
+ * renamed it. GitHub still answered the old name on 2026-10-06: the raw host served it as if
+ * nothing had changed, and the API answered a 301 to a repository id. That is GitHub's to keep,
+ * not SEF's publication, so nothing here relies on it.
  */
 export const SEF_DATA_REPO = "safe-fndn/safenet-data"
 
