@@ -1,8 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { type Address, getAddress } from "viem"
-
-const DEFAULT_URL =
-  "https://raw.githubusercontent.com/safe-fndn/safenet-beta-data/refs/heads/main/assets/validator-info.json"
+import { SEF_DATA } from "@cobuilders/safenet-core"
 
 export interface ValidatorInfo {
   address: Address
@@ -31,7 +29,7 @@ function isValidEntry(v: unknown): v is RawValidator {
 
 async function fetchValidators(): Promise<ValidatorInfo[]> {
   const url =
-    import.meta.env.VITE_VALIDATOR_INFO_URL || DEFAULT_URL
+    import.meta.env.VITE_VALIDATOR_INFO_URL || SEF_DATA.validatorInfo
   const res = await fetch(url)
   if (!res.ok) {
     throw new Error(

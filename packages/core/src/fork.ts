@@ -12,10 +12,12 @@
  * 2026-09-24, was the last root update before both, so the root on chain at the block equals
  * the root in that commit's proof files. Both suites check this on every run.
  */
+import { SEF_DATA_REPO } from "./contracts.js"
+
 export const MAINNET_FORK = {
   blockNumber: 26_122_454n,
   sefData: {
-    repo: "safe-fndn/safenet-beta-data",
+    repo: SEF_DATA_REPO,
     commit: "4cdcc6e1d672b79a5f84a2e9c67bfe4aa353a6d7",
   },
 } as const

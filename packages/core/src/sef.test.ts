@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { SEF_DATA } from "./contracts.js"
+import { SEF_DATA, SEF_DATA_REPO } from "./contracts.js"
 import { PARTICIPATION_WINDOW_DAYS, parseSefAmount, participationWindow, rewardProofUrl } from "./sef.js"
 
 // An address made up for the test. Its first four bytes differ, so the radix path is checkable.
@@ -32,6 +32,19 @@ test("the participation window ends at the publish hour and spans 14 days", () =
 test("a publish exactly on the hour ends the window on that hour", () => {
   const { end } = participationWindow(new Date("2026-10-04T21:00:00.000Z"))
   assert.equal(end.toISOString(), "2026-10-04T21:00:00.000Z")
+})
+
+test("every SEF URL is built on the one repository name", () => {
+  const urls = [
+    SEF_DATA.validatorInfo,
+    SEF_DATA.networkInfo,
+    SEF_DATA.rewardsLatest,
+    SEF_DATA.rewardsProofBase,
+    SEF_DATA.validatorInfoCommits,
+    SEF_DATA.networkInfoCommits,
+    SEF_DATA.assetsAtCommit("abc1234"),
+  ]
+  for (const url of urls) assert.ok(url.includes(`/${SEF_DATA_REPO}/`), url)
 })
 
 test("the commit-pinned asset base names the commit", () => {

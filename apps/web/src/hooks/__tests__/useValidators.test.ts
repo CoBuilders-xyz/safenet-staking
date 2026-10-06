@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { renderHook } from "@testing-library/react"
+import { SEF_DATA } from "@cobuilders/safenet-core"
 import { findValidator } from "../useValidators"
 
 const mockFetch = vi.fn()
@@ -26,6 +27,7 @@ describe("useValidators", () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllEnvs()
   })
 
   it("calls useQuery with validators key and 5 min staleTime", () => {
@@ -67,6 +69,26 @@ describe("useValidators", () => {
         participationRate: 85.23,
       },
     ])
+  })
+
+  it("queryFn fetches SEF's published file, from core, when no URL is configured", async () => {
+    vi.stubEnv("VITE_VALIDATOR_INFO_URL", "")
+    mockFetch.mockResolvedValue({ ok: true, text: () => Promise.resolve("[]") })
+
+    renderHook(() => useValidators())
+    await capturedQueryFn!()
+
+    expect(mockFetch).toHaveBeenCalledWith(SEF_DATA.validatorInfo)
+  })
+
+  it("queryFn fetches VITE_VALIDATOR_INFO_URL when it is set", async () => {
+    vi.stubEnv("VITE_VALIDATOR_INFO_URL", "https://validators.example/validators.json")
+    mockFetch.mockResolvedValue({ ok: true, text: () => Promise.resolve("[]") })
+
+    renderHook(() => useValidators())
+    await capturedQueryFn!()
+
+    expect(mockFetch).toHaveBeenCalledWith("https://validators.example/validators.json")
   })
 
   it("queryFn throws on non-ok response", async () => {

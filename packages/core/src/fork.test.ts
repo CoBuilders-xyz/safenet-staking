@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { CONTRACTS, SEF_DATA } from "./contracts.js"
+import { CONTRACTS, SEF_DATA, SEF_DATA_REPO } from "./contracts.js"
 import { MAINNET_FORK, MAINNET_FORK_SEF_DATA } from "./fork.js"
 
 test("the fork block sits after every Mainnet contract the suite uses", () => {
@@ -15,6 +15,7 @@ test("SEF's data is pinned to a full commit, not a branch", () => {
 })
 
 test("the pinned SEF URLs keep the layout of the live ones", () => {
+  assert.equal(MAINNET_FORK.sefData.repo, SEF_DATA_REPO)
   const live = (url: string) => url.replace(/\/main\//, `/${MAINNET_FORK.sefData.commit}/`)
   assert.equal(MAINNET_FORK_SEF_DATA.validatorInfo, live(SEF_DATA.validatorInfo))
   assert.equal(MAINNET_FORK_SEF_DATA.rewardsProofBase, live(SEF_DATA.rewardsProofBase))
