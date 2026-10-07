@@ -9,6 +9,23 @@ exactly, to the last wei. `--json` gives the same fields, with amounts as wei in
 
 ## Install
 
+The package is not on npm yet. Until it is, run it from a clone of this repository, without
+building:
+
+```sh
+pnpm install
+pnpm --filter @cobuilders/safenet-cli start status
+```
+
+Or build it and run the binary, which takes the same arguments as `safenet`:
+
+```sh
+pnpm --filter @cobuilders/safenet-cli build
+node packages/cli/dist/index.js --help
+```
+
+After it is published, install it globally:
+
 ```sh
 npm install -g @cobuilders/safenet-cli
 safenet --help
@@ -18,12 +35,6 @@ Or run it once, without installing:
 
 ```sh
 npx @cobuilders/safenet-cli status
-```
-
-The package is not on npm yet. Until it is, run it from this repository without building:
-
-```sh
-pnpm install && pnpm --filter @cobuilders/safenet-cli start status
 ```
 
 ## Commands
@@ -102,8 +113,8 @@ messages have URLs removed.
 ## Library
 
 The package also exports the library the commands call, as `@cobuilders/safenet-cli/lib`, and
-the program builder as `@cobuilders/safenet-cli/program`. The library's declarations refer to one
-type from `@cobuilders/safenet-core`, which is not published.
+the program builder as `@cobuilders/safenet-cli/program`. Both ship with their declarations,
+which need only `viem`, `zod` and `commander`, the package's own dependencies.
 
 ## Requirements
 
