@@ -44,3 +44,10 @@ unless the operator allows writes when the server starts.
 - [packages/mcp/README.md](packages/mcp/README.md): the tools and their arguments, the settings,
   and how to add the server to Claude Desktop and Cursor.
 - [packages/mcp/CLAUDE.md](packages/mcp/CLAUDE.md): how it is built and tested.
+
+## License
+
+This repository is released under the MIT License, see [LICENSE](LICENSE). `apps/web` derives
+from Safe Foundation's [safenet-staking-ui](https://github.com/safe-fndn/safenet-staking-ui),
+which is also MIT. Its copyright notice stays in [apps/web/LICENSE](apps/web/LICENSE), as the
+MIT License requires.

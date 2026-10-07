@@ -10,6 +10,7 @@
     "safe",
     "staking"
   ],
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/CoBuilders-xyz/safenet-staking.git",
