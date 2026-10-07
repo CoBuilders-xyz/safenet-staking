@@ -5,7 +5,7 @@
 import { stopAnvil } from "./anvil"
 import { command, portInUse, say } from "./processes"
 import { stopProxy } from "./proxy"
-import { ANVIL_PORT, PROXY_PORT, WEB_PORT } from "./settings"
+import { ANVIL_PORT, LOCAL_PROXY_HOST, PROXY_PORT, WEB_PORT } from "./settings"
 
 await command(async () => {
   console.log("\n  Manual QA fork: down\n")
@@ -14,8 +14,9 @@ await command(async () => {
   const anvilStopped = await stopAnvil()
   say("Anvil", anvilStopped ? "stopped" : "was not running")
 
-  for (const [name, port] of [["proxy", PROXY_PORT], ["Vite", WEB_PORT], ["Anvil", ANVIL_PORT]] as const) {
-    if (await portInUse(port)) say("Port", `${port} (${name}) is still in use, by a process this tool did not start`)
+  const probes = [["proxy", PROXY_PORT, LOCAL_PROXY_HOST], ["Vite", WEB_PORT, "127.0.0.1"], ["Anvil", ANVIL_PORT, "127.0.0.1"]] as const
+  for (const [name, port, host] of probes) {
+    if (await portInUse(port, host)) say("Port", `${port} (${name}) is still in use, by a process this tool did not start`)
   }
   console.log()
 })

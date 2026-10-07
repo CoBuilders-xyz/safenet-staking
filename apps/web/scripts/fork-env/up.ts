@@ -7,9 +7,12 @@
  *   3. The chain baseline: new root, funded test account, topped-up MerkleDrop, snapshot.
  *   4. The proxy, which serves the app, the proofs and the RPC on one origin, and its Vite.
  *
- * Then it prints what a tester needs: the origin to open, the account to import, the amounts.
+ * Every port is checked first, so nothing is stopped when one is held by a process this tool did
+ * not start. Then it prints what a tester needs: the origin to open, the account to import, the
+ * amounts.
  */
 import { formatEther } from "viem"
+import { anvilStatus, foreignPort } from "./anvil"
 import { ensureAnvil, sefSourceLabel } from "./baseline"
 import { PROXY_LOG, command, rpc, say, waitFor, type SetupRecord } from "./processes"
 import { foreignPorts, proxyStatus, startProxy, stopProxy, webAnswers } from "./proxy"
@@ -72,8 +75,18 @@ function summary(setup: SetupRecord): void {
 `)
 }
 
+/**
+ * Every port checked before anything is stopped: a restart of our own Anvil, for new settings,
+ * must not happen when the proxy's ports turn out to be someone else's.
+ */
+async function preflight(): Promise<void> {
+  if ((await anvilStatus()).state === "foreign") throw foreignPort()
+  if ((await proxyStatus()) === "foreign") throw foreignPorts()
+}
+
 await command(async () => {
   console.log("\n  Manual QA fork\n")
+  await preflight()
   const setup = await ensureAnvil()
   await ensureProxy()
   await verify(setup)

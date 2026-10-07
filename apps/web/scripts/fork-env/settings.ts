@@ -51,10 +51,10 @@ export const PROXY_ORIGIN = (process.env.QA_PROXY_ORIGIN ?? `http://127.0.0.1:${
 export const ANVIL_URL = `http://127.0.0.1:${ANVIL_PORT}`
 export const WEB_URL = `http://127.0.0.1:${WEB_PORT}`
 /** Where this machine reaches the proxy, whatever origin the bundle carries. */
-export const LOCAL_PROXY_URL = (() => {
-  const host = ["0.0.0.0", "::", "::0"].includes(PROXY_HOST) ? "127.0.0.1" : PROXY_HOST
-  return `http://${host.includes(":") ? `[${host}]` : host}:${PROXY_PORT}`
-})()
+/** Where this machine reaches a server bound to `host`: loopback for a wildcard, else the host itself. */
+export const localHost = (host: string): string => (["0.0.0.0", "::", "::0"].includes(host) ? "127.0.0.1" : host)
+export const LOCAL_PROXY_HOST = localHost(PROXY_HOST)
+export const LOCAL_PROXY_URL = `http://${LOCAL_PROXY_HOST.includes(":") ? `[${LOCAL_PROXY_HOST}]` : LOCAL_PROXY_HOST}:${PROXY_PORT}`
 
 function amount(name: string, fallback: string): bigint {
   const value = process.env[name] ?? fallback

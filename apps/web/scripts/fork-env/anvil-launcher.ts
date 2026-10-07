@@ -33,29 +33,56 @@ const anvil = spawn(
   ],
   { stdio: ["ignore", "pipe", "pipe"] },
 )
-createInterface({ input: anvil.stdout }).on("line", (line) => console.log(redact(line)))
-createInterface({ input: anvil.stderr }).on("line", (line) => console.error(redact(line)))
+let record: AnvilRecord | undefined
 
-// Without its record this Anvil could never be told from someone else's, and `fork:down` could
-// never stop it. So when the record cannot be written, Anvil is stopped and this process exits
-// with it, through the exit handler below.
-anvil.on("spawn", () => {
+/**
+ * Records this launcher and Anvil. Without the record this Anvil could never be told from
+ * someone else's, and `fork:down` could never stop it. So when it cannot be written, Anvil is
+ * stopped and this process exits with it, through the exit handler below.
+ */
+function writeAnvilRecord(next: AnvilRecord): void {
   try {
-    const record: AnvilRecord = {
-      launcher: self(process.pid),
-      anvil: self(anvil.pid ?? 0),
-      port: ANVIL_PORT,
-      block: FORK_BLOCK.toString(),
-      sefRef: SEF_SOURCE.ref,
-      testAmount: TEST_AMOUNT.toString(),
-      testBalance: TEST_BALANCE.toString(),
-    }
-    writeRecord(ANVIL_RECORD, record)
+    writeRecord(ANVIL_RECORD, next)
+    record = next
   } catch (err) {
     console.error(`${stamp()} cannot record anvil (${redact(err instanceof Error ? err.message : String(err))}); stopping it`)
     anvil.kill("SIGTERM")
   }
+}
+
+// Recorded at once, not listening, so it can be stopped while it sets up the fork. Anvil fetches
+// the fork block from the archive endpoint before it binds the port, which takes seconds; until
+// then something else may answer on the port, and only the line below says the port is Anvil's.
+anvil.on("spawn", () => {
+  let launcher: AnvilRecord["launcher"], spawned: AnvilRecord["anvil"]
+  try {
+    launcher = self(process.pid)
+    spawned = self(anvil.pid ?? 0)
+  } catch (err) {
+    console.error(`${stamp()} cannot record anvil (${redact(err instanceof Error ? err.message : String(err))}); stopping it`)
+    anvil.kill("SIGTERM")
+    return
+  }
+  writeAnvilRecord({
+    launcher,
+    anvil: spawned,
+    listening: false,
+    port: ANVIL_PORT,
+    block: FORK_BLOCK.toString(),
+    sefRef: SEF_SOURCE.ref,
+    testAmount: TEST_AMOUNT.toString(),
+    testBalance: TEST_BALANCE.toString(),
+  })
 })
+
+/** Anvil's last line of setup, printed once it holds the port. */
+const LISTENING = `Listening on 127.0.0.1:${ANVIL_PORT}`
+
+createInterface({ input: anvil.stdout }).on("line", (line) => {
+  console.log(redact(line))
+  if (line.trim() === LISTENING && record && !record.listening) writeAnvilRecord({ ...record, listening: true })
+})
+createInterface({ input: anvil.stderr }).on("line", (line) => console.error(redact(line)))
 /** Forgets this Anvil, unless the record already names another launcher's. */
 function forget(): void {
   if (readRecord<AnvilRecord>(ANVIL_RECORD)?.launcher.pid === process.pid) removeRecord(ANVIL_RECORD)

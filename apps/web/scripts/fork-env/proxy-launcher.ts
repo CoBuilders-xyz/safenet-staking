@@ -6,8 +6,8 @@
  *   everything else, and the HMR websocket, to the Vite dev server this process starts
  *
  * Vite runs with VITE_RPC_URL and VITE_REWARDS_BASE_URL under the proxy origin, so the app reads
- * the fork and the generated proofs through the same door as MetaMask, and with the validator
- * list from the same source as the proofs. Vite refuses a Host header it does not know, so it
+ * the fork and the generated proofs through the same door as MetaMask, with the validator list
+ * from the same source as the proofs, and with its log scans starting at the fork block. Vite refuses a Host header it does not know, so it
  * sees its own.
  *
  * An Anvil error on a read it forwarded to the archive endpoint can name that endpoint, whose
@@ -21,7 +21,7 @@ import { connect } from "node:net"
 import { normalize, resolve, sep } from "node:path"
 import { createInterface } from "node:readline"
 import { PROXY_RECORD, readRecord, redact, removeRecord, self, writeRecord, type ProxyRecord } from "./processes"
-import { ANVIL_PORT, PROXY_HOST, PROXY_ORIGIN, PROXY_PORT, REWARDS_DIR, SEF_SOURCE, WEB_DIR, WEB_PORT } from "./settings"
+import { ANVIL_PORT, FORK_BLOCK, PROXY_HOST, PROXY_ORIGIN, PROXY_PORT, REWARDS_DIR, SEF_SOURCE, WEB_DIR, WEB_PORT } from "./settings"
 
 const stamp = () => new Date().toISOString()
 
@@ -42,6 +42,11 @@ const vite = spawn(
       VITE_RPC_URL_FALLBACK_2: "",
       VITE_REWARDS_BASE_URL: `${PROXY_ORIGIN}/rewards`,
       VITE_VALIDATOR_INFO_URL: SEF_SOURCE.validatorInfo,
+      // The test account holds no history before the fork, so the interface's log scans start
+      // there, as in the fork suite. Earlier blocks would be fetched from the archive node for
+      // nothing. The fork block is core's MAINNET_FORK.blockNumber unless QA_FORK_BLOCK says
+      // otherwise.
+      VITE_STAKING_DEPLOY_BLOCK: FORK_BLOCK.toString(),
     },
   },
 )
@@ -153,6 +158,7 @@ server.listen(PROXY_PORT, PROXY_HOST, () => {
       anvilPort: ANVIL_PORT,
       origin: PROXY_ORIGIN,
       validatorInfo: SEF_SOURCE.validatorInfo,
+      scanFrom: FORK_BLOCK.toString(),
     }
     writeRecord(PROXY_RECORD, record)
   } catch (err) {

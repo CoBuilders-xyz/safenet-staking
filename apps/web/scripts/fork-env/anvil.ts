@@ -6,8 +6,8 @@
  * someone else and is never touched; `fork:up` fails and says so.
  */
 import {
-  ANVIL_LOG, ANVIL_RECORD, SETUP_RECORD, alive, owned, portInUse, readRecord, removeRecord, rpc, sleep, startDetached,
-  terminate, waitFor, type AnvilRecord, type Owned, type SetupRecord,
+  ANVIL_LOG, ANVIL_RECORD, SETUP_RECORD, ownership, portInUse, readRecord, removeRecord, rpc, sleep, startDetached,
+  stillRunning, terminate, waitFor, type AnvilRecord, type Owned, type SetupRecord,
 } from "./processes"
 import {
   ANVIL_PORT, ANVIL_URL, FORK_BLOCK, FORK_CHAIN_ID_HEX, SEF_SOURCE, TEST_AMOUNT, TEST_BALANCE, archiveUrl, childEnvironment,
@@ -19,10 +19,13 @@ export const anvilAnswers = async (): Promise<boolean> => (await rpc(ANVIL_URL, 
 export const foreignPort = (): Error =>
   new Error(`Port ${ANVIL_PORT} is in use, and not by an Anvil this tool started. Stop it, or set QA_ANVIL_PORT.`)
 
-/** The processes of this tool's Anvil that still run. Empty when there is no such Anvil. */
+/**
+ * The processes of this tool's Anvil that still run. Empty when there is no such Anvil. Fails,
+ * keeping the record, when one may run but its start time cannot be read.
+ */
 function ownProcesses(record: AnvilRecord | undefined): Owned[] {
   if (!record) return []
-  return [record.launcher, record.anvil].filter(owned)
+  return stillRunning([record.launcher, record.anvil])
 }
 
 function asWanted(r: Pick<AnvilRecord, "port" | "block" | "sefRef" | "testAmount" | "testBalance">): boolean {
@@ -54,6 +57,7 @@ export async function anvilStatus(): Promise<AnvilStatus> {
     if (record && record.port !== ANVIL_PORT && (await portInUse(ANVIL_PORT))) return { state: "foreign" }
     return { state: "stale", why: "its block, port, data source or amounts differ from the settings" }
   }
+  if (!record.listening) return { state: "stale", why: "it never reported that it listens on its port" }
   if (!(await anvilAnswers())) return { state: "stale", why: "it does not answer" }
   const setup = readRecord<SetupRecord>(SETUP_RECORD)
   if (!setup || !asWanted({ port: ANVIL_PORT, ...setup })) return { state: "stale", why: "its setup did not complete" }
@@ -62,25 +66,28 @@ export async function anvilStatus(): Promise<AnvilStatus> {
 
 /**
  * Starts Anvil detached and resolves once the record names this launch's launcher and Anvil,
- * both still running, and Anvil answers. Refuses when the port is taken: whatever answers there
- * is not this tool's. Fails, with the log named, when Anvil does not come up or the launcher
- * exits first.
+ * both still running, Anvil has reported that it listens on the port, and it answers. Until it
+ * listens, whatever answers on the port is not it: Anvil binds only after it has fetched the
+ * fork block. Refuses when the port is taken. Fails, with the log named, when Anvil does not
+ * come up or the launcher exits first.
  */
 export async function startAnvil(): Promise<void> {
   if (await portInUse(ANVIL_PORT)) throw foreignPort()
   removeRecord(ANVIL_RECORD)
   removeRecord(SETUP_RECORD)
   const env = { ...childEnvironment(), MAINNET_RPC_URL: archiveUrl() }
-  const launcherPid = startDetached("anvil-launcher.ts", ANVIL_LOG, env)
-  const ours = (r: AnvilRecord | undefined): r is AnvilRecord =>
-    r?.launcher.pid === launcherPid && r.port === ANVIL_PORT && owned(r.launcher) && owned(r.anvil)
+  const launcher = startDetached("anvil-launcher.ts", ANVIL_LOG, env)
+  const ours = (r: AnvilRecord | undefined): boolean =>
+    !!r &&
+    r.launcher.pid === launcher.pid &&
+    r.port === ANVIL_PORT &&
+    r.listening &&
+    ownership(r.launcher) === "ours" &&
+    ownership(r.anvil) === "ours"
   const deadline = Date.now() + 180_000
   while (Date.now() < deadline) {
-    const record = readRecord<AnvilRecord>(ANVIL_RECORD)
-    // Checked again after the answer: an Anvil that failed to bind exits, and what answered
-    // was then someone else's.
-    if (ours(record) && (await anvilAnswers()) && ours(readRecord<AnvilRecord>(ANVIL_RECORD))) return
-    if (!alive(launcherPid)) break
+    if (ours(readRecord<AnvilRecord>(ANVIL_RECORD)) && (await anvilAnswers())) return
+    if (launcher.exitCode !== null || launcher.signalCode !== null) break
     await sleep(500)
   }
   await stopAnvil()
