@@ -21,8 +21,8 @@ export function YourRewardsSection({ isConnected, rewards }: YourRewardsSectionP
       {!isConnected ? (
         <div className="space-y-4">
           <SectionNote>
-            Safenet Beta pays rewards to the addresses that staked SAFE. Connect a wallet to see what
-            it earned and claim it.
+            Safenet pays rewards to the addresses that stake SAFE. Connect a wallet to see what it
+            earned and claim it.
           </SectionNote>
           <ConnectButton />
         </div>
@@ -34,7 +34,7 @@ export function YourRewardsSection({ isConnected, rewards }: YourRewardsSectionP
         <SectionLoading />
       ) : proof === null ? (
         <SectionNote>
-          This address has not earned rewards in Safenet Beta. SEF publishes no reward file for it.
+          This address has not earned Safenet rewards. SEF publishes no reward file for it.
         </SectionNote>
       ) : proof ? (
         <>

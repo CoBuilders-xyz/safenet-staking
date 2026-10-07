@@ -121,7 +121,7 @@ test("a result is structured content, the same JSON as --json, after a short sum
   assert.equal(structured.block, String(BLOCK))
   assert.equal(structured.totalStaked.value, String(5n * SAFE))
   assert.equal(r.content[0]?.type, "text")
-  assert.match(textOf(r), /^Safenet Beta at Ethereum Mainnet block 24000000: 5 SAFE staked, 3 active validators/)
+  assert.match(textOf(r), /^Safenet at Ethereum Mainnet block 24000000: 5 SAFE staked, 3 active validators/)
   assert.deepEqual(JSON.parse((r.content[1] as { text: string }).text), structured)
   await s.close()
 })

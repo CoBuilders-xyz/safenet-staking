@@ -33,13 +33,8 @@ export function Header() {
             className="flex flex-col items-start gap-0.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
             onClick={closeMobileMenu}
           >
-            <span className="flex items-center gap-2">
-              <span className="font-heading text-lg font-semibold leading-none tracking-tight text-foreground">
-                Safenet Staking
-              </span>
-              <span className="rounded-sm border border-primary/40 bg-accent px-1 py-px text-[10px] font-medium uppercase leading-none tracking-wider text-accent-foreground">
-                Beta
-              </span>
+            <span className="font-heading text-lg font-semibold leading-none tracking-tight text-foreground">
+              Safenet Staking
             </span>
             <span className="text-xs leading-none text-muted-foreground">by CoBuilders</span>
           </Link>

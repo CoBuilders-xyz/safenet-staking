@@ -28,7 +28,7 @@ export function RewardsPage() {
     <div className="space-y-6">
       <PageHero
         title="Rewards"
-        subtitle="Claim your Safenet Beta rewards and check them against the chain"
+        subtitle="Claim your Safenet rewards and check them against the chain"
       />
       <div className="grid gap-6 md:grid-cols-2">
         <YourRewardsSection isConnected={isConnected} rewards={rewards} />

@@ -137,11 +137,11 @@ function progressLine(tool: string, event: Progress): string {
 
 export function createServer(config: ServerConfig, deps: Dependencies): Server {
   const server = new Server(
-    { name: "safenet-mcp", title: "Safenet Beta", version: VERSION },
+    { name: "safenet-mcp", title: "Safenet", version: VERSION },
     {
       capabilities: { tools: {} },
       instructions:
-        "Reads Safenet Beta staking on Ethereum Mainnet and the data SEF publishes. Every figure carries its source. " +
+        "Reads Safenet staking on Ethereum Mainnet and the data SEF publishes. Every figure carries its source. " +
         "Amounts are wei as decimal strings, with SAFE amounts as decimal strings next to them in write results. " +
         (config.writes.allowed
           ? "Writes are allowed: a write tool with dryRun false signs with the operator's signer and sends; run it with dryRun true first."

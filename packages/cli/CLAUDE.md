@@ -1,6 +1,6 @@
 # packages/cli
 
-`safenet`, the command-line interface for Safenet Beta: six read commands, and five writes that
+`safenet`, the command-line interface for Safenet: six read commands, and five writes that
 stake, unstake and claim. Every write takes `--dry-run`, which signs nothing. Every address, start
 block, event, function and error comes from `@cobuilders/safenet-core`.
 

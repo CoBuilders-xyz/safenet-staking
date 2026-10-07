@@ -2,7 +2,7 @@
   "name": "@cobuilders/safenet-mcp",
   "version": "0.0.0",
   "type": "module",
-  "description": "safenet-mcp, an MCP server for Safenet Beta over stdio: the safenet CLI's reads, and its writes as dry runs unless the operator allows them.",
+  "description": "safenet-mcp, an MCP server for Safenet over stdio: the safenet CLI's reads, and its writes as dry runs unless the operator allows them.",
   "keywords": [
     "mcp",
     "model-context-protocol",

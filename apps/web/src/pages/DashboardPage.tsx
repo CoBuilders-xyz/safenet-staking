@@ -11,7 +11,7 @@ export function DashboardPage() {
     <div className="space-y-6">
       <PageHero
         title="Stake your SAFE"
-        subtitle="Earn rewards for helping secure Safenet Beta"
+        subtitle="Earn rewards for helping secure Safenet"
       >
         <p className="mt-4 text-xs text-muted-foreground">
           Rewards are not guaranteed and may vary.{" "}

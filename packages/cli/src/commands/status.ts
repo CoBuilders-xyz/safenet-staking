@@ -33,7 +33,7 @@ export function renderStatus(s: NetworkStatus): string {
     ? "Merkle root: match. The root on chain is the root in SEF's latest.json."
     : "Merkle root: differs. The root on chain is not the root in SEF's latest.json."
   return [
-    `Safenet Beta on Ethereum Mainnet, block ${formatCount(s.block)}`,
+    `Safenet on Ethereum Mainnet, block ${formatCount(s.block)}`,
     "",
     renderTable([{ header: "FIGURE" }, { header: "VALUE" }, { header: "SOURCE" }], rows),
     "",

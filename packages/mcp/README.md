@@ -1,6 +1,6 @@
 # safenet-mcp
 
-An [MCP](https://modelcontextprotocol.io) server for Safenet Beta staking on Ethereum Mainnet.
+An [MCP](https://modelcontextprotocol.io) server for Safenet staking on Ethereum Mainnet.
 It gives an AI client the reads of the `safenet` command-line interface, and its writes as dry
 runs. It talks over stdio.
 

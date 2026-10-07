@@ -135,7 +135,7 @@ writeFileSync(resolve(ROOT, "subgraph.yaml"), `# GENERATED FILE. Do not edit by 
 #
 # startBlock is ${FULL ? "the verified deploy block" : `${DAYS} days back from the chain head at generation time`}.
 ${FULL ? "" : "# A windowed subgraph cannot answer validator registration history or the epoch record.\n"}specVersion: 1.0.0
-description: Safenet Beta consensus and signing on Gnosis Chain. CoBuilders, Track A.
+description: Safenet consensus and signing on Gnosis Chain. CoBuilders, Track A.
 repository: https://github.com/CoBuilders-xyz/safenet-staking
 ${PRUNE_NEVER ? "indexerHints:\n  prune: never\n" : ""}schema:
   file: ./schema.graphql
