@@ -3,7 +3,9 @@ import type { Hex } from "viem"
 import { CONTRACTS, erc20Abi, merkleDropAbi, stakingAbi } from "@cobuilders/safenet-core"
 import type { Context } from "./context.js"
 import { figure, sameHex, type Figure } from "./figure.js"
-import { fetchNetworkInfo, fetchRewardsLatest, fetchValidators, parseSefAmount, parseWei } from "./sef.js"
+import {
+  fetchNetworkInfo, fetchValidators, parseSefAmount, parseWei, readRewardsLatest, type RewardsSourceUsed,
+} from "./sef.js"
 
 export interface NetworkStatus {
   readonly block: bigint
@@ -31,6 +33,8 @@ export interface NetworkStatus {
     readonly published: Figure<string>
     readonly match: boolean
   }
+  /** Where rewards/latest.json was read from: SEF's IPFS dataset, or the repository mirror. */
+  readonly rewardsSource: RewardsSourceUsed
 }
 
 /** A figure that holds only while the chain root is the published one. */
@@ -43,10 +47,10 @@ export async function getStatus(ctx: Context): Promise<NetworkStatus> {
   const staking = CONTRACTS.staking.address
   const merkleDrop = CONTRACTS.merkleDrop.address
   // Every chain read is pinned to one block, so the figures describe one instant.
-  const [blockNumber, validators, latest, network] = await Promise.all([
+  const [blockNumber, validators, { latest, source: rewardsSource }, network] = await Promise.all([
     client.getBlockNumber(),
     fetchValidators(ctx),
-    fetchRewardsLatest(ctx),
+    readRewardsLatest(ctx),
     fetchNetworkInfo(ctx),
   ])
   const [totalStaked, pending, root, balance, registered] = await Promise.all([
@@ -102,5 +106,6 @@ export async function getStatus(ctx: Context): Promise<NetworkStatus> {
       published: figure(latest.merkleRoot, "SEF: rewards/latest.json merkleRoot"),
       match: rootMatches,
     },
+    rewardsSource,
   }
 }

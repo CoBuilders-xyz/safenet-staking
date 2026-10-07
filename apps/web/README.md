@@ -40,7 +40,8 @@ from [`.env.example`](.env.example) into the root `.env`.
 | `VITE_SANCTIONS_API_URL` | No | Sanctions check endpoint (HTTP 403 = blocked) |
 | `VITE_GEOBLOCK_CACHE_DAYS` | No | Geo-block cache duration in days (defaults to 7) |
 | `VITE_VALIDATOR_INFO_URL` | No | Validator info JSON endpoint (defaults to SEF's published file, `SEF_DATA.validatorInfo` in `@cobuilders/safenet-core`) |
-| `VITE_REWARDS_BASE_URL` | No | Base URL for reward proof files (defaults to SEF's published rewards data, `SEF_DATA.rewardsProofBase` in `@cobuilders/safenet-core`) |
+| `VITE_REWARDS_BASE_URL` | No | Base URL for `latest.json` and the reward proof files. Replaces every source when set; unset, the interface reads SEF's IPFS dataset and then the repository (see [Where reward data comes from](#where-reward-data-comes-from)) |
+| `VITE_IPFS_GATEWAY` | No | An IPFS gateway origin, tried before the public gateways for SEF's reward dataset |
 | `VITE_DOCS_URL` | No | Documentation link in footer (defaults to Safe docs) |
 | `VITE_TERMS_URL` | No | Footer terms link (hidden if unset) |
 | `VITE_PRIVACY_URL` | No | Footer privacy link (hidden if unset) |
@@ -166,6 +167,10 @@ The UI uses "delegation" terminology (Delegate/Undelegate) but the smart contrac
 - **Write hooks** (`useStakingWrites.ts`) return a unified `{ action, isSigningTx, isConfirmingTx, isSuccess, error, reset, txHash }` interface
 - **Validator discovery** fetches `ValidatorUpdated` events from the deploy block with automatic chunked fallback for RPC block-range limits
 - **Rewards** — Merkle-proof-based reward claiming via a MerkleDrop contract. Proofs are generated off-chain (see below) and served as static JSON files
+
+### Where reward data comes from
+
+SEF declares the IPFS dataset behind the ENS name `rewards.safenet-gov.eth` the canonical source of reward data, and keeps the repository `safe-fndn/safenet-data` as a temporary mirror. The interface reads `latest.json` and each proof in this order, and the first source that answers wins. First, `VITE_REWARDS_BASE_URL` when it is set: it replaces every other source, for the manual QA fork and the fork suite. Next, SEF's dataset through each IPFS gateway, `VITE_IPFS_GATEWAY` first and then the public ones in `@cobuilders/safenet-core`, but only when the name's contenthash is set. Last, the repository. A source that fails, answers 404, serves a file of the wrong shape or does not answer within 10 seconds falls through to the next; the gateways share one 10-second budget, so dead gateways delay the repository by one timeout, not one each. The name is resolved once an hour per session, and again after a minute when the chain could not be read. On 2026-10-07 its contenthash was empty, so the interface read the repository; when SEF populates it, the interface reads the dataset with no deploy. The Verifiability section names the source of the published root, and the gateway it came through. The dataset's layout is assumed to repeat the repository's `assets/rewards` layout under its root, and is checked when SEF populates the name.
 
 ### Merkle Proof Generation
 

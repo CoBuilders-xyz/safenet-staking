@@ -1,14 +1,26 @@
 /**
- * Reading the files SEF publishes at safe-fndn/safenet-data.
+ * Reading the files SEF publishes: the validator and network files at safe-fndn/safenet-data,
+ * and the reward files from SEF's IPFS dataset behind its ENS name, or from that repository
+ * while the name is empty. The order lives in packages/core/src/rewards-source.ts, which the
+ * interface reads too, so the CLI, the MCP server and the web show the same rewards.
  *
  * Shapes come from packages/core/src/sef.ts, which records when each was read off the live file.
  */
 import { parseUnits } from "viem"
 import {
   PARTICIPATION_WINDOW_DAYS,
+  REWARDS_LATEST_PATH,
+  REWARDS_SOURCE_STALE_MS,
+  RewardsReadError,
   SEF_DATA,
+  SEF_REWARDS_ENS_NAME,
+  describeFailure,
   participationWindow,
-  rewardProofUrl,
+  readRewardsFile,
+  resolveRewardsSource,
+  rewardProofPath,
+  type RewardsDataBase,
+  type RewardsSource,
   type SefNetworkInfo,
   type SefRewardProof,
   type SefRewardsLatest,
@@ -41,6 +53,95 @@ export interface ParticipationWindow {
   readonly commit: string | null
   /** Why start and end are null. Absent when they are known. */
   readonly unknownBecause?: string
+}
+
+/**
+ * Where the reward files were read from. Declared here, not taken from core, because the
+ * library's public declarations return it and core is not published.
+ */
+export interface RewardsSourceUsed {
+  /**
+   * `ens`: SEF's IPFS dataset behind the ENS name, the canonical source. `repository`:
+   * safe-fndn/safenet-data, a mirror, read while the name has no usable contenthash.
+   */
+  readonly kind: "ens" | "repository" | "override"
+  /** The base the file was read from. `latest.json` and `proofs/` sit under it. */
+  readonly url: string
+  /** The IPFS gateway, for `ens`. */
+  readonly gateway: string | null
+  readonly ens: {
+    readonly name: string
+    /** `set`, or why the dataset was not tried: `empty`, `unsupported` or `unreadable`. */
+    readonly status: "set" | "empty" | "unsupported" | "unreadable"
+    /** The raw contenthash, when the name held one. */
+    readonly contenthash: string | null
+    readonly reason: string | null
+  }
+}
+
+function sourceUsed(source: RewardsSource, base: RewardsDataBase): RewardsSourceUsed {
+  const { ens } = source
+  return {
+    kind: base.kind,
+    url: base.url,
+    gateway: base.gateway ?? null,
+    ens: {
+      name: SEF_REWARDS_ENS_NAME,
+      status: ens.status,
+      contenthash: ens.status === "set" || ens.status === "unsupported" ? ens.raw : null,
+      reason: ens.status === "unsupported" || ens.status === "unreadable" ? ens.reason : null,
+    },
+  }
+}
+
+/**
+ * The resolved ENS name and the bases to try, reused per context for an hour. The MCP server
+ * keeps one context while it runs, so it sees SEF populate the name within the hour.
+ */
+const resolved = new WeakMap<Context, { until: number; source: Promise<RewardsSource> }>()
+
+export function rewardsSource(ctx: Context): Promise<RewardsSource> {
+  const cached = resolved.get(ctx)
+  if (cached && cached.until > Date.now()) return cached.source
+  const source = resolveRewardsSource(ctx.client, { gateway: ctx.ipfsGateway })
+  resolved.set(ctx, { until: Date.now() + REWARDS_SOURCE_STALE_MS, source })
+  return source
+}
+
+/**
+ * One reward file from the first source that has it, checked against `isShape` at each source,
+ * so a file of the wrong shape falls through like a failed request. Null when every source
+ * answered 404. When only the repository was tried, its own error is thrown unchanged.
+ */
+async function readRewards<T>(
+  ctx: Context,
+  path: string,
+  what: string,
+  isShape: (data: unknown) => data is T,
+): Promise<{ value: T | null; url: string; source: RewardsSourceUsed }> {
+  const source = await rewardsSource(ctx)
+  try {
+    const read = await readRewardsFile({
+      bases: source.bases,
+      path,
+      attempt: async (url, signal) => {
+        const res = await get(ctx, url, what, { signal })
+        if (res.status === 404) return null
+        if (!res.ok) throw new SafenetError(`Could not read ${what}: the server answered HTTP ${res.status}`)
+        const data: unknown = await res.json().catch(() => {
+          throw new SafenetError(`${what} is not valid JSON`)
+        })
+        if (!isShape(data)) throw new SafenetError(`${what} no longer has the shape this tool reads`)
+        return data
+      },
+    })
+    return { value: read.value, url: read.url, source: sourceUsed(source, read.base) }
+  } catch (error) {
+    if (!(error instanceof RewardsReadError)) throw error
+    const [only] = error.failures
+    if (error.failures.length === 1 && only?.kind === "error" && only.error instanceof SafenetError) throw only.error
+    throw new SafenetError(`Could not read ${what} from any source: ${error.failures.map(describeFailure).join("; ")}`)
+  }
 }
 
 async function get(ctx: Context, url: string, what: string, init?: RequestInit): Promise<Response> {
@@ -195,10 +296,18 @@ function isNetworkInfo(data: unknown): data is SefNetworkInfo {
   )
 }
 
+/** SEF's rewards/latest.json, and where it was read from. */
+export async function readRewardsLatest(
+  ctx: Context,
+): Promise<{ latest: SefRewardsLatest; source: RewardsSourceUsed }> {
+  const what = "SEF's rewards/latest.json"
+  const { value, source } = await readRewards(ctx, REWARDS_LATEST_PATH, what, isRewardsLatest)
+  if (!value) throw new SafenetError(`Could not read ${what}: the server answered HTTP 404`)
+  return { latest: value, source }
+}
+
 export async function fetchRewardsLatest(ctx: Context): Promise<SefRewardsLatest> {
-  const data = await fetchSefJson<unknown>(ctx, SEF_DATA.rewardsLatest, "SEF's rewards/latest.json")
-  if (!isRewardsLatest(data)) throw new SafenetError("SEF's rewards/latest.json no longer has the shape this tool reads")
-  return data
+  return (await readRewardsLatest(ctx)).latest
 }
 
 export async function fetchNetworkInfo(ctx: Context): Promise<SefNetworkInfo> {
@@ -219,16 +328,14 @@ function isProof(data: unknown): data is SefRewardProof {
   )
 }
 
-/** The address's reward proof, or null when SEF published none: it never earned rewards. */
+/**
+ * The address's reward proof, or null when no source has one: it never earned rewards. `url` is
+ * the file that answered, or, with no proof, where the first source would publish it.
+ */
 export async function fetchRewardProof(
   ctx: Context,
   address: string,
-): Promise<{ proof: SefRewardProof | null; url: string }> {
-  const url = rewardProofUrl(address)
-  const res = await get(ctx, url, "SEF's reward proof file")
-  if (res.status === 404) return { proof: null, url }
-  if (!res.ok) throw new SafenetError(`Could not read SEF's reward proof file: the server answered HTTP ${res.status}`)
-  const data: unknown = await res.json().catch(() => undefined)
-  if (!isProof(data)) throw new SafenetError("SEF's reward proof file no longer has the shape this tool reads")
-  return { proof: data, url }
+): Promise<{ proof: SefRewardProof | null; url: string; source: RewardsSourceUsed }> {
+  const { value, url, source } = await readRewards(ctx, rewardProofPath(address), "SEF's reward proof file", isProof)
+  return { proof: value, url, source }
 }

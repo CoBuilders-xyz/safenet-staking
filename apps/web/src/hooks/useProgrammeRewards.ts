@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query"
 import { useReadContract } from "wagmi"
-import { erc20Abi, merkleDropAbi, type SefRewardsLatest } from "@cobuilders/safenet-core"
+import { REWARDS_LATEST_PATH, erc20Abi, merkleDropAbi, type SefRewardsLatest } from "@cobuilders/safenet-core"
 import { getContractAddresses } from "@/config/contracts"
 import { activeChain } from "@/config/chains"
-import { rewardsBaseUrl } from "./useRewardProof"
+import { useRewardsFileReader, type RewardsFileRead } from "./useRewardsSource"
 
 const { merkleDrop, token } = getContractAddresses(activeChain.id)
 
@@ -31,11 +31,16 @@ export function parseRewardsLatest(data: unknown): SefRewardsLatest {
   return o as unknown as SefRewardsLatest
 }
 
-async function fetchLatest(): Promise<SefRewardsLatest> {
-  const response = await fetch(`${rewardsBaseUrl}/latest.json`)
+/** One source's latest.json: null on a 404, an error otherwise. */
+async function fetchLatestAt(url: string, signal: AbortSignal): Promise<SefRewardsLatest | null> {
+  const response = await fetch(url, { signal })
+  if (response.status === 404) return null
   if (!response.ok) throw new Error(`Failed to fetch rewards file: ${response.status}`)
   return parseRewardsLatest(await response.json())
 }
+
+/** Where the published file came from: shown next to the root it carries. */
+export type RewardsLatestSource = Omit<RewardsFileRead<SefRewardsLatest>, "value">
 
 export interface ProgrammeTotals {
   /** Cumulative SAFE allocated to date, from SEF's file. */
@@ -75,12 +80,23 @@ export function sameRoot(a: string | undefined, b: string | undefined): boolean 
  * section without failing the others. Nothing here depends on the connected wallet.
  */
 export function useProgrammeRewards() {
-  const latest = useQuery({
+  const read = useRewardsFileReader()
+  // One query, observed twice: once for the file, once for where it came from.
+  const latestQuery = {
     queryKey: ["rewardsLatest"],
-    queryFn: fetchLatest,
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
+      const answer = await read(REWARDS_LATEST_PATH, fetchLatestAt, signal)
+      if (answer.value === null) throw new Error("Failed to fetch rewards file: 404")
+      return answer
+    },
     staleTime: 5 * 60 * 1000,
     retry: false,
-  })
+  }
+  const latest = useQuery({ ...latestQuery, select: (answer): SefRewardsLatest => answer.value! })
+  const latestSource = useQuery({
+    ...latestQuery,
+    select: ({ base, url, ens }): RewardsLatestSource => ({ base, url, ens }),
+  }).data
 
   const onChainRoot = useReadContract({
     address: merkleDrop,
@@ -107,5 +123,5 @@ export function useProgrammeRewards() {
       ? deriveProgramme(BigInt(latest.data.tokenTotal), dropBalance.data)
       : undefined
 
-  return { merkleDrop, latest, onChainRoot, dropBalance, totals, rootMatches }
+  return { merkleDrop, latest, latestSource, onChainRoot, dropBalance, totals, rootMatches }
 }

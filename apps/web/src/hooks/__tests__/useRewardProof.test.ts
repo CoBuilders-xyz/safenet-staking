@@ -9,7 +9,7 @@ vi.stubGlobal("fetch", mockFetch)
 let capturedOptions:
   | {
       queryKey?: unknown[]
-      queryFn?: () => Promise<unknown>
+      queryFn?: (context: { signal: AbortSignal }) => Promise<unknown>
       enabled?: boolean
       staleTime?: number
       retry?: boolean
@@ -21,7 +21,11 @@ vi.mock("@tanstack/react-query", () => ({
     capturedOptions = opts as typeof capturedOptions
     return { data: undefined }
   }),
+  // Resolves the reward source on every read. With no Mainnet client, that is the repository.
+  useQueryClient: () => ({ fetchQuery: (o: { queryFn: () => unknown }) => o.queryFn() }),
 }))
+
+vi.mock("wagmi", () => ({ usePublicClient: () => undefined }))
 
 describe("useRewardProof", () => {
   let useRewardProof: (address: Address | undefined, enabled?: boolean) => { data: unknown }
@@ -81,7 +85,7 @@ describe("useRewardProof", () => {
     })
 
     async function callQueryFn() {
-      return capturedOptions!.queryFn!()
+      return capturedOptions!.queryFn!({ signal: new AbortController().signal })
     }
 
     it("returns null on 404", async () => {

@@ -7,6 +7,7 @@ import { activeChain } from "@/config/chains"
 import type { RewardProof } from "@/hooks/useRewardProof"
 import type { useRewards } from "@/hooks/useRewards"
 import type { useProgrammeRewards } from "@/hooks/useProgrammeRewards"
+import { REPOSITORY_REWARDS_BASE, SEF_DATA, SEF_REWARDS_ENS_NAME } from "@cobuilders/safenet-core"
 import { TEST_ACCOUNTS } from "@/__tests__/test-data"
 import { RewardsPage } from "../RewardsPage"
 
@@ -14,6 +15,7 @@ const SAFE = 10n ** 18n
 const ROOT_A = "0x" + "ab".repeat(32)
 const ROOT_B = "0x" + "cd".repeat(32)
 const { merkleDrop } = getContractAddresses(activeChain.id)
+const DATASET = "https://dweb.link/ipfs/bafybeibj6lixxzqtsb45ysdjnupvqkufgdvzqbnvmhw2kf7cfkesy7r7d4"
 
 type Rewards = ReturnType<typeof useRewards>
 type Programme = ReturnType<typeof useProgrammeRewards>
@@ -79,6 +81,7 @@ function programme(overrides: Partial<Record<keyof Programme, unknown>> = {}): P
   return {
     merkleDrop,
     latest: { data: LATEST, error: null, refetch: vi.fn() },
+    latestSource: { base: REPOSITORY_REWARDS_BASE, url: SEF_DATA.rewardsLatest, ens: { status: "empty" } },
     onChainRoot: { data: ROOT_A, error: null, refetch: vi.fn() },
     dropBalance: { data: 300n * SAFE, error: null, refetch: vi.fn() },
     totals: { allocated: 1000n * SAFE, unclaimed: 300n * SAFE, claimed: 700n * SAFE, unclaimedPercent: 30 },
@@ -350,6 +353,54 @@ describe("RewardsPage", () => {
   })
 
   describe("Verifiability", () => {
+    it("names the repository as the source while the ENS name is empty, and says so", () => {
+      renderPage()
+
+      const ver = section("Verifiability")
+      expect(valueOf(ver, "Source")).toHaveTextContent("SEF's repository, through raw.githubusercontent.com")
+      expect(valueOf(ver, "Source")).toHaveTextContent(`${SEF_REWARDS_ENS_NAME} points at no dataset yet.`)
+      expect(within(ver).getByRole("link", { name: "rewards/latest.json" })).toHaveAttribute("href", SEF_DATA.rewardsLatest)
+    })
+
+    it("names SEF's IPFS dataset and the gateway it came through, and links the file read", () => {
+      mockUseProgramme.mockReturnValue(
+        programme({
+          latestSource: {
+            base: { url: DATASET, kind: "ens", gateway: "https://dweb.link" },
+            url: `${DATASET}/latest.json`,
+            ens: { status: "set" },
+          },
+        }),
+      )
+      renderPage()
+
+      const ver = section("Verifiability")
+      expect(valueOf(ver, "Source")).toHaveTextContent(/^SEF's IPFS dataset \(ENS\), through dweb\.link$/)
+      expect(within(ver).getByRole("link", { name: "rewards/latest.json" })).toHaveAttribute("href", `${DATASET}/latest.json`)
+      expect(within(section("Programme")).getByRole("link", { name: "rewards/latest.json" })).toHaveAttribute(
+        "href",
+        `${DATASET}/latest.json`,
+      )
+    })
+
+    it("says the repository was read because the dataset did not answer", () => {
+      mockUseProgramme.mockReturnValue(
+        programme({ latestSource: { base: REPOSITORY_REWARDS_BASE, url: SEF_DATA.rewardsLatest, ens: { status: "set" } } }),
+      )
+      renderPage()
+
+      expect(valueOf(section("Verifiability"), "Source")).toHaveTextContent(/did not answer through any gateway/)
+    })
+
+    it("shows no source when no source answered", () => {
+      mockUseProgramme.mockReturnValue(
+        programme({ latest: { data: undefined, error: new Error("404"), refetch: vi.fn() }, latestSource: undefined }),
+      )
+      renderPage()
+
+      expect(valueOf(section("Verifiability"), "Source")).toHaveTextContent("Unavailable")
+    })
+
     it("links the MerkleDrop on the explorer and shows both roots and the balance", () => {
       renderPage()
 

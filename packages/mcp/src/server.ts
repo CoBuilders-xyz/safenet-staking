@@ -151,7 +151,7 @@ export function createServer(config: ServerConfig, deps: Dependencies): Server {
 
   let ctx: Context | undefined
   const context = () =>
-    (ctx ??= deps.lib.createContext({ rpcUrl: config.rpcUrl, githubToken: config.githubToken }))
+    (ctx ??= deps.lib.createContext({ rpcUrl: config.rpcUrl, githubToken: config.githubToken, ipfsGateway: config.ipfsGateway }))
 
   // Live writes run one at a time, so two calls never race for the same nonce.
   let tail: Promise<unknown> = Promise.resolve()

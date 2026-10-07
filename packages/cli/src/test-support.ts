@@ -7,7 +7,9 @@ import {
   ContractFunctionRevertedError, HttpRequestError, WaitForTransactionReceiptTimeoutError, encodeAbiParameters, encodeErrorResult, encodeEventTopics, numberToHex, pad,
   type Abi, type Hex, type PublicClient,
 } from "viem"
-import { ANVIL_TEST_MNEMONIC, CONTRACTS, SEF_DATA, rewardProofUrl, safeTokenEventsAbi } from "@cobuilders/safenet-core"
+import {
+  ANVIL_TEST_MNEMONIC, CONTRACTS, REWARDS_LATEST_PATH, SEF_DATA, rewardProofPath, rewardProofUrl, safeTokenEventsAbi,
+} from "@cobuilders/safenet-core"
 import type { Context, Signer } from "./lib/index.js"
 import type { Io, Runtime } from "./cli.js"
 import { loadSigner } from "./commands/signer.js"
@@ -56,7 +58,18 @@ export interface FakeOptions {
   readonly proofAccount?: Hex
   /** Replaces how the program loads a signer. */
   readonly loadSigner?: (request: SignerRequest, ctx: Context) => Promise<Signer>
+  /** The contenthash of SEF's ENS name. Empty, as on Mainnet on 2026-10-07, when unset. */
+  readonly ensContenthash?: Hex
+  /** IPFS gateway hosts that answer 502. Every other gateway serves the dataset. */
+  readonly failingGateways?: readonly string[]
+  /** The status the repository answers for its reward files, when not 200. */
+  readonly repositoryStatus?: number
 }
+
+/** A made-up ENS resolver. */
+export const ENS_RESOLVER = fakeAddress(0xe75)
+/** The dataset's latest.json carries this epoch, the repository's 0, so a test sees which answered. */
+export const DATASET_EPOCH = 1
 
 /** What the fake chain was asked to do that a dry run must never ask. */
 export interface SendLog {
@@ -103,6 +116,9 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
     withdrawalQueues: () => [1n, 2n],
     withdrawalNodes: ([, id]) =>
       id === 1n ? [5n * SAFE, BLOCK_TIME - 60n, 0n, 2n] : [2n * SAFE, BLOCK_TIME + 90_000n, 1n, 0n],
+    // SEF's ENS name: the Universal Resolver names the resolver, the resolver the contenthash.
+    findResolver: () => [ENS_RESOLVER, fakeRoot(0), 0n],
+    contenthash: () => o.ensContenthash ?? "0x",
   }
   let lastSent: { to: Hex; account: { address: Hex } } | undefined
   const receiptFor = () => ({
@@ -207,9 +223,30 @@ export const SEF_VALIDATORS = [
 
 export const PUBLISHED_AT = "2026-10-04T21:12:45Z"
 
+const latestFile = (epoch: number) => ({
+  epoch, merkleRoot: ROOT, rewardsUntil: "2026-09-22T00:00:00.000Z",
+  tokenTotal: String(50n * SAFE), unpaidAmount: "0", updatedAt: "2026-09-22T08:55:44.268Z",
+})
+
+/** SEF's IPFS dataset through a gateway: the repository's layout under the dataset root. */
+function fakeDataset(o: FakeOptions, url: URL): Response {
+  if (o.failingGateways?.includes(url.host)) return new Response("bad gateway", { status: 502 })
+  const path = url.pathname.split("/").slice(3).join("/")
+  if (path === REWARDS_LATEST_PATH) return json(latestFile(DATASET_EPOCH))
+  if (path === rewardProofPath(o.proofAccount ?? STAKER) && o.proof !== null) {
+    return json(o.proof ?? { cumulativeAmount: String(12n * SAFE), kycAmount: "0", merkleRoot: ROOT, proof: [] })
+  }
+  return new Response("not found", { status: 404 })
+}
+
 function fakeFetch(o: FakeOptions): typeof fetch {
   return (async (input: string | URL | Request) => {
     const url = String(input)
+    const parsed = new URL(url)
+    if (/^\/ip[fn]s\//.test(parsed.pathname)) return fakeDataset(o, parsed)
+    if (o.repositoryStatus && url.startsWith(SEF_DATA.rewardsProofBase)) {
+      return new Response("repository unavailable", { status: o.repositoryStatus })
+    }
     if (url === SEF_DATA.validatorInfoCommits) {
       if (o.githubStatus && o.githubStatus !== 200) return json({ message: "rate limited" }, o.githubStatus)
       return json([{ sha: "abcdef0123456789", commit: { committer: { date: PUBLISHED_AT } } }])
@@ -218,12 +255,7 @@ function fakeFetch(o: FakeOptions): typeof fetch {
     if (url === SEF_DATA.networkInfo && o.networkInfo) return json(o.networkInfo)
     if (url === SEF_DATA.rewardsLatest && o.rewardsLatest) return json(o.rewardsLatest)
     if (url === SEF_DATA.networkInfo) return json({ total_staked_amount: "300", total_transactions_checked: 1 })
-    if (url === SEF_DATA.rewardsLatest) {
-      return json({
-        epoch: 0, merkleRoot: ROOT, rewardsUntil: "2026-09-22T00:00:00.000Z",
-        tokenTotal: String(50n * SAFE), unpaidAmount: "0", updatedAt: "2026-09-22T08:55:44.268Z",
-      })
-    }
+    if (url === SEF_DATA.rewardsLatest) return json(latestFile(0))
     if (url === rewardProofUrl(o.proofAccount ?? STAKER)) {
       if (o.proof === null) return new Response("404: Not Found", { status: 404 })
       return json(o.proof ?? { cumulativeAmount: String(12n * SAFE), kycAmount: "0", merkleRoot: ROOT, proof: [] })

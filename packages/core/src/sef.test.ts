@@ -1,7 +1,9 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { SEF_DATA, SEF_DATA_REPO } from "./contracts.js"
-import { PARTICIPATION_WINDOW_DAYS, parseSefAmount, participationWindow, rewardProofUrl } from "./sef.js"
+import {
+  PARTICIPATION_WINDOW_DAYS, REWARDS_LATEST_PATH, parseSefAmount, participationWindow, rewardProofPath, rewardProofUrl,
+} from "./sef.js"
 
 // An address made up for the test. Its first four bytes differ, so the radix path is checkable.
 const ADDRESS = "0xAbCdEf0123456789aBcDeF0123456789AbCdEf01"
@@ -11,6 +13,15 @@ test("a proof URL fans out on the first four bytes of the lower-case address", (
     rewardProofUrl(ADDRESS),
     `${SEF_DATA.rewardsProofBase}/proofs/ab/cd/ef/01/${ADDRESS.toLowerCase()}.json`,
   )
+})
+
+test("a proof path is relative, so any rewards data base can carry it", () => {
+  assert.equal(rewardProofPath(ADDRESS), `proofs/ab/cd/ef/01/${ADDRESS.toLowerCase()}.json`)
+  assert.equal(rewardProofUrl(ADDRESS, "https://gw.example.org/ipfs/x"), `https://gw.example.org/ipfs/x/${rewardProofPath(ADDRESS)}`)
+})
+
+test("the repository's latest.json sits at the latest path under its rewards base", () => {
+  assert.equal(SEF_DATA.rewardsLatest, `${SEF_DATA.rewardsProofBase}/${REWARDS_LATEST_PATH}`)
 })
 
 test("a proof URL does not depend on the address's checksum casing", () => {

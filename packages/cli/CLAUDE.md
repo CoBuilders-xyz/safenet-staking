@@ -45,7 +45,7 @@ The writes send what the web interface sends, in the same order:
 | `safenet stake <validator> <amount> [--approve exact\|unlimited]` | `approve` on the SAFE token only when the allowance is below the amount, exact by default; then `stake(validator, amount)` |
 | `safenet unstake <validator> <amount>` | `initiateWithdrawal(validator, amount)`, which starts the delay |
 | `safenet withdrawals claim <id \| --all>` | `claimWithdrawal()` once per withdrawal. It takes no id and pays the oldest first, so `<id>` claims every one up to it. Only withdrawals past their delay, read from `withdrawalQueues` and `withdrawalNodes`, are claimed; the rest are named |
-| `safenet rewards claim` | `claim` with SEF's proof for the signer, read through core's `rewardProofUrl()`, only while the proof's root is the root on chain; otherwise one sentence and exit 1 |
+| `safenet rewards claim` | `claim` with SEF's proof for the signer, read at core's `rewardProofPath()` from the first source that has it, only while the proof's root is the root on chain; otherwise one sentence and exit 1 |
 | `safenet rewards claim-and-stake <validator> [--amount] [--approve]` | the claim, then the approval if short, then the stake of what the claim's SAFE `Transfer` log says arrived, or of `--amount`. An `--amount` above the proof's claimable amount is refused before anything is sent, as `stake` and `unstake` refuse. Only when the claim pays less than `--amount` is what arrived staked instead, with a line on stderr and `cappedToReceived` in the result. One transaction after another; no EIP-5792 batch |
 
 Global options: `--json`, `--rpc-url <url>`, `--verbose`. Exit codes: 0 success, 1 the operation
@@ -87,6 +87,9 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   `validator-info.json`, floored to the hour, by `participationWindow()` in core; the file is read
   at that commit. When the GitHub API does not answer, the window is reported unknown, never
   guessed. `GITHUB_TOKEN` or `GH_TOKEN` raises its limit.
+- Reward files come from SEF's IPFS dataset behind its ENS name when the contenthash is set,
+  through each gateway, and then from the repository mirror: `readRewards()` in `src/lib/sef.ts`,
+  over core's `src/rewards-source.ts`. `status` reports the source used as `rewardsSource`.
 - Rewards allocated and unclaimed are derived only while the Merkle root on chain is the one in
   SEF's `latest.json`, the same rule as `useProgrammeRewards()` in the web app. Otherwise the
   balance still funds the old root, so both are null with a `reason`, and the raw balance shows

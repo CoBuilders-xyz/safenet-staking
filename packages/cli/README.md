@@ -106,9 +106,14 @@ without a signer option, a write exits 2.
 |---|---|
 | `MAINNET_RPC_URL` | The Mainnet RPC endpoint, tried before the public endpoints. `--rpc-url` overrides it |
 | `GITHUB_TOKEN` or `GH_TOKEN` | Raises the GitHub API limit for the lookup that dates SEF's participation window. Optional |
+| `IPFS_GATEWAY` | An IPFS gateway origin, tried before the public gateways for SEF's reward dataset. Optional |
 
 An RPC URL can carry a key. It is never printed: `--verbose` shows the host only, and error
 messages have URLs removed.
+
+## Reward data
+
+SEF declares the IPFS dataset behind the ENS name `rewards.safenet-gov.eth` the canonical source of reward data, and keeps the repository `safe-fndn/safenet-data` as a temporary mirror. `status`, `rewards check` and both claims read `latest.json` and the proofs in the order the web interface uses: SEF's dataset through each IPFS gateway, `IPFS_GATEWAY` first and then ipfs.io, dweb.link and cloudflare-ipfs.com, but only when the name's contenthash is set; then the repository. A source that fails, answers 404, serves a file of the wrong shape or does not answer within 10 seconds falls through to the next; the gateways share one 10-second budget. When every source fails, the error names each one. The name is resolved once per run, and once an hour by the MCP server. `status --json` reports the source in `rewardsSource`: its `kind`, `ens` for the dataset or `repository` for the mirror, the `url` and `gateway` read, and what the name held, as `ens.status` `set`, `empty`, `unsupported` or `unreadable`. On 2026-10-07 the contenthash was empty, so the CLI read the repository; it reads the dataset as soon as SEF populates the name.
 
 ## Library
 

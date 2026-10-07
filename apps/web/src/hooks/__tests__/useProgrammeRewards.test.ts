@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderHook } from "@testing-library/react"
+import { SEF_DATA } from "@cobuilders/safenet-core"
 import { getContractAddresses } from "@/config/contracts"
 import { activeChain } from "@/config/chains"
 import {
@@ -30,10 +31,13 @@ vi.stubGlobal("fetch", mockFetch)
 
 vi.mock("wagmi", () => ({
   useReadContract: (...args: unknown[]) => mockUseReadContract(...args),
+  usePublicClient: () => undefined,
 }))
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
+  // Resolves the reward source on every read. With no Mainnet client, that is the repository.
+  useQueryClient: () => ({ fetchQuery: (o: { queryFn: () => unknown }) => o.queryFn() }),
 }))
 
 /** Route each read to a result by function name, so the order of calls does not matter. */
@@ -136,18 +140,30 @@ describe("useProgrammeRewards", () => {
 
   it("fetches SEF's latest.json and validates it", async () => {
     renderHook(() => useProgrammeRewards())
-    const { queryKey, queryFn } = mockUseQuery.mock.calls[0][0] as {
+    const { queryKey, queryFn, select } = mockUseQuery.mock.calls[0][0] as {
       queryKey: unknown[]
-      queryFn: () => Promise<unknown>
+      queryFn: (context: { signal: AbortSignal }) => Promise<unknown>
+      select: (answer: unknown) => unknown
     }
+    const sourceOf = (mockUseQuery.mock.calls[1][0] as { select: (answer: unknown) => unknown }).select
     expect(queryKey).toEqual(["rewardsLatest"])
+    const signal = new AbortController().signal
 
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => LATEST })
-    await expect(queryFn()).resolves.toEqual(LATEST)
-    expect(String(mockFetch.mock.calls[0][0])).toMatch(/\/latest\.json$/)
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => LATEST })
+    const answer = await queryFn({ signal })
+    expect(select(answer)).toEqual(LATEST)
+    expect(sourceOf(answer)).toEqual({
+      base: { url: SEF_DATA.rewardsProofBase, kind: "repository" },
+      url: SEF_DATA.rewardsLatest,
+      ens: { status: "unreadable", reason: "no Mainnet client" },
+    })
+    expect(String(mockFetch.mock.calls[0][0])).toBe(SEF_DATA.rewardsLatest)
 
     mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
-    await expect(queryFn()).rejects.toThrow("Failed to fetch rewards file: 404")
+    await expect(queryFn({ signal })).rejects.toThrow("Failed to fetch rewards file: 404")
+
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 })
+    await expect(queryFn({ signal })).rejects.toThrow("Failed to fetch rewards file: 500")
   })
 
   it("has no totals until both the file and the balance are known", () => {

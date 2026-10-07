@@ -67,6 +67,15 @@ export interface MockChainState {
   receiptLogs: Map<string, RpcLog[]>
   /** Counts claims, so each gets its own transaction hash and its own receipt. */
   claims: number
+  /**
+   * The contenthash of SEF's ENS name, read through the Universal Resolver. "0x", as on Mainnet
+   * on 2026-10-07, sends the interface to the repository; a value sends it to the IPFS dataset.
+   */
+  ensContenthash: Hex
+  /** Gateway hosts whose requests fail, so a test can watch the next gateway answer. */
+  failingGateways: string[]
+  /** When true, every request to SEF's repository fails, as if it were blocked. */
+  repositoryDown: boolean
 }
 
 export interface MockChainStateOverrides {
@@ -107,6 +116,9 @@ export function createMockChainState(overrides: MockChainStateOverrides = {}): M
     rejectNextTx: false,
     receiptLogs: new Map(),
     claims: 0,
+    ensContenthash: "0x",
+    failingGateways: [],
+    repositoryDown: false,
   }
 }
 

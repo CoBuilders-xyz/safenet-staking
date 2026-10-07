@@ -40,8 +40,12 @@ legitimately contains none of them.
   match.
 - `src/abis.ts` — the indexed event registry, `indexedEvent()` to look one up by name, the
   decoded error registry, and the ABIs built from them.
-- `src/sef.ts` — the shapes of SEF's published files, the URL of an address's reward proof, and
-  the window a published participation rate covers.
+- `src/sef.ts` — the shapes of SEF's published files, the paths of the reward files under a
+  rewards data base, and the window a published participation rate covers.
+- `src/rewards-source.ts` — where reward data is read from. The ENS name SEF declares canonical,
+  `SEF_REWARDS_ENS_NAME`, and the public gateways, `IPFS_GATEWAYS`, live here and nowhere else.
+  It resolves the name's contenthash, lists the bases to try, the IPFS dataset through each
+  gateway and then the repository mirror, and reads a file from the first base that answers.
 - `src/deployments.ts` — what the interface needs per chain, derived from `src/contracts.ts`.
 - `src/parity/` — the comparison behind `pnpm test:parity`, which both subgraph packages share.
   `compare.ts` holds the rules as pure functions: exact and declared-precision comparison, the
@@ -71,5 +75,7 @@ legitimately contains none of them.
 3. Keep the export surface to constants, ABIs, and small accessors that only look a constant up
    or derive a location from it, such as `indexedEvent()` or `rewardProofUrl()`. No business
    logic lives here, because every other package imports this one and nothing should import them
-   back. The one exception is `src/parity/`, behind its own export: both subgraph packages need
-   the same comparison, and it imports nothing from them.
+   back. The exceptions are `src/parity/`, behind its own export: both subgraph packages need
+   the same comparison, and it imports nothing from them; and `src/rewards-source.ts`, because
+   the interface and the CLI must try SEF's reward sources in the same order. It reads the chain
+   and fetches only through what its caller passes in.

@@ -2,7 +2,8 @@
  * Core Playwright fixtures providing connected and disconnected page states.
  */
 
-import { test as base, type Page } from "@playwright/test"
+import { test as base, type Page, type Route } from "@playwright/test"
+import { IPFS_GATEWAYS, REWARDS_LATEST_PATH, SEF_DATA } from "@cobuilders/safenet-core"
 import { createEthereumProviderScript, createDisconnectedProviderScript } from "../mocks/ethereum-provider"
 import { createRpcHandler } from "../mocks/rpc-handler"
 import { createMockChainState, applyMockTx, type MockChainState } from "../mocks/mock-chain-state"
@@ -92,12 +93,14 @@ async function setupPage(page: Page, options: SetupPageOptions, state: MockChain
     })
   })
 
-  // Intercept SEF's reward files (see src/hooks/useRewardProof.ts). `latest.json` is served
-  // from `state.rewardsLatest` (null = 404). Every other path is the per-address proof, served
-  // from `state.rewardProof`, so tests can configure per-address rewards before navigating.
-  // Undefined (the default) is served as a 404, matching "this address never earned rewards".
-  await page.route("**/mock-rewards.test/**", async (route) => {
-    if (new URL(route.request().url()).pathname.endsWith("/latest.json")) {
+  // SEF's reward files (see src/hooks/useRewardsSource.ts), wherever the interface reads them:
+  // the repository, or the IPFS dataset through a gateway when `state.ensContenthash` is set.
+  // Both serve the same files. `latest.json` is `state.rewardsLatest` (null = 404). Every other
+  // path is the per-address proof, `state.rewardProof`, so tests can configure per-address
+  // rewards before navigating. Undefined (the default) is served as a 404, matching "this
+  // address never earned rewards". Nothing reaches a real gateway or the real repository.
+  const serveRewardFile = async (route: Route) => {
+    if (new URL(route.request().url()).pathname.endsWith(`/${REWARDS_LATEST_PATH}`)) {
       const latest = state.rewardsLatest
       await route.fulfill(
         latest
@@ -112,7 +115,21 @@ async function setupPage(page: Page, options: SetupPageOptions, state: MockChain
       return
     }
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(proof) })
-  })
+  }
+  await page.route(
+    (url) => url.href.startsWith(`${SEF_DATA.rewardsProofBase}/`),
+    (route) => (state.repositoryDown ? route.abort("blockedbyclient") : serveRewardFile(route)),
+  )
+  const gatewayHosts = IPFS_GATEWAYS.map((g) => new URL(g).host)
+  await page.route(
+    (url) => gatewayHosts.includes(url.host),
+    (route) => {
+      const host = new URL(route.request().url()).host
+      return state.ensContenthash === "0x" || state.failingGateways.includes(host)
+        ? route.fulfill({ status: 502, body: "bad gateway" })
+        : serveRewardFile(route)
+    },
+  )
 
   await stubGeoCheck(page)
 

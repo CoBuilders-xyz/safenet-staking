@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query"
 import { getAddress } from "viem"
 import type { Address, Hex } from "viem"
-import { SEF_DATA } from "@cobuilders/safenet-core"
+import { rewardProofPath } from "@cobuilders/safenet-core"
+import { useRewardsFileReader } from "./useRewardsSource"
 
 export interface RewardProof {
   cumulativeAmount: string
@@ -33,20 +34,9 @@ function isValidProof(data: unknown): data is RewardProof {
   return true
 }
 
-/** Where SEF publishes the reward files. The e2e suite points this at a mock. */
-export const rewardsBaseUrl: string =
-  import.meta.env.VITE_REWARDS_BASE_URL || SEF_DATA.rewardsProofBase
-
-function radixProofPath(addr: string): string {
-  const hex = addr.slice(2, 10).toLowerCase()
-  return `${hex.slice(0, 2)}/${hex.slice(2, 4)}/${hex.slice(4, 6)}/${hex.slice(6, 8)}`
-}
-
-async function fetchProof(address: Address): Promise<RewardProof | null> {
-  const normalized = getAddress(address)
-  const lower = normalized.toLowerCase()
-  const url = `${rewardsBaseUrl}/proofs/${radixProofPath(lower)}/${lower}.json`
-  const response = await fetch(url)
+/** One source's proof for the address: null on a 404, an error otherwise. */
+async function fetchProofAt(url: string, signal: AbortSignal): Promise<RewardProof | null> {
+  const response = await fetch(url, { signal })
   if (response.status === 404) return null
   if (!response.ok) throw new Error(`Failed to fetch reward proof: ${response.status}`)
   const json: unknown = await response.json()
@@ -64,10 +54,15 @@ export function heldPendingCompliance(proof: RewardProof | null | undefined): bi
   return BigInt(proof.kycAmount)
 }
 
+/**
+ * The address's proof from the first source that has it, SEF's IPFS dataset before the
+ * repository. Null when none has one: the address never earned rewards.
+ */
 export function useRewardProof(address: Address | undefined, enabled = true) {
+  const read = useRewardsFileReader()
   return useQuery({
     queryKey: ["rewardProof", address],
-    queryFn: () => fetchProof(address!),
+    queryFn: async ({ signal }) => (await read(rewardProofPath(getAddress(address!)), fetchProofAt, signal)).value,
     enabled: !!address && enabled,
     staleTime: 5 * 60 * 1000,
     retry: false,

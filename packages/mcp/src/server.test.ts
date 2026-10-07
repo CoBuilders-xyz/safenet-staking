@@ -72,12 +72,16 @@ test("each read tool calls its library function with the parsed arguments", asyn
 
 test("the context is made once, from the server's RPC setting", async () => {
   const fake = fakeLibrary()
-  const config = readConfig({ SAFENET_MCP_RPC_URL: "https://rpc.invalid/key", GITHUB_TOKEN: "token" })
+  const config = readConfig({
+    SAFENET_MCP_RPC_URL: "https://rpc.invalid/key", GITHUB_TOKEN: "token", IPFS_GATEWAY: "https://gw.invalid",
+  })
   const s = await connect(config, { fake })
   await s.call("status")
   await s.call("status")
   const made = fake.calls.filter((c) => c.fn === "createContext")
-  assert.deepEqual(made.map((c) => c.args), [[{ rpcUrl: "https://rpc.invalid/key", githubToken: "token" }]])
+  assert.deepEqual(made.map((c) => c.args), [[
+    { rpcUrl: "https://rpc.invalid/key", githubToken: "token", ipfsGateway: "https://gw.invalid" },
+  ]])
   await s.close()
 })
 
