@@ -13,4 +13,9 @@ export default defineConfig({
   // packages/core ships TypeScript source, which node cannot run, so it is bundled in.
   // The published dependencies stay external and resolve from node_modules.
   noExternal: ["@cobuilders/safenet-core"],
+  esbuildOptions(options) {
+    // The map keeps file and line references for stack traces, but not the TypeScript itself:
+    // the private workspace sources it would carry stay out of the npm tarball.
+    options.sourcesContent = false
+  },
 })

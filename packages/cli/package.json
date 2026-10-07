@@ -1,10 +1,21 @@
 {
   "name": "@cobuilders/safenet-cli",
   "version": "0.0.0",
-  "private": true,
   "type": "module",
   "description": "safenet, a command-line interface for Safenet Beta: reads, and stake, unstake and claims with --dry-run.",
   "license": "MIT",
+  "keywords": [
+    "cli",
+    "safenet",
+    "safe",
+    "staking",
+    "ethereum"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CoBuilders-xyz/safenet-staking.git",
+    "directory": "packages/cli"
+  },
   "engines": {
     "node": ">=22.14.0"
   },
@@ -23,6 +34,13 @@
       "import": "./dist/program.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "bootstrap": "echo '@cobuilders/safenet-cli: nothing to prepare'",
     "dev": "tsc --noEmit --watch",
@@ -35,12 +53,12 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@cobuilders/safenet-core": "workspace:*",
     "commander": "15.0.0",
     "viem": "2.46.2",
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@cobuilders/safenet-core": "workspace:*",
     "@types/node": "22.19.2",
     "tsup": "8.5.1",
     "tsx": "4.23.15",

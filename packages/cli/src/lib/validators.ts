@@ -1,11 +1,11 @@
 /** `safenet validators list` and `safenet validators show`. */
 import { getAddress, type Address } from "viem"
-import { CONTRACTS, indexedEvent, stakingAbi, type SefValidator } from "@cobuilders/safenet-core"
+import { CONTRACTS, indexedEvent, stakingAbi } from "@cobuilders/safenet-core"
 import type { Context } from "./context.js"
 import { SafenetError } from "./errors.js"
 import { figure, type Figure } from "./figure.js"
 import { ScanError, scanLogs } from "./scan.js"
-import { fetchValidatorsWithWindow, type ParticipationWindow } from "./sef.js"
+import { fetchValidatorsWithWindow, type ParticipationWindow, type SefValidator } from "./sef.js"
 
 export interface Validator {
   readonly address: Address

@@ -133,5 +133,7 @@ reason.
 
 `pnpm build` bundles `dist/index.js`, the binary, with tsup, and `dist/lib/index.js` and
 `dist/program.js` with their declarations. Core is bundled in, because it ships TypeScript
-source; `commander`, `viem` and `zod` stay external. The library's declarations still import one
-type from core, which is not published, so a consumer outside this workspace needs core's types.
+source; `commander`, `viem` and `zod` stay external. The declarations must not name core, which
+is not published: tsup's `dts.resolve` leaves a broken import for core's TypeScript source, so a
+type the public API returns is declared in this package. `SefValidator` in `src/lib/sef.ts` is
+one; `src/lib/sef.test.ts` fails to type-check when it differs from core's.

@@ -217,9 +217,6 @@ importers:
 
   packages/cli:
     dependencies:
-      '@cobuilders/safenet-core':
-        specifier: workspace:*
-        version: link:../core
       commander:
         specifier: 15.0.0
         version: 15.0.0
@@ -230,6 +227,9 @@ importers:
         specifier: 4.6.5
         version: 4.6.5
     devDependencies:
+      '@cobuilders/safenet-core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: 22.19.2
         version: 22.19.2

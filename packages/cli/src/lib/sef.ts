@@ -12,10 +12,24 @@ import {
   type SefNetworkInfo,
   type SefRewardProof,
   type SefRewardsLatest,
-  type SefValidator,
 } from "@cobuilders/safenet-core"
 import type { Context } from "./context.js"
 import { SafenetError } from "./errors.js"
+
+/**
+ * One validator in SEF's `validator-info.json`: core's `SefValidator`, field for field.
+ *
+ * Declared here because the library's public declarations return it, and core is not published,
+ * so a consumer could not resolve core's name. `sef.test.ts` fails to type-check if the two differ.
+ */
+export interface SefValidator {
+  address: string
+  commission: number
+  is_active: boolean
+  label: string
+  /** A double. */
+  participation_rate_14d: number
+}
 
 /** The window a published participation rate covers. Every rate is shown with one. */
 export interface ParticipationWindow {
