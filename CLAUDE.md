@@ -1,6 +1,6 @@
 # CLAUDE.md — safenet-staking
 
-A pnpm and Turborepo monorepo. `apps/web` is the Safenet Beta staking interface.
+A pnpm and Turborepo monorepo. `apps/web` is the Safenet staking interface.
 `packages/subgraph-mainnet` and `packages/subgraph-gnosis` index the Safenet contracts on each
 chain. `packages/core` holds the constants all of them read.
 

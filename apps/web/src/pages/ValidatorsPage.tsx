@@ -11,7 +11,7 @@ export function ValidatorsPage() {
   return (
     <div className="space-y-8">
       <PageHero
-        title="Safenet Beta"
+        title="Safenet validators"
         subtitle="Select a validator to stake your SAFE tokens"
       />
       <ValidatorList autoOpenDelegate={delegateParam} />

@@ -22,7 +22,7 @@ query NetworkTotals {
   }
 }
 
-# Six validators are registered during Beta, far below graph-node's page of 1000.
+# Safenet registers a handful of validators, far below graph-node's page of 1000.
 query ValidatorStakes {
   _meta {
     ...MainnetFreshness

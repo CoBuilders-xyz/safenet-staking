@@ -22,7 +22,7 @@ export const ARCHIVE_ADVICE =
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 
 export function statusSummary(s: NetworkStatus): string {
-  return `Safenet Beta at Ethereum Mainnet block ${s.block}: ${safe(s.totalStaked.value)} staked, ` +
+  return `Safenet at Ethereum Mainnet block ${s.block}: ${safe(s.totalStaked.value)} staked, ` +
     `${plural(s.activeValidators.value, "active validator")}, ${safe(s.pendingWithdrawals.value)} in pending withdrawals. ` +
     `The Merkle root on chain ${s.merkleRoot.match ? "matches" : "differs from"} the one in SEF's latest.json.`
 }

@@ -40,7 +40,7 @@ test("status over stdio", { skip, timeout: TIMEOUT }, async () => {
   const s = r.structuredContent as { totalStaked: { value: string }; merkleRoot: { match: boolean } }
   assert.ok(isWei(s.totalStaked.value) && BigInt(s.totalStaked.value) > 0n)
   assert.equal(typeof s.merkleRoot.match, "boolean")
-  assert.match(r.content[0]?.type === "text" ? r.content[0].text : "", /^Safenet Beta at Ethereum Mainnet block \d+/)
+  assert.match(r.content[0]?.type === "text" ? r.content[0].text : "", /^Safenet at Ethereum Mainnet block \d+/)
 })
 
 test("validators_list over stdio", { skip, timeout: TIMEOUT }, async () => {

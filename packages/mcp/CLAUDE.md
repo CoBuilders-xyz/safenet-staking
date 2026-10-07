@@ -1,6 +1,6 @@
 # packages/mcp
 
-`safenet-mcp`, an MCP server for Safenet Beta over stdio: one tool per `safenet` command, eleven
+`safenet-mcp`, an MCP server for Safenet over stdio: one tool per `safenet` command, eleven
 in all. It calls the CLI's library, `@cobuilders/safenet-cli/lib`, not the binary. Reads are
 reads. Writes are dry runs unless the operator allows them when the server starts. Every address,
 start block, event, function and error comes from `@cobuilders/safenet-core` through the library;

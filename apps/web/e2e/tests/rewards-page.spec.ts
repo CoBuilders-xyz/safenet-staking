@@ -141,7 +141,7 @@ test.describe("Rewards page", () => {
     // Default mockChainState.rewardProof is undefined -> the proof endpoint answers 404
     await page.goto("/#/rewards")
 
-    await expect(section(page, "Your rewards").getByText(/has not earned rewards in Safenet Beta/)).toBeVisible({ timeout: 10_000 })
+    await expect(section(page, "Your rewards").getByText(/has not earned Safenet rewards/)).toBeVisible({ timeout: 10_000 })
     await expect(section(page, "Actions").getByText("This address has nothing to claim.")).toBeVisible()
     await expect(claimButton(page)).toBeDisabled()
   })

@@ -110,7 +110,7 @@ test.describe("Dashboard route", () => {
     // Each check is content only that page renders. The header nav says "Validators", "Withdrawals"
     // and "Rewards" on every page, the 404 included, so a nav label proves nothing.
     const links: [string, (p: typeof page) => ReturnType<typeof page.getByRole>][] = [
-      ["/#/validators", (p) => p.getByRole("heading", { name: "Safenet Beta" })],
+      ["/#/validators", (p) => p.getByRole("heading", { name: "Safenet validators" })],
       [`/#/validators/${VALIDATORS.validatorA}`, (p) => p.getByRole("link", { name: "Back to Validators" })],
       ["/#/withdrawals", (p) => p.getByRole("heading", { name: "Withdrawals", exact: true })],
       ["/#/rewards", (p) => p.getByRole("heading", { name: "Rewards", exact: true })],

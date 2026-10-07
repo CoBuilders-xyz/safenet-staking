@@ -158,7 +158,7 @@ describe("RewardsPage", () => {
       mockUseRewards.mockReturnValue(rewards({ proof: null, data: { claimable: 0n, totalClaimed: 0n, canClaim: false } }))
       renderPage()
 
-      expect(within(section("Your rewards")).getByText(/has not earned rewards in Safenet Beta/)).toBeInTheDocument()
+      expect(within(section("Your rewards")).getByText(/has not earned Safenet rewards/)).toBeInTheDocument()
       expect(within(section("Actions")).getByText("This address has nothing to claim.")).toBeInTheDocument()
     })
 

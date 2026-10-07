@@ -41,7 +41,7 @@ const ROOT_UPDATED =
 
 /**
  * Claim & Stake: claim the MerkleDrop rewards, then stake exactly what arrived, in two
- * transactions. Beta rewards do not compound, so without this they sit in the wallet.
+ * transactions. MerkleDrop rewards do not compound, so without this they sit in the wallet.
  *
  * The stake step is the same form and the same transactions as DelegateDialog: approve and
  * stake, batched into one in a wallet that supports it, and no approval when the allowance

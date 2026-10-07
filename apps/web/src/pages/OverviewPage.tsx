@@ -12,7 +12,7 @@ import {
 } from "@/components/overview/OverviewSections"
 
 /**
- * The state of Safenet Beta, with no wallet. Each section reads its own data and sits in its own
+ * The state of Safenet, with no wallet. Each section reads its own data and sits in its own
  * error boundary, so one failing source leaves the others on screen.
  */
 export function OverviewPage() {
@@ -20,7 +20,7 @@ export function OverviewPage() {
     <div className="space-y-6">
       <PageHero
         title="Network overview"
-        subtitle="The state of Safenet Beta staking and consensus. No wallet needed."
+        subtitle="The state of Safenet staking and consensus. No wallet needed."
       >
         <Button asChild variant="outline" className="mt-6">
           <Link to="/dashboard">Open the staking dashboard</Link>

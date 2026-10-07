@@ -1,4 +1,4 @@
-# Safenet Beta, Gnosis Chain: consensus and signing.
+# Safenet, Gnosis Chain: consensus and signing.
 #
 # The shape differs from the Mainnet subgraph for one reason: volume. Mainnet holds 1,835
 # logs over its entire history. Gnosis emits 153,646 in two days, and roughly 15 million

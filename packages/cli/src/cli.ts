@@ -106,7 +106,7 @@ function commandRuntime(runtime: Runtime): CommandRuntime {
 export function buildProgram(runtime: Runtime): Command {
   const program = new Command("safenet")
     .description(
-      "Read Safenet Beta from Ethereum Mainnet and from the data SEF publishes, and stake, unstake and claim. " +
+      "Read Safenet from Ethereum Mainnet and from the data SEF publishes, and stake, unstake and claim. " +
         "Every write takes --dry-run, which signs nothing.",
     )
     .version(pkg.version)

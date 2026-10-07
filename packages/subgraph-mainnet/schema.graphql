@@ -1,4 +1,4 @@
-# Safenet Beta, Ethereum Mainnet: staking and rewards.
+# Safenet, Ethereum Mainnet: staking and rewards.
 #
 # The shape follows what metrics-poc.ts already proves against the chain. That script is the
 # oracle this subgraph is tested against, so every figure it reports must be answerable here

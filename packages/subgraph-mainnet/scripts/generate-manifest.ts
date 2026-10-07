@@ -106,7 +106,7 @@ const manifest = `# GENERATED FILE. Do not edit by hand.
 # Addresses, start blocks and event signatures live in core. Editing this file
 # creates a second source for them, which is the drift that rule exists to prevent.
 specVersion: 1.0.0
-description: Safenet Beta staking and rewards on Ethereum Mainnet. CoBuilders, Track A.
+description: Safenet staking and rewards on Ethereum Mainnet. CoBuilders, Track A.
 repository: https://github.com/CoBuilders-xyz/safenet-staking
 schema:
   file: ./schema.graphql
