@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import type { SefValidator as CoreSefValidator } from "@cobuilders/safenet-core"
 import type { SefValidator } from "./sef.js"
 
+// Enforced by tsc in `pnpm check`: `pnpm test` runs this through tsx, which strips types.
 /** True only when each type is assignable to the other, so a field added, dropped or retyped fails. */
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
 

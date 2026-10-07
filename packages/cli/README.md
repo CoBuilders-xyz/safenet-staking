@@ -1,8 +1,8 @@
 # safenet-cli
 
 `safenet` is a command-line interface for Safenet Beta staking on Ethereum Mainnet. Six commands
-read the staking contracts and the data SEF publishes. Five write: stake, unstake and claim.
-Every write takes `--dry-run`, which signs nothing.
+read the staking contracts and the data SEF (Safe Ecosystem Foundation) publishes. Five write:
+stake, unstake and claim. Every write takes `--dry-run`, which signs nothing.
 
 Each figure names its source: `chain: Contract.call()` or `SEF: file field`. Amounts print
 exactly, to the last wei. `--json` gives the same fields, with amounts as wei in decimal strings.
