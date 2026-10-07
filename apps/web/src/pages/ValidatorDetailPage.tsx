@@ -16,6 +16,8 @@ import { useToast } from "@/hooks/useToast"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Info } from "lucide-react"
 import { useWrongNetwork } from "@/hooks/useWrongNetwork"
+import { ParticipationRate } from "@/components/validators/ParticipationRate"
+import { PARTICIPATION_RULE, WITHDRAWN, WITHDRAWN_STATUS } from "@/lib/programme"
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left"
 import Copy from "lucide-react/dist/esm/icons/copy"
 export function ValidatorDetailPage() {
@@ -106,11 +108,16 @@ export function ValidatorDetailPage() {
             {isActive ? (
               <Badge variant="secondary" className="text-sm">Active</Badge>
             ) : (
-              <Badge className="bg-warning/20 text-warning hover:bg-warning/30 text-sm">Inactive</Badge>
+              <Badge className="bg-warning/20 text-warning hover:bg-warning/30 text-sm">{WITHDRAWN}</Badge>
             )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!isActive && (
+            <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+              {WITHDRAWN_STATUS}. Its stake and past participation stay shown; staking with it is off.
+            </p>
+          )}
           <div className="flex gap-6 text-sm">
             <div className="flex items-center gap-1">
               <span className="text-muted-foreground">Commission: </span>
@@ -139,9 +146,14 @@ export function ValidatorDetailPage() {
             </div>
             <div>
               <span className="text-muted-foreground">Participation (14d): </span>
-              <span className="font-medium">{validatorInfo.participationRate}%</span>
+              <ParticipationRate
+                className="font-medium"
+                rate={validatorInfo.participationRate / 100}
+                text={`${validatorInfo.participationRate}%`}
+              />
             </div>
           </div>
+          <p className="text-xs text-muted-foreground">{PARTICIPATION_RULE}</p>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-lg bg-muted/30 p-4">

@@ -7,6 +7,7 @@
  * source a number on screen came from.
  */
 import type { Route } from "@playwright/test"
+import { BETA_END_DAY, utcDayMs } from "@cobuilders/safenet-core"
 import { AMOUNTS, VALIDATORS } from "../fixtures/test-data"
 
 /** ok: fresh answers. fail: HTTP 500. stale: answers whose last block is an hour old. */
@@ -51,7 +52,6 @@ function mainnet(operation: string, mode: SubgraphMode): unknown {
         _meta,
         network: {
           totalStaked: SUBGRAPH_FIGURES.totalStaked.toString(),
-          activeValidators: 2,
           stakersCurrent: SUBGRAPH_FIGURES.stakers,
           rewardsClaimed: SUBGRAPH_FIGURES.rewardsClaimed.toString(),
           currentRoot: null,
@@ -63,6 +63,8 @@ function mainnet(operation: string, mode: SubgraphMode): unknown {
         validators: [
           { id: VALIDATORS.validatorA, totalStaked: SUBGRAPH_FIGURES.validatorA.toString(), stakersCurrent: 25 },
           { id: VALIDATORS.validatorB, totalStaked: SUBGRAPH_FIGURES.validatorB.toString(), stakersCurrent: 12 },
+          // Withdrawn: still registered on chain, with nothing staked.
+          { id: VALIDATORS.validatorC, totalStaked: "0", stakersCurrent: 0 },
         ],
       }
     case "RecentDays":
@@ -79,23 +81,36 @@ function mainnet(operation: string, mode: SubgraphMode): unknown {
 
 function gnosis(operation: string, mode: SubgraphMode): unknown {
   if (operation !== "ConsensusWindow") throw new Error(`no mock for gnosis ${operation}`)
-  const today = Math.floor(Date.now() / 1000 / DAY) * DAY
-  // Sixteen days back to today: the first indexed day and today are partial, 14 count.
-  const dates = Array.from({ length: 17 }, (_, i) => today - (16 - i) * DAY)
+  // Beta's last days, as the live subgraph holds them: attestations on the Beta Consensus contract
+  // stopped on Beta's last day, with one stray ceremony the day after. The first day is partial
+  // and dropped, and the stray is not a Beta day, so the window is the 14 days to Beta's end,
+  // whatever today is, and the Overview dates it as Beta. The mock answers whatever the query's
+  // date bound, so the stray reaches the client, which must leave it out.
+  const betaEnd = utcDayMs(BETA_END_DAY) / 1000
+  const dates = Array.from({ length: 16 }, (_, i) => betaEnd - (15 - i) * DAY)
+  const stray = betaEnd + DAY
   const buckets = Array.from({ length: 65 }, (_, i) => (i === SUBGRAPH_FIGURES.latencyMedianBlocks ? "100" : "0"))
   return {
     _meta: meta(SUBGRAPH_FIGURES.gnosisBlock, mode),
     firstDay: [{ date: dates[0] }],
-    consensusDays: dates.map((date) => ({
-      date,
-      attestations: String(SUBGRAPH_FIGURES.attestationsPerDay),
-      attestationCeremonies: "1000",
-      latencyBuckets: buckets,
-    })),
-    validatorDays: dates.flatMap((date) => [
-      { date, attended: "1000", validator: { id: VALIDATORS.validatorA } },
-      { date, attended: "990", validator: { id: VALIDATORS.validatorB } },
-    ]),
+    // Newest first, as the query orders them.
+    consensusDays: [
+      { date: stray, attestations: "1", attestationCeremonies: "1", latencyBuckets: buckets },
+      ...[...dates].reverse().map((date) => ({
+        date,
+        attestations: String(SUBGRAPH_FIGURES.attestationsPerDay),
+        attestationCeremonies: "1000",
+        latencyBuckets: buckets,
+      })),
+    ],
+    validatorDays: [
+      { date: stray, attended: "1", validator: { id: VALIDATORS.validatorA } },
+      ...[...dates].reverse().flatMap((date) => [
+        { date, attended: "1000", validator: { id: VALIDATORS.validatorA } },
+        { date, attended: "990", validator: { id: VALIDATORS.validatorB } },
+        { date, attended: "980", validator: { id: VALIDATORS.validatorC } },
+      ]),
+    ],
   }
 }
 

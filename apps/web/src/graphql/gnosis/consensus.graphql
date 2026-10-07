@@ -8,7 +8,11 @@ fragment GnosisFreshness on _Meta_ {
   hasIndexingErrors
 }
 
-query ConsensusWindow($since: Int!) {
+# The window ends at the last day the subgraph holds, not at today: both lists are read newest
+# first. So a network that stopped attesting keeps its last figures, dated, instead of an empty
+# window. $until is the last day of the indexed programme, when it has ended, so stray rows
+# after it do not push its days out of the page.
+query ConsensusWindow($days: Int!, $until: Int!) {
   _meta {
     ...GnosisFreshness
   }
@@ -16,13 +20,13 @@ query ConsensusWindow($since: Int!) {
   firstDay: consensusDays(first: 1, orderBy: date, orderDirection: asc) {
     date
   }
-  consensusDays(first: 1000, where: { date_gte: $since }, orderBy: date, orderDirection: asc) {
+  consensusDays(first: $days, where: { date_lte: $until }, orderBy: date, orderDirection: desc) {
     date
     attestations
     attestationCeremonies
     latencyBuckets
   }
-  validatorDays(first: 1000, where: { date_gte: $since }, orderBy: date, orderDirection: asc) {
+  validatorDays(first: 1000, where: { date_lte: $until }, orderBy: date, orderDirection: desc) {
     date
     attended
     validator {

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, within } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
+import { TooltipProvider } from "@radix-ui/react-tooltip"
 import { getAddress } from "viem"
-import { GNOSIS_SNAPSHOT } from "@cobuilders/safenet-core"
+import { AEGIS_START_DAY, BETA_END_DAY, GNOSIS_SNAPSHOT, utcDayMs } from "@cobuilders/safenet-core"
 import { MOCK_VALIDATORS, TEST_ACCOUNTS } from "@/__tests__/test-data"
 import type { SubgraphResult } from "@/hooks/useSubgraphQuery"
 import { OverviewPage } from "../OverviewPage"
@@ -21,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   rewards: vi.fn(),
   days: vi.fn(),
   consensus: vi.fn(),
+  validators: vi.fn(),
 }))
 vi.mock("@/hooks/useNetworkTotals", () => ({ useNetworkTotals: () => mocks.network(), useNetworkQuery: () => mocks.networkQuery() }))
 vi.mock("@/hooks/useValidatorStakes", () => ({ useValidatorStakes: () => mocks.stakes() }))
@@ -29,7 +31,7 @@ vi.mock("@/hooks/useRecentDays", () => ({ RECENT_DAYS: 30, useRecentDays: () => 
 vi.mock("@/hooks/useConsensusFigures", () => ({ useConsensusFigures: () => mocks.consensus() }))
 vi.mock("@/hooks/useValidators", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks/useValidators")>()),
-  useValidators: () => ({ data: MOCK_VALIDATORS, error: null }),
+  useValidators: () => mocks.validators(),
 }))
 
 const ready = <T,>(value: T, source: string) => ({ state: "ready" as const, value, source })
@@ -39,9 +41,10 @@ function live() {
   mocks.network.mockReturnValue({
     subgraph: LIVE,
     totalStaked: ready(73_000_000n * SAFE, "subgraph"),
-    activeValidators: ready(6, "subgraph"),
+    validatorCounts: ready({ active: 2, withdrawn: 0 }, "sef"),
     stakers: ready(884, "subgraph"),
   })
+  mocks.validators.mockReturnValue({ data: MOCK_VALIDATORS, error: null })
   mocks.stakes.mockReturnValue({
     subgraph: LIVE,
     rows: ready(
@@ -70,16 +73,23 @@ function live() {
     participation: new Map([[A.toLowerCase(), { rate: 0.995, attended: 199n, absences: 1n }]]),
     snapshot: GNOSIS_SNAPSHOT,
     snapshotReason: undefined,
+    betaOnly: false,
   })
 }
 
 function renderPage() {
   return render(
     <MemoryRouter>
-      <OverviewPage />
+      <TooltipProvider>
+        <OverviewPage />
+      </TooltipProvider>
     </MemoryRouter>,
   )
 }
+
+const DAY = 86_400
+/** The last two weeks of Beta, as the Gnosis subgraph's window covers them, from core's calendar. */
+const BETA_WINDOW = { days: 14, from: utcDayMs(BETA_END_DAY) / 1000 - 13 * DAY, to: utcDayMs(BETA_END_DAY) / 1000 }
 
 describe("OverviewPage", () => {
   beforeEach(() => {
@@ -94,7 +104,8 @@ describe("OverviewPage", () => {
     expect(screen.getByRole("status", { name: "Data freshness" })).toHaveTextContent("Mainnet subgraph: live. Last indexed block 25,900,000")
 
     expect(within(screen.getByRole("group", { name: "Total SAFE staked" })).getByText("73,000,000")).toBeInTheDocument()
-    expect(within(screen.getByRole("group", { name: "Active validators" })).getByText("6")).toBeInTheDocument()
+    expect(screen.getByRole("group", { name: "Active validators" })).toHaveTextContent("2 active")
+    expect(screen.getByRole("group", { name: "Active validators" })).not.toHaveTextContent("withdrawn")
     expect(within(screen.getByRole("group", { name: "Attestations per day" })).getByText("4,600")).toBeInTheDocument()
     expect(within(screen.getByRole("group", { name: "Attestation latency" })).getByText("~20 s")).toBeInTheDocument()
 
@@ -154,6 +165,7 @@ describe("OverviewPage", () => {
       participation: undefined,
       snapshot: GNOSIS_SNAPSHOT,
       snapshotReason: "The Gnosis subgraph has not indexed a complete UTC day yet.",
+      betaOnly: false,
     })
     renderPage()
     for (const name of ["Attestations per day", "Attestation latency"]) {
@@ -174,7 +186,7 @@ describe("OverviewPage", () => {
     mocks.network.mockReturnValue({
       subgraph: FAILED,
       totalStaked: ready(70_000_000n * SAFE, "contract"),
-      activeValidators: ready(6, "sef"),
+      validatorCounts: ready({ active: 2, withdrawn: 0 }, "sef"),
       stakers: { state: "unavailable", reason: "The subgraph could not be queried. No contract read gives this figure." },
     })
     mocks.consensus.mockReturnValue({
@@ -185,6 +197,7 @@ describe("OverviewPage", () => {
       participation: undefined,
       snapshot: GNOSIS_SNAPSHOT,
       snapshotReason: "The subgraph could not be queried.",
+      betaOnly: false,
     })
     mocks.days.mockReturnValue({ subgraph: FAILED, activity: { state: "unavailable", reason: "No contract read gives a daily history." } })
     renderPage()
@@ -197,6 +210,57 @@ describe("OverviewPage", () => {
       "Snapshot measured Tue 29 Sep 2026, 14:41 UTC. The subgraph could not be queried.",
     )
     expect(within(screen.getByRole("region", { name: "Last 30 days" })).getByText(/Unavailable\. No contract read/)).toBeInTheDocument()
+  })
+
+  it("counts validators by SEF's flag, and keeps a withdrawn one's stake and participation with no way to stake", () => {
+    mocks.validators.mockReturnValue({ data: [MOCK_VALIDATORS[0], { ...MOCK_VALIDATORS[1], isActive: false }], error: null })
+    mocks.network.mockReturnValue({ ...mocks.network(), validatorCounts: ready({ active: 1, withdrawn: 1 }, "sef") })
+    renderPage()
+
+    const headline = screen.getByRole("group", { name: "Active validators" })
+    expect(headline).toHaveTextContent("1 active")
+    expect(headline).toHaveTextContent("1 withdrawn")
+    expect(headline).toHaveTextContent("SEF's published validator list")
+
+    const validators = screen.getByRole("region", { name: "Validators" })
+    const row = (name: string) => within(validators).getByRole("link", { name }).closest("tr")!
+    const greenfield = row("Greenfield")
+    expect(greenfield).toHaveTextContent("Withdrawn, Aegis participation unconfirmed")
+    expect(greenfield).toHaveTextContent("400")
+    expect(greenfield).toHaveTextContent("99.70%")
+    expect(within(greenfield).queryByRole("link", { name: /^Stake/ })).not.toBeInTheDocument()
+
+    const gnosis = row("Gnosis")
+    expect(gnosis).toHaveTextContent("Active")
+    expect(within(gnosis).getByRole("link", { name: "Stake with Gnosis" })).toHaveAttribute("href", `/validators?delegate=${A}`)
+  })
+
+  it("dates the Gnosis figures as Beta, above the figures, while the index holds no Aegis day", () => {
+    mocks.consensus.mockReturnValue({ ...mocks.consensus(), window: BETA_WINDOW, betaOnly: true })
+    renderPage()
+
+    const notes = screen.getAllByRole("note", { name: "Beta ended" })
+    expect(notes).toHaveLength(2)
+    for (const note of notes) expect(note).toHaveTextContent("Beta ended on 5 October 2026. Aegis data starts on 13 October 2026.")
+
+    for (const name of ["Attestations per day", "Attestation latency"]) {
+      expect(screen.getByRole("group", { name })).toHaveTextContent("Beta, Tue 22 Sep 2026 to Mon 5 Oct 2026. Gnosis subgraph, complete UTC days.")
+    }
+    // The figures stay.
+    expect(within(screen.getByRole("group", { name: "Attestations per day" })).getByText("4,600")).toBeInTheDocument()
+    const validators = screen.getByRole("region", { name: "Validators" })
+    expect(validators).toHaveTextContent("Participation: Beta, Tue 22 Sep 2026 to Mon 5 Oct 2026: the Gnosis subgraph")
+    expect(within(validators).getByText("99.50%")).toBeInTheDocument()
+  })
+
+  it("shows no dated state once the figures reach an Aegis day", () => {
+    const aegis = { days: 14, from: utcDayMs(AEGIS_START_DAY) / 1000 + DAY, to: utcDayMs(AEGIS_START_DAY) / 1000 + 14 * DAY }
+    mocks.consensus.mockReturnValue({ ...mocks.consensus(), window: aegis, betaOnly: false })
+    renderPage()
+    expect(screen.queryByRole("note", { name: "Beta ended" })).not.toBeInTheDocument()
+    expect(screen.getByRole("group", { name: "Attestations per day" })).toHaveTextContent(
+      "Gnosis subgraph, complete UTC days Wed 14 Oct 2026 to Tue 27 Oct 2026",
+    )
   })
 
   it("keeps the page up when one section throws", () => {

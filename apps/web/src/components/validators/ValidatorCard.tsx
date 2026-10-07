@@ -13,6 +13,8 @@ import { useToast } from "@/hooks/useToast"
 import { useWrongNetwork } from "@/hooks/useWrongNetwork"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Info } from "lucide-react"
+import { WITHDRAWN } from "@/lib/programme"
+import { ParticipationRate } from "./ParticipationRate"
 
 interface ValidatorCardProps {
   validator: Address
@@ -129,7 +131,7 @@ export function ValidatorCard({
                 bg-destructive/15
                 border border-destructive/40"
             >
-              Inactive
+              {WITHDRAWN}
             </span>
           )}
         </div>
@@ -174,7 +176,11 @@ export function ValidatorCard({
               Participation (14d):
             </span>
             <span className={`text-xl font-mono leading-none uppercase ${valueColor}`}>
-              {metadata ? `${metadata.participationRate}%` : "—"}
+              {metadata ? (
+                <ParticipationRate rate={metadata.participationRate / 100} text={`${metadata.participationRate}%`} />
+              ) : (
+                "—"
+              )}
             </span>
           </div>
         </div>

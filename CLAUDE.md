@@ -9,8 +9,8 @@ The authoritative in-repo sources are `packages/core` for every address, start b
 
 ## Non-negotiables
 
-**Never type a hex address, a start block, or an event signature anywhere except
-`packages/core`.** Import them. This is the single rule that keeps agents from hallucinating
+**Never type a hex address, a start block, an event signature, or a programme date anywhere
+except `packages/core`.** Import them. This is the single rule that keeps agents from hallucinating
 constants that look plausible and are wrong.
 
 **No source file is authoritative for ABIs. Only the chain is.** The deployed Safenet contracts

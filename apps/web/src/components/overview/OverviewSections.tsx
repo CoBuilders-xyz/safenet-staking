@@ -10,6 +10,7 @@ import { findValidator, useValidators } from "@/hooks/useValidators"
 import { hhi } from "@/lib/distribution"
 import type { FigureSource } from "@/lib/figure"
 import { formatTokenAmount, formatUtcDateTime } from "@/lib/format"
+import { BETA_ENDED_NOTICE, PARTICIPATION_RULE } from "@/lib/programme"
 import { ChainFreshness } from "./Freshness"
 import { Distribution } from "./Distribution"
 import { FigureValue, OverviewSection } from "./OverviewSection"
@@ -52,35 +53,70 @@ export function FreshnessPanel() {
   )
 }
 
+/**
+ * Above Gnosis figures that all describe Beta. Shown from the data, not the calendar alone: it
+ * goes once the index holds an Aegis day with a ceremony.
+ */
+export function BetaEndedNotice() {
+  return (
+    <p role="note" aria-label="Beta ended" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+      {BETA_ENDED_NOTICE}
+    </p>
+  )
+}
+
+/** The label of Gnosis figures that describe Beta: the days the window actually covers. */
+const betaWindow = (window: { from: number; to: number }) => `Beta, ${dayOf(window.from)} to ${dayOf(window.to)}`
+
 export function HeadlineStats() {
-  const { totalStaked, activeValidators } = useNetworkTotals()
-  const { attestations, latency, window, snapshot, snapshotReason } = useConsensusFigures()
+  const { totalStaked, validatorCounts } = useNetworkTotals()
+  const { attestations, latency, window, snapshot, snapshotReason, betaOnly } = useConsensusFigures()
   // A snapshot figure says why it is shown. The freshness panel says so too when the subgraph is
   // down, but not when it is live and simply has no complete day yet.
   const gnosisSource = (source: FigureSource) =>
     source === "subgraph" && window
-      ? `Gnosis subgraph, complete UTC days ${dayOf(window.from)} to ${dayOf(window.to)}`
+      ? betaOnly
+        ? `${betaWindow(window)}. Gnosis subgraph, complete UTC days.`
+        : `Gnosis subgraph, complete UTC days ${dayOf(window.from)} to ${dayOf(window.to)}`
       : `Snapshot measured ${formatUtcDateTime(snapshot.runAt)}.${snapshotReason ? ` ${snapshotReason}` : ""}`
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <Stat label="Total SAFE staked" figure={totalStaked} format={(v) => formatTokenAmount(v, 18, 0)} source={mainnetSource} />
-      <Stat label="Active validators" figure={activeValidators} format={String} source={mainnetSource} />
-      <Stat
-        label="Attestations per day"
-        figure={attestations}
-        format={(v) => v.mean.toLocaleString("en-US")}
-        detail={(v) => `Mean over ${v.days} complete days, range ${v.min.toLocaleString("en-US")} to ${v.max.toLocaleString("en-US")}`}
-        source={gnosisSource}
-      />
-      <Stat
-        label="Attestation latency"
-        figure={latency}
-        format={(v) => `~${v.seconds} s`}
-        detail={(v) => `Median of ${v.medianBlocks} blocks from proposal to attestation`}
-        source={gnosisSource}
-        tone="accent"
-      />
+    <div className="space-y-4">
+      {betaOnly && <BetaEndedNotice />}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="Total SAFE staked" figure={totalStaked} format={(v) => formatTokenAmount(v, 18, 0)} source={mainnetSource} />
+        <Stat
+          label="Active validators"
+          figure={validatorCounts}
+          format={(v) => (
+            <>
+              {v.active} active
+              {v.withdrawn > 0 && (
+                <span className="ml-3 inline-block whitespace-nowrap align-middle font-sans text-sm tracking-normal text-warning">
+                  {v.withdrawn} withdrawn
+                </span>
+              )}
+            </>
+          )}
+          detail={(v) => (v.withdrawn > 0 ? "Withdrawn: Aegis participation unconfirmed." : undefined)}
+          source={mainnetSource}
+        />
+        <Stat
+          label="Attestations per day"
+          figure={attestations}
+          format={(v) => v.mean.toLocaleString("en-US")}
+          detail={(v) => `Mean over ${v.days} complete days, range ${v.min.toLocaleString("en-US")} to ${v.max.toLocaleString("en-US")}`}
+          source={gnosisSource}
+        />
+        <Stat
+          label="Attestation latency"
+          figure={latency}
+          format={(v) => `~${v.seconds} s`}
+          detail={(v) => `Median of ${v.medianBlocks} blocks from proposal to attestation`}
+          source={gnosisSource}
+          tone="accent"
+        />
+      </div>
     </div>
   )
 }
@@ -153,7 +189,7 @@ export function RewardsPanel() {
 
 export function ValidatorsPanel() {
   const { rows } = useValidatorStakes()
-  const { participation, window } = useConsensusFigures()
+  const { participation, window, betaOnly } = useConsensusFigures()
   const sef = useValidators()
 
   const tableRows = (stakes: ValidatorStakeRow[]): ValidatorTableRow[] =>
@@ -165,6 +201,7 @@ export function ValidatorsPanel() {
         participation: ours ? ours.rate : published ? published.participationRate / 100 : undefined,
         participationSource: ours ? "subgraph" : published ? "sef" : undefined,
         absences: ours?.absences,
+        status: !sef.data ? undefined : !published ? "unlisted" : published.isActive ? "active" : "withdrawn",
       }
     })
 
@@ -172,9 +209,11 @@ export function ValidatorsPanel() {
   // the window falls back to SEF's figure even while the subgraph is live; such rows are marked.
   const fromSubgraph = participation && window && rows.state === "ready" && rows.value.some((r) => participation.has(r.address.toLowerCase()))
   const fromSef = rows.state === "ready" && rows.value.some((r) => !participation?.has(r.address.toLowerCase()))
-  const subgraphWords = window
-    ? `the Gnosis subgraph, attestation ceremonies attended over ${window.days} complete UTC days to ${dayOf(window.to)}`
-    : ""
+  const subgraphWords = !window
+    ? ""
+    : betaOnly
+      ? `${betaWindow(window)}: the Gnosis subgraph, attestation ceremonies attended over ${window.days} complete UTC days`
+      : `the Gnosis subgraph, attestation ceremonies attended over ${window.days} complete UTC days to ${dayOf(window.to)}`
   const participationSource =
     fromSubgraph && fromSef
       ? `Participation: ${subgraphWords}; rows marked "SEF file" use SEF's published 14-day figure.`
@@ -185,8 +224,9 @@ export function ValidatorsPanel() {
   return (
     <OverviewSection
       title="Validators"
-      source={rows.state === "ready" ? `Stake: ${mainnetSource(rows.source)}. ${participationSource}` : undefined}
+      source={rows.state === "ready" ? `Stake: ${mainnetSource(rows.source)}. ${participationSource} ${PARTICIPATION_RULE}` : undefined}
     >
+      {betaOnly && fromSubgraph && <BetaEndedNotice />}
       <FigureValue
         figure={rows}
         skeletonClassName="block h-48 w-full"

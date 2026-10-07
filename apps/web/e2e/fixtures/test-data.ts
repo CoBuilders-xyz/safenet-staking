@@ -9,10 +9,14 @@ export const MERKLE_DROP_CONTRACT = "0x9999999999999999999999999999999999999999"
 /** Test user address */
 export const TEST_USER = "0x1111111111111111111111111111111111111111"
 
-/** Validator addresses */
+/**
+ * Validator addresses. A and B are active. C is listed with `is_active: false`: withdrawn, like a
+ * validator that left at the end of Beta. It holds no stake and has no mocked contract state.
+ */
 export const VALIDATORS = {
   validatorA: "0x1234567890abcdef1234567890abcdef12345678",
   validatorB: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+  validatorC: "0xc0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0",
 } as const
 
 /** Mainnet. The RPC is fully mocked, so this is the identity the app expects. */

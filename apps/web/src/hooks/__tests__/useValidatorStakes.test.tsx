@@ -65,6 +65,17 @@ describe("useValidatorStakes", () => {
     ])
   })
 
+  it("keeps a withdrawn validator in the fallback: its stake is still staked", async () => {
+    answerOperations({ ValidatorStakes: new Error("down") })
+    mockValidators.mockReturnValue({ data: [MOCK_VALIDATORS[0], { ...MOCK_VALIDATORS[1], isActive: false }], error: null })
+    const { result } = render()
+    await waitFor(() => expect(result.current.rows.state).toBe("ready"))
+    if (result.current.rows.state !== "ready") throw new Error("not ready")
+
+    expect(mockStakes).toHaveBeenLastCalledWith([TEST_ACCOUNTS.validator1, TEST_ACCOUNTS.validator2], { enabled: true })
+    expect(result.current.rows.value.map((r) => r.label)).toEqual(["Greenfield", "Gnosis"])
+  })
+
   it("makes the distribution unavailable when one fallback read fails, rather than wrong", async () => {
     answerOperations({ ValidatorStakes: new Error("down") })
     mockStakes.mockReturnValue({ data: [ok(100n * SAFE), { status: "failure", error: new Error("x") }], error: null })

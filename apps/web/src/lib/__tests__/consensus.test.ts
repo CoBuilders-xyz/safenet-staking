@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest"
 import type { ConsensusWindowQuery } from "@/graphql/gnosis/generated"
+import { AEGIS_START_DAY, BETA_END_DAY, utcDayMs } from "@cobuilders/safenet-core"
 import {
+  CONSENSUS_QUERY_DAYS,
   CONSENSUS_WINDOW_DAYS,
-  consensusWindowSince,
+  consensusQueryVariables,
   deriveConsensusWindow,
+  describesBeta,
   histogramQuantile,
   utcDayStart,
 } from "../consensus"
@@ -44,13 +47,18 @@ function query(overrides: Partial<ConsensusWindowQuery> = {}): ConsensusWindowQu
   }
 }
 
-describe("utcDayStart and consensusWindowSince", () => {
+describe("utcDayStart and consensusQueryVariables", () => {
   it("floors to UTC midnight", () => {
     expect(utcDayStart(NOON)).toBe(TODAY)
   })
 
-  it("asks for one day more than the window, so the first can be dropped", () => {
-    expect(consensusWindowSince(NOON)).toBe(TODAY - (CONSENSUS_WINDOW_DAYS + 1) * DAY)
+  it("reads the newest days up to Beta's last while the subgraph indexes Beta", () => {
+    expect(consensusQueryVariables("beta")).toEqual({ days: CONSENSUS_QUERY_DAYS, until: utcDayMs(BETA_END_DAY) / 1000 })
+    expect(consensusQueryVariables()).toEqual(consensusQueryVariables("beta"))
+  })
+
+  it("reads the newest days with no date bound once it indexes Aegis", () => {
+    expect(consensusQueryVariables("aegis").until).toBe(2_147_483_647)
   })
 })
 
@@ -108,5 +116,106 @@ describe("deriveConsensusWindow", () => {
   it("drops participation when the page limit may have cut rows off", () => {
     const rows = Array.from({ length: 1000 }, () => ({ date: TODAY - DAY, attended: "1", validator: { id: A } }))
     expect(deriveConsensusWindow(query({ validatorDays: rows }), NOON)!.participation).toBeUndefined()
+  })
+
+  it("keeps participation from a full page that reaches back past the window's first day", () => {
+    // Newest first, as the query orders them: the window's two days, then older rows to fill the page.
+    const rows = [
+      { date: TODAY - DAY, attended: "500", validator: { id: A } },
+      { date: TODAY - 2 * DAY, attended: "400", validator: { id: A } },
+      ...Array.from({ length: 998 }, () => ({ date: TODAY - 3 * DAY, attended: "1", validator: { id: B } })),
+    ]
+    const p = deriveConsensusWindow(query({ validatorDays: rows }), NOON)!.participation!
+    expect(p.get(A)?.attended).toBe(900n)
+    expect(p.has(B)).toBe(false)
+  })
+
+  it("ends at the last day the subgraph holds, so a network that stopped keeps its figures", () => {
+    // Nothing indexed for a month: the window is still the last complete days there are.
+    const w = deriveConsensusWindow(
+      query({ consensusDays: [day(-32, 1, 1), day(-31, 4000, 400, [1]), day(-30, 10, 1, [1])], firstDay: [{ date: TODAY - 32 * DAY }] }),
+      NOON,
+    )!
+    expect(w.from).toBe(TODAY - 31 * DAY)
+    expect(w.to).toBe(TODAY - 30 * DAY)
+    expect(w.lastCeremonyDay).toBe(TODAY - 30 * DAY)
+  })
+
+  it("names the last counted day with a ceremony, skipping days without one", () => {
+    const w = deriveConsensusWindow(query({ consensusDays: [day(-3, 1, 1), day(-2, 4000, 400), day(-1, 0, 0), day(0, 0, 0)] }), NOON)!
+    expect(w.to).toBe(TODAY - DAY)
+    expect(w.lastCeremonyDay).toBe(TODAY - 2 * DAY)
+  })
+})
+
+describe("the window at the end of Beta", () => {
+  // Days counted from the core calendar, in unix seconds; no programme date is typed here.
+  const END = utcDayMs(BETA_END_DAY) / 1000
+  const START = utcDayMs(AEGIS_START_DAY) / 1000
+  /** The stray ceremony the Beta contract recorded after Beta ended: chain data, not a programme date. */
+  const STRAY = Date.parse("2026-10-06T00:00:00Z") / 1000
+  const noonOf = (date: number) => (date + DAY / 2) * 1000
+  const row = (date: number, attestations: number) => ({
+    date,
+    attestations: String(attestations),
+    attestationCeremonies: String(attestations),
+    latencyBuckets: ["0", "1"],
+  })
+  const checked = noonOf(END + 3 * DAY)
+  // Beta's last 14 days at 4,000, its last day at 1,210, then the stray ceremony.
+  const beta = Array.from({ length: 13 }, (_, i) => row(END - (13 - i) * DAY, 4000))
+  const lastDays = { firstDay: [{ date: END - 14 * DAY }], validatorDays: [], consensusDays: [...beta, row(END, 1210), row(STRAY, 1)] }
+
+  it("drops a gap day: the window ends on Beta's last day and the stray is not in the range", () => {
+    const w = deriveConsensusWindow(query(lastDays), checked)!
+    expect(w.from).toBe(END - 13 * DAY)
+    expect(w.to).toBe(END)
+    expect(w.days).toBe(14)
+    expect(w.attestationsPerDay.min).toBe(1210)
+    expect(w.attestationsPerDay.max).toBe(4000)
+    expect(w.lastCeremonyDay).toBe(END)
+  })
+
+  it("drops a stray on the Beta contract dated after Aegis started", () => {
+    const after = START + 7 * DAY
+    const w = deriveConsensusWindow(query({ ...lastDays, consensusDays: [...lastDays.consensusDays, row(after, 1)] }), noonOf(after + 2 * DAY))!
+    expect(w.to).toBe(END)
+    expect(w.attestationsPerDay.min).toBe(1210)
+    expect(describesBeta(w.lastCeremonyDay)).toBe(true)
+  })
+
+  it("counts only consecutive calendar days: a day with no row inside them is not counted", () => {
+    // Rows a week apart: the 14 calendar days ending on the newest row hold only two of them.
+    const sparse = [34, 27, 20, 13, 6].map((n) => row(END - n * DAY, 3000))
+    const w = deriveConsensusWindow(query({ firstDay: [{ date: END - 60 * DAY }], validatorDays: [], consensusDays: sparse }), checked)!
+    expect(w.from).toBe(END - 13 * DAY)
+    expect(w.to).toBe(END - 6 * DAY)
+    expect(w.days).toBe(2)
+  })
+
+  it("keeps Aegis days once the subgraph indexes the Aegis contracts", () => {
+    const days = [row(START + DAY, 5000), row(START + 2 * DAY, 5100)]
+    const w = deriveConsensusWindow(query({ ...lastDays, consensusDays: days }), noonOf(START + 3 * DAY), "aegis")!
+    expect(w.to).toBe(START + 2 * DAY)
+  })
+})
+
+describe("describesBeta", () => {
+  const seconds = (ms: number) => ms / 1000
+
+  it("is true while the subgraph indexes Beta, even for a row dated in Aegis", () => {
+    expect(describesBeta(seconds(utcDayMs(BETA_END_DAY)))).toBe(true)
+    expect(describesBeta(seconds(utcDayMs(AEGIS_START_DAY)) + 7 * DAY, "beta")).toBe(true)
+  })
+
+  it("once Aegis is indexed, is true while the last day is in Beta or the gap, or there is no ceremony", () => {
+    expect(describesBeta(seconds(utcDayMs(BETA_END_DAY)), "aegis")).toBe(true)
+    expect(describesBeta(seconds(utcDayMs(AEGIS_START_DAY)) - DAY, "aegis")).toBe(true)
+    expect(describesBeta(undefined, "aegis")).toBe(true)
+  })
+
+  it("once Aegis is indexed, turns false when the last day is an Aegis day", () => {
+    expect(describesBeta(seconds(utcDayMs(AEGIS_START_DAY)), "aegis")).toBe(false)
+    expect(describesBeta(seconds(utcDayMs(AEGIS_START_DAY)) + 20 * DAY, "aegis")).toBe(false)
   })
 })

@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw"
 import type { Address } from "viem"
+import { PARTICIPATION_RULE } from "@/lib/programme"
 
 export function ValidatorList({
   autoOpenDelegate,
@@ -80,22 +81,25 @@ export function ValidatorList({
   }
 
   return (
-    <div className="grid gap-6 sm:grid-cols-2">
-      {validators.map((v) => (
-        <ValidatorCard
-          key={v.address}
-          validator={v.address}
-          isActive={v.isActive}
-          autoOpenDelegate={
-            autoOpenDelegate?.toLowerCase() === v.address.toLowerCase()
-          }
-          totalStake={totalStakeMap.get(v.address)}
-          loadingTotalStake={loadingTotalStakes}
-          userStake={userStakeMap.get(v.address)}
-          loadingUserStake={loadingUserStakes}
-          validators={validators}
-        />
-      ))}
+    <div className="space-y-4">
+      <div className="grid gap-6 sm:grid-cols-2">
+        {validators.map((v) => (
+          <ValidatorCard
+            key={v.address}
+            validator={v.address}
+            isActive={v.isActive}
+            autoOpenDelegate={
+              autoOpenDelegate?.toLowerCase() === v.address.toLowerCase()
+            }
+            totalStake={totalStakeMap.get(v.address)}
+            loadingTotalStake={loadingTotalStakes}
+            userStake={userStakeMap.get(v.address)}
+            loadingUserStake={loadingUserStakes}
+            validators={validators}
+          />
+        ))}
+      </div>
+      <p className="text-sm text-muted-foreground">{PARTICIPATION_RULE}</p>
     </div>
   )
 }

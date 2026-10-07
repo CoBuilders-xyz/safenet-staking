@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
+import { PARTICIPATION_RULE } from "@/lib/programme"
 import { ValidatorList } from "../validators/ValidatorList"
 import { TEST_ACCOUNTS, MOCK_VALIDATORS } from "@/__tests__/test-data"
 
@@ -102,6 +103,16 @@ describe("ValidatorList", () => {
 
     expect(screen.getByTestId(`validator-card-${TEST_ACCOUNTS.validator1}`)).toBeInTheDocument()
     expect(screen.getByTestId(`validator-card-${TEST_ACCOUNTS.validator2}`)).toBeInTheDocument()
+  })
+
+  it("states SEF's reward rule as text under the cards, where a tooltip cannot open on touch", () => {
+    mockUseValidators.mockReturnValue({ data: [...MOCK_VALIDATORS], isLoading: false, error: null, refetch: vi.fn() })
+    render(
+      <MemoryRouter>
+        <ValidatorList />
+      </MemoryRouter>,
+    )
+    expect(screen.getByText(PARTICIPATION_RULE)).toBeInTheDocument()
   })
 
   it("renders all validators without filtering", () => {

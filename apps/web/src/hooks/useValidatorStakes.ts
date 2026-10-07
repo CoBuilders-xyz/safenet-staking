@@ -22,8 +22,9 @@ export interface ValidatorStakeRow {
 /**
  * Registered validators with their stake and share, largest first.
  *
- * From the Mainnet subgraph while it is live. Otherwise the validators are SEF's active list and
- * each stake is `totalValidatorStakes()` on the staking contract. Shares need every stake, so a
+ * From the Mainnet subgraph while it is live. Otherwise the validators are SEF's list, withdrawn
+ * ones included because their stake is still staked, and each stake is `totalValidatorStakes()` on
+ * the staking contract. Shares need every stake, so a
  * single failed read makes the whole distribution unavailable rather than wrong.
  */
 export function useValidatorStakes() {
@@ -31,8 +32,8 @@ export function useValidatorStakes() {
   const live = selectLive(subgraph, (d) => (d.validators.length > 0 ? d.validators : undefined))
   const degraded = live.status === "degraded"
   const sef = useValidators()
-  const sefActive = useMemo(() => sef.data?.filter((v) => v.isActive).map((v) => v.address) ?? [], [sef.data])
-  const reads = useValidatorTotalStakes(sefActive, { enabled: degraded })
+  const sefListed = useMemo(() => sef.data?.map((v) => v.address) ?? [], [sef.data])
+  const reads = useValidatorTotalStakes(sefListed, { enabled: degraded })
 
   let rows: Figure<ValidatorStakeRow[]> = loading()
 
@@ -55,7 +56,7 @@ export function useValidatorStakes() {
       rows = unavailable(`${NETWORK_MESSAGES.validatorListFailed} Without it there is no list of validators to read stakes for.`)
     } else if (!sef.data) {
       rows = loading()
-    } else if (sefActive.length === 0) {
+    } else if (sefListed.length === 0) {
       rows = ready([], "contract")
     } else if (reads.error) {
       rows = unavailable(NETWORK_MESSAGES.stakingReadFailed)
@@ -69,7 +70,7 @@ export function useValidatorStakes() {
           : ready(
               sortByStake(
                 withShares(
-                  sefActive.map((address, i) => ({
+                  sefListed.map((address, i) => ({
                     address,
                     label: findValidator(sef.data, address)?.label,
                     stake: reads.data[i].result as bigint,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { formatParticipation, formatTokenAmount, truncateAddress, formatCountdown, formatUtcDateTime } from "../format"
+import { formatParticipation, formatTokenAmount, truncateAddress, formatCountdown, formatUtcDateTime, formatUtcDayLong } from "../format"
 
 describe("formatTokenAmount", () => {
   it("formats zero", () => {
@@ -116,5 +116,15 @@ describe("formatParticipation", () => {
   it("takes the rate at nine decimals before flooring, so 3 attended of 10,000 reads 0.03% and not 0.02%", () => {
     const rate = Number((3n * 1_000_000_000n) / 10_000n) / 1_000_000_000
     expect(formatParticipation(rate, 9_997n)).toBe("0.03%")
+  })
+})
+
+describe("formatUtcDayLong", () => {
+  it("writes the UTC day with the month in full", () => {
+    expect(formatUtcDayLong(Date.UTC(2026, 9, 5))).toBe("5 October 2026")
+  })
+
+  it("takes the UTC day, not the local one", () => {
+    expect(formatUtcDayLong(Date.UTC(2026, 9, 12, 23, 59))).toBe("12 October 2026")
   })
 })

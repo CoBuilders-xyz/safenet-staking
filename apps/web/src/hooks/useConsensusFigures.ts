@@ -2,8 +2,10 @@ import { GNOSIS_SNAPSHOT } from "@cobuilders/safenet-core"
 import { ConsensusWindowDocument } from "@/graphql/gnosis/generated"
 import {
   GNOSIS_BLOCK_SECONDS,
-  consensusWindowSince,
+  consensusQueryVariables,
   deriveConsensusWindow,
+  describesBeta,
+  utcDayStart,
   type ConsensusWindow,
 } from "@/lib/consensus"
 import { describeDegradation } from "@/lib/subgraph"
@@ -50,11 +52,13 @@ const SNAPSHOT_LATENCY: Latency = {
  * it is set whenever a figure here comes from the snapshot.
  * Participation has no snapshot fallback here: the overview uses SEF's published figure instead,
  * which their cron refreshes every three hours.
+ *
+ * `betaOnly` is true while these figures describe Beta, which has ended: while the subgraph indexes
+ * the Beta contracts, and after that while the last day they cover, the window's last day with a
+ * ceremony or the snapshot's run, is before Aegis.
  */
 export function useConsensusFigures() {
-  const subgraph = useSubgraphQuery("gnosis", "consensus-window", ConsensusWindowDocument, () => ({
-    since: consensusWindowSince(Date.now()),
-  }))
+  const subgraph = useSubgraphQuery("gnosis", "consensus-window", ConsensusWindowDocument, () => consensusQueryVariables())
 
   const window: ConsensusWindow | undefined =
     subgraph.status === "live" ? deriveConsensusWindow(subgraph.data, subgraph.freshness.checkedAt) : undefined
@@ -62,8 +66,10 @@ export function useConsensusFigures() {
   let attestations: Figure<AttestationRate> = loading()
   let latency: Figure<Latency> = loading()
   let snapshotReason: string | undefined
+  let betaOnly = false
 
   if (window) {
+    betaOnly = describesBeta(window.lastCeremonyDay)
     attestations = ready({ ...window.attestationsPerDay, days: window.days }, "subgraph")
     if (window.latencyMedianBlocks === undefined) snapshotReason = CONSENSUS_MESSAGES.noLatencySample
     latency =
@@ -75,6 +81,7 @@ export function useConsensusFigures() {
           )
   } else if (subgraph.status !== "loading") {
     snapshotReason = subgraph.status === "degraded" ? describeDegradation(subgraph.degradation) : CONSENSUS_MESSAGES.noCompleteDay
+    betaOnly = describesBeta(utcDayStart(Date.parse(GNOSIS_SNAPSHOT.runAt)))
     attestations = ready(SNAPSHOT_RATE, "snapshot")
     latency = ready(SNAPSHOT_LATENCY, "snapshot")
   }
@@ -87,5 +94,6 @@ export function useConsensusFigures() {
     participation: window?.participation,
     snapshot: GNOSIS_SNAPSHOT,
     snapshotReason,
+    betaOnly,
   }
 }

@@ -134,3 +134,64 @@ export function parseSefAmount(amount: string): bigint {
   }
   return BigInt(whole + frac.padEnd(SAFE_DECIMALS, "0"))
 }
+
+/** A UTC calendar day, written YYYY-MM-DD. */
+export type UtcDay = `${number}-${number}-${number}`
+
+/*
+ * The programme calendar, from the Safe Ecosystem Foundation's transition note of 7 October 2026.
+ * Beta ended on BETA_END_DAY and its final rewards distribution was scheduled for 8 October.
+ * Aegis starts on AEGIS_START_DAY, when its rewards start accruing. The days between belong to
+ * neither programme. On-chain, attestations on the Beta Consensus contract on Gnosis stopped on
+ * BETA_END_DAY, with one stray ceremony on 6 October.
+ */
+
+/** The last UTC day of Safenet Beta. */
+export const BETA_END_DAY: UtcDay = "2026-10-05"
+
+/** The first UTC day of Aegis: rewards accrue from this day. */
+export const AEGIS_START_DAY: UtcDay = "2026-10-13"
+
+/** Aegis distributes rewards once per reward period of this many days. */
+export const REWARD_PERIOD_DAYS = 14
+
+/**
+ * The participation a validator needs in a reward period. Below it, in SEF's words, "both the
+ * validator and its delegators earn no rewards for that period". A fraction, like
+ * `participation_rate_14d`.
+ */
+export const REWARD_PARTICIPATION_THRESHOLD = 0.75
+
+export type ProgrammePhase = "beta" | "gap" | "aegis"
+
+/** A programme, as opposed to the gap between two. */
+export type Programme = Exclude<ProgrammePhase, "gap">
+
+/**
+ * The programme whose contracts packages/subgraph-gnosis indexes. Every ConsensusDay and
+ * ValidatorDay row comes from these contracts, so a row dated outside the programme is a stray
+ * on a closed contract, not a day of the network. The change that indexes the Aegis contracts
+ * moves this.
+ */
+export const GNOSIS_INDEXED_PROGRAMME: Programme = "beta"
+
+const DAY_MS = 86_400_000
+
+/** Milliseconds of a UTC day's midnight. */
+export function utcDayMs(day: UtcDay): number {
+  const ms = Date.parse(`${day}T00:00:00Z`)
+  if (Number.isNaN(ms)) throw new Error(`not a UTC day: ${day}`)
+  return ms
+}
+
+/**
+ * The programme the UTC day containing `at` belongs to: Beta up to and including BETA_END_DAY,
+ * Aegis from AEGIS_START_DAY, and the gap between.
+ */
+export function programmePhase(at: Date): ProgrammePhase {
+  const day = Math.floor(at.getTime() / DAY_MS) * DAY_MS
+  if (Number.isNaN(day)) throw new Error("not a date")
+  if (day <= utcDayMs(BETA_END_DAY)) return "beta"
+  if (day >= utcDayMs(AEGIS_START_DAY)) return "aegis"
+  return "gap"
+}

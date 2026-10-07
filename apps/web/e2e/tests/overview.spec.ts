@@ -17,7 +17,11 @@ test.describe("Network Overview", () => {
 
     await expect(page.getByRole("group", { name: "Total SAFE staked" })).toContainText("12,345")
     await expect(page.getByRole("group", { name: "Total SAFE staked" })).toContainText("Mainnet subgraph")
-    await expect(page.getByRole("group", { name: "Active validators" })).toContainText("2")
+    // SEF's flag, not the subgraph's registered count: Validator C is withdrawn.
+    const counts = page.getByRole("group", { name: "Active validators" })
+    await expect(counts).toContainText("2 active")
+    await expect(counts).toContainText("1 withdrawn")
+    await expect(counts).toContainText("SEF's published validator list")
     await expect(page.getByRole("group", { name: "Attestations per day" })).toContainText("4,800")
     await expect(page.getByRole("group", { name: "Attestations per day" })).toContainText("Gnosis subgraph")
     await expect(page.getByRole("group", { name: "Attestation latency" })).toContainText("~20 s")
@@ -34,10 +38,17 @@ test.describe("Network Overview", () => {
     await expect(rewards.getByText("Match")).toBeVisible()
 
     const validators = page.getByRole("region", { name: "Validators" })
-    await expect(validators.getByRole("link", { name: "Validator A" })).toHaveAttribute("href", new RegExp(`#/validators/${VALIDATORS.validatorA}$`, "i"))
+    await expect(validators.getByRole("link", { name: "Validator A", exact: true })).toHaveAttribute("href", new RegExp(`#/validators/${VALIDATORS.validatorA}$`, "i"))
     await expect(validators).toContainText("7,000")
     await expect(validators).toContainText("99.00%")
     await expect(validators).toContainText("140 missed")
+    await expect(validators.getByRole("link", { name: "Stake with Validator A" })).toHaveAttribute("href", new RegExp(`#/validators\\?delegate=${VALIDATORS.validatorA}$`, "i"))
+    const withdrawn = validators.getByRole("row").filter({ has: page.getByRole("link", { name: "Validator C", exact: true }) })
+    await expect(withdrawn).toContainText("Withdrawn, Aegis participation unconfirmed")
+    // The subgraph's rate, 980 of 1,000, not SEF's published 97.50%: the subgraph is live.
+    await expect(withdrawn).toContainText("98.00%")
+    await expect(withdrawn).not.toContainText("97.50%")
+    await expect(withdrawn.getByRole("link", { name: /^Stake/ })).toHaveCount(0)
 
     const activity = page.getByRole("region", { name: "Last 30 days" })
     await expect(activity).toContainText("37")
@@ -88,6 +99,25 @@ test.describe("Network Overview", () => {
     await expect(page.getByRole("group", { name: "Total SAFE staked" })).toContainText("10,000")
     // The Gnosis subgraph is still fresh, so its figures stay.
     await expect(page.getByRole("group", { name: "Attestations per day" })).toContainText("4,800")
+  })
+
+  test("dates the Gnosis figures as Beta while the index holds no Aegis day, and keeps them", async ({ disconnectedPage: page }) => {
+    await page.goto("/")
+
+    // The mocked Gnosis subgraph holds Beta's last days only, as the live one does.
+    const notes = page.getByRole("note", { name: "Beta ended" })
+    await expect(notes.first()).toHaveText("Beta ended on 5 October 2026. Aegis data starts on 13 October 2026.")
+    await expect(notes).toHaveCount(2)
+
+    const attestations = page.getByRole("group", { name: "Attestations per day" })
+    await expect(attestations).toContainText("4,800")
+    // The mock also holds the stray ceremony of 6 October, with 1 attestation: the label ends on
+    // Beta's last day and the range leaves the stray out.
+    await expect(attestations).toContainText("Beta, Tue 22 Sep 2026 to Mon 5 Oct 2026. Gnosis subgraph, complete UTC days.")
+    await expect(attestations).toContainText("Mean over 14 complete days, range 4,800 to 4,800")
+    await expect(attestations).not.toContainText("Tue 6 Oct")
+    await expect(page.getByRole("group", { name: "Attestation latency" })).toContainText("Beta, Tue 22 Sep 2026 to Mon 5 Oct 2026")
+    await expect(page.getByRole("region", { name: "Validators" })).toContainText("Participation: Beta, Tue 22 Sep 2026 to Mon 5 Oct 2026")
   })
 
   test("needs no wallet: the overview renders without one connected", async ({ disconnectedPage: page }) => {

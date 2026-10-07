@@ -68,10 +68,23 @@ describe("ValidatorCard", () => {
     expect(screen.getByText("Active")).toBeInTheDocument()
   })
 
-  it("shows Inactive badge for inactive validator", () => {
+  it("shows a Withdrawn badge for a validator SEF marks inactive", () => {
     renderCard({ isActive: false })
 
-    expect(screen.getByText("Inactive")).toBeInTheDocument()
+    expect(screen.getByText("Withdrawn")).toBeInTheDocument()
+  })
+
+  it("shows the 75% reward threshold beside the participation rate", () => {
+    renderCard()
+
+    expect(screen.getByRole("button", { name: "At or above the 75% reward threshold" })).toBeInTheDocument()
+  })
+
+  it("marks a participation rate below the threshold", () => {
+    renderCard({ validators: [{ ...MOCK_VALIDATORS[0], participationRate: 72.5 }] })
+
+    expect(screen.getByText("72.5%")).toHaveClass("text-warning")
+    expect(screen.getByRole("button", { name: "Below the 75% reward threshold" })).toBeInTheDocument()
   })
 
   it("shows Stake and Unstake buttons when connected", () => {
