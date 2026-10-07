@@ -47,24 +47,52 @@ function asWanted(r: ProxyRecord): boolean {
 
 export type ProxyStatus = "ready" | "stale" | "absent" | "foreign"
 
+/** Why `fork:up` stops when a port the settings name is held by a process this tool did not start. */
+export const foreignPorts = (): Error =>
+  new Error(
+    `Port ${PROXY_PORT} or ${WEB_PORT} is in use, and not by a process this tool started. Stop it, or set QA_PROXY_PORT and QA_WEB_PORT.`,
+  )
+
+/** Whether a port the settings name is held by something other than the proxy and Vite of `record`. */
+async function portTakenBesides(record: ProxyRecord | undefined): Promise<boolean> {
+  const ours = record ? [record.proxyPort, record.webPort] : []
+  for (const port of [PROXY_PORT, WEB_PORT]) {
+    if (!ours.includes(port) && (await portInUse(port))) return true
+  }
+  return false
+}
+
 export async function proxyStatus(): Promise<ProxyStatus> {
   const record = readRecord<ProxyRecord>(PROXY_RECORD)
   if (ownProcesses(record).length === 0) {
     removeRecord(PROXY_RECORD)
-    return (await portInUse(PROXY_PORT)) || (await portInUse(WEB_PORT)) ? "foreign" : "absent"
+    return (await portTakenBesides(undefined)) ? "foreign" : "absent"
   }
-  if (!record || !asWanted(record)) return "stale"
+  if (!record || !asWanted(record)) {
+    // Ours runs on other ports, and something else holds one the settings name. Restarting would
+    // stop ours and still find the port taken, so leave both alone.
+    return (await portTakenBesides(record)) ? "foreign" : "stale"
+  }
   if (!(await proxyAnswers())) return "stale"
   return "ready"
 }
 
-/** Starts the proxy detached and resolves once it answers. Vite takes a few seconds longer. */
+/**
+ * Starts the proxy detached and resolves once the record names this launch's proxy and Vite,
+ * both still running, and the proxy answers. The proxy writes the record only once it listens,
+ * so what answers is it. Refuses when a port is taken: whatever holds it is not this tool's.
+ * Fails, with the log named, when the proxy does not come up or exits first. Vite takes a few
+ * seconds longer.
+ */
 export async function startProxy(): Promise<void> {
+  if (await portTakenBesides(undefined)) throw foreignPorts()
   removeRecord(PROXY_RECORD)
   const launcherPid = startDetached("proxy-launcher.ts", PROXY_LOG, childEnvironment())
+  const ours = (r: ProxyRecord | undefined): boolean =>
+    r?.proxy.pid === launcherPid && r.proxyPort === PROXY_PORT && owned(r.proxy) && owned(r.vite)
   const deadline = Date.now() + 60_000
   while (Date.now() < deadline) {
-    if (await proxyAnswers()) return
+    if (ours(readRecord<ProxyRecord>(PROXY_RECORD)) && (await proxyAnswers())) return
     if (!alive(launcherPid)) break
     await sleep(250)
   }
@@ -74,11 +102,13 @@ export async function startProxy(): Promise<void> {
 
 /** Stops this tool's proxy and its Vite, if any, and forgets them. Answers whether there was one. */
 export async function stopProxy(): Promise<boolean> {
-  const processes = ownProcesses(readRecord<ProxyRecord>(PROXY_RECORD))
+  const record = readRecord<ProxyRecord>(PROXY_RECORD)
+  const processes = ownProcesses(record)
   for (const o of processes) await terminate(o)
   removeRecord(PROXY_RECORD)
-  if (processes.length > 0) {
-    await waitFor(async () => !(await portInUse(PROXY_PORT)) && !(await portInUse(WEB_PORT)), 10_000)
+  // The ports they were started on, which the settings may no longer name.
+  if (record && processes.length > 0) {
+    await waitFor(async () => !(await portInUse(record.proxyPort)) && !(await portInUse(record.webPort)), 10_000)
   }
   return processes.length > 0
 }

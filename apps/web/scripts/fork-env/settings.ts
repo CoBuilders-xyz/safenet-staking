@@ -11,8 +11,8 @@
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { parseEnv } from "node:util"
-import { parseEther } from "viem"
-import { MAINNET_FORK, SEF_DATA } from "@cobuilders/safenet-core"
+import { parseEther, toHex } from "viem"
+import { CHAINS, MAINNET_FORK, SEF_DATA } from "@cobuilders/safenet-core"
 
 export const WEB_DIR = resolve(import.meta.dirname, "../..")
 export const REPO_ROOT = resolve(WEB_DIR, "../..")
@@ -20,17 +20,6 @@ export const REPO_ROOT = resolve(WEB_DIR, "../..")
 export const STATE_DIR = resolve(WEB_DIR, ".fork-env")
 export const REWARDS_DIR = resolve(STATE_DIR, "rewards")
 
-/**
- * The Mainnet block the fork starts from, unless QA_FORK_BLOCK says otherwise.
- *
- * 26,122,549 is the block this environment was first built from, on 2026-10-05. It sits in the
- * same rewards period as the fork suites' block, `MAINNET_FORK.blockNumber` in core, so the
- * MerkleDrop root on chain at it is the root in SEF's proof files at the commit core pins next
- * to that block. Read there, every carried-over claimer's proof verifies on the fork for good.
- * A later block, after a newer root reached the chain, needs SEF's files at a later commit, or
- * the live ones: see QA_SEF_DATA_COMMIT below.
- */
-export const DEFAULT_FORK_BLOCK = 26_122_549n
 /** What the test account has to claim, in SAFE. */
 export const DEFAULT_TEST_AMOUNT = "742.318640275"
 /** What the test account holds in its wallet before the claim, in SAFE. */
@@ -75,9 +64,23 @@ function amount(name: string, fallback: string): bigint {
   return parseEther(value)
 }
 
+/**
+ * The chain the fork is: Mainnet, as core names it. Anvil runs under its id, so the app, which is
+ * built for Mainnet, and MetaMask's Mainnet network take the fork as Mainnet.
+ */
+export const FORK_CHAIN = CHAINS.mainnet
+export const FORK_CHAIN_ID_HEX = toHex(FORK_CHAIN.id)
+
+/**
+ * The Mainnet block the fork starts from: the fork suites' block in core, unless QA_FORK_BLOCK
+ * names another. Core pins it together with SEF's data commit, whose proofs carry the root on
+ * chain at it, so read there every carried-over claimer's proof verifies on the fork for good.
+ * A later block, after a newer root reached the chain, needs SEF's files at a later commit, or
+ * the live ones: see QA_SEF_DATA_COMMIT below.
+ */
 export const FORK_BLOCK: bigint = (() => {
   const value = process.env.QA_FORK_BLOCK
-  if (value === undefined || value === "") return DEFAULT_FORK_BLOCK
+  if (value === undefined || value === "") return MAINNET_FORK.blockNumber
   if (!/^\d+$/.test(value)) throw new Error(`QA_FORK_BLOCK must be a block number, got ${JSON.stringify(value)}`)
   return BigInt(value)
 })()
@@ -87,9 +90,9 @@ export const TEST_BALANCE = amount("QA_TEST_BALANCE", DEFAULT_TEST_BALANCE)
 /**
  * Where SEF's files are read: the proof of every carried-over claimer, latest.json, and the
  * validator list the interface shows. SEF rewrites the proofs on `main` with every new root,
- * about fortnightly, so by default they are read at the commit core pins next to the fork
- * suites' block, whose root is the one on chain at the default block. QA_SEF_DATA_COMMIT names
- * another commit, or `main` for the live files.
+ * about fortnightly, so by default they are read at the commit core pins next to the default
+ * block, whose root is the one on chain at that block. QA_SEF_DATA_COMMIT names another commit,
+ * or `main` for the live files.
  */
 export interface SefSource {
   /** The commit, or `main`. */

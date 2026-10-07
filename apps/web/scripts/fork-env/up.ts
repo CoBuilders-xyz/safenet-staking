@@ -12,8 +12,8 @@
 import { formatEther } from "viem"
 import { ensureAnvil, sefSourceLabel } from "./baseline"
 import { PROXY_LOG, command, rpc, say, waitFor, type SetupRecord } from "./processes"
-import { proxyStatus, startProxy, stopProxy, webAnswers } from "./proxy"
-import { LOCAL_PROXY_URL, PROXY_ORIGIN, PROXY_PORT, WEB_PORT, WEB_URL } from "./settings"
+import { foreignPorts, proxyStatus, startProxy, stopProxy, webAnswers } from "./proxy"
+import { FORK_CHAIN, FORK_CHAIN_ID_HEX, LOCAL_PROXY_URL, PROXY_ORIGIN, WEB_URL } from "./settings"
 
 async function ensureProxy(): Promise<void> {
   const status = await proxyStatus()
@@ -22,9 +22,7 @@ async function ensureProxy(): Promise<void> {
       say("Proxy", `answers on ${LOCAL_PROXY_URL}`)
       return
     case "foreign":
-      throw new Error(
-        `Port ${PROXY_PORT} or ${WEB_PORT} is in use, and not by a process this tool started. Stop it, or set QA_PROXY_PORT and QA_WEB_PORT.`,
-      )
+      throw foreignPorts()
     case "stale":
       say("Proxy", "restarting: it changed settings or stopped answering")
       await stopProxy()
@@ -39,13 +37,15 @@ async function ensureProxy(): Promise<void> {
 /** The three routes, through the proxy, as the browser will use them. */
 async function verify(setup: SetupRecord): Promise<void> {
   const chainId = await rpc(`${LOCAL_PROXY_URL}/rpc`, "eth_chainId")
-  if (chainId !== "0x1") throw new Error(`${LOCAL_PROXY_URL}/rpc does not answer eth_chainId with 0x1 (got ${String(chainId)})`)
+  if (chainId !== FORK_CHAIN_ID_HEX) {
+    throw new Error(`${LOCAL_PROXY_URL}/rpc does not answer eth_chainId with ${FORK_CHAIN_ID_HEX} (got ${String(chainId)})`)
+  }
   const res = await fetch(`${LOCAL_PROXY_URL}/rewards/latest.json`)
   const latest = res.ok ? ((await res.json()) as { merkleRoot?: string }) : undefined
   if (latest?.merkleRoot?.toLowerCase() !== setup.root.toLowerCase()) {
     throw new Error(`${LOCAL_PROXY_URL}/rewards/latest.json does not carry the root on chain`)
   }
-  say("Checks", "eth_chainId through /rpc is 0x1, /rewards/latest.json carries the root on chain")
+  say("Checks", `eth_chainId through /rpc is ${FORK_CHAIN_ID_HEX}, /rewards/latest.json carries the root on chain`)
   if (!(await waitFor(webAnswers, 90_000, 500))) {
     throw new Error(
       `The app does not answer through the proxy after 90 s. See ${PROXY_LOG}, then run \`pnpm fork:up\` again, or \`pnpm fork:down\`.`,
@@ -59,7 +59,7 @@ function summary(setup: SetupRecord): void {
   The manual QA fork is up.
 
   Open            ${PROXY_ORIGIN}/#/rewards
-  MetaMask RPC    ${PROXY_ORIGIN}/rpc  on the Ethereum Mainnet network, chain id 1
+  MetaMask RPC    ${PROXY_ORIGIN}/rpc  on the Ethereum Mainnet network, chain id ${FORK_CHAIN.id}
   Account         ${setup.account}  Anvil's account 0; docs/manual-qa-fork.md says how to import it
   In the wallet   ${formatEther(BigInt(setup.balance))} SAFE
   To claim        ${formatEther(BigInt(setup.claimable))} SAFE

@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import { fileURLToPath } from "node:url"
 import { bytesToHex } from "viem"
 import { mnemonicToAccount } from "viem/accounts"
+import { ANVIL_TEST_MNEMONIC } from "@cobuilders/safenet-core"
 import type { Context } from "@cobuilders/safenet-cli/lib"
 import { ConfigError, readConfig } from "./config.js"
 import { signerLoader } from "./signer.js"
@@ -10,8 +11,7 @@ import { KEY_LIKE_VALUE, PASSWORD_VALUE } from "./test-support.js"
 
 // The settings read at start, and the signer they lead to. No network.
 
-const TEST_MNEMONIC = "test test test test test test test test test test test junk"
-const account0 = mnemonicToAccount(TEST_MNEMONIC)
+const account0 = mnemonicToAccount(ANVIL_TEST_MNEMONIC)
 const TEST_KEY = bytesToHex(account0.getHdKey().privateKey!)
 // Written by Foundry's `cast wallet import` for account 1 of the test mnemonic; the CLI's tests use it too.
 const KEYSTORE = fileURLToPath(new URL("../../cli/src/fixtures/keystore-anvil-1.json", import.meta.url))
@@ -86,7 +86,7 @@ test("the signer comes from the named variable, or from the keystore and its pas
   const fromKey = await signerLoader({ K: TEST_KEY })({ kind: "private-key-env", name: "K" }, ctx)
   assert.equal(fromKey.address, account0.address)
   const fromKeystore = await signerLoader({ PW: KEYSTORE_PASSWORD })({ kind: "keystore", path: KEYSTORE, passwordEnv: "PW" }, ctx)
-  assert.equal(fromKeystore.address, mnemonicToAccount(TEST_MNEMONIC, { addressIndex: 1 }).address)
+  assert.equal(fromKeystore.address, mnemonicToAccount(ANVIL_TEST_MNEMONIC, { addressIndex: 1 }).address)
 })
 
 test("a variable that does not hold a key is refused without repeating its value", async () => {

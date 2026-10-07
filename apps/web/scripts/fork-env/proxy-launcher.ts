@@ -140,18 +140,26 @@ server.on("error", (err) => {
   shutdown(1)
 })
 
+// Without its record this proxy could never be told from someone else's, and `fork:down` could
+// never stop it. So when the record cannot be written, it stops, with its Vite.
 server.listen(PROXY_PORT, PROXY_HOST, () => {
-  const record: ProxyRecord = {
-    proxy: self(process.pid),
-    vite: self(vite.pid ?? 0),
-    host: PROXY_HOST,
-    proxyPort: PROXY_PORT,
-    webPort: WEB_PORT,
-    anvilPort: ANVIL_PORT,
-    origin: PROXY_ORIGIN,
-    validatorInfo: SEF_SOURCE.validatorInfo,
+  try {
+    const record: ProxyRecord = {
+      proxy: self(process.pid),
+      vite: self(vite.pid ?? 0),
+      host: PROXY_HOST,
+      proxyPort: PROXY_PORT,
+      webPort: WEB_PORT,
+      anvilPort: ANVIL_PORT,
+      origin: PROXY_ORIGIN,
+      validatorInfo: SEF_SOURCE.validatorInfo,
+    }
+    writeRecord(PROXY_RECORD, record)
+  } catch (err) {
+    console.error(`${stamp()} cannot record the proxy (${redact(err instanceof Error ? err.message : String(err))}); stopping`)
+    shutdown(1)
+    return
   }
-  writeRecord(PROXY_RECORD, record)
   console.log(`${stamp()} proxy on ${PROXY_HOST}:${PROXY_PORT}, origin ${PROXY_ORIGIN}, vite on ${VITE.host}:${VITE.port}`)
 })
 

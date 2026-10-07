@@ -7,8 +7,8 @@ costs anything.
 
 ## Prerequisites
 
-- Foundry. `anvil` runs the fork and `cast` derives the test account's key. `pnpm bootstrap`
-  checks both and says how to install them.
+- Foundry, for `anvil`, which runs the fork. `pnpm bootstrap` checks for it and says how to
+  install it.
 - `.env.local` at the repository root with `MAINNET_RPC_URL`, an archive endpoint.
   `pnpm env:pull` writes it. A public endpoint cannot serve state at a pinned block.
 - `pnpm bootstrap`, once per worktree. It installs the dependencies and writes `.env.ports`,
@@ -40,7 +40,7 @@ ignores: the logs, the generated proofs, and a record of the running processes.
   Account         0x…  Anvil's account 0; docs/manual-qa-fork.md says how to import it
   In the wallet   3000 SAFE
   To claim        742.318640275 SAFE
-  Fork block      26122549
+  Fork block      26122454
   Merkle root     0x…
   Carried over    119 real claimers at their amounts in SEF's files at commit 4cdcc6e
 ```
@@ -55,29 +55,41 @@ The chain is Mainnet as it stood at the fork block, with three changes:
   Its Mainnet EIP-7702 delegation is cleared, so wallets treat it as a plain account.
 - The MerkleDrop holds the test amount on top of its balance, so the claim is paid.
 
-SEF's files are read at the commit `packages/core` pins next to the fork suites' block, whose
-root is the one on chain at the default block. So every real claimer is carried over, and stays
-so when SEF publishes its next root. The Rewards page shows the period end from that commit's
+The default fork block is the fork suites' block, `MAINNET_FORK.blockNumber` in `packages/core`,
+and SEF's files are read at the data commit core pins next to it, whose root is the one on chain
+at that block. So every real claimer is carried over, and stays so when SEF publishes its next
+root. The Rewards page shows the period end from that commit's
 `latest.json`, and a file time stamped when `fork:up` built the rewards.
 
 The interface reads the chain and the proofs through one origin, the proxy. `/rpc` goes to
 Anvil, `/rewards/` serves the generated proofs and `latest.json`, and everything else is the Vite
-dev server, started with `VITE_RPC_URL` and `VITE_REWARDS_BASE_URL` under that origin and with
-the validator list from the same commit as the proofs, so every validator the Stake step offers
-is registered on the fork. MetaMask talks to the same `/rpc`. The Network Overview reads the
-same generated `latest.json` and validator list and, without a local graph-node, falls back to
-contract reads.
+dev server. MetaMask talks to the same `/rpc`.
+
+Vite starts with five settings of the tool's: `VITE_RPC_URL` and `VITE_REWARDS_BASE_URL` under
+the proxy origin, `VITE_RPC_URL_FALLBACK_1` and `VITE_RPC_URL_FALLBACK_2` empty, so no read
+falls back to the real chain, and `VITE_VALIDATOR_INFO_URL` at the same commit as the proofs, so
+every validator the Stake step offers is registered on the fork. From the shell it inherits only
+an allowlist: `PATH`, `HOME`, the user, shell and temporary directory, the locale, time zone,
+terminal and colour variables, `CI`, `NODE_OPTIONS`, `NODE_ENV`, `NODE_EXTRA_CA_CERTS`, and any
+`QA_` or `VITE_` variable. No other exported variable, and nothing of `.env.local` but its
+`VITE_` values, which Vite reads itself as it always does. The five above win over both.
+
+The Network Overview reads the same generated `latest.json` and validator list. Its other
+figures come from the subgraphs, and the tool sets no subgraph URL: the interface uses the
+defaults in `packages/core`, the Studio deployments, which index the real chains. So where the
+Overview shows a subgraph figure, it is today's Mainnet or Gnosis, not the fork's.
 
 ## MetaMask
 
 Use a browser profile with no real wallet in it. The test account's key is public: anyone who
 knows it can move whatever that address holds on any chain.
 
-1. Import the account. The key is the first private key Anvil prints when it starts: read it
-   from `apps/web/.fork-env/anvil.log`, or derive it from Anvil's default mnemonic:
+1. Import the account. It is account 0 of Anvil's public test mnemonic, which
+   `packages/core` pins as `ANVIL_TEST_MNEMONIC`. Its key is the first one Anvil prints under
+   Private Keys when it starts, in `apps/web/.fork-env/anvil.log`, after `(0)`:
 
    ```sh
-   cast wallet private-key "test test test test test test test test test test test junk"
+   grep -m 1 -E '^\(0\) 0x[0-9a-f]{64}$' apps/web/.fork-env/anvil.log
    ```
 
    In MetaMask: account menu, Add account or hardware wallet, Import account, paste the key. The
@@ -133,8 +145,8 @@ variable wins.
 | `QA_PROXY_PORT` | from `.env.ports`, else 5180 | The proxy, the one port a browser and MetaMask use. |
 | `QA_PROXY_HOST` | `127.0.0.1` | The interface the proxy binds. |
 | `QA_PROXY_ORIGIN` | `http://127.0.0.1:<QA_PROXY_PORT>` | The origin the interface and MetaMask reach the proxy at. It is built into the app. |
-| `QA_FORK_BLOCK` | 26122549 | The Mainnet block the fork starts from. |
-| `QA_SEF_DATA_COMMIT` | the commit `packages/core` pins | Where SEF's proofs, `latest.json` and validator list are read: a full commit hash of SEF's data repository, or `main` for the live files. |
+| `QA_FORK_BLOCK` | `MAINNET_FORK.blockNumber` in `packages/core`, 26122454 | The Mainnet block the fork starts from. |
+| `QA_SEF_DATA_COMMIT` | `MAINNET_FORK.sefData.commit` in `packages/core` | Where SEF's proofs, `latest.json` and validator list are read: a full commit hash of SEF's data repository, or `main` for the live files. |
 | `QA_TEST_AMOUNT` | 742.318640275 | What the test account has to claim, in SAFE. |
 | `QA_TEST_BALANCE` | 3000 | What the test account holds before the claim, in SAFE. |
 | `MAINNET_RPC_URL` | from `.env.local` | The archive endpoint Anvil forks from. Never printed. Anvil's log has its URL replaced. |
@@ -145,9 +157,15 @@ restart Anvil and rebuild the baseline. A change to `QA_WEB_PORT`, `QA_PROXY_POR
 Vite carries the last two. One fork command runs at a time; a second one started meanwhile says
 so and stops.
 
-The default block is the one this environment was first built from, and the default commit is
-the one `packages/core` pins for the fork suites: its proofs carry the root on chain at that
-block, so every real claimer is carried over. The two must match. SEF publishes a new root about
+A new port must be free. When a process the tool did not start holds it, `fork:up` says so and
+stops before it stops anything, and the fork already running stays up on its old ports.
+`fork:down` stops the running fork on the ports it was started on, whatever the settings say
+now. The ports in `.env.ports` are chosen per worktree to stay clear of the fork suites and of
+other worktrees; pick another one by hand only when something else holds them.
+
+The default block and the default commit are the pair `packages/core` pins for the fork suites:
+the commit's proofs carry the root on chain at the block, so every real claimer is carried
+over. The two must match. SEF publishes a new root about
 every two weeks and rewrites every proof file with it. To fork a block after a newer root
 reached the chain, set `QA_FORK_BLOCK` to it and `QA_SEF_DATA_COMMIT` to a commit of SEF's data
 that carries that root, or to `main` while the live files still do. With a mismatch, `fork:up`
@@ -164,8 +182,15 @@ accounts and cheat methods, so expose it only to the people testing.
 
 ## When something is off
 
-- `Port … is in use, and not by an Anvil this tool started`: something else holds the port.
-  `fork:up` never stops a process it did not start. Stop it yourself, or pick another port.
+- `Port … is in use, and not by an Anvil this tool started`, or `not by a process this tool
+  started` for the proxy and Vite: something else holds the port. `fork:up` never stops a
+  process it did not start, and never uses one: it stops before it changes the chain. Stop it
+  yourself, or pick another port.
+- `cannot read the start time of process …`: the tool tells its own processes from others by
+  pid and start time. On Linux it reads `/proc`; elsewhere it runs `ps -o lstart=`. Without
+  either it starts nothing, because it could not stop it safely later.
+- `reading SEF's rewards/…: …`: a file of SEF's data could not be read. The message names the
+  file, `latest.json` or one claimer's `proofs/…` file; the URL is redacted.
 - The interface loads but shows nothing to claim: the account connected is not the imported one.
   The interface reads the chain through the proxy, not through MetaMask.
 - The claim fails in MetaMask before it is sent, or MetaMask shows the wrong balances: MetaMask

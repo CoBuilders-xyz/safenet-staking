@@ -10,12 +10,12 @@
  * port.
  */
 import { execFileSync, spawn } from "node:child_process"
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { closeSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { createConnection } from "node:net"
 import { resolve } from "node:path"
 import { STATE_DIR, WEB_DIR } from "./settings"
 
-/** A process the tool started: its pid and the start time `ps` reports for it. */
+/** A process the tool started: its pid and its start time, as startedAt() reads it. */
 export interface Owned {
   pid: number
   startedAt: string
@@ -106,12 +106,28 @@ export function alive(pid: number | undefined): boolean {
 }
 
 /**
- * When the process with this pid started, as `ps` prints it, or undefined when there is none.
- * `ps -o lstart=` prints the time and nothing else: never a command line, which for Anvil
- * carries the archive endpoint. The call runs under a fixed locale and time zone, so the string
- * compares equal from any shell, whatever language or zone it has.
+ * When the process with this pid started, or undefined when there is none or it cannot be read.
+ *
+ * On Linux, field 22 of /proc/<pid>/stat: the start in clock ticks after boot, which no clock
+ * step moves. `ps -o lstart=` on Linux derives a wall-clock time from it and the current boot
+ * time, so a clock step could make the same process read differently.
+ *
+ * Elsewhere, macOS among them, `ps -o lstart=`, which there prints the start time the kernel
+ * recorded. It prints the time and nothing else: never a command line, which for Anvil carries
+ * the archive endpoint. The call runs under a fixed locale and time zone, so the string compares
+ * equal from any shell, whatever language or zone it has.
  */
 export function startedAt(pid: number): string | undefined {
+  if (process.platform === "linux") {
+    try {
+      const stat = readFileSync(`/proc/${pid}/stat`, "utf8")
+      // Field 2, the command name, is in parentheses and may hold spaces; field 3 follows it.
+      const ticks = stat.slice(stat.lastIndexOf(")") + 2).split(" ")[22 - 3]
+      return ticks && /^\d+$/.test(ticks) ? `ticks ${ticks}` : undefined
+    } catch {
+      return undefined
+    }
+  }
   try {
     const out = execFileSync("ps", ["-o", "lstart=", "-p", String(pid)], {
       encoding: "utf8",
@@ -124,12 +140,19 @@ export function startedAt(pid: number): string | undefined {
   }
 }
 
-/** This process as the tool will remember it. */
-export const self = (pid: number): Owned => ({ pid, startedAt: startedAt(pid) ?? "" })
+/**
+ * This process as the tool will remember it. Fails when its start time cannot be read: a record
+ * without one could never be told apart from a later process with the same pid.
+ */
+export function self(pid: number): Owned {
+  const at = startedAt(pid)
+  if (at === undefined) throw new Error(`cannot read the start time of process ${pid}, so it cannot be recorded as the tool's`)
+  return { pid, startedAt: at }
+}
 
 /** Whether the process the record names still runs: same pid, same start time. */
 export function owned(o: Owned | undefined): boolean {
-  return !!o && o.startedAt !== "" && alive(o.pid) && startedAt(o.pid) === o.startedAt
+  return !!o && !!o.startedAt && alive(o.pid) && startedAt(o.pid) === o.startedAt
 }
 
 /** Whether something accepts connections on a loopback port. */
@@ -222,17 +245,60 @@ export function say(what: string, detail: string): void {
 
 const LOCK = "lock.json"
 
+const busy = () => new Error("another fork command is running; wait for it to finish")
+
+/** Links `from` to `to`, which must not exist: an atomic create. False when `to` exists. */
+function linkNew(from: string, to: string): boolean {
+  try {
+    linkSync(from, to)
+    return true
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "EEXIST") return false
+    throw err
+  }
+}
+
+const sameOwned = (a: Owned | undefined, b: Owned | undefined): boolean =>
+  a?.pid === b?.pid && a?.startedAt === b?.startedAt
+
 /**
  * One fork command at a time. Two at once would each start an Anvil for the same port and each
  * write the same records. The lock names the process that holds it; one left by a process that
  * no longer runs is taken over.
+ *
+ * The lock appears whole or not at all: it is written under a name of this process's own, then
+ * linked into place, which fails when a lock exists. So a reader never sees an empty one. A
+ * stale lock is first moved aside under this process's name, which only one of two commands
+ * taking it over at once can do; if what was moved is not the stale lock read a moment before,
+ * another command has just taken it, and it goes back.
  */
 function acquireLock(): void {
   mkdirSync(STATE_DIR, { recursive: true })
-  const file = resolve(STATE_DIR, LOCK)
-  const holder = readRecord<Owned>(LOCK)
-  if (owned(holder)) throw new Error("another fork command is running; wait for it to finish")
-  writeFileSync(file, JSON.stringify(self(process.pid)) + "\n")
+  const lock = resolve(STATE_DIR, LOCK)
+  const mine = `${LOCK}.${process.pid}`
+  const aside = `${mine}.stale`
+  writeRecord(mine, self(process.pid))
+  try {
+    if (linkNew(resolve(STATE_DIR, mine), lock)) return
+    const holder = readRecord<Owned>(LOCK)
+    if (owned(holder)) throw busy()
+    try {
+      renameSync(lock, resolve(STATE_DIR, aside))
+    } catch {
+      // Gone already: released, or taken over by another command, which the link then meets.
+      if (linkNew(resolve(STATE_DIR, mine), lock)) return
+      throw busy()
+    }
+    const moved = readRecord<Owned>(aside)
+    if (!sameOwned(moved, holder)) {
+      linkNew(resolve(STATE_DIR, aside), lock)
+      throw busy()
+    }
+    if (!linkNew(resolve(STATE_DIR, mine), lock)) throw busy()
+  } finally {
+    removeRecord(mine)
+    removeRecord(aside)
+  }
 }
 
 /**

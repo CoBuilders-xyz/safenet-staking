@@ -10,22 +10,20 @@ import {
   type Abi, type Address, type ContractFunctionArgs, type ContractFunctionName, type Hex,
 } from "viem"
 import { mnemonicToAccount } from "viem/accounts"
-import { mainnet } from "viem/chains"
-import { CONTRACTS, merkleDropAbi } from "@cobuilders/safenet-core"
+import { ANVIL_TEST_MNEMONIC, CONTRACTS, merkleDropAbi } from "@cobuilders/safenet-core"
 import { rpc } from "./processes"
-import { ANVIL_URL, TEST_AMOUNT, TEST_BALANCE } from "./settings"
+import { ANVIL_URL, FORK_CHAIN, TEST_AMOUNT, TEST_BALANCE } from "./settings"
 
 /**
- * Anvil's and Hardhat's public test mnemonic. Its keys are published, and its first account is
- * the wallet a tester imports. Anvil unlocks the same accounts, which the setup checks.
+ * The wallet a tester imports: account 0 of Anvil's public mnemonic, which core pins. Anvil
+ * unlocks the same account, which the setup checks.
  */
-export const ANVIL_MNEMONIC = "test test test test test test test test test test test junk"
-export const testAccount = (): Address => mnemonicToAccount(ANVIL_MNEMONIC).address
+export const testAccount = (): Address => mnemonicToAccount(ANVIL_TEST_MNEMONIC).address
 
 const transport = http(ANVIL_URL)
-export const chain = createPublicClient({ chain: mainnet, transport })
-const test = createTestClient({ chain: mainnet, mode: "anvil", transport })
-const wallet = createWalletClient({ chain: mainnet, transport })
+export const chain = createPublicClient({ chain: FORK_CHAIN, transport })
+const test = createTestClient({ chain: FORK_CHAIN, mode: "anvil", transport })
+const wallet = createWalletClient({ chain: FORK_CHAIN, transport })
 
 const MERKLE_DROP = CONTRACTS.merkleDrop.address
 const SAFE_TOKEN = CONTRACTS.safeToken.address
@@ -40,7 +38,7 @@ async function send<const abi extends Abi, name extends ContractFunctionName<abi
   call: { address: Address; abi: abi; functionName: name; args: ContractFunctionArgs<abi, "nonpayable" | "payable", name> },
 ): Promise<void> {
   // viem's generics cannot follow `call` through the spread; the constraint above keeps it sound.
-  const hash = await wallet.writeContract({ ...call, account: from, chain: mainnet } as never)
+  const hash = await wallet.writeContract({ ...call, account: from, chain: FORK_CHAIN } as never)
   const receipt = await chain.waitForTransactionReceipt({ hash, timeout: 60_000 })
   if (receipt.status !== "success") throw new Error(`${String(call.functionName)} reverted`)
 }

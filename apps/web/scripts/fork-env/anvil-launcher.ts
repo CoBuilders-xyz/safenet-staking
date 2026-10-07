@@ -11,7 +11,7 @@
 import { spawn } from "node:child_process"
 import { createInterface } from "node:readline"
 import { ANVIL_RECORD, readRecord, redact, removeRecord, self, writeRecord, type AnvilRecord } from "./processes"
-import { ANVIL_PORT, FORK_BLOCK, SEF_SOURCE, TEST_AMOUNT, TEST_BALANCE } from "./settings"
+import { ANVIL_PORT, FORK_BLOCK, FORK_CHAIN, SEF_SOURCE, TEST_AMOUNT, TEST_BALANCE } from "./settings"
 
 const stamp = () => new Date().toISOString()
 
@@ -27,7 +27,7 @@ const anvil = spawn(
   [
     "--fork-url", forkUrl,
     "--fork-block-number", FORK_BLOCK.toString(),
-    "--chain-id", "1",
+    "--chain-id", String(FORK_CHAIN.id),
     "--host", "127.0.0.1",
     "--port", String(ANVIL_PORT),
   ],
@@ -36,17 +36,25 @@ const anvil = spawn(
 createInterface({ input: anvil.stdout }).on("line", (line) => console.log(redact(line)))
 createInterface({ input: anvil.stderr }).on("line", (line) => console.error(redact(line)))
 
+// Without its record this Anvil could never be told from someone else's, and `fork:down` could
+// never stop it. So when the record cannot be written, Anvil is stopped and this process exits
+// with it, through the exit handler below.
 anvil.on("spawn", () => {
-  const record: AnvilRecord = {
-    launcher: self(process.pid),
-    anvil: self(anvil.pid ?? 0),
-    port: ANVIL_PORT,
-    block: FORK_BLOCK.toString(),
-    sefRef: SEF_SOURCE.ref,
-    testAmount: TEST_AMOUNT.toString(),
-    testBalance: TEST_BALANCE.toString(),
+  try {
+    const record: AnvilRecord = {
+      launcher: self(process.pid),
+      anvil: self(anvil.pid ?? 0),
+      port: ANVIL_PORT,
+      block: FORK_BLOCK.toString(),
+      sefRef: SEF_SOURCE.ref,
+      testAmount: TEST_AMOUNT.toString(),
+      testBalance: TEST_BALANCE.toString(),
+    }
+    writeRecord(ANVIL_RECORD, record)
+  } catch (err) {
+    console.error(`${stamp()} cannot record anvil (${redact(err instanceof Error ? err.message : String(err))}); stopping it`)
+    anvil.kill("SIGTERM")
   }
-  writeRecord(ANVIL_RECORD, record)
 })
 /** Forgets this Anvil, unless the record already names another launcher's. */
 function forget(): void {

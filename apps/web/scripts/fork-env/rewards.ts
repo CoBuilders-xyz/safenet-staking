@@ -5,8 +5,8 @@
  * latest.json, so the app reads them exactly as it reads SEF's.
  *
  * SEF's files are read at the source the settings name: by default the commit core pins next to
- * the fork suites' block, whose root is the one on chain at the default block, so every claimer
- * is carried over and stays so. A claimer is carried over only when its proof carries the root
+ * the default block, whose root is the one on chain at that block, so every claimer is carried
+ * over and stays so. A claimer is carried over only when its proof carries the root
  * on chain at the fork block: then its amount is the real one for that root. With a source whose
  * root differs, every claimer drops out and only the test account remains. `fork:up` reports
  * both counts and the root match.
@@ -75,7 +75,7 @@ export async function writeRewards(
   }
 
   // SEF's latest.json with the new root, and the test amount added to what was allocated.
-  const published = (await fetchJson(`${source.rewardsBase}/latest.json`)) as SefRewardsLatest
+  const published = (await fetchSefFile(source, "latest.json")) as SefRewardsLatest
   const latest: SefRewardsLatest = {
     epoch: published.epoch + 1,
     merkleRoot: tree.root,
@@ -117,24 +117,31 @@ function proofPath(address: Address): string {
 
 /** SEF's proof for an address at the source, or null when SEF published none. */
 async function fetchProof(source: SefSource, address: Address): Promise<SefRewardProof | null> {
-  const url = `${source.rewardsBase}/${proofPath(address)}`
-  const res = await fetchWithRetry(url)
+  const path = proofPath(address)
+  const res = await fetchWithRetry(source, path)
   if (res.status === 404) return null
-  if (!res.ok) throw new Error(`GET ${url}: HTTP ${res.status}`)
+  if (!res.ok) throw new Error(failed(path, `HTTP ${res.status}`))
   return (await res.json()) as SefRewardProof
 }
 
-async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetchWithRetry(url)
-  if (!res.ok) throw new Error(`GET ${url}: HTTP ${res.status}`)
+async function fetchSefFile(source: SefSource, path: string): Promise<unknown> {
+  const res = await fetchWithRetry(source, path)
+  if (!res.ok) throw new Error(failed(path, `HTTP ${res.status}`))
   return res.json()
 }
 
-async function fetchWithRetry(url: string): Promise<Response> {
+/**
+ * What failed, named by the file's path under SEF's rewards directory rather than by its URL:
+ * the one line a command prints on failure has every URL redacted, and the path survives that.
+ */
+const failed = (path: string, why: string): string => `reading SEF's rewards/${path}: ${why}`
+
+/** A file under SEF's rewards directory at the source, retried on a 5xx or a network error. */
+async function fetchWithRetry(source: SefSource, path: string): Promise<Response> {
   let lastError: unknown
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(20_000) })
+      const res = await fetch(`${source.rewardsBase}/${path}`, { signal: AbortSignal.timeout(20_000) })
       if (res.status < 500) return res
       lastError = new Error(`HTTP ${res.status}`)
     } catch (err) {
@@ -142,5 +149,5 @@ async function fetchWithRetry(url: string): Promise<Response> {
     }
     await new Promise((r) => setTimeout(r, 1_000 * (attempt + 1)))
   }
-  throw new Error(`GET ${url} failed three times`, { cause: lastError })
+  throw new Error(failed(path, "failed three times"), { cause: lastError })
 }

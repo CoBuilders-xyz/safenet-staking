@@ -1,7 +1,8 @@
 /**
- * The Mainnet state the fork suites run against: `pnpm test:fork` in apps/web and in packages/cli
- * each start Anvil on a fork of this block. A test fixture, not a production constant. Nothing
- * outside those suites reads it.
+ * The Mainnet state the forks run against: `pnpm test:fork` in apps/web and in packages/cli each
+ * start Anvil on a fork of this block, and the manual QA fork, `pnpm fork:up`, starts from it
+ * unless QA_FORK_BLOCK names another. A test fixture, not a production constant. Nothing but
+ * those three reads it.
  *
  * The block and SEF's data commit are pinned together, and must move together. SEF overwrites
  * its proof files on `main` with every new Merkle root, so a pinned block read with proofs from
@@ -34,3 +35,10 @@ export const MAINNET_FORK_SEF_DATA = {
    */
   proofTree: `https://api.github.com/repos/${MAINNET_FORK.sefData.repo}/git/trees/${MAINNET_FORK.sefData.commit}:assets/rewards/proofs?recursive=1`,
 } as const
+
+/**
+ * Anvil's and Hardhat's public test mnemonic. Anvil unlocks the accounts it derives, its keys are
+ * published, and they hold nothing on Mainnet that matters. The fork suites and the manual QA
+ * fork sign with account 0. A test fixture, like the rest of this file.
+ */
+export const ANVIL_TEST_MNEMONIC = "test test test test test test test test test test test junk"

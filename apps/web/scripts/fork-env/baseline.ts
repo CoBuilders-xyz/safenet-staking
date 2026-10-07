@@ -3,11 +3,11 @@
  * baseline, with a snapshot to come back to.
  */
 import { formatEther } from "viem"
-import { anvilStatus, startAnvil, stopAnvil } from "./anvil"
+import { anvilStatus, foreignPort, startAnvil, stopAnvil } from "./anvil"
 import { chain, establishBaseline, testAccount } from "./chain"
 import { ANVIL_LOG, SETUP_RECORD, say, writeRecord, type SetupRecord } from "./processes"
 import { writeRewards } from "./rewards"
-import { ANVIL_PORT, ANVIL_URL, FORK_BLOCK, REWARDS_DIR, SEF_SOURCE, TEST_AMOUNT, TEST_BALANCE } from "./settings"
+import { ANVIL_URL, FORK_BLOCK, REWARDS_DIR, SEF_SOURCE, TEST_AMOUNT, TEST_BALANCE } from "./settings"
 
 /** The source of SEF's files, as the messages name it. */
 export const sefSourceLabel = SEF_SOURCE.ref === "main" ? "SEF's live files" : `SEF's files at commit ${SEF_SOURCE.ref.slice(0, 7)}`
@@ -20,7 +20,7 @@ export async function ensureAnvil(): Promise<SetupRecord> {
       say("Anvil", `answers on ${ANVIL_URL} at block ${status.setup.block}, baseline in place`)
       return status.setup
     case "foreign":
-      throw new Error(`Port ${ANVIL_PORT} is in use, and not by an Anvil this tool started. Stop it, or set QA_ANVIL_PORT.`)
+      throw foreignPort()
     case "stale":
       say("Anvil", `restarting: ${status.why}`)
       await stopAnvil()
