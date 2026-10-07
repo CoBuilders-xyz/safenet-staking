@@ -35,6 +35,9 @@ Every package implements the same five. Turborepo fans them out.
 | `pnpm test` | Unit tests. |
 | `pnpm check` | Lint and types. |
 
+`pnpm fork:up` starts the manual QA fork for Claim & Stake, the interface on an Anvil fork of
+Mainnet with a funded test account: [docs/manual-qa-fork.md](docs/manual-qa-fork.md).
+
 ## MCP server
 
 `packages/mcp` is `safenet-mcp`, an MCP server over stdio that gives an AI client the reads of

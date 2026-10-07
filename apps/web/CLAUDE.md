@@ -16,6 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Coverage:** `yarn test:coverage`
 - **E2E tests:** `yarn test:e2e` (Playwright)
 - **Generate Merkle proofs:** `pnpm generate:proofs [--out <dir>]` (reads `scripts/merkle-config.json`, writes to the git-ignored `.rewards/` by default)
+- **Manual QA fork:** `pnpm fork:up`, `pnpm fork:reset`, `pnpm fork:down`, from the repository root or here. The tool is `scripts/fork-env/`; the guide is `docs/manual-qa-fork.md` at the repository root
 
 ## Pre-push Checklist
 

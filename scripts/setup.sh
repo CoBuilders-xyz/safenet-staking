@@ -40,7 +40,9 @@ fi
 # Several worktrees run at once, so ports must not collide. FORK_PORT, the fork suite's
 # own web server, ends in 8 where WEB_PORT and E2E_PORT end in 3, so no offset makes it
 # land on another worktree's web port. CLI_ANVIL_PORT, the CLI fork suite's Anvil, ends in 6
-# where ANVIL_PORT ends in 5, for the same reason, so both fork suites can run at once.
+# where ANVIL_PORT ends in 5, for the same reason, so both fork suites can run at once. The
+# manual QA fork, `pnpm fork:up`, has three of its own: QA_ANVIL_PORT ends in 7, QA_WEB_PORT in
+# 9 and QA_PROXY_PORT in 0, so none of them lands on a suite's port either.
 WT="$(basename "$ROOT")"
 OFFSET=$(( $(printf '%s' "$WT" | cksum | cut -d' ' -f1) % 40 * 10 ))
 cat > .env.ports <<PORTS
@@ -51,6 +53,9 @@ E2E_PORT=$((5273 + OFFSET))
 FORK_PORT=$((5178 + OFFSET))
 ANVIL_PORT=$((8545 + OFFSET))
 CLI_ANVIL_PORT=$((8546 + OFFSET))
+QA_ANVIL_PORT=$((8547 + OFFSET))
+QA_WEB_PORT=$((5179 + OFFSET))
+QA_PROXY_PORT=$((5180 + OFFSET))
 GRAPH_NODE_PORT=$((8000 + OFFSET))
 GRAPH_WS_PORT=$((8100 + OFFSET))
 GRAPH_ADMIN_PORT=$((8020 + OFFSET))

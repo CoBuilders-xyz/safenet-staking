@@ -1,0 +1,94 @@
+/**
+ * `pnpm fork:up`: the manual QA environment for Claim & Stake, on demand, from any machine with
+ * Foundry and the archive endpoint. Safe to run again: whatever is already up and right stays.
+ *
+ *   1. Anvil on a fork of Mainnet at the pinned block, in its own session.
+ *   2. The rewards tree: every real claimer at its amount in SEF's files, plus the test account.
+ *   3. The chain baseline: new root, funded test account, topped-up MerkleDrop, snapshot.
+ *   4. The proxy, which serves the app, the proofs and the RPC on one origin, and its Vite.
+ *
+ * Every port is checked first, so nothing is stopped when one is held by a process this tool did
+ * not start. Then it prints what a tester needs: the origin to open, the account to import, the
+ * amounts.
+ */
+import { formatEther } from "viem"
+import { anvilStatus, foreignPort } from "./anvil"
+import { ensureAnvil, sefSourceLabel } from "./baseline"
+import { PROXY_LOG, command, rpc, say, waitFor, type SetupRecord } from "./processes"
+import { foreignPorts, proxyStatus, startProxy, stopProxy, webAnswers } from "./proxy"
+import { FORK_CHAIN, FORK_CHAIN_ID_HEX, LOCAL_PROXY_URL, PROXY_ORIGIN, WEB_URL } from "./settings"
+
+async function ensureProxy(): Promise<void> {
+  const status = await proxyStatus()
+  switch (status) {
+    case "ready":
+      say("Proxy", `answers on ${LOCAL_PROXY_URL}`)
+      return
+    case "foreign":
+      throw foreignPorts()
+    case "stale":
+      say("Proxy", "restarting: it changed settings or stopped answering")
+      await stopProxy()
+      break
+    case "absent":
+      break
+  }
+  say("Proxy", `starting on ${LOCAL_PROXY_URL} with Vite on ${WEB_URL}, log in ${PROXY_LOG}`)
+  await startProxy()
+}
+
+/** The three routes, through the proxy, as the browser will use them. */
+async function verify(setup: SetupRecord): Promise<void> {
+  const chainId = await rpc(`${LOCAL_PROXY_URL}/rpc`, "eth_chainId")
+  if (chainId !== FORK_CHAIN_ID_HEX) {
+    throw new Error(`${LOCAL_PROXY_URL}/rpc does not answer eth_chainId with ${FORK_CHAIN_ID_HEX} (got ${String(chainId)})`)
+  }
+  const res = await fetch(`${LOCAL_PROXY_URL}/rewards/latest.json`)
+  const latest = res.ok ? ((await res.json()) as { merkleRoot?: string }) : undefined
+  if (latest?.merkleRoot?.toLowerCase() !== setup.root.toLowerCase()) {
+    throw new Error(`${LOCAL_PROXY_URL}/rewards/latest.json does not carry the root on chain`)
+  }
+  say("Checks", `eth_chainId through /rpc is ${FORK_CHAIN_ID_HEX}, /rewards/latest.json carries the root on chain`)
+  if (!(await waitFor(webAnswers, 90_000, 500))) {
+    throw new Error(
+      `The app does not answer through the proxy after 90 s. See ${PROXY_LOG}, then run \`pnpm fork:up\` again, or \`pnpm fork:down\`.`,
+    )
+  }
+  say("Checks", "the app answers through the proxy")
+}
+
+function summary(setup: SetupRecord): void {
+  console.log(`
+  The manual QA fork is up.
+
+  Open            ${PROXY_ORIGIN}/#/rewards
+  MetaMask RPC    ${PROXY_ORIGIN}/rpc  on the Ethereum Mainnet network, chain id ${FORK_CHAIN.id}
+  Account         ${setup.account}  Anvil's account 0; docs/manual-qa-fork.md says how to import it
+  In the wallet   ${formatEther(BigInt(setup.balance))} SAFE
+  To claim        ${formatEther(BigInt(setup.claimable))} SAFE
+  Fork block      ${setup.block}
+  Merkle root     ${setup.root}
+  Carried over    ${setup.carriedOver} real claimers at their amounts in ${sefSourceLabel}
+
+  pnpm fork:reset   puts the chain back to this state
+  pnpm fork:down    stops Anvil, Vite and the proxy
+`)
+}
+
+/**
+ * Every port checked before anything is stopped: a restart of our own Anvil, for new settings,
+ * must not happen when the proxy's ports turn out to be someone else's.
+ */
+async function preflight(): Promise<void> {
+  if ((await anvilStatus()).state === "foreign") throw foreignPort()
+  if ((await proxyStatus()) === "foreign") throw foreignPorts()
+}
+
+await command(async () => {
+  console.log("\n  Manual QA fork\n")
+  await preflight()
+  const setup = await ensureAnvil()
+  await ensureProxy()
+  await verify(setup)
+  summary(setup)
+})

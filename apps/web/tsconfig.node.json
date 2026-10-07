@@ -27,6 +27,7 @@
     "codegen.ts",
     "scripts/subgraph-api-schema.ts",
     "scripts/codegen-check.ts",
-    "scripts/codegen-live-check.ts"
+    "scripts/codegen-live-check.ts",
+    "scripts/fork-env/*.ts"
   ]
 }

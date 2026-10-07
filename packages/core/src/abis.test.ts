@@ -74,3 +74,12 @@ test("the ERC-20 ABI reads the allowance and sends the approval", () => {
   assert.equal(fn("allowance")?.stateMutability, "view")
   assert.equal(fn("approve")?.stateMutability, "nonpayable")
 })
+
+test("the MerkleDrop ABI has the owner's root update the manual QA fork sends", () => {
+  const fn = (name: string) =>
+    merkleDropAbi.find((i): i is Extract<(typeof merkleDropAbi)[number], { type: "function" }> =>
+      i.type === "function" && i.name === name)
+  assert.equal(fn("owner")?.stateMutability, "view")
+  assert.equal(fn("setMerkleRoot")?.stateMutability, "nonpayable")
+  assert.deepEqual(fn("setMerkleRoot")?.inputs.map((i) => i.type), ["bytes32"])
+})

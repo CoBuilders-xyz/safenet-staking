@@ -7,7 +7,7 @@ import {
   ContractFunctionRevertedError, HttpRequestError, WaitForTransactionReceiptTimeoutError, encodeAbiParameters, encodeErrorResult, encodeEventTopics, numberToHex, pad,
   type Abi, type Hex, type PublicClient,
 } from "viem"
-import { CONTRACTS, SEF_DATA, rewardProofUrl, safeTokenEventsAbi } from "@cobuilders/safenet-core"
+import { ANVIL_TEST_MNEMONIC, CONTRACTS, SEF_DATA, rewardProofUrl, safeTokenEventsAbi } from "@cobuilders/safenet-core"
 import type { Context, Signer } from "./lib/index.js"
 import type { Io, Runtime } from "./cli.js"
 import { loadSigner } from "./commands/signer.js"
@@ -68,11 +68,8 @@ export const CLAIMABLE = 2n * 10n ** 18n
 export const WITHDRAWAL_DELAY = 172_800n
 export const TX_HASH = fakeRoot(0xfeed)
 
-/**
- * Anvil's and Hardhat's public test mnemonic. Its keys are published, hold nothing on Mainnet that
- * matters, and are what every Ethereum test suite signs with.
- */
-export const TEST_MNEMONIC = "test test test test test test test test test test test junk"
+/** Anvil's public test mnemonic, as core pins it. */
+export const TEST_MNEMONIC = ANVIL_TEST_MNEMONIC
 
 /** The SAFE Transfer a claim emits, shaped as a log, so the code that reads it is tested too. */
 function transferLog(to: Hex, value: bigint) {
