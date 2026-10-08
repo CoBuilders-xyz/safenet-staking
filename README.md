@@ -53,9 +53,14 @@ unless the operator allows writes when the server starts.
 Production is IPFS. Vercel serves previews only.
 
 A release is a tag `v*`, or a manual run of the `Release` workflow. The workflow builds the
-interface from the committed public values in `apps/web/build.env`, fails if the bundle holds
-a secret, packs it into a CAR and pins that CAR to Pinata. Then it checks that the dedicated
-Pinata gateway and each public gateway in `packages/core` serve it.
+interface from the committed public values in `apps/web/build.env`, packs it into a CAR and
+pins that CAR to Pinata. Then it checks that the dedicated Pinata gateway and each public
+gateway in `packages/core` serve it. A manual run pins only from `main`.
+
+The build job receives no secret, so none can reach the bundle. That is the guarantee in CI.
+The browser-safety check also runs there, but its bundle half compares the build with
+`.env.local`, which the runner does not have, so it finds nothing to compare. On a developer
+machine with `.env.local`, it fails the release build when a secret reaches the bundle.
 
 The CID depends only on the source, the lockfile and `build.env`, so anyone can rebuild it
 and compare. [`VERIFY.md`](VERIFY.md) has the exact commands.

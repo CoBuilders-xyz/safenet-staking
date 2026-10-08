@@ -228,7 +228,7 @@ pnpm --filter @cobuilders/safenet-web release:pin
 ```
 
 The release build reads `build.env` and no `.env` file. `release:pin` needs `PINATA_JWT` and
-`PINATA_GATEWAY`, from the environment or from `.env.local` at the repository root. The build uses hash-based routing (`HashRouter`) for compatibility with IPFS gateways. Set `VITE_APP_URL` in `build.env` to the canonical URL so that `og:image` and `twitter:image` meta tags resolve correctly for social crawlers.
+`PINATA_GATEWAY`, from the environment or from `.env.local` at the repository root, and also reads `RELEASE_NAME`, the name shown in Pinata, and `GATEWAY_TIMEOUT_SECONDS`, how long each gateway may take to serve the release, 900 by default. The build uses hash-based routing (`HashRouter`) for compatibility with IPFS gateways. Set `VITE_APP_URL` in `build.env` to the canonical URL so that `og:image` and `twitter:image` meta tags resolve correctly for social crawlers.
 
 ### Safe App
 
