@@ -95,7 +95,7 @@ export function useProgrammeRewards() {
   const latest = useQuery({ ...latestQuery, select: (answer): SefRewardsLatest => answer.value! })
   const latestSource = useQuery({
     ...latestQuery,
-    select: ({ base, url, ens }): RewardsLatestSource => ({ base, url, ens }),
+    select: ({ base, url, ens, tried }): RewardsLatestSource => ({ base, url, ens, tried }),
   }).data
 
   const onChainRoot = useReadContract({

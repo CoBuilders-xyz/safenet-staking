@@ -62,6 +62,8 @@ export interface FakeOptions {
   readonly ensContenthash?: Hex
   /** IPFS gateway hosts that answer 502. Every other gateway serves the dataset. */
   readonly failingGateways?: readonly string[]
+  /** Every gateway answers, and the dataset has no file at the expected paths: a layout mismatch. */
+  readonly datasetMissing?: boolean
   /** The status the repository answers for its reward files, when not 200. */
   readonly repositoryStatus?: number
 }
@@ -231,6 +233,7 @@ const latestFile = (epoch: number) => ({
 /** SEF's IPFS dataset through a gateway: the repository's layout under the dataset root. */
 function fakeDataset(o: FakeOptions, url: URL): Response {
   if (o.failingGateways?.includes(url.host)) return new Response("bad gateway", { status: 502 })
+  if (o.datasetMissing) return new Response("not found", { status: 404 })
   const path = url.pathname.split("/").slice(3).join("/")
   if (path === REWARDS_LATEST_PATH) return json(latestFile(DATASET_EPOCH))
   if (path === rewardProofPath(o.proofAccount ?? STAKER) && o.proof !== null) {
@@ -280,7 +283,7 @@ export function fakeRuntime(
   return {
     io,
     env,
-    createContext: () => fakeContext(o, sends),
+    createContext: (options) => ({ ...fakeContext(o, sends), ipfsGateway: options.ipfsGateway }),
     loadSigner: o.loadSigner ?? ((request, ctx) => loadSigner(request, ctx, { env, askPassword: undefined })),
     stdout: () => out,
     stderr: () => err,

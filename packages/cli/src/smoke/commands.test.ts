@@ -70,10 +70,15 @@ before(async () => {
 test("safenet status", { skip, timeout: TIMEOUT }, async () => {
   const s = await json<{
     totalStaked: { value: string }; rewardsAllocated: { value: string }; merkleRoot: { match: boolean }
+    rewardsSource: { kind: string; ens: { status: string } }
   }>("status")
   assert.ok(isWei(s.totalStaked.value) && BigInt(s.totalStaked.value) > 0n)
   assert.ok(isWei(s.rewardsAllocated.value))
   assert.equal(typeof s.merkleRoot.match, "boolean")
+  // The real Universal Resolver and resolver calls: "empty" on 2026-10-08, "set" once SEF
+  // populates the name. "unreadable" or "unsupported" means the ENS read itself broke.
+  assert.ok(["set", "empty"].includes(s.rewardsSource.ens.status), s.rewardsSource.ens.status)
+  assert.ok(["ens", "repository"].includes(s.rewardsSource.kind), s.rewardsSource.kind)
   const text = await safenet("status")
   assert.equal(text.code, 0)
   assert.match(text.stdout, /Merkle root: (match|differs)\./)

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { QueryClient } from "@tanstack/react-query"
 import { numberToHex, pad, type Hex } from "viem"
 import {
-  REPOSITORY_REWARDS_BASE, REWARDS_LATEST_PATH, SEF_DATA, type EnsReadClient,
+  REPOSITORY_REWARDS_BASE, REWARDS_LATEST_PATH, REWARDS_SOURCE_STALE_MS, SEF_DATA, type EnsReadClient,
 } from "@cobuilders/safenet-core"
 import { readRewardsFileThrough, resolveWebRewardsSource } from "../useRewardsSource"
 
@@ -51,7 +51,7 @@ describe("resolveWebRewardsSource", () => {
     expect(source.bases.map((b) => b.url)).toEqual([
       `https://ipfs.io/ipfs/${CID}`,
       `https://dweb.link/ipfs/${CID}`,
-      `https://cloudflare-ipfs.com/ipfs/${CID}`,
+      `https://ipfs.filebase.io/ipfs/${CID}`,
       SEF_DATA.rewardsProofBase,
     ])
   })
@@ -93,7 +93,7 @@ describe("readRewardsFileThrough", () => {
     expect(read.value).toEqual({ epoch: 0 })
     expect(read.base).toEqual(REPOSITORY_REWARDS_BASE)
     expect(fetch.mock.calls.map(([url]) => new URL(url).host)).toEqual([
-      "ipfs.io", "dweb.link", "cloudflare-ipfs.com", "raw.githubusercontent.com",
+      "ipfs.io", "dweb.link", "ipfs.filebase.io", "raw.githubusercontent.com",
     ])
   })
 
@@ -113,6 +113,21 @@ describe("readRewardsFileThrough", () => {
     expect(readContract.mock.calls.filter(([p]) => p.functionName === "findResolver")).toHaveLength(1)
   })
 
+  it("reads no proof, not an error, when a gateway fails and the repository answers 404", async () => {
+    vi.stubGlobal("fetch", serve({ "ipfs.io": 429 }))
+    const read = await readRewardsFileThrough(queryClient, ensClient(CONTENTHASH).client, "proofs/x.json", attempt, signal)
+    expect(read.value).toBeNull()
+    expect(read.base).toEqual(REPOSITORY_REWARDS_BASE)
+    expect(read.tried.map((a) => a.outcome)).toEqual(["error", "not found", "not found", "not found"])
+  })
+
+  it("keeps the resolution for the hour with no component observing it", async () => {
+    vi.stubGlobal("fetch", serve({ "ipfs.io": { epoch: 1 } }))
+    await readRewardsFileThrough(queryClient, ensClient(CONTENTHASH).client, REWARDS_LATEST_PATH, attempt, signal)
+    const query = queryClient.getQueryCache().find({ queryKey: ["rewardsSource"] })
+    expect(query?.gcTime).toBe(REWARDS_SOURCE_STALE_MS)
+  })
+
   it("throws the repository's own error when it was the only source and failed", async () => {
     vi.stubGlobal("fetch", serve({ "raw.githubusercontent.com": 500 }))
     await expect(
@@ -121,9 +136,9 @@ describe("readRewardsFileThrough", () => {
   })
 
   it("names every source when all of them fail", async () => {
-    vi.stubGlobal("fetch", serve({ "ipfs.io": 502, "dweb.link": 502, "cloudflare-ipfs.com": "down", "raw.githubusercontent.com": 500 }))
+    vi.stubGlobal("fetch", serve({ "ipfs.io": 502, "dweb.link": 502, "ipfs.filebase.io": "down", "raw.githubusercontent.com": 500 }))
     await expect(
       readRewardsFileThrough(queryClient, ensClient(CONTENTHASH).client, REWARDS_LATEST_PATH, attempt, signal),
-    ).rejects.toThrow(/ipfs\.io: .*502; dweb\.link: .*502; cloudflare-ipfs\.com: Failed to fetch; raw\.githubusercontent\.com: .*500/)
+    ).rejects.toThrow(/ipfs\.io: .*502; dweb\.link: .*502; ipfs\.filebase\.io: Failed to fetch; raw\.githubusercontent\.com: .*500/)
   })
 })

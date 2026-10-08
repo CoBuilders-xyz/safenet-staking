@@ -21,7 +21,10 @@ async function statusJson(options: Parameters<typeof fakeRuntime>[0] = {}) {
   assert.equal(code, 0, rt.stderr())
   return JSON.parse(rt.stdout()) as {
     rewardsEpoch: { value: { epoch: number } }
-    rewardsSource: { kind: string; url: string; gateway: string | null; ens: Record<string, unknown> }
+    rewardsSource: {
+      kind: string; url: string; gateway: string | null; ens: Record<string, unknown>
+      tried: { kind: string; outcome: string }[]
+    }
   }
 }
 
@@ -31,6 +34,7 @@ test("with an empty contenthash, status reads the repository and says why", asyn
     kind: "repository",
     url: SEF_DATA.rewardsProofBase,
     gateway: null,
+    tried: [{ kind: "repository", url: SEF_DATA.rewardsProofBase, gateway: null, outcome: "found", reason: null }],
     ens: { name: SEF_REWARDS_ENS_NAME, status: "empty", contenthash: null, reason: null },
   })
   assert.equal(s.rewardsEpoch.value.epoch, 0)
@@ -60,7 +64,7 @@ test("the dataset answers while the repository is down", async () => {
 
 test("when every gateway fails, the repository answers and the contenthash is still reported", async () => {
   const s = await statusJson({
-    ensContenthash: CONTENTHASH, failingGateways: ["ipfs.io", "dweb.link", "cloudflare-ipfs.com"],
+    ensContenthash: CONTENTHASH, failingGateways: ["ipfs.io", "dweb.link", "ipfs.filebase.io"],
   })
   assert.equal(s.rewardsSource.kind, "repository")
   assert.equal(s.rewardsSource.ens.status, "set")
@@ -69,11 +73,11 @@ test("when every gateway fails, the repository answers and the contenthash is st
 
 test("when every source fails, the error names each one", async () => {
   const rt = fakeRuntime({
-    ensContenthash: CONTENTHASH, failingGateways: ["ipfs.io", "dweb.link", "cloudflare-ipfs.com"], repositoryStatus: 503,
+    ensContenthash: CONTENTHASH, failingGateways: ["ipfs.io", "dweb.link", "ipfs.filebase.io"], repositoryStatus: 503,
   })
   assert.equal(await run(["status"], rt), 1)
   assert.match(rt.stderr(), /Could not read SEF's rewards\/latest\.json from any source/)
-  assert.match(rt.stderr(), /ipfs\.io: .*502.*dweb\.link.*cloudflare-ipfs\.com.*raw\.githubusercontent\.com: .*503/)
+  assert.match(rt.stderr(), /ipfs\.io: .*502.*dweb\.link.*ipfs\.filebase\.io.*raw\.githubusercontent\.com: .*503/)
 })
 
 test("a garbage contenthash is reported unsupported, and the repository is read", async () => {
@@ -98,10 +102,51 @@ test("rewards check reads the proof from the dataset, and the MCP library with i
   assert.equal(r.earned, true)
 })
 
-test("an address the dataset and the repository both lack has no proof", async () => {
+test("an address the dataset and the repository both lack has no proof, settled by the repository", async () => {
   const r = await checkRewards(fakeContext({ ensContenthash: CONTENTHASH, proof: null }), STAKER)
   assert.equal(r.earned, false)
-  assert.equal(r.proofUrl, `https://ipfs.io/ipfs/${CID}/${rewardProofPath(STAKER)}`)
+  assert.equal(r.proofUrl, `${SEF_DATA.rewardsProofBase}/${rewardProofPath(STAKER)}`)
+  assert.equal(r.proofSource.kind, "repository")
+})
+
+test("an address without rewards is not an error when a gateway fails", async () => {
+  // The day SEF populates the name: one gateway rate-limited, the others and the repository 404.
+  const rt = fakeRuntime({ ensContenthash: CONTENTHASH, proof: null, failingGateways: ["ipfs.io"] })
+  assert.equal(await run(["rewards", "check", STAKER, "--json"], rt), 0, rt.stderr())
+  const r = JSON.parse(rt.stdout()) as { earned: boolean; proofSource: { tried: { outcome: string }[] } }
+  assert.equal(r.earned, false)
+  assert.deepEqual(r.proofSource.tried.map((t) => t.outcome), ["error", "not found", "not found", "not found"])
+})
+
+test("rewards check --json names the source of the proof", async () => {
+  const rt = fakeRuntime({ ensContenthash: CONTENTHASH })
+  assert.equal(await run(["rewards", "check", STAKER, "--json"], rt), 0, rt.stderr())
+  const r = JSON.parse(rt.stdout()) as { proofSource: { kind: string; gateway: string } }
+  assert.equal(r.proofSource.kind, "ens")
+  assert.equal(r.proofSource.gateway, "https://ipfs.io")
+  const text = fakeRuntime({ ensContenthash: CONTENTHASH })
+  await run(["rewards", "check", STAKER], text)
+  assert.match(text.stdout(), /Proof read from\s+SEF's IPFS dataset \(ENS\), through ipfs\.io/)
+})
+
+test("a dataset that answers 404 everywhere is reported as a missing file, not an outage", async () => {
+  const s = await statusJson({ ensContenthash: CONTENTHASH, datasetMissing: true })
+  assert.equal(s.rewardsSource.kind, "repository")
+  assert.deepEqual(s.rewardsSource.tried.map((t) => [t.kind, t.outcome]), [
+    ["ens", "not found"], ["ens", "not found"], ["ens", "not found"], ["repository", "found"],
+  ])
+  const rt = fakeRuntime({ ensContenthash: CONTENTHASH, datasetMissing: true })
+  await run(["status"], rt)
+  assert.match(rt.stdout(), /SEF's repository, a mirror: the IPFS dataset has no such file at the expected path/)
+  const down = fakeRuntime({ ensContenthash: CONTENTHASH, failingGateways: ["ipfs.io", "dweb.link", "ipfs.filebase.io"] })
+  await run(["status"], down)
+  assert.match(down.stdout(), /SEF's repository, a mirror: the IPFS dataset did not answer/)
+})
+
+test("IPFS_GATEWAY is tried before the public gateways", async () => {
+  const s = await statusJson({ ensContenthash: CONTENTHASH, env: { IPFS_GATEWAY: "https://gw.example.org/ipfs/" } })
+  assert.equal(s.rewardsSource.gateway, "https://gw.example.org")
+  assert.equal(s.rewardsSource.url, `https://gw.example.org/ipfs/${CID}`)
 })
 
 test("one context resolves the ENS name once", async () => {

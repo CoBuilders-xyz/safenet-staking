@@ -1,23 +1,10 @@
 import type { Command } from "commander"
-import { getStatus, type DerivedFigure, type NetworkStatus, type RewardsSourceUsed } from "../lib/index.js"
+import { getStatus, type DerivedFigure, type NetworkStatus } from "../lib/index.js"
 import type { CommandRuntime } from "../cli.js"
-import { formatCount, formatSafe, formatTime, renderTable } from "./format.js"
+import { describeRewardsSource, formatCount, formatSafe, formatTime, renderTable } from "./format.js"
 
 const derived = (f: DerivedFigure) =>
   f.value === null ? `not derivable: ${f.reason ?? "no value"}` : formatSafe(f.value)
-
-/** Which source the reward files came from, and why when it is not the canonical one. */
-export function describeRewardsSource(r: RewardsSourceUsed): string {
-  if (r.kind === "ens") return `SEF's IPFS dataset (ENS), through ${r.gateway ? new URL(r.gateway).host : "a gateway"}`
-  if (r.kind === "override") return "a configured URL"
-  const why = {
-    set: "the IPFS dataset did not answer",
-    empty: `${r.ens.name} has no contenthash yet`,
-    unsupported: `${r.ens.name} has a contenthash this tool cannot read`,
-    unreadable: `${r.ens.name} could not be read`,
-  }[r.ens.status]
-  return `SEF's repository, a mirror: ${why}`
-}
 
 export function renderStatus(s: NetworkStatus): string {
   const epoch = s.rewardsEpoch.value

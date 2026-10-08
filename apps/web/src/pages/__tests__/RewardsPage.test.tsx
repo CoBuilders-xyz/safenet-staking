@@ -81,7 +81,10 @@ function programme(overrides: Partial<Record<keyof Programme, unknown>> = {}): P
   return {
     merkleDrop,
     latest: { data: LATEST, error: null, refetch: vi.fn() },
-    latestSource: { base: REPOSITORY_REWARDS_BASE, url: SEF_DATA.rewardsLatest, ens: { status: "empty" } },
+    latestSource: {
+      base: REPOSITORY_REWARDS_BASE, url: SEF_DATA.rewardsLatest, ens: { status: "empty" },
+      tried: [{ base: REPOSITORY_REWARDS_BASE, outcome: "found" }],
+    },
     onChainRoot: { data: ROOT_A, error: null, refetch: vi.fn() },
     dropBalance: { data: 300n * SAFE, error: null, refetch: vi.fn() },
     totals: { allocated: 1000n * SAFE, unclaimed: 300n * SAFE, claimed: 700n * SAFE, unclaimedPercent: 30 },
@@ -357,8 +360,8 @@ describe("RewardsPage", () => {
       renderPage()
 
       const ver = section("Verifiability")
-      expect(valueOf(ver, "Source")).toHaveTextContent("SEF's repository, through raw.githubusercontent.com")
-      expect(valueOf(ver, "Source")).toHaveTextContent(`${SEF_REWARDS_ENS_NAME} points at no dataset yet.`)
+      expect(valueOf(ver, "Source of latest.json")).toHaveTextContent("SEF's repository, through raw.githubusercontent.com")
+      expect(valueOf(ver, "Source of latest.json")).toHaveTextContent(`${SEF_REWARDS_ENS_NAME} points at no dataset yet.`)
       expect(within(ver).getByRole("link", { name: "rewards/latest.json" })).toHaveAttribute("href", SEF_DATA.rewardsLatest)
     })
 
@@ -369,13 +372,14 @@ describe("RewardsPage", () => {
             base: { url: DATASET, kind: "ens", gateway: "https://dweb.link" },
             url: `${DATASET}/latest.json`,
             ens: { status: "set" },
+            tried: [{ base: { url: DATASET, kind: "ens" }, outcome: "found" }],
           },
         }),
       )
       renderPage()
 
       const ver = section("Verifiability")
-      expect(valueOf(ver, "Source")).toHaveTextContent(/^SEF's IPFS dataset \(ENS\), through dweb\.link$/)
+      expect(valueOf(ver, "Source of latest.json")).toHaveTextContent(/^SEF's IPFS dataset \(ENS\), through dweb\.link$/)
       expect(within(ver).getByRole("link", { name: "rewards/latest.json" })).toHaveAttribute("href", `${DATASET}/latest.json`)
       expect(within(section("Programme")).getByRole("link", { name: "rewards/latest.json" })).toHaveAttribute(
         "href",
@@ -383,13 +387,23 @@ describe("RewardsPage", () => {
       )
     })
 
-    it("says the repository was read because the dataset did not answer", () => {
+    it.each([
+      ["did not answer", "error", /SEF's IPFS dataset did not answer through any gateway\./],
+      ["has no latest.json", "not found", /SEF's IPFS dataset has no latest\.json at the expected path\./],
+    ])("says the repository was read because the dataset %s", (_, outcome, reason) => {
       mockUseProgramme.mockReturnValue(
-        programme({ latestSource: { base: REPOSITORY_REWARDS_BASE, url: SEF_DATA.rewardsLatest, ens: { status: "set" } } }),
+        programme({
+          latestSource: {
+            base: REPOSITORY_REWARDS_BASE,
+            url: SEF_DATA.rewardsLatest,
+            ens: { status: "set" },
+            tried: [{ base: { url: DATASET, kind: "ens" }, outcome }, { base: REPOSITORY_REWARDS_BASE, outcome: "found" }],
+          },
+        }),
       )
       renderPage()
 
-      expect(valueOf(section("Verifiability"), "Source")).toHaveTextContent(/did not answer through any gateway/)
+      expect(valueOf(section("Verifiability"), "Source of latest.json")).toHaveTextContent(reason)
     })
 
     it("shows no source when no source answered", () => {
@@ -398,7 +412,7 @@ describe("RewardsPage", () => {
       )
       renderPage()
 
-      expect(valueOf(section("Verifiability"), "Source")).toHaveTextContent("Unavailable")
+      expect(valueOf(section("Verifiability"), "Source of latest.json")).toHaveTextContent("Unavailable")
     })
 
     it("links the MerkleDrop on the explorer and shows both roots and the balance", () => {

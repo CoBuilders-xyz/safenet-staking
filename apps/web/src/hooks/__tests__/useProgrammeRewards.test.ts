@@ -156,6 +156,7 @@ describe("useProgrammeRewards", () => {
       base: { url: SEF_DATA.rewardsProofBase, kind: "repository" },
       url: SEF_DATA.rewardsLatest,
       ens: { status: "unreadable", reason: "no Mainnet client" },
+      tried: [{ base: { url: SEF_DATA.rewardsProofBase, kind: "repository" }, outcome: "found" }],
     })
     expect(String(mockFetch.mock.calls[0][0])).toBe(SEF_DATA.rewardsLatest)
 

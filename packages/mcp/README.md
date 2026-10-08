@@ -52,7 +52,7 @@ The server reads these environment variables when it starts.
 | `SAFENET_MCP_RPC_URL` | The Mainnet RPC endpoint |
 | `MAINNET_RPC_URL` | The endpoint when `SAFENET_MCP_RPC_URL` is not set. Without either, public endpoints are used, which refuse history scans |
 | `GITHUB_TOKEN` or `GH_TOKEN` | Raises the GitHub API limit for the lookup that dates SEF's participation window. Optional |
-| `IPFS_GATEWAY` | An IPFS gateway origin, tried before the public gateways for SEF's reward dataset. Optional |
+| `IPFS_GATEWAY` | An IPFS gateway, tried before the public gateways for SEF's reward dataset. Only its origin is used. Optional |
 | `SAFENET_MCP_ALLOW_WRITES` | `1` allows writes when a signer is also set. Anything else but `0` or nothing stops the server |
 | `SAFENET_MCP_PRIVATE_KEY_ENV` | The **name** of a variable that holds the private key |
 | `SAFENET_MCP_KEYSTORE` | The path of a version 3 keystore file, instead of a key |
@@ -62,6 +62,10 @@ The signer settings take names, never secrets: a value that looks like a key is 
 message repeats it. While writes are off, the signer is not loaded at all.
 
 The server logs where the endpoint comes from, never the URL, which can carry a key.
+
+Reward files come from SEF's IPFS dataset behind `rewards.safenet-gov.eth` when the name is set,
+then from the repository mirror; `status` and `rewards_check` report which, in the order and with
+the fields the "Reward data" section of the safenet-cli README describes.
 
 ## Claude Desktop
 

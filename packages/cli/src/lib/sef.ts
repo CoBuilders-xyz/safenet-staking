@@ -10,16 +10,18 @@ import { parseUnits } from "viem"
 import {
   PARTICIPATION_WINDOW_DAYS,
   REWARDS_LATEST_PATH,
+  REWARDS_SOURCE_RETRY_MS,
   REWARDS_SOURCE_STALE_MS,
   RewardsReadError,
   SEF_DATA,
   SEF_REWARDS_ENS_NAME,
-  describeFailure,
+  describeAttempt,
+  failureReason,
   participationWindow,
   readRewardsFile,
   resolveRewardsSource,
   rewardProofPath,
-  type RewardsDataBase,
+  type RewardsRead,
   type RewardsSource,
   type SefNetworkInfo,
   type SefRewardProof,
@@ -69,22 +71,42 @@ export interface RewardsSourceUsed {
   readonly url: string
   /** The IPFS gateway, for `ens`. */
   readonly gateway: string | null
+  /**
+   * Every source asked, in order, ending with the one above. A gateway's `not found` on every
+   * gateway, while the repository has the file, points at the dataset's layout, not at an outage.
+   */
+  readonly tried: readonly {
+    readonly kind: "ens" | "repository" | "override"
+    readonly url: string
+    readonly gateway: string | null
+    readonly outcome: "found" | "not found" | "timeout" | "skipped" | "error"
+    /** Why, for `error`, with every URL cut to its host. */
+    readonly reason: string | null
+  }[]
   readonly ens: {
     readonly name: string
     /** `set`, or why the dataset was not tried: `empty`, `unsupported` or `unreadable`. */
     readonly status: "set" | "empty" | "unsupported" | "unreadable"
-    /** The raw contenthash, when the name held one. */
+    /** The raw contenthash, when one was read. */
     readonly contenthash: string | null
     readonly reason: string | null
   }
 }
 
-function sourceUsed(source: RewardsSource, base: RewardsDataBase): RewardsSourceUsed {
+function sourceUsed(source: RewardsSource, read: RewardsRead<unknown>): RewardsSourceUsed {
   const { ens } = source
+  const { base } = read
   return {
     kind: base.kind,
     url: base.url,
     gateway: base.gateway ?? null,
+    tried: read.tried.map((a) => ({
+      kind: a.base.kind,
+      url: a.base.url,
+      gateway: a.base.gateway ?? null,
+      outcome: a.outcome,
+      reason: a.outcome === "error" ? failureReason(a.error) : null,
+    })),
     ens: {
       name: SEF_REWARDS_ENS_NAME,
       status: ens.status,
@@ -95,8 +117,9 @@ function sourceUsed(source: RewardsSource, base: RewardsDataBase): RewardsSource
 }
 
 /**
- * The resolved ENS name and the bases to try, reused per context for an hour. The MCP server
- * keeps one context while it runs, so it sees SEF populate the name within the hour.
+ * The resolved ENS name and the bases to try, reused per context for an hour, or for a minute
+ * when the chain could not be read. The MCP server keeps one context while it runs, so it sees
+ * SEF populate the name within the hour, and one failed RPC call does not hold it on the mirror.
  */
 const resolved = new WeakMap<Context, { until: number; source: Promise<RewardsSource> }>()
 
@@ -104,7 +127,11 @@ export function rewardsSource(ctx: Context): Promise<RewardsSource> {
   const cached = resolved.get(ctx)
   if (cached && cached.until > Date.now()) return cached.source
   const source = resolveRewardsSource(ctx.client, { gateway: ctx.ipfsGateway })
-  resolved.set(ctx, { until: Date.now() + REWARDS_SOURCE_STALE_MS, source })
+  const entry = { until: Date.now() + REWARDS_SOURCE_STALE_MS, source }
+  resolved.set(ctx, entry)
+  void source.then((s) => {
+    if (s.ens.status === "unreadable") entry.until = Date.now() + REWARDS_SOURCE_RETRY_MS
+  })
   return source
 }
 
@@ -135,12 +162,12 @@ async function readRewards<T>(
         return data
       },
     })
-    return { value: read.value, url: read.url, source: sourceUsed(source, read.base) }
+    return { value: read.value, url: read.url, source: sourceUsed(source, read) }
   } catch (error) {
     if (!(error instanceof RewardsReadError)) throw error
-    const [only] = error.failures
-    if (error.failures.length === 1 && only?.kind === "error" && only.error instanceof SafenetError) throw only.error
-    throw new SafenetError(`Could not read ${what} from any source: ${error.failures.map(describeFailure).join("; ")}`)
+    const [only] = error.attempts
+    if (error.attempts.length === 1 && only?.outcome === "error" && only.error instanceof SafenetError) throw only.error
+    throw new SafenetError(`Could not read ${what} from any source: ${error.attempts.map(describeAttempt).join("; ")}`)
   }
 }
 
@@ -306,10 +333,6 @@ export async function readRewardsLatest(
   return { latest: value, source }
 }
 
-export async function fetchRewardsLatest(ctx: Context): Promise<SefRewardsLatest> {
-  return (await readRewardsLatest(ctx)).latest
-}
-
 export async function fetchNetworkInfo(ctx: Context): Promise<SefNetworkInfo> {
   const data = await fetchSefJson<unknown>(ctx, SEF_DATA.networkInfo, "SEF's network-info.json")
   if (!isNetworkInfo(data)) throw new SafenetError("SEF's network-info.json no longer has the shape this tool reads")
@@ -330,7 +353,7 @@ function isProof(data: unknown): data is SefRewardProof {
 
 /**
  * The address's reward proof, or null when no source has one: it never earned rewards. `url` is
- * the file that answered, or, with no proof, where the first source would publish it.
+ * the file that answered, or, with no proof, the file whose 404 settled it: the repository's.
  */
 export async function fetchRewardProof(
   ctx: Context,

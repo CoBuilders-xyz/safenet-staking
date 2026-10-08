@@ -17,14 +17,29 @@ describe("rewardsSourceHost", () => {
     expect(rewardsSourceHost(DATASET)).toBe("dweb.link")
     expect(rewardsSourceHost(REPOSITORY_REWARDS_BASE)).toBe("raw.githubusercontent.com")
   })
+
+  it("resolves a relative override against the page instead of throwing", () => {
+    expect(rewardsSourceHost({ url: "/rewards", kind: "override" })).toBe(location.host)
+  })
 })
 
 describe("repositoryReason", () => {
+  const set = { status: "set", raw: "0x", contenthash: { protocol: "ipfs", cid: "b" } } as const
+  const found = { base: REPOSITORY_REWARDS_BASE, outcome: "found" } as const
+
   it("says why the mirror was read, for each ENS state", () => {
-    expect(repositoryReason({ status: "empty" })).toBe(`${SEF_REWARDS_ENS_NAME} points at no dataset yet.`)
-    expect(repositoryReason({ status: "unsupported", raw: "0xdeadbeef", reason: "x" })).toMatch(/cannot read/)
-    expect(repositoryReason({ status: "unreadable", reason: "x" })).toMatch(/could not be read/)
-    expect(repositoryReason({ status: "set", raw: "0x", contenthash: { protocol: "ipfs", cid: "b" } })).toMatch(/did not answer/)
-    expect(repositoryReason(null)).toBeUndefined()
+    expect(repositoryReason({ status: "empty" }, [found])).toBe(`${SEF_REWARDS_ENS_NAME} points at no dataset yet.`)
+    expect(repositoryReason({ status: "unsupported", raw: "0xdeadbeef", reason: "x" }, [found])).toMatch(/cannot read/)
+    expect(repositoryReason({ status: "unreadable", reason: "x" }, [found])).toMatch(/could not be read/)
+    expect(repositoryReason(null, [])).toBeUndefined()
+  })
+
+  it("tells a dataset without the file apart from one that did not answer", () => {
+    expect(repositoryReason(set, [{ base: DATASET, outcome: "not found" }, found])).toBe(
+      "SEF's IPFS dataset has no latest.json at the expected path.",
+    )
+    expect(repositoryReason(set, [{ base: DATASET, outcome: "error" }, found])).toMatch(/did not answer/)
+    expect(repositoryReason(set, [{ base: DATASET, outcome: "not found" }, { base: DATASET, outcome: "timeout" }, found]))
+      .toMatch(/did not answer/)
   })
 })

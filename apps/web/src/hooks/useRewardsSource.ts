@@ -2,6 +2,7 @@ import { useCallback } from "react"
 import { useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { usePublicClient } from "wagmi"
 import {
+  REWARDS_SOURCE_RETRY_MS,
   REWARDS_SOURCE_STALE_MS,
   RewardsReadError,
   readRewardsFile,
@@ -45,19 +46,21 @@ export async function resolveWebRewardsSource(
   return resolveRewardsSource(client, { gateway: ipfsGateway })
 }
 
-/** A failed chain read is retried after a minute, not reused for the hour a resolution is. */
-const UNREADABLE_STALE_MS = 60_000
-
 /**
  * The ENS resolution, cached for the session under one query key, so every reward file read in
- * the same hour uses the same bases. It never fails: a failed read falls back to the repository.
+ * the same hour uses the same bases. A failed chain read is read again after a minute. It never
+ * fails: a failed read falls back to the repository.
+ *
+ * The query is reached only through `fetchQuery`, with no component observing it, so TanStack
+ * would collect it after its default five idle minutes; `gcTime` keeps it for the hour.
  */
 function rewardsSourceQuery(client: EnsReadClient | undefined) {
   return {
     queryKey: ["rewardsSource"],
     queryFn: () => resolveWebRewardsSource(client),
     staleTime: (query: { state: { data?: WebRewardsSource } }) =>
-      query.state.data?.ens?.status === "unreadable" ? UNREADABLE_STALE_MS : REWARDS_SOURCE_STALE_MS,
+      query.state.data?.ens?.status === "unreadable" ? REWARDS_SOURCE_RETRY_MS : REWARDS_SOURCE_STALE_MS,
+    gcTime: REWARDS_SOURCE_STALE_MS,
     retry: false,
   }
 }
@@ -81,8 +84,8 @@ export async function readRewardsFileThrough<T>(
     return { ...read, ens: source.ens }
   } catch (error) {
     // With one source, its own error says more than a list of one.
-    if (error instanceof RewardsReadError && error.failures.length === 1 && error.failures[0]!.kind === "error") {
-      throw error.failures[0]!.error
+    if (error instanceof RewardsReadError && error.attempts.length === 1 && error.attempts[0]!.outcome === "error") {
+      throw error.attempts[0]!.error
     }
     throw error
   }

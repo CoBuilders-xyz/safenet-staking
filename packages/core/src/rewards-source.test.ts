@@ -4,7 +4,7 @@ import { bytesToHex, numberToHex, pad, stringToBytes, zeroAddress, type Hex } fr
 import { normalize } from "viem/ens"
 import {
   IPFS_GATEWAYS, REPOSITORY_REWARDS_BASE, RewardsReadError, SEF_REWARDS_ENS_NAME,
-  decodeContenthash, ipfsGateways, readRewardsEnsState, readRewardsFile, resolveRewardsSource, rewardsDataBases,
+  datasetMiss, decodeContenthash, ipfsGateways, readRewardsEnsState, readRewardsFile, resolveRewardsSource, rewardsDataBases,
   type EnsReadClient, type RewardsDataBase,
 } from "./rewards-source.js"
 import { SEF_DATA } from "./contracts.js"
@@ -24,12 +24,15 @@ const IPNS_KEY = "bafzaajaiaejcaaicamcakbqhbaequcymbuha6earcijrifiwc4mbsgq3dqor4
 const RESOLVER = pad(numberToHex(0xe75), { size: 20 })
 
 /** A client whose ENS name resolves to `contenthash`, or whose reads fail with `error`. */
-function ensClient(contenthash: Hex, options: { resolver?: Hex; error?: Error; hang?: boolean } = {}): EnsReadClient {
+function ensClient(
+  contenthash: Hex,
+  options: { resolver?: Hex; offset?: bigint; error?: Error; hang?: boolean } = {},
+): EnsReadClient {
   return {
     readContract: (async (p: { functionName: string }) => {
       if (options.hang) return new Promise(() => {})
       if (options.error) throw options.error
-      if (p.functionName === "findResolver") return [options.resolver ?? RESOLVER, `0x${"00".repeat(32)}`, 0n]
+      if (p.functionName === "findResolver") return [options.resolver ?? RESOLVER, `0x${"00".repeat(32)}`, options.offset ?? 0n]
       if (p.functionName === "contenthash") return contenthash
       throw new Error(`unexpected ${p.functionName}`)
     }) as unknown as EnsReadClient["readContract"],
@@ -59,6 +62,13 @@ test("an IPNS DNSLink name, written as an identity hash over its text, decodes t
   assert.deepEqual(decodeContenthash(raw), { protocol: "ipns", name: "rewards.example.org" })
 })
 
+test("a real DNSLink contenthash with a trailing space decodes to the bare name", () => {
+  // tokens.uniswap.eth on Mainnet, read 2026-10-08: "tokens.uniswap.org " in an identity hash.
+  assert.deepEqual(decodeContenthash("0xe50101700013746f6b656e732e756e69737761702e6f726720"), {
+    protocol: "ipns", name: "tokens.uniswap.org",
+  })
+})
+
 test("an empty contenthash decodes to nothing", () => {
   assert.equal(decodeContenthash("0x"), null)
 })
@@ -82,13 +92,18 @@ test("a name with no resolver reads as empty", async () => {
   assert.deepEqual(await readRewardsEnsState(ensClient(IPFS_CONTENTHASH, { resolver: zeroAddress })), { status: "empty" })
 })
 
+test("a resolver found on a parent name is a wildcard resolver, reported unsupported without a read", async () => {
+  const state = await readRewardsEnsState(ensClient(IPFS_CONTENTHASH, { offset: 8n }))
+  assert.deepEqual(state, { status: "unsupported", raw: null, reason: "the name is served by a parent's wildcard resolver" })
+})
+
 test("an IPFS contenthash puts the dataset first, through each gateway in order, then the repository", async () => {
   const source = await resolveRewardsSource(ensClient(IPFS_CONTENTHASH))
   assert.equal(source.ens.status, "set")
   assert.deepEqual(source.bases, [
     { url: `https://ipfs.io/ipfs/${IPFS_CID}`, kind: "ens", gateway: "https://ipfs.io" },
     { url: `https://dweb.link/ipfs/${IPFS_CID}`, kind: "ens", gateway: "https://dweb.link" },
-    { url: `https://cloudflare-ipfs.com/ipfs/${IPFS_CID}`, kind: "ens", gateway: "https://cloudflare-ipfs.com" },
+    { url: `https://ipfs.filebase.io/ipfs/${IPFS_CID}`, kind: "ens", gateway: "https://ipfs.filebase.io" },
     REPOSITORY_REWARDS_BASE,
   ])
 })
@@ -133,6 +148,12 @@ test("the gateway list drops an invalid or repeated entry", () => {
   assert.deepEqual(ipfsGateways("https://ipfs.io/"), [...IPFS_GATEWAYS])
 })
 
+test("a configured gateway counts by its origin, so a path cannot double /ipfs/", async () => {
+  assert.deepEqual(ipfsGateways("https://gw.example.org/ipfs/")[0], "https://gw.example.org")
+  const source = await resolveRewardsSource(ensClient(IPFS_CONTENTHASH), { gateway: "https://gw.example.org/ipfs/" })
+  assert.equal(source.bases[0]!.url, `https://gw.example.org/ipfs/${IPFS_CID}`)
+})
+
 test("only a set contenthash adds dataset bases", () => {
   assert.deepEqual(rewardsDataBases({ status: "unreadable", reason: "x" }), [REPOSITORY_REWARDS_BASE])
   assert.equal(REPOSITORY_REWARDS_BASE.url, SEF_DATA.rewardsProofBase)
@@ -148,7 +169,7 @@ function answers(by: Record<string, unknown>) {
     const host = new URL(url).host
     asked.push(host)
     const a = by[host]
-    if (a === "fail") throw new Error("HTTP 502")
+    if (a === "fail") throw new Error(host === "raw.githubusercontent.com" ? "HTTP 500" : "HTTP 502")
     if (a === "hang") {
       return new Promise<never>((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))))
     }
@@ -163,6 +184,7 @@ test("the first base that answers wins, and later bases are not asked", async ()
   assert.deepEqual(read.value, { from: "a" })
   assert.equal(read.base, BASES[0])
   assert.equal(read.url, `${BASES[0]!.url}/latest.json`)
+  assert.deepEqual(read.tried.map((a) => a.outcome), ["found"])
   assert.deepEqual(asked, ["a.example"])
 })
 
@@ -172,23 +194,64 @@ test("an error, a 404 and a wrong shape each fall through to the next base", asy
   assert.deepEqual(read.value, { from: "repo" })
   assert.equal(read.base, REPOSITORY_REWARDS_BASE)
   assert.deepEqual(asked, ["a.example", "b.example", "raw.githubusercontent.com"])
+  assert.deepEqual(read.tried.map((a) => a.outcome), ["error", "not found", "found"])
+  assert.equal(datasetMiss(read.tried), "unanswered")
 })
 
-test("a 404 from every base is no file, reported at the first base", async () => {
+test("a dataset that answers 404 on every gateway is told apart from one that did not answer", async () => {
+  const { attempt } = answers({ "raw.githubusercontent.com": { from: "repo" } })
+  const read = await readRewardsFile({ bases: BASES, path: "latest.json", attempt })
+  assert.equal(read.base, REPOSITORY_REWARDS_BASE)
+  assert.equal(datasetMiss(read.tried), "not found")
+  assert.equal(datasetMiss([{ base: REPOSITORY_REWARDS_BASE, outcome: "found" }]), undefined)
+})
+
+test("a 404 from every base is no file, settled by the repository", async () => {
   const { attempt } = answers({})
   const read = await readRewardsFile({ bases: BASES, path: "proofs/x.json", attempt })
   assert.equal(read.value, null)
-  assert.equal(read.base, BASES[0])
+  assert.equal(read.base, REPOSITORY_REWARDS_BASE)
+  assert.equal(read.url, `${REPOSITORY_REWARDS_BASE.url}/proofs/x.json`)
 })
 
-test("no file and a failure is an error naming every base, not a missing file", async () => {
-  const { attempt } = answers({ "a.example": "fail" })
+test("a gateway 404, a gateway error and a repository 404 are no file, not an error", async () => {
+  // The day SEF populates the name, an address without rewards meets a rate-limited gateway.
+  const { attempt } = answers({ "a.example": null, "b.example": "fail" })
+  const read = await readRewardsFile({ bases: BASES, path: "proofs/x.json", attempt })
+  assert.equal(read.value, null)
+  assert.deepEqual(read.tried.map((a) => a.outcome), ["not found", "error", "not found"])
+})
+
+test("a timed-out gateway and a repository 404 are no file", async () => {
+  const { attempt } = answers({ "a.example": "hang", "b.example": "hang" })
+  const read = await readRewardsFile({ bases: BASES, path: "proofs/x.json", attempt, timeoutMs: 30 })
+  assert.equal(read.value, null)
+  assert.deepEqual(read.tried.map((a) => a.outcome), ["timeout", "skipped", "not found"])
+})
+
+test("a configured override's 404 is no file", async () => {
+  const override = { url: "https://mock-rewards.test", kind: "override" } as const
+  const read = await readRewardsFile({ bases: [override], path: "proofs/x.json", attempt: async () => null })
+  assert.equal(read.value, null)
+  assert.equal(read.base, override)
+})
+
+test("no file and no 404 from the repository is an error naming every base, not a missing file", async () => {
+  const { attempt } = answers({ "a.example": "fail", "raw.githubusercontent.com": "fail" })
   await assert.rejects(readRewardsFile({ bases: BASES, path: "latest.json", attempt }), (error: unknown) => {
     assert.ok(error instanceof RewardsReadError)
-    assert.deepEqual(error.failures.map((f) => f.kind), ["error", "not found", "not found"])
-    assert.match(error.message, /a\.example: HTTP 502; b\.example: not found; raw\.githubusercontent\.com: not found/)
+    assert.deepEqual(error.attempts.map((a) => a.outcome), ["error", "not found", "error"])
+    assert.match(error.message, /a\.example: HTTP 502; b\.example: not found; raw\.githubusercontent\.com: HTTP 500/)
     return true
   })
+})
+
+test("an error names a relative override as given, rather than failing to parse it", async () => {
+  const relative = { url: "/rewards", kind: "override" } as const
+  await assert.rejects(
+    readRewardsFile({ bases: [relative], path: "latest.json", attempt: async () => { throw new Error("HTTP 500") } }),
+    /\/rewards: HTTP 500/,
+  )
 })
 
 test("hanging gateways share one budget, and the repository still gets its own", async () => {

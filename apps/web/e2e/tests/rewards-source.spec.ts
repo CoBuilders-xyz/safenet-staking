@@ -46,7 +46,7 @@ test.describe("Rewards data source", () => {
     await page.goto("/#/rewards")
 
     const verify = section(page, "Verifiability")
-    await expect(valueOf(verify, "Source")).toHaveText("SEF's IPFS dataset (ENS), through dweb.link", { timeout: 10_000 })
+    await expect(valueOf(verify, "Source of latest.json")).toHaveText("SEF's IPFS dataset (ENS), through dweb.link", { timeout: 10_000 })
     await expect(verify.getByText(TEST_MERKLE_ROOT, { exact: true })).toHaveCount(2)
     await expect(verify.getByText("Match", { exact: true })).toBeVisible()
     await expect(verify.getByRole("link", { name: "rewards/latest.json" })).toHaveAttribute(
@@ -59,12 +59,29 @@ test.describe("Rewards data source", () => {
     expect(requests).not.toContain("raw.githubusercontent.com")
   })
 
+  test("with a contenthash set and a gateway failing, an address without rewards reads as never earned", async ({
+    connectedPage: page,
+    mockChainState,
+  }) => {
+    // The day SEF populates the name: ipfs.io rate-limited, the other gateways and the
+    // repository answer 404 for an address that has no proof.
+    mockChainState.ensContenthash = CONTENTHASH
+    mockChainState.failingGateways = ["ipfs.io"]
+
+    await page.goto("/#/rewards")
+
+    const yours = section(page, "Your rewards")
+    await expect(yours.getByText(/has not earned Safenet rewards/)).toBeVisible({ timeout: 10_000 })
+    await expect(yours.getByText(/could not be loaded/)).toHaveCount(0)
+    await expect(section(page, "Actions").getByText("This address has nothing to claim.")).toBeVisible()
+  })
+
   test("with the contenthash empty, reads the repository and says why", async ({ disconnectedPage: page }) => {
     const requests = rewardRequests(page)
 
     await page.goto("/#/rewards")
 
-    const source = valueOf(section(page, "Verifiability"), "Source")
+    const source = valueOf(section(page, "Verifiability"), "Source of latest.json")
     await expect(source).toContainText("SEF's repository, through raw.githubusercontent.com", { timeout: 10_000 })
     await expect(source).toContainText(`${SEF_REWARDS_ENS_NAME} points at no dataset yet.`)
     await expect(section(page, "Verifiability").getByText("Match", { exact: true })).toBeVisible()

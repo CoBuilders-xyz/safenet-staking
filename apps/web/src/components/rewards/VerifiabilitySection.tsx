@@ -68,7 +68,7 @@ export function VerifiabilitySection({ programme }: { programme: ReturnType<type
         <Field label="Root published by SEF">
           <HexValue read={{ data: latest.data?.merkleRoot, error: latest.error }} label="published root" />
         </Field>
-        <Field label="Source">
+        <Field label="Source of latest.json">
           <SourceValue source={latestSource} error={latest.error} />
         </Field>
         <Field label="Roots">
@@ -104,14 +104,17 @@ export function VerifiabilitySection({ programme }: { programme: ReturnType<type
   )
 }
 
-/** Which source the published root was read from, and the gateway or why the mirror was read. */
+/**
+ * Which source latest.json, and so the published root, was read from, and the gateway or why
+ * the mirror was read. Each address's proof is read the same way, on its own.
+ */
 function SourceValue({ source, error }: { source: ReturnType<typeof useProgrammeRewards>["latestSource"]; error: unknown }) {
   if (!source) {
     if (error) return <span className="text-sm">Unavailable</span>
     return <Skeleton className="h-5 w-48" aria-label="Loading source" />
   }
-  const { base, ens } = source
-  const reason = base.kind === "repository" ? repositoryReason(ens) : undefined
+  const { base, ens, tried } = source
+  const reason = base.kind === "repository" ? repositoryReason(ens, tried) : undefined
   return (
     <>
       <span className="text-sm">
