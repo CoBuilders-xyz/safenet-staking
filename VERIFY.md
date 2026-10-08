@@ -30,7 +30,9 @@ Compare that CID with the published one:
 
 - the `Release CID` in the summary of the release workflow run for that tag, also in the
   `CID` file of its `release-<CID>` artifact;
-- the CID a gateway serves, for example `https://<CID>.ipfs.dweb.link/`.
+- the CID a gateway serves: request `/ipfs/<CID>/index.html` from any public gateway in
+  `IPFS_GATEWAYS`, in `packages/core/src/rewards-source.ts`. The release workflow checks those
+  same gateways.
 
 To rebuild a second time, start clean: `rm -rf apps/web/dist apps/web/release`. The release
 build also does this itself.

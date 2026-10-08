@@ -1,17 +1,21 @@
 #!/usr/bin/env tsx
 /**
- * Pin release/app.car to Pinata, then prove two public gateways serve it.
+ * Pin release/app.car to Pinata, then prove the gateways serve it.
  *
  * Run `pnpm --filter @cobuilders/safenet-web release:build` first. This script uploads the
  * CAR as a CAR, so Pinata stores the DAG that build produced and keeps its root CID. It fails
  * if Pinata reports any other CID.
  *
- * Then it fetches index.html through the Pinata gateway and through dweb.link, and fails
- * unless both answer 200 with the index.html inside the CAR, within the retry window. A pin no
- * gateway serves is not a release, and a 200 with a fallback page is not a pin being served.
+ * Then it fetches `/ipfs/<cid>/index.html` through the dedicated Pinata gateway and through
+ * each public gateway in IPFS_GATEWAYS from packages/core, and fails unless every one answers
+ * 200 with the index.html inside the CAR, within the retry window. A pin no gateway serves is
+ * not a release, and a 200 with a fallback page is not a pin being served. The public list is
+ * the one the interface reads SEF's reward dataset through. Its comment records when each
+ * gateway was last probed, and why the IPFS project's own public gateways are not on it: they
+ * retired on 2026-09-21 and answer 429, so a check against them could never pass.
  *
  * PINATA_GATEWAY is a secret, so its host never reaches the log or the step summary. Output
- * names it "the dedicated Pinata gateway" and prints the dweb.link URL in full.
+ * names it "the dedicated Pinata gateway" and prints each public gateway URL in full.
  *
  * Required environment variables. Missing ones fail the run; nothing is skipped:
  *   PINATA_JWT       API JWT from https://app.pinata.cloud/developers/api-keys
@@ -26,6 +30,7 @@ import { execFileSync } from "node:child_process"
 import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { IPFS_GATEWAYS } from "@cobuilders/safenet-core"
 import { PinataSDK } from "pinata"
 
 const RELEASE = resolve(import.meta.dirname, "../release")
@@ -80,10 +85,11 @@ execFileSync(process.execPath, [
 const expectedIndex = readFileSync(join(unpacked, "root", "index.html"))
 rmSync(unpacked, { recursive: true, force: true })
 
-const dwebUrl = `https://${cid}.ipfs.dweb.link/index.html`
+// Path-style URLs on every gateway: each public one serves `<gateway>/ipfs/<cid>/<path>`.
+const publicUrls = IPFS_GATEWAYS.map((origin) => `${origin}/ipfs/${cid}/index.html`)
 const gateways = [
   { label: "the dedicated Pinata gateway", url: `https://${gateway}/ipfs/${cid}/index.html` },
-  { label: dwebUrl, url: dwebUrl },
+  ...publicUrls.map((url) => ({ label: url, url })),
 ]
 
 async function waitFor200({ label, url }: { label: string; url: string }): Promise<void> {
@@ -121,10 +127,10 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     [
       `### Pinned \`${cid}\``,
       "",
-      `- ${dwebUrl}`,
+      ...publicUrls.map((url) => `- ${url}`),
       `- \`/ipfs/${cid}/index.html\` on the dedicated Pinata gateway`,
       "",
     ].join("\n"),
   )
 }
-console.log(`release-pin: ${cid} is pinned and served by both gateways`)
+console.log(`release-pin: ${cid} is pinned and served by every gateway`)

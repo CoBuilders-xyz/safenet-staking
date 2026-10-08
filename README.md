@@ -54,8 +54,8 @@ Production is IPFS. Vercel serves previews only.
 
 A release is a tag `v*`, or a manual run of the `Release` workflow. The workflow builds the
 interface from the committed public values in `apps/web/build.env`, fails if the bundle holds
-a secret, packs it into a CAR and pins that CAR to Pinata. Then it checks that two public
-gateways serve it.
+a secret, packs it into a CAR and pins that CAR to Pinata. Then it checks that the dedicated
+Pinata gateway and each public gateway in `packages/core` serve it.
 
 The CID depends only on the source, the lockfile and `build.env`, so anyone can rebuild it
 and compare. [`VERIFY.md`](VERIFY.md) has the exact commands.

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       pin:
-        description: Pin the CAR to Pinata and check two public gateways. Off builds and verifies only.
+        description: Pin the CAR to Pinata and check that the gateways serve it. Off builds and verifies only.
         type: boolean
         default: true
   push:

@@ -66,7 +66,7 @@ environment or from `.env.local` at the repository root.
 | `yarn test:e2e` | Run Playwright end-to-end tests |
 | `pnpm test:fork` | Run the staking flows against real contracts on an Anvil Mainnet fork (see below) |
 | `pnpm release:build` | Reproducible production build, packed into a CAR with its CID |
-| `pnpm release:pin` | Pin the CAR to Pinata and check two gateways |
+| `pnpm release:pin` | Pin the CAR to Pinata and check that the gateways serve it |
 | `yarn generate:proofs` | Generate Merkle proofs for reward distribution |
 
 See [`MANUAL_TESTING.md`](./MANUAL_TESTING.md) for the pre-release manual QA checklist
