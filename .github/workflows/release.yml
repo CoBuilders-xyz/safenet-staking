@@ -41,7 +41,9 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+          # No dependency cache: a cache written by another workflow could feed the build that
+          # becomes the published artifact. A fresh install from the lockfile costs a minute.
+          package-manager-cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Lint and types
@@ -90,7 +92,9 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+          # No dependency cache: a cache written by another workflow could feed the build that
+          # becomes the published artifact. A fresh install from the lockfile costs a minute.
+          package-manager-cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Download the CAR and the CID
