@@ -49,13 +49,11 @@ jobs:
       - name: Lint and types
         run: pnpm check
       # Builds with build.env only, runs the browser-safety check over dist, then writes
-      # apps/web/release/app.car and apps/web/release/CID.
+      # apps/web/release/app.car and apps/web/release/CID. CI has no root .env.local, so the
+      # check's bundle half finds nothing to compare here. The real guarantee is that this job
+      # references no secrets.* at all.
       - name: Release build, CAR and CID
         run: pnpm --filter @cobuilders/safenet-web release:build
-      # CI has no root .env.local, so this step only proves src reads no process.env. The real
-      # guarantee here is that the build job references no secrets.* at all.
-      - name: Browser-safety check
-        run: pnpm check:browser
       - name: Record the CID
         id: cid
         run: |
@@ -81,8 +79,11 @@ jobs:
   pin:
     name: pin
     needs: build
-    # A tag push always pins. A manual run pins unless pin=false.
-    if: github.event_name == 'push' || inputs.pin
+    # A tag push always pins. A manual run pins unless pin=false. Either way only from main or a
+    # v* tag, so a manual run from a feature branch never pins to the production account.
+    if: >-
+      (github.event_name == 'push' || inputs.pin) &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
