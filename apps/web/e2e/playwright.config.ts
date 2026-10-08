@@ -31,7 +31,9 @@ const mocked: Pick<PlaywrightTestConfig, "projects" | "webServer"> = {
       VITE_TERMS_URL: "https://terms.test",
       VITE_WALLETCONNECT_PROJECT_ID: "00000000000000000000000000000000",
       VITE_MERKLE_DROP_ADDRESS: "0x9999999999999999999999999999999999999999",
-      VITE_REWARDS_BASE_URL: "https://mock-rewards.test",
+      // No VITE_REWARDS_BASE_URL: the mocked suite reads SEF's reward files the way production
+      // does, through the ENS name on the mocked RPC, and the fixture serves the repository
+      // and the gateways. The fork suite below keeps the override, pinned to the fork block.
       VITE_SUBGRAPH_URL_MAINNET: "https://mock-subgraph.test/mainnet",
       VITE_SUBGRAPH_URL_GNOSIS: "https://mock-subgraph.test/gnosis",
     },

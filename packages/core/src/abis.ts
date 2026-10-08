@@ -224,3 +224,16 @@ export const erc20Abi = parseAbi([
 
 /** The SAFE `Transfer` event, to read from a receipt what a claim paid out. */
 export const safeTokenEventsAbi = parseAbi([signatureOf("safeToken", "Transfer")])
+
+/**
+ * ENS, read only to find SEF's canonical reward dataset. Standard interfaces, not Safenet's:
+ * the Universal Resolver's `findResolver`, which viem's own `getEnsResolver` calls, and a
+ * resolver's `contenthash` from ENSIP-7. `src/rewards-source.ts` reads them.
+ */
+export const ensUniversalResolverAbi = parseAbi([
+  "function findResolver(bytes name) view returns (address, bytes32, uint256)",
+])
+
+export const ensResolverAbi = parseAbi([
+  "function contenthash(bytes32 node) view returns (bytes)",
+])

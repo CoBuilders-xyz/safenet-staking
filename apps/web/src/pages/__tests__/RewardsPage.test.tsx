@@ -7,6 +7,7 @@ import { activeChain } from "@/config/chains"
 import type { RewardProof } from "@/hooks/useRewardProof"
 import type { useRewards } from "@/hooks/useRewards"
 import type { useProgrammeRewards } from "@/hooks/useProgrammeRewards"
+import { REPOSITORY_REWARDS_BASE, SEF_DATA, SEF_REWARDS_ENS_NAME } from "@cobuilders/safenet-core"
 import { TEST_ACCOUNTS } from "@/__tests__/test-data"
 import { RewardsPage } from "../RewardsPage"
 
@@ -14,6 +15,7 @@ const SAFE = 10n ** 18n
 const ROOT_A = "0x" + "ab".repeat(32)
 const ROOT_B = "0x" + "cd".repeat(32)
 const { merkleDrop } = getContractAddresses(activeChain.id)
+const DATASET = "https://ipfs.filebase.io/ipfs/bafybeibj6lixxzqtsb45ysdjnupvqkufgdvzqbnvmhw2kf7cfkesy7r7d4"
 
 type Rewards = ReturnType<typeof useRewards>
 type Programme = ReturnType<typeof useProgrammeRewards>
@@ -60,6 +62,7 @@ function rewards(overrides: Partial<Omit<Rewards, "data">> & { data?: Partial<Re
     refetch: vi.fn(),
     reload: vi.fn(),
     proof: PROOF,
+    proofSource: undefined,
     hasMerkleDrop: true,
     ...rest,
   }
@@ -79,6 +82,10 @@ function programme(overrides: Partial<Record<keyof Programme, unknown>> = {}): P
   return {
     merkleDrop,
     latest: { data: LATEST, error: null, refetch: vi.fn() },
+    latestSource: {
+      base: REPOSITORY_REWARDS_BASE, url: SEF_DATA.rewardsLatest, ens: { status: "empty" },
+      tried: [{ base: REPOSITORY_REWARDS_BASE, outcome: "found" }],
+    },
     onChainRoot: { data: ROOT_A, error: null, refetch: vi.fn() },
     dropBalance: { data: 300n * SAFE, error: null, refetch: vi.fn() },
     totals: { allocated: 1000n * SAFE, unclaimed: 300n * SAFE, claimed: 700n * SAFE, unclaimedPercent: 30 },
@@ -160,6 +167,28 @@ describe("RewardsPage", () => {
 
       expect(within(section("Your rewards")).getByText(/has not earned Safenet rewards/)).toBeInTheDocument()
       expect(within(section("Actions")).getByText("This address has nothing to claim.")).toBeInTheDocument()
+      expect(within(section("Your rewards")).queryByText(/rests on SEF's repository/)).not.toBeInTheDocument()
+    })
+
+    it("adds a caveat when only the mirror settled it, because the dataset did not answer", () => {
+      const notFound = { base: REPOSITORY_REWARDS_BASE, outcome: "not found" }
+      mockUseRewards.mockReturnValue(
+        rewards({
+          proof: null,
+          data: { claimable: 0n, totalClaimed: 0n, canClaim: false },
+          proofSource: {
+            base: REPOSITORY_REWARDS_BASE,
+            url: `${SEF_DATA.rewardsProofBase}/proofs/x.json`,
+            ens: { status: "set", raw: "0x", contenthash: { protocol: "ipfs", cid: "b" } },
+            tried: [{ base: { url: DATASET, kind: "ens" }, outcome: "error" }, notFound],
+          } as Rewards["proofSource"],
+        }),
+      )
+      renderPage()
+
+      const yours = section("Your rewards")
+      expect(within(yours).getByText(/has not earned Safenet rewards/)).toBeInTheDocument()
+      expect(within(yours).getByText(/did not answer, so this rests on SEF's repository, a mirror/)).toBeInTheDocument()
     })
 
     it("shows an error with a retry, scoped to the section", async () => {
@@ -350,6 +379,65 @@ describe("RewardsPage", () => {
   })
 
   describe("Verifiability", () => {
+    it("names the repository as the source while the ENS name is empty, and says so", () => {
+      renderPage()
+
+      const ver = section("Verifiability")
+      expect(valueOf(ver, "Source of latest.json")).toHaveTextContent("SEF's repository, through raw.githubusercontent.com")
+      expect(valueOf(ver, "Source of latest.json")).toHaveTextContent(`${SEF_REWARDS_ENS_NAME} points at no dataset yet.`)
+      expect(within(ver).getByRole("link", { name: "rewards/latest.json" })).toHaveAttribute("href", SEF_DATA.rewardsLatest)
+    })
+
+    it("names SEF's IPFS dataset and the gateway it came through, and links the file read", () => {
+      mockUseProgramme.mockReturnValue(
+        programme({
+          latestSource: {
+            base: { url: DATASET, kind: "ens", gateway: "https://ipfs.filebase.io" },
+            url: `${DATASET}/latest.json`,
+            ens: { status: "set" },
+            tried: [{ base: { url: DATASET, kind: "ens" }, outcome: "found" }],
+          },
+        }),
+      )
+      renderPage()
+
+      const ver = section("Verifiability")
+      expect(valueOf(ver, "Source of latest.json")).toHaveTextContent(/^SEF's IPFS dataset \(ENS\), through ipfs\.filebase\.io$/)
+      expect(within(ver).getByRole("link", { name: "rewards/latest.json" })).toHaveAttribute("href", `${DATASET}/latest.json`)
+      expect(within(section("Programme")).getByRole("link", { name: "rewards/latest.json" })).toHaveAttribute(
+        "href",
+        `${DATASET}/latest.json`,
+      )
+    })
+
+    it.each([
+      ["did not answer", "error", /SEF's IPFS dataset did not answer through any gateway\./],
+      ["has no latest.json", "not found", /SEF's IPFS dataset has no latest\.json at the expected path\./],
+    ])("says the repository was read because the dataset %s", (_, outcome, reason) => {
+      mockUseProgramme.mockReturnValue(
+        programme({
+          latestSource: {
+            base: REPOSITORY_REWARDS_BASE,
+            url: SEF_DATA.rewardsLatest,
+            ens: { status: "set" },
+            tried: [{ base: { url: DATASET, kind: "ens" }, outcome }, { base: REPOSITORY_REWARDS_BASE, outcome: "found" }],
+          },
+        }),
+      )
+      renderPage()
+
+      expect(valueOf(section("Verifiability"), "Source of latest.json")).toHaveTextContent(reason)
+    })
+
+    it("shows no source when no source answered", () => {
+      mockUseProgramme.mockReturnValue(
+        programme({ latest: { data: undefined, error: new Error("404"), refetch: vi.fn() }, latestSource: undefined }),
+      )
+      renderPage()
+
+      expect(valueOf(section("Verifiability"), "Source of latest.json")).toHaveTextContent("Unavailable")
+    })
+
     it("links the MerkleDrop on the explorer and shows both roots and the balance", () => {
       renderPage()
 

@@ -2,6 +2,7 @@ import { ConnectButton } from "@/components/wallet/ConnectButton"
 import type { useRewards } from "@/hooks/useRewards"
 import { heldPendingCompliance } from "@/hooks/useRewardProof"
 import { formatTokenAmount } from "@/lib/format"
+import { proofAbsenceCaveat } from "@/lib/rewardsSource"
 import { MESSAGES } from "./messages"
 import { RewardsSection, SectionError, SectionLoading, SectionNote, StatRow } from "./RewardsSection"
 
@@ -11,7 +12,8 @@ interface YourRewardsSectionProps {
 }
 
 export function YourRewardsSection({ isConnected, rewards }: YourRewardsSectionProps) {
-  const { data, proof, isLoading, error, refetch, hasMerkleDrop } = rewards
+  const { data, proof, proofSource, isLoading, error, refetch, hasMerkleDrop } = rewards
+  const caveat = proofAbsenceCaveat(proofSource)
 
   return (
     <RewardsSection
@@ -33,9 +35,12 @@ export function YourRewardsSection({ isConnected, rewards }: YourRewardsSectionP
       ) : isLoading ? (
         <SectionLoading />
       ) : proof === null ? (
-        <SectionNote>
-          This address has not earned Safenet rewards. SEF publishes no reward file for it.
-        </SectionNote>
+        <>
+          <SectionNote>
+            This address has not earned Safenet rewards. SEF publishes no reward file for it.
+          </SectionNote>
+          {caveat && <p className="text-xs text-muted-foreground">{caveat}</p>}
+        </>
       ) : proof ? (
         <>
           <dl>

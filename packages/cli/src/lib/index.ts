@@ -9,7 +9,9 @@ export { SafenetError } from "./errors.js"
 export { errorSentence, redactUrls, scrubSecrets } from "./redact.js"
 export { figure, type Figure } from "./figure.js"
 export { ScanError, scanLogs, type ScanRequest } from "./scan.js"
-export { fetchValidatorsWithWindow, type ParticipationWindow, type SefValidator } from "./sef.js"
+export {
+  fetchValidatorsWithWindow, type ParticipationWindow, type RewardsSourceUsed, type SefValidator,
+} from "./sef.js"
 export { getStatus, ROOT_DIFFERS, type DerivedFigure, type NetworkStatus } from "./status.js"
 export {
   listValidators, showValidator, sortValidators, VALIDATOR_SOURCES,

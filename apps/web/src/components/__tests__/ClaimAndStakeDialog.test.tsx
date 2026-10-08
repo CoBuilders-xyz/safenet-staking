@@ -106,6 +106,7 @@ function rewards(overrides: Partial<Rewards> = {}): Rewards {
     refetch: vi.fn(),
     reload: vi.fn(),
     proof: PROOF,
+    proofSource: undefined,
     hasMerkleDrop: true,
     ...overrides,
   }

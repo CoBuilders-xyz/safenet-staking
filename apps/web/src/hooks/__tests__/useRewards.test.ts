@@ -17,6 +17,7 @@ vi.mock("wagmi", () => ({
 
 vi.mock("../useRewardProof", () => ({
   useRewardProof: (...args: unknown[]) => mockUseRewardProof(...args),
+  useRewardProofSource: () => undefined,
 }))
 
 function proof(merkleRoot: string): RewardProof {

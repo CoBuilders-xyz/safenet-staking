@@ -12,6 +12,8 @@ export interface Context {
   readonly fetch: typeof fetch
   /** Raises the GitHub API limit from 60 requests an hour per IP. Never printed. */
   readonly githubToken?: string | undefined
+  /** An IPFS gateway to try before the public ones, for SEF's reward dataset. */
+  readonly ipfsGateway?: string | undefined
   /** Pause before each retry of a refused log range, times the attempt. Tests set 0. */
   readonly retryDelayMs?: number
 }
@@ -20,6 +22,7 @@ export interface ContextOptions {
   /** Overrides MAINNET_RPC_URL and the public list. */
   readonly rpcUrl?: string | undefined
   readonly githubToken?: string | undefined
+  readonly ipfsGateway?: string | undefined
 }
 
 /**
@@ -47,5 +50,5 @@ export function createContext(options: ContextOptions = {}): Context {
     transport: fallback(rpcEndpoints(options.rpcUrl).map((url) => http(url, { retryCount: 2 }))),
     batch: { multicall: true },
   }) as PublicClient
-  return { client, fetch: globalThis.fetch, githubToken: options.githubToken }
+  return { client, fetch: globalThis.fetch, githubToken: options.githubToken, ipfsGateway: options.ipfsGateway }
 }

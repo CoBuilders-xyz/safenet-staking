@@ -1,10 +1,11 @@
 /**
  * `safenet rewards claim` and `safenet rewards claim-and-stake`.
  *
- * The claim sends what SEF published for the address, read through core's `rewardProofUrl()`,
- * and only while the proof's root is the root on chain. A stale proof is refused before
- * anything is simulated: the contract would revert with `MerkleRootWasUpdated` or
- * `InvalidProof`, and the reason is SEF's publishing, not the user's input.
+ * The claim sends what SEF published for the address, read at core's `rewardProofPath()` from
+ * the first source that has it, SEF's IPFS dataset before the repository, and only while the
+ * proof's root is the root on chain. A stale proof is refused before anything is simulated:
+ * the contract would revert with `MerkleRootWasUpdated` or `InvalidProof`, and the reason is
+ * SEF's publishing, not the user's input.
  *
  * Claim & Stake then stakes what arrived, read from the SAFE `Transfer` log of the claim, not
  * the amount the proof promised: the contract pays the difference from what it already paid,
@@ -16,7 +17,7 @@ import { CONTRACTS, merkleDropAbi, safeTokenEventsAbi } from "@cobuilders/safene
 import type { Context } from "./context.js"
 import { SafenetError } from "./errors.js"
 import { figure, sameHex, type Figure } from "./figure.js"
-import { fetchRewardProof, parseWei } from "./sef.js"
+import { fetchRewardProof, parseWei, type RewardsSourceUsed } from "./sef.js"
 import { actor, readStake, requireValidator, runStake, type Approval, type ApprovalKind } from "./stake.js"
 import {
   WriteError, amount, call, createRunner, type Amount, type Call, type Runner, type WriteMode, type WriteOptions,
@@ -28,6 +29,8 @@ const SAFE_TOKEN = CONTRACTS.safeToken.address
 
 export interface RewardsClaim {
   readonly proofUrl: string
+  /** Where the proof was read from. */
+  readonly proofSource: RewardsSourceUsed
   /** The root on chain, which is also the proof's: a proof for another root is refused. */
   readonly merkleRoot: Figure<Hex>
   readonly cumulative: Figure<Amount>
@@ -64,7 +67,7 @@ const isBytes32 = (s: unknown): s is Hex => typeof s === "string" && /^0x[0-9a-f
 /** Reads the proof and the chain, and refuses a claim that cannot succeed, in one sentence. */
 async function prepareClaim(ctx: Context, account: Address, blockNumber: bigint): Promise<PreparedClaim> {
   const read = { address: MERKLE_DROP, abi: merkleDropAbi, blockNumber } as const
-  const [{ proof, url }, root, claimed] = await Promise.all([
+  const [{ proof, url, source: proofSource }, root, claimed] = await Promise.all([
     fetchRewardProof(ctx, account),
     ctx.client.readContract({ ...read, functionName: "merkleRoot" }),
     ctx.client.readContract({ ...read, functionName: "cumulativeClaimed", args: [account] }),
@@ -91,6 +94,7 @@ async function prepareClaim(ctx: Context, account: Address, blockNumber: bigint)
     call: call("MerkleDrop", MERKLE_DROP, merkleDropAbi, "claim", [account, cumulative, root, hashes]),
     figures: {
       proofUrl: url,
+      proofSource,
       merkleRoot: figure(root, "chain: MerkleDrop.merkleRoot(), equal to the proof's merkleRoot"),
       cumulative: figure(amount(cumulative), `${source}, cumulativeAmount`),
       claimedBefore: figure(amount(claimed), "chain: MerkleDrop.cumulativeClaimed(address)"),

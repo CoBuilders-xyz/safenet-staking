@@ -1,17 +1,18 @@
 import type { ReactNode } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { REWARD_PERIOD_MS, type useProgrammeRewards } from "@/hooks/useProgrammeRewards"
-import { rewardsBaseUrl } from "@/hooks/useRewardProof"
 import { formatTokenAmount, formatUtcDateTime } from "@/lib/format"
 import { MESSAGES } from "./messages"
 import { RewardsSection, SectionError, SectionLoading, SectionNote, StatRow } from "./RewardsSection"
 
-const LATEST_FILE_URL = `${rewardsBaseUrl}/latest.json`
-
-/** The source caption shared by the two programme-wide sections. */
-export function PublishedFileLink() {
+/**
+ * The source caption shared by the two programme-wide sections. It links the file that was
+ * read, from whichever source answered, once one has.
+ */
+export function PublishedFileLink({ href }: { href: string | undefined }) {
+  if (!href) return <>rewards/latest.json</>
   return (
-    <a href={LATEST_FILE_URL} target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+    <a href={href} target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
       rewards/latest.json
     </a>
   )
@@ -26,7 +27,8 @@ export function ProgrammeSection({ programme }: { programme: ReturnType<typeof u
       title="Programme"
       source={
         <>
-          Allocated, period and epoch: SEF&apos;s published file <PublishedFileLink />. Claimed and
+          Allocated, period and epoch: SEF&apos;s published file{" "}
+          <PublishedFileLink href={programme.latestSource?.url} />. Claimed and
           unclaimed: allocated minus the MerkleDrop&apos;s live SAFE balance on Ethereum, derived only
           while the contract holds the published root.
         </>

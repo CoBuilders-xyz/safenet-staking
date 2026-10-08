@@ -4,7 +4,7 @@ import { CONTRACTS, indexedEvent, merkleDropAbi } from "@cobuilders/safenet-core
 import type { Context } from "./context.js"
 import { figure, sameHex, type Figure } from "./figure.js"
 import { scanLogs } from "./scan.js"
-import { fetchRewardProof, parseWei } from "./sef.js"
+import { fetchRewardProof, parseWei, type RewardsSourceUsed } from "./sef.js"
 
 export interface RewardsCheck {
   readonly block: bigint
@@ -12,6 +12,8 @@ export interface RewardsCheck {
   /** False when SEF published no proof for the address: it never earned rewards. */
   readonly earned: boolean
   readonly proofUrl: string
+  /** Where the proof was read from, or, with no proof, which source settled that there is none. */
+  readonly proofSource: RewardsSourceUsed
   /** Everything earned to date. Null when there is no proof. */
   readonly cumulative: Figure<bigint | null>
   readonly claimed: Figure<bigint>
@@ -41,7 +43,7 @@ export async function checkRewards(ctx: Context, address: Address): Promise<Rewa
   const { client } = ctx
   const merkleDrop = CONTRACTS.merkleDrop.address
   const blockNumber = await client.getBlockNumber()
-  const [{ proof, url }, claimed, onChainRoot] = await Promise.all([
+  const [{ proof, url, source }, claimed, onChainRoot] = await Promise.all([
     fetchRewardProof(ctx, address),
     client.readContract({ address: merkleDrop, abi: merkleDropAbi, functionName: "cumulativeClaimed", args: [address], blockNumber }),
     client.readContract({ address: merkleDrop, abi: merkleDropAbi, functionName: "merkleRoot", blockNumber }),
@@ -58,6 +60,7 @@ export async function checkRewards(ctx: Context, address: Address): Promise<Rewa
     address,
     earned: proof !== null,
     proofUrl: url,
+    proofSource: source,
     cumulative: figure(cumulative, `${proofSource}, cumulativeAmount`),
     claimed: figure(claimed, "chain: MerkleDrop.cumulativeClaimed(address)"),
     claimable: figure(claimable, "cumulativeAmount minus cumulativeClaimed"),

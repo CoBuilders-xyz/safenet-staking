@@ -22,6 +22,8 @@ export interface ServerConfig {
   /** SAFENET_MCP_RPC_URL. Undefined leaves the library to MAINNET_RPC_URL, then core's public list. */
   readonly rpcUrl: string | undefined
   readonly githubToken: string | undefined
+  /** IPFS_GATEWAY: a gateway tried before the public ones for SEF's reward dataset. */
+  readonly ipfsGateway: string | undefined
   readonly writes: Writes
   /** Lines for stderr at start: settings that have no effect, said once. */
   readonly notices: readonly string[]
@@ -96,6 +98,7 @@ export function readConfig(env: Env): ServerConfig {
   return {
     rpcUrl,
     githubToken: set(env.GITHUB_TOKEN) ? env.GITHUB_TOKEN : set(env.GH_TOKEN) ? env.GH_TOKEN : undefined,
+    ipfsGateway: set(env.IPFS_GATEWAY) ? env.IPFS_GATEWAY : undefined,
     writes,
     notices,
   }

@@ -92,6 +92,11 @@ const SEF_API = `https://api.github.com/repos/${SEF_DATA_REPO}`
 export const SEF_DATA = {
   validatorInfo: `${SEF_RAW}/main/assets/validator-info.json`,
   networkInfo: `${SEF_RAW}/main/assets/network-info.json`,
+  /**
+   * The reward files in the repository. From the first Aegis distribution SEF names the IPFS
+   * dataset behind `rewards.safenet-gov.eth` canonical and keeps the repository as a temporary
+   * mirror, so readers try that dataset first: see src/rewards-source.ts.
+   */
   rewardsLatest: `${SEF_RAW}/main/assets/rewards/latest.json`,
   rewardsProofBase: `${SEF_RAW}/main/assets/rewards`,
   /**

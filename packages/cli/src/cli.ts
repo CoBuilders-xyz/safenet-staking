@@ -81,6 +81,7 @@ function commandRuntime(runtime: Runtime): CommandRuntime {
       return runtime.createContext({
         rpcUrl: globals.rpcUrl,
         githubToken: runtime.env.GITHUB_TOKEN || runtime.env.GH_TOKEN || undefined,
+        ipfsGateway: runtime.env.IPFS_GATEWAY || undefined,
       })
     },
     emit(globals, data, render) {

@@ -5,7 +5,8 @@
  * happens only where the output says so (percentages, to two places).
  */
 import { formatUnits } from "viem"
-import type { ParticipationWindow } from "../lib/index.js"
+import { datasetMiss } from "@cobuilders/safenet-core"
+import type { ParticipationWindow, RewardsSourceUsed } from "../lib/index.js"
 
 /**
  * What to do about a refused log scan. The library reports what failed; which flag to use is
@@ -107,4 +108,25 @@ export function formatSpan(from: Date, to: Date): string {
   if (d > 0) return `${d}d ${h}h`
   if (h > 0) return `${h}h ${m}m`
   return `${m}m`
+}
+
+/**
+ * Which source a reward file came from, and, when it is the mirror, why. A dataset that
+ * answered 404 on every gateway is told apart from one that did not answer: the first points
+ * at the dataset's layout, the second at the gateways.
+ */
+export function describeRewardsSource(r: RewardsSourceUsed): string {
+  if (r.kind === "ens") return `SEF's IPFS dataset (ENS), through ${r.gateway ? new URL(r.gateway).host : "a gateway"}`
+  if (r.kind === "override") return "a configured URL"
+  // core's datasetMiss() is the one rule for telling the two apart.
+  const miss = datasetMiss(r.tried.map((t) => ({ base: { url: t.url, kind: t.kind }, outcome: t.outcome })))
+  const why = {
+    set: miss === "not found"
+      ? "the IPFS dataset has no such file at the expected path"
+      : "the IPFS dataset did not answer",
+    empty: `${r.ens.name} has no contenthash yet`,
+    unsupported: `${r.ens.name} is set in a form this tool cannot read`,
+    unreadable: `${r.ens.name} could not be read`,
+  }[r.ens.status]
+  return `SEF's repository, a mirror: ${why}`
 }

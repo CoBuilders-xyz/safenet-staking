@@ -2,7 +2,7 @@ import { useAccount, useReadContract } from "wagmi"
 import { merkleDropAbi } from "@/abi/merkleDropAbi"
 import { getContractAddresses } from "@/config/contracts"
 import { activeChain } from "@/config/chains"
-import { useRewardProof } from "./useRewardProof"
+import { useRewardProof, useRewardProofSource } from "./useRewardProof"
 import { sameRoot } from "./useProgrammeRewards"
 
 const { merkleDrop } = getContractAddresses(activeChain.id)
@@ -25,6 +25,7 @@ export function useRewards() {
     error: proofError,
     refetch: refetchProof,
   } = useRewardProof(address, !!merkleDrop)
+  const proofSource = useRewardProofSource(address, !!merkleDrop)
 
   const hasProof = !!proof
 
@@ -73,7 +74,7 @@ export function useRewards() {
     return { proof: fresh.data, root: root.data, error: fresh.error ?? root.error ?? null }
   }
   // `null` means SEF published no file for this address: it never earned rewards.
-  const meta = { isLoading, error, refetch, reload, proof, hasMerkleDrop: !!merkleDrop }
+  const meta = { isLoading, error, refetch, reload, proof, proofSource, hasMerkleDrop: !!merkleDrop }
 
   if (!proof || cumulativeClaimed === undefined) {
     return { data: EMPTY, ...meta }

@@ -66,14 +66,30 @@ export interface SefRewardProof {
 }
 
 /**
- * Where SEF publishes one address's reward proof. The path fans out on the first four bytes
- * of the lower-case address, two hex digits per directory.
+ * The reward files, as paths relative to a rewards data base: the repository's
+ * `assets/rewards` directory, or the root of SEF's IPFS dataset. Every reader builds its URLs
+ * from these two, so the layout lives here alone.
+ *
+ * The repository's layout was read off the live files on 2026-10-04. The IPFS dataset's layout
+ * is not published yet: these paths assume it repeats the repository's under its root, and
+ * must be checked against the dataset when SEF populates the ENS name. See rewards-source.ts.
  */
-export function rewardProofUrl(address: string): string {
+export const REWARDS_LATEST_PATH = "latest.json"
+
+/**
+ * One address's reward proof, relative to a rewards data base. The path fans out on the first
+ * four bytes of the lower-case address, two hex digits per directory.
+ */
+export function rewardProofPath(address: string): string {
   if (!/^0x[0-9a-fA-F]{40}$/.test(address)) throw new Error(`not an address: ${address}`)
   const lower = address.toLowerCase()
   const radix = lower.slice(2, 10).match(/../g)!.join("/")
-  return `${SEF_DATA.rewardsProofBase}/proofs/${radix}/${lower}.json`
+  return `proofs/${radix}/${lower}.json`
+}
+
+/** Where a rewards data base publishes one address's reward proof. The repository by default. */
+export function rewardProofUrl(address: string, base: string = SEF_DATA.rewardsProofBase): string {
+  return `${base}/${rewardProofPath(address)}`
 }
 
 /** validator-info.json reports `participation_rate_14d` over this many days. */

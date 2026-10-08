@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import type { useProgrammeRewards } from "@/hooks/useProgrammeRewards"
 import { explorerAddressUrl, explorerName } from "@/lib/explorer"
 import { formatTokenAmount } from "@/lib/format"
+import { repositoryReason, rewardsSourceHost, rewardsSourceLabel } from "@/lib/rewardsSource"
 import { PublishedFileLink } from "./ProgrammeSection"
 import { MESSAGES } from "./messages"
 import { RewardsSection, SectionError, SectionNote } from "./RewardsSection"
@@ -30,7 +31,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function VerifiabilitySection({ programme }: { programme: ReturnType<typeof useProgrammeRewards> }) {
-  const { merkleDrop, onChainRoot, latest, dropBalance, rootMatches } = programme
+  const { merkleDrop, onChainRoot, latest, latestSource, dropBalance, rootMatches } = programme
 
   if (!merkleDrop) {
     return (
@@ -48,7 +49,7 @@ export function VerifiabilitySection({ programme }: { programme: ReturnType<type
       source={
         <>
           On-chain root and balance: the MerkleDrop contract on Ethereum. Published root: SEF&apos;s
-          file <PublishedFileLink />.
+          file <PublishedFileLink href={latestSource?.url} />.
         </>
       }
     >
@@ -66,6 +67,9 @@ export function VerifiabilitySection({ programme }: { programme: ReturnType<type
         </Field>
         <Field label="Root published by SEF">
           <HexValue read={{ data: latest.data?.merkleRoot, error: latest.error }} label="published root" />
+        </Field>
+        <Field label="Source of latest.json">
+          <SourceValue source={latestSource} error={latest.error} />
         </Field>
         <Field label="Roots">
           <RootIndicator matches={rootMatches} />
@@ -97,6 +101,27 @@ export function VerifiabilitySection({ programme }: { programme: ReturnType<type
         </SectionNote>
       )}
     </RewardsSection>
+  )
+}
+
+/**
+ * Which source latest.json, and so the published root, was read from, and the gateway or why
+ * the mirror was read. Each address's proof is read the same way, on its own.
+ */
+function SourceValue({ source, error }: { source: ReturnType<typeof useProgrammeRewards>["latestSource"]; error: unknown }) {
+  if (!source) {
+    if (error) return <span className="text-sm">Unavailable</span>
+    return <Skeleton className="h-5 w-48" aria-label="Loading source" />
+  }
+  const { base, ens, tried } = source
+  const reason = base.kind === "repository" ? repositoryReason(ens, tried) : undefined
+  return (
+    <>
+      <span className="text-sm">
+        {rewardsSourceLabel(base)}, through {rewardsSourceHost(base)}
+      </span>
+      {reason && <p className="text-xs text-muted-foreground">{reason}</p>}
+    </>
   )
 }
 

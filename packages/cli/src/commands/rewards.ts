@@ -4,7 +4,7 @@ import {
   type ClaimAndStakeResult, type RewardsCheck, type RewardsClaim, type RewardsClaimResult, type RewardsHistory,
 } from "../lib/index.js"
 import type { CommandRuntime } from "../cli.js"
-import { formatCount, formatSafe, formatTime, renderTable } from "./format.js"
+import { describeRewardsSource, formatCount, formatSafe, formatTime, renderTable } from "./format.js"
 import { addressSchema, claimAndStakeSchema, historySchema, parseOptions, writeSchema } from "./options.js"
 import {
   addWriteOptions, approvalText, figureRow, renderFigures, renderProgress, renderSteps, writeHead, type FigureRow,
@@ -30,7 +30,7 @@ export function renderRewardsClaim(r: RewardsClaimResult): string {
     "",
     renderFigures(claimRows(r.claim)),
     "",
-    `Proof: ${r.claim.proofUrl}`,
+    `Proof: ${r.claim.proofUrl}, from ${describeRewardsSource(r.claim.proofSource)}`,
     "",
     renderSteps(r.steps),
   ].join("\n")
@@ -53,7 +53,7 @@ export function renderClaimAndStake(r: ClaimAndStakeResult): string {
     "",
     renderFigures(rows),
     "",
-    `Proof: ${r.claim.proofUrl}`,
+    `Proof: ${r.claim.proofUrl}, from ${describeRewardsSource(r.claim.proofSource)}`,
     "",
     renderSteps(r.steps),
   ].join("\n")
@@ -67,6 +67,7 @@ export function renderRewardsCheck(r: RewardsCheck): string {
       "",
       "Never earned: SEF published no reward proof for this address (the file is a 404).",
       `Claimed on chain: ${formatSafe(r.claimed.value)} (${r.claimed.source}).`,
+      `No proof at ${r.proofUrl}; settled by ${describeRewardsSource(r.proofSource)}.`,
     ]
     return lines.join("\n")
   }
@@ -85,6 +86,7 @@ export function renderRewardsCheck(r: RewardsCheck): string {
   if (r.kycAmount.value !== null) {
     rows.push(["Held pending compliance", formatSafe(r.heldPendingCompliance), "kycAmount, unless kyc is true"])
   }
+  rows.push(["Proof read from", describeRewardsSource(r.proofSource), r.proofUrl])
   if (r.root) {
     rows.push(["Merkle root, chain", r.root.onChain.value, r.root.onChain.source])
     rows.push(["Merkle root, proof", r.root.proof.value, r.root.proof.source])

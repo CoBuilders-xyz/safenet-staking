@@ -1,7 +1,7 @@
 import type { Command } from "commander"
 import { getStatus, type DerivedFigure, type NetworkStatus } from "../lib/index.js"
 import type { CommandRuntime } from "../cli.js"
-import { formatCount, formatSafe, formatTime, renderTable } from "./format.js"
+import { describeRewardsSource, formatCount, formatSafe, formatTime, renderTable } from "./format.js"
 
 const derived = (f: DerivedFigure) =>
   f.value === null ? `not derivable: ${f.reason ?? "no value"}` : formatSafe(f.value)
@@ -28,6 +28,7 @@ export function renderStatus(s: NetworkStatus): string {
     ["SAFE held by MerkleDrop", formatSafe(s.merkleDropBalance.value), s.merkleDropBalance.source],
     ["Merkle root, chain", s.merkleRoot.onChain.value, s.merkleRoot.onChain.source],
     ["Merkle root, published", s.merkleRoot.published.value, s.merkleRoot.published.source],
+    ["Rewards data", describeRewardsSource(s.rewardsSource), s.rewardsSource.url],
   ]
   const root = s.merkleRoot.match
     ? "Merkle root: match. The root on chain is the root in SEF's latest.json."
