@@ -1,0 +1,11 @@
+# Text is checked out with LF on every platform. A checkout with core.autocrlf=true would
+# otherwise write CRLF into apps/web/index.html and apps/web/public, and the release CID would
+# change with the machine. VERIFY.md relies on this.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff2 binary
+*.car binary

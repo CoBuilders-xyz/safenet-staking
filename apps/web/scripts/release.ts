@@ -3,9 +3,13 @@
  * Build the production bundle and pack it into a CAR whose root CID anyone can reproduce.
  *
  *   1. Read build.env. It is the only input besides the source and the lockfile: every .env
- *      file and every VITE_ variable already in the shell is ignored.
+ *      file, every VITE_ variable already in the shell and the graph-node port from .env.ports
+ *      are ignored.
  *   2. `vite build --mode production` into dist/.
  *   3. tools/check-browser-safety.mjs over dist/. A secret in the bundle fails the release.
+ *      Its bundle half compares dist/ with .env.local, which only a developer machine has: on
+ *      the CI runner it finds nothing to compare. There the guarantee is that the build job
+ *      receives no secret at all.
  *   4. Pack dist/ into release/app.car and write the root CID to release/CID.
  *
  * CID settings are ipfs-car 3.1.0's defaults, which are also the web3.storage defaults:
@@ -50,6 +54,10 @@ for (const key of Object.keys(process.env)) {
   if (key.startsWith("VITE_")) delete process.env[key]
 }
 Object.assign(process.env, publicEnv)
+// vite.config.ts inlines GRAPH_NODE_PORT, from the shell or else from the .env.ports that
+// `pnpm bootstrap` writes per worktree, so a bootstrapped checkout would build another CID. An
+// empty string wins over .env.ports in its `??` chain, and is what CI builds with.
+process.env.GRAPH_NODE_PORT = ""
 // Vite keeps a NODE_ENV already set in the shell, and NODE_ENV=development changes the bundle.
 process.env.NODE_ENV = "production"
 

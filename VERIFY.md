@@ -57,8 +57,9 @@ It prints the root CID. It must equal `apps/web/release/CID`.
 | The public build-time values | `apps/web/build.env` |
 | The CID settings | `ipfs-car` 3.1.0 defaults: CIDv1, raw leaves, 1 MiB fixed-size chunks, balanced layout 1024 links wide, no mtime, no mode |
 
-Nothing else. The release build ignores every `.env` file and every `VITE_` variable in your
-shell, and the bundle holds no timestamp. `apps/web/build.env` is committed and holds only
+Nothing else. The release build ignores every `.env` file, every `VITE_` variable in your
+shell and the graph-node port in `.env.ports`, and the bundle holds no timestamp. Text files
+are checked out with LF line endings on every platform, by `.gitattributes`. `apps/web/build.env` is committed and holds only
 public values; a value there ships to every visitor.
 
 ## If your CID differs
@@ -68,5 +69,11 @@ public values; a value there ships to every visitor.
    The release build forces `NODE_ENV=production`. If you changed the script, check that
    your shell's `NODE_ENV` does not reach Vite: `NODE_ENV=development` gives another CID.
 3. `pnpm install` must have run with `--frozen-lockfile`, so the lockfile did not change.
-4. Compare the files: `ls -lR apps/web/dist` on both sides, then `diff` the first file that
+4. `git ls-files --eol apps/web | grep crlf` must print nothing. `.gitattributes` checks text
+   out with LF, but a working tree written before it existed can still hold CRLF in
+   `index.html` or under `public/`, and that gives another CID. Re-clone to fix it.
+5. The release build sets `GRAPH_NODE_PORT` to an empty string. `vite.config.ts` inlines that
+   port into the bundle, from your shell or from the `.env.ports` that `pnpm bootstrap` writes
+   per worktree. If you changed the script, check that neither reaches Vite.
+6. Compare the files: `ls -lR apps/web/dist` on both sides, then `diff` the first file that
    differs. A difference there is a reproducibility bug. Please open an issue with it.
