@@ -4,17 +4,24 @@ import { gatewayHost, gatewayUrl, probeAsset, servesRelease } from "../release-g
 const bytes = (text: string) => new TextEncoder().encode(text)
 
 describe("probeAsset", () => {
-  it("picks the first .js file under assets/ in byte order", () => {
-    const paths = ["index.html", "assets/b.js", "assets/B.js", "assets/a.css", "favicon.ico"]
-    expect(probeAsset(paths)).toBe("assets/B.js")
+  const file = (path: string, size: number) => ({ path, size })
+
+  it("picks the smallest .js file under assets/", () => {
+    const files = [file("index.html", 10), file("assets/a.js", 899_000), file("assets/z.js", 1_200), file("assets/a.css", 5)]
+    expect(probeAsset(files)).toBe("assets/z.js")
+  })
+
+  it("breaks a tie in size by name in byte order", () => {
+    expect(probeAsset([file("assets/b.js", 100), file("assets/B.js", 100), file("assets/c.js", 200)])).toBe("assets/B.js")
   })
 
   it("ignores .js files outside assets/ and source maps", () => {
-    expect(probeAsset(["sw.js", "assets/app.js.map", "assets/app.js"])).toBe("assets/app.js")
+    const files = [file("sw.js", 1), file("assets/app.js.map", 2), file("assets/app.js", 300)]
+    expect(probeAsset(files)).toBe("assets/app.js")
   })
 
   it("is undefined when the release holds no JavaScript under assets/", () => {
-    expect(probeAsset(["index.html", "assets/app.css"])).toBeUndefined()
+    expect(probeAsset([file("index.html", 10), file("assets/app.css", 20)])).toBeUndefined()
   })
 })
 

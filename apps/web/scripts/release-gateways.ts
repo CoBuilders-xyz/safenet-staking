@@ -4,15 +4,17 @@
  */
 
 /**
- * The file whose bytes prove a gateway serves this release: the first `.js` file under
- * `assets/`, in byte order. Not index.html: a gateway fronted by Cloudflare injects a challenge
- * script into every text/html response, so its index.html never equals the release's. A
- * JavaScript file is served as it is stored. `paths` are relative to the release root, with `/`.
+ * The file whose bytes prove a gateway serves this release: the smallest `.js` file under
+ * `assets/`, ties broken by name in byte order. Small, because a gateway fetches it from the
+ * network on first request, and a large chunk drew 504s before its 200. Not index.html: a
+ * gateway fronted by Cloudflare injects a challenge script into every text/html response, so
+ * its index.html never equals the release's. A JavaScript file is served as it is stored.
+ * Each `path` is relative to the release root, with `/`; `size` is in bytes.
  */
-export function probeAsset(paths: readonly string[]): string | undefined {
-  return paths
-    .filter((p) => p.startsWith("assets/") && p.endsWith(".js"))
-    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))[0]
+export function probeAsset(files: readonly { path: string; size: number }[]): string | undefined {
+  return files
+    .filter(({ path }) => path.startsWith("assets/") && path.endsWith(".js"))
+    .sort((a, b) => a.size - b.size || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))[0]?.path
 }
 
 /** True when a gateway's body is the release's file, byte for byte. */
