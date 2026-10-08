@@ -105,3 +105,19 @@ test("with build.env present, a value it does not hold still fails, naming only 
   assert.match(output, /The value of SECRET /)
   assert.doesNotMatch(output, /PROJECT_ID/)
 })
+
+test("a key that shares its stem with a build.env key but leaks another value fails, naming it", () => {
+  const { status, output } = check('PROJECT_ID="plantedvalue456"\n', "const p=plantedvalue456;\n", {
+    buildEnv: "VITE_PROJECT_ID=publicvalue0123\n",
+  })
+  assert.equal(status, 1)
+  assert.match(output, /The value of PROJECT_ID from \.env\.local appears/)
+})
+
+test("a value build.env holds under a key without VITE_ earns no exemption", () => {
+  const { status, output } = check('PROJECT_ID="publicvalue0123"\n', 'const p="publicvalue0123";\n', {
+    buildEnv: "PROJECT_ID=publicvalue0123\n",
+  })
+  assert.equal(status, 1)
+  assert.match(output, /The value of PROJECT_ID /)
+})

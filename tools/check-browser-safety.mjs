@@ -24,15 +24,18 @@ if (hits) {
 
 // 2. build: no secret from .env.local may appear anywhere in dist, index.html and every asset
 // included. VITE_ values are skipped: Vite puts every one of them into the bundle by design, so
-// they are public by definition. So is any value that apps/web/build.env also holds: the release
-// build ships that file on purpose, whatever key .env.local stores the same value under.
+// they are public by definition. So is any value that apps/web/build.env holds under a VITE_ key:
+// the release build ships those on purpose, whatever key .env.local stores the same value under.
+// A non-VITE_ key in build.env breaks that file's own rule, so its value earns no exemption.
 const envPath = join(ROOT, ".env.local")
 const distDir = join(ROOT, "apps/web/dist")
 const buildEnvPath = join(ROOT, "apps/web/build.env")
 if (existsSync(envPath) && existsSync(distDir)) {
   // The release build reads build.env with parseEnv, so read it the same way here.
   const published = new Set(
-    existsSync(buildEnvPath) ? Object.values(parseEnv(readFileSync(buildEnvPath, "utf8"))) : [],
+    Object.entries(existsSync(buildEnvPath) ? parseEnv(readFileSync(buildEnvPath, "utf8")) : {})
+      .filter(([key]) => key.startsWith("VITE_"))
+      .map(([, value]) => value),
   )
   const secrets = readFileSync(envPath, "utf8")
     .split("\n")
