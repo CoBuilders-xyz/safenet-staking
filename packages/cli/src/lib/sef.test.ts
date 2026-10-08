@@ -19,5 +19,6 @@ test("the library's rewards source names core's kinds and ENS states, no more an
   const kinds: Same<RewardsSourceUsed["kind"], RewardsDataBase["kind"]> = true
   const states: Same<RewardsSourceUsed["ens"]["status"], RewardsEnsState["status"]> = true
   const outcomes: Same<RewardsSourceUsed["tried"][number]["outcome"], RewardsAttempt["outcome"]> = true
-  assert.ok(kinds && states && outcomes)
+  const triedKinds: Same<RewardsSourceUsed["tried"][number]["kind"], RewardsDataBase["kind"]> = true
+  assert.ok(kinds && states && outcomes && triedKinds)
 })

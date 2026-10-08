@@ -2,9 +2,10 @@
  * `safenet rewards claim` and `safenet rewards claim-and-stake`.
  *
  * The claim sends what SEF published for the address, read at core's `rewardProofPath()` from
- * the first source that has it, SEF's IPFS dataset before the repository, and only while the proof's root is the root on chain. A stale proof is refused before
- * anything is simulated: the contract would revert with `MerkleRootWasUpdated` or
- * `InvalidProof`, and the reason is SEF's publishing, not the user's input.
+ * the first source that has it, SEF's IPFS dataset before the repository, and only while the
+ * proof's root is the root on chain. A stale proof is refused before anything is simulated:
+ * the contract would revert with `MerkleRootWasUpdated` or `InvalidProof`, and the reason is
+ * SEF's publishing, not the user's input.
  *
  * Claim & Stake then stakes what arrived, read from the SAFE `Transfer` log of the claim, not
  * the amount the proof promised: the contract pays the difference from what it already paid,

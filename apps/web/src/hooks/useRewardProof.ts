@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { getAddress } from "viem"
 import type { Address, Hex } from "viem"
 import { rewardProofPath } from "@cobuilders/safenet-core"
-import { useRewardsFileReader } from "./useRewardsSource"
+import { useRewardsFileReader, type RewardsFileRead } from "./useRewardsSource"
 
 export interface RewardProof {
   cumulativeAmount: string
@@ -54,17 +54,34 @@ export function heldPendingCompliance(proof: RewardProof | null | undefined): bi
   return BigInt(proof.kycAmount)
 }
 
-/**
- * The address's proof from the first source that has it, SEF's IPFS dataset before the
- * repository. Null when none has one: the address never earned rewards.
- */
-export function useRewardProof(address: Address | undefined, enabled = true) {
+/** Where the proof was read from, or which source settled that there is none. */
+export type RewardProofSource = Omit<RewardsFileRead<RewardProof>, "value">
+
+/** One query, observed twice: by `useRewardProof` for the proof, by `useRewardProofSource` for its source. */
+function useRewardProofRead<S>(address: Address | undefined, enabled: boolean, select: (read: RewardsFileRead<RewardProof>) => S) {
   const read = useRewardsFileReader()
   return useQuery({
     queryKey: ["rewardProof", address],
-    queryFn: async ({ signal }) => (await read(rewardProofPath(getAddress(address!)), fetchProofAt, signal)).value,
+    queryFn: ({ signal }) => read(rewardProofPath(getAddress(address!)), fetchProofAt, signal),
+    select,
     enabled: !!address && enabled,
     staleTime: 5 * 60 * 1000,
     retry: false,
   })
+}
+
+const proofOf = (read: RewardsFileRead<RewardProof>) => read.value
+const sourceOf = ({ base, url, ens, tried }: RewardsFileRead<RewardProof>): RewardProofSource => ({ base, url, ens, tried })
+
+/**
+ * The address's proof from the first source that has it, SEF's IPFS dataset before the
+ * repository. Null when the repository answered 404: the address never earned rewards.
+ */
+export function useRewardProof(address: Address | undefined, enabled = true) {
+  return useRewardProofRead(address, enabled, proofOf)
+}
+
+/** Where `useRewardProof`'s answer came from. Reads nothing more: it observes the same query. */
+export function useRewardProofSource(address: Address | undefined, enabled = true) {
+  return useRewardProofRead(address, enabled, sourceOf).data
 }

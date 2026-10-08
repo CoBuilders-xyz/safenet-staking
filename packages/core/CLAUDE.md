@@ -51,9 +51,10 @@ legitimately contains none of them.
   `SEF_REWARDS_ENS_NAME`, and the public gateways, `IPFS_GATEWAYS`, live here and nowhere else.
   It resolves the name's contenthash, lists the bases to try, the IPFS dataset through each
   gateway and then the repository mirror, and reads a file from the first base that answers. A
-  file is absent only when the repository, or a configured override, answers 404: the dataset's layout under the
-  contenthash is assumed to repeat the repository's `assets/rewards` until SEF confirms it, so a
-  404 from a gateway proves nothing.
+  file is absent only when the repository, or a configured override, answers 404: the dataset's
+  layout under the contenthash is assumed to repeat the repository's `assets/rewards` until SEF
+  confirms it, so a 404 from a gateway proves nothing. The gateway comment records how each
+  gateway was checked, and why ipfs.io and dweb.link are not listed: both retired.
 - `src/deployments.ts` — what the interface needs per chain, derived from `src/contracts.ts`.
 - `src/parity/` — the comparison behind `pnpm test:parity`, which both subgraph packages share.
   `compare.ts` holds the rules as pure functions: exact and declared-precision comparison, the

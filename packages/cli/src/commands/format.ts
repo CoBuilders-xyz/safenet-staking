@@ -5,6 +5,7 @@
  * happens only where the output says so (percentages, to two places).
  */
 import { formatUnits } from "viem"
+import { datasetMiss } from "@cobuilders/safenet-core"
 import type { ParticipationWindow, RewardsSourceUsed } from "../lib/index.js"
 
 /**
@@ -117,9 +118,10 @@ export function formatSpan(from: Date, to: Date): string {
 export function describeRewardsSource(r: RewardsSourceUsed): string {
   if (r.kind === "ens") return `SEF's IPFS dataset (ENS), through ${r.gateway ? new URL(r.gateway).host : "a gateway"}`
   if (r.kind === "override") return "a configured URL"
-  const gateways = r.tried.filter((t) => t.kind === "ens")
+  // core's datasetMiss() is the one rule for telling the two apart.
+  const miss = datasetMiss(r.tried.map((t) => ({ base: { url: t.url, kind: t.kind }, outcome: t.outcome })))
   const why = {
-    set: gateways.length > 0 && gateways.every((t) => t.outcome === "not found")
+    set: miss === "not found"
       ? "the IPFS dataset has no such file at the expected path"
       : "the IPFS dataset did not answer",
     empty: `${r.ens.name} has no contenthash yet`,

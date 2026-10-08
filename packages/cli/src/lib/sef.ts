@@ -137,8 +137,9 @@ export function rewardsSource(ctx: Context): Promise<RewardsSource> {
 
 /**
  * One reward file from the first source that has it, checked against `isShape` at each source,
- * so a file of the wrong shape falls through like a failed request. Null when every source
- * answered 404. When only the repository was tried, its own error is thrown unchanged.
+ * so a file of the wrong shape falls through like a failed request. Null when the repository,
+ * whose layout is known, or the configured override answered 404, whatever the gateways did.
+ * When only the repository was tried, its own error is thrown unchanged.
  */
 async function readRewards<T>(
   ctx: Context,

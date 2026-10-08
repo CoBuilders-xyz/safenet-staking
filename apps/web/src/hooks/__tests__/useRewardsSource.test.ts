@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { QueryClient } from "@tanstack/react-query"
 import { numberToHex, pad, type Hex } from "viem"
 import {
-  REPOSITORY_REWARDS_BASE, REWARDS_LATEST_PATH, REWARDS_SOURCE_STALE_MS, SEF_DATA, type EnsReadClient,
+  REPOSITORY_REWARDS_BASE, REWARDS_LATEST_PATH, REWARDS_SOURCE_RETRY_MS, REWARDS_SOURCE_STALE_MS, SEF_DATA, type EnsReadClient,
 } from "@cobuilders/safenet-core"
 import { readRewardsFileThrough, resolveWebRewardsSource } from "../useRewardsSource"
 
@@ -49,8 +49,7 @@ describe("resolveWebRewardsSource", () => {
   it("puts SEF's IPFS dataset first, gateway by gateway, then the repository", async () => {
     const source = await resolveWebRewardsSource(ensClient(CONTENTHASH).client, undefined)
     expect(source.bases.map((b) => b.url)).toEqual([
-      `https://ipfs.io/ipfs/${CID}`,
-      `https://dweb.link/ipfs/${CID}`,
+      `https://ipfs.orbitor.dev/ipfs/${CID}`,
       `https://ipfs.filebase.io/ipfs/${CID}`,
       SEF_DATA.rewardsProofBase,
     ])
@@ -78,22 +77,22 @@ describe("readRewardsFileThrough", () => {
   })
 
   it("reads the dataset through the first gateway that answers", async () => {
-    vi.stubGlobal("fetch", serve({ "ipfs.io": 504, "dweb.link": { epoch: 1 }, "raw.githubusercontent.com": { epoch: 0 } }))
+    vi.stubGlobal("fetch", serve({ "ipfs.orbitor.dev": 504, "ipfs.filebase.io": { epoch: 1 }, "raw.githubusercontent.com": { epoch: 0 } }))
     const read = await readRewardsFileThrough(queryClient, ensClient(CONTENTHASH).client, REWARDS_LATEST_PATH, attempt, signal)
     expect(read.value).toEqual({ epoch: 1 })
-    expect(read.base).toEqual({ url: `https://dweb.link/ipfs/${CID}`, kind: "ens", gateway: "https://dweb.link" })
-    expect(read.url).toBe(`https://dweb.link/ipfs/${CID}/latest.json`)
+    expect(read.base).toEqual({ url: `https://ipfs.filebase.io/ipfs/${CID}`, kind: "ens", gateway: "https://ipfs.filebase.io" })
+    expect(read.url).toBe(`https://ipfs.filebase.io/ipfs/${CID}/latest.json`)
     expect(read.ens?.status).toBe("set")
   })
 
   it("falls through every gateway to the repository", async () => {
-    const fetch = serve({ "ipfs.io": "down", "dweb.link": 502, "raw.githubusercontent.com": { epoch: 0 } })
+    const fetch = serve({ "ipfs.orbitor.dev": "down", "ipfs.filebase.io": 502, "raw.githubusercontent.com": { epoch: 0 } })
     vi.stubGlobal("fetch", fetch)
     const read = await readRewardsFileThrough(queryClient, ensClient(CONTENTHASH).client, REWARDS_LATEST_PATH, attempt, signal)
     expect(read.value).toEqual({ epoch: 0 })
     expect(read.base).toEqual(REPOSITORY_REWARDS_BASE)
     expect(fetch.mock.calls.map(([url]) => new URL(url).host)).toEqual([
-      "ipfs.io", "dweb.link", "ipfs.filebase.io", "raw.githubusercontent.com",
+      "ipfs.orbitor.dev", "ipfs.filebase.io", "raw.githubusercontent.com",
     ])
   })
 
@@ -106,7 +105,7 @@ describe("readRewardsFileThrough", () => {
   })
 
   it("resolves the ENS name once per session, not once per file", async () => {
-    vi.stubGlobal("fetch", serve({ "ipfs.io": { epoch: 1 } }))
+    vi.stubGlobal("fetch", serve({ "ipfs.orbitor.dev": { epoch: 1 } }))
     const { client, readContract } = ensClient(CONTENTHASH)
     await readRewardsFileThrough(queryClient, client, REWARDS_LATEST_PATH, attempt, signal)
     await readRewardsFileThrough(queryClient, client, "proofs/x.json", attempt, signal)
@@ -114,18 +113,45 @@ describe("readRewardsFileThrough", () => {
   })
 
   it("reads no proof, not an error, when a gateway fails and the repository answers 404", async () => {
-    vi.stubGlobal("fetch", serve({ "ipfs.io": 429 }))
+    vi.stubGlobal("fetch", serve({ "ipfs.orbitor.dev": 429 }))
     const read = await readRewardsFileThrough(queryClient, ensClient(CONTENTHASH).client, "proofs/x.json", attempt, signal)
     expect(read.value).toBeNull()
     expect(read.base).toEqual(REPOSITORY_REWARDS_BASE)
-    expect(read.tried.map((a) => a.outcome)).toEqual(["error", "not found", "not found", "not found"])
+    expect(read.tried.map((a) => a.outcome)).toEqual(["error", "not found", "not found"])
   })
 
   it("keeps the resolution for the hour with no component observing it", async () => {
-    vi.stubGlobal("fetch", serve({ "ipfs.io": { epoch: 1 } }))
+    vi.stubGlobal("fetch", serve({ "ipfs.orbitor.dev": { epoch: 1 } }))
     await readRewardsFileThrough(queryClient, ensClient(CONTENTHASH).client, REWARDS_LATEST_PATH, attempt, signal)
     const query = queryClient.getQueryCache().find({ queryKey: ["rewardsSource"] })
     expect(query?.gcTime).toBe(REWARDS_SOURCE_STALE_MS)
+  })
+
+  it("reads the name again a minute after a failed read, and keeps a set name for the hour", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: 1_800_000_000_000 })
+    try {
+      vi.stubGlobal("fetch", serve({ "ipfs.orbitor.dev": { epoch: 1 }, "raw.githubusercontent.com": { epoch: 0 } }))
+      const { client, readContract } = ensClient(CONTENTHASH)
+      readContract.mockRejectedValueOnce(new Error("RPC blip"))
+      const lookups = () => readContract.mock.calls.filter(([p]) => p.functionName === "findResolver").length
+      const read = () => readRewardsFileThrough(queryClient, client, REWARDS_LATEST_PATH, attempt, signal)
+
+      expect((await read()).ens?.status).toBe("unreadable")
+      vi.setSystemTime(Date.now() + REWARDS_SOURCE_RETRY_MS - 1)
+      await read()
+      expect(lookups()).toBe(1)
+      vi.setSystemTime(Date.now() + 2)
+      expect((await read()).ens?.status).toBe("set")
+      expect(lookups()).toBe(2)
+      vi.setSystemTime(Date.now() + REWARDS_SOURCE_STALE_MS - 1)
+      await read()
+      expect(lookups()).toBe(2)
+      vi.setSystemTime(Date.now() + 2)
+      await read()
+      expect(lookups()).toBe(3)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("throws the repository's own error when it was the only source and failed", async () => {
@@ -136,9 +162,9 @@ describe("readRewardsFileThrough", () => {
   })
 
   it("names every source when all of them fail", async () => {
-    vi.stubGlobal("fetch", serve({ "ipfs.io": 502, "dweb.link": 502, "ipfs.filebase.io": "down", "raw.githubusercontent.com": 500 }))
+    vi.stubGlobal("fetch", serve({ "ipfs.orbitor.dev": 502, "ipfs.filebase.io": "down", "raw.githubusercontent.com": 500 }))
     await expect(
       readRewardsFileThrough(queryClient, ensClient(CONTENTHASH).client, REWARDS_LATEST_PATH, attempt, signal),
-    ).rejects.toThrow(/ipfs\.io: .*502; dweb\.link: .*502; ipfs\.filebase\.io: Failed to fetch; raw\.githubusercontent\.com: .*500/)
+    ).rejects.toThrow(/ipfs\.orbitor\.dev: .*502; ipfs\.filebase\.io: Failed to fetch; raw\.githubusercontent\.com: .*500/)
   })
 })

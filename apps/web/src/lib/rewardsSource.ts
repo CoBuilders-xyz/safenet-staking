@@ -41,3 +41,15 @@ export function repositoryReason(ens: RewardsEnsState | null, tried: readonly Re
     default: return undefined
   }
 }
+
+/**
+ * A caveat for "no proof" when only the repository mirror settled it: SEF's IPFS dataset, the
+ * canonical source, was tried and did not answer. Undefined when the dataset was not tried, or
+ * answered 404 too.
+ */
+export function proofAbsenceCaveat(
+  source: { base: RewardsDataBase; tried: readonly RewardsAttempt[] } | undefined,
+): string | undefined {
+  if (source?.base.kind !== "repository" || datasetMiss(source.tried) !== "unanswered") return undefined
+  return "SEF's IPFS dataset, the canonical source, did not answer, so this rests on SEF's repository, a mirror."
+}

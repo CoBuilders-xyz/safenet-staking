@@ -101,8 +101,7 @@ test("an IPFS contenthash puts the dataset first, through each gateway in order,
   const source = await resolveRewardsSource(ensClient(IPFS_CONTENTHASH))
   assert.equal(source.ens.status, "set")
   assert.deepEqual(source.bases, [
-    { url: `https://ipfs.io/ipfs/${IPFS_CID}`, kind: "ens", gateway: "https://ipfs.io" },
-    { url: `https://dweb.link/ipfs/${IPFS_CID}`, kind: "ens", gateway: "https://dweb.link" },
+    { url: `https://ipfs.orbitor.dev/ipfs/${IPFS_CID}`, kind: "ens", gateway: "https://ipfs.orbitor.dev" },
     { url: `https://ipfs.filebase.io/ipfs/${IPFS_CID}`, kind: "ens", gateway: "https://ipfs.filebase.io" },
     REPOSITORY_REWARDS_BASE,
   ])
@@ -110,7 +109,7 @@ test("an IPFS contenthash puts the dataset first, through each gateway in order,
 
 test("an IPNS contenthash builds /ipns/ URLs", async () => {
   const source = await resolveRewardsSource(ensClient(IPNS_CONTENTHASH))
-  assert.equal(source.bases[0]!.url, `https://ipfs.io/ipns/${IPNS_KEY}`)
+  assert.equal(source.bases[0]!.url, `https://ipfs.orbitor.dev/ipns/${IPNS_KEY}`)
   assert.equal(source.bases.at(-1), REPOSITORY_REWARDS_BASE)
 })
 
@@ -145,7 +144,7 @@ test("a chain that does not answer in time reads as unreadable", async () => {
 test("the gateway list drops an invalid or repeated entry", () => {
   assert.deepEqual(ipfsGateways("not a url"), [...IPFS_GATEWAYS])
   assert.deepEqual(ipfsGateways("ftp://gw.example.org"), [...IPFS_GATEWAYS])
-  assert.deepEqual(ipfsGateways("https://ipfs.io/"), [...IPFS_GATEWAYS])
+  assert.deepEqual(ipfsGateways("https://ipfs.orbitor.dev/"), [...IPFS_GATEWAYS])
 })
 
 test("a configured gateway counts by its origin, so a path cannot double /ipfs/", async () => {
@@ -226,7 +225,7 @@ test("a timed-out gateway and a repository 404 are no file", async () => {
   const { attempt } = answers({ "a.example": "hang", "b.example": "hang" })
   const read = await readRewardsFile({ bases: BASES, path: "proofs/x.json", attempt, timeoutMs: 30 })
   assert.equal(read.value, null)
-  assert.deepEqual(read.tried.map((a) => a.outcome), ["timeout", "skipped", "not found"])
+  assert.deepEqual(read.tried.map((a) => a.outcome), ["timeout", "timeout", "not found"])
 })
 
 test("a configured override's 404 is no file", async () => {
@@ -252,6 +251,43 @@ test("an error names a relative override as given, rather than failing to parse 
     readRewardsFile({ bases: [relative], path: "latest.json", attempt: async () => { throw new Error("HTTP 500") } }),
     /\/rewards: HTTP 500/,
   )
+})
+
+test("a hang at the first gateway takes its share only, so the second still answers", async () => {
+  const { asked, attempt } = answers({ "a.example": "hang", "b.example": { from: "b" } })
+  const read = await readRewardsFile({ bases: BASES, path: "latest.json", attempt, timeoutMs: 60 })
+  assert.deepEqual(read.value, { from: "b" })
+  assert.deepEqual(read.tried.map((a) => a.outcome), ["timeout", "found"])
+  assert.deepEqual(asked, ["a.example", "b.example"])
+})
+
+test("time a fast failure leaves unused passes to the next gateway", async () => {
+  // a.example fails at once, so b.example may use nearly the whole budget, not half of it.
+  const slow = async (url: string, signal: AbortSignal) => {
+    if (new URL(url).host === "a.example") throw new Error("HTTP 502")
+    if (new URL(url).host === "raw.githubusercontent.com") return null
+    return new Promise<{ from: string }>((resolve, reject) => {
+      const timer = setTimeout(() => resolve({ from: "b" }), 50)
+      signal.addEventListener("abort", () => (clearTimeout(timer), reject(new Error("aborted"))))
+    })
+  }
+  const read = await readRewardsFile({ bases: BASES, path: "latest.json", attempt: slow, timeoutMs: 80 })
+  assert.deepEqual(read.value, { from: "b" })
+})
+
+test("with the mirror down and the dataset answering 404, the read fails: a gateway's 404 proves nothing", async () => {
+  // Pinned on purpose: relaxing the absence rule to trust the dataset's 404 must change this test.
+  for (const [repository, outcome] of [["fail", "error"], ["hang", "timeout"]] as const) {
+    const { attempt } = answers({ "raw.githubusercontent.com": repository })
+    await assert.rejects(
+      readRewardsFile({ bases: BASES, path: "proofs/x.json", attempt, timeoutMs: 30 }),
+      (error: unknown) => {
+        assert.ok(error instanceof RewardsReadError)
+        assert.deepEqual(error.attempts.map((a) => a.outcome), ["not found", "not found", outcome])
+        return true
+      },
+    )
+  }
 })
 
 test("hanging gateways share one budget, and the repository still gets its own", async () => {

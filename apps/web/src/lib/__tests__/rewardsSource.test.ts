@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest"
 import { REPOSITORY_REWARDS_BASE, SEF_REWARDS_ENS_NAME } from "@cobuilders/safenet-core"
-import { repositoryReason, rewardsSourceHost, rewardsSourceLabel } from "../rewardsSource"
+import { proofAbsenceCaveat, repositoryReason, rewardsSourceHost, rewardsSourceLabel } from "../rewardsSource"
 
-const DATASET = { url: "https://dweb.link/ipfs/bafy", kind: "ens", gateway: "https://dweb.link" } as const
+const DATASET = { url: "https://ipfs.filebase.io/ipfs/bafy", kind: "ens", gateway: "https://ipfs.filebase.io" } as const
 
 describe("rewardsSourceLabel", () => {
   it("names each kind of source", () => {
@@ -14,7 +14,7 @@ describe("rewardsSourceLabel", () => {
 
 describe("rewardsSourceHost", () => {
   it("gives the gateway for the dataset and the server for the others", () => {
-    expect(rewardsSourceHost(DATASET)).toBe("dweb.link")
+    expect(rewardsSourceHost(DATASET)).toBe("ipfs.filebase.io")
     expect(rewardsSourceHost(REPOSITORY_REWARDS_BASE)).toBe("raw.githubusercontent.com")
   })
 
@@ -41,5 +41,21 @@ describe("repositoryReason", () => {
     expect(repositoryReason(set, [{ base: DATASET, outcome: "error" }, found])).toMatch(/did not answer/)
     expect(repositoryReason(set, [{ base: DATASET, outcome: "not found" }, { base: DATASET, outcome: "timeout" }, found]))
       .toMatch(/did not answer/)
+  })
+})
+
+describe("proofAbsenceCaveat", () => {
+  const notFound = { base: REPOSITORY_REWARDS_BASE, outcome: "not found" } as const
+
+  it("qualifies a missing proof that only the mirror settled, while the dataset did not answer", () => {
+    expect(proofAbsenceCaveat({ base: REPOSITORY_REWARDS_BASE, tried: [{ base: DATASET, outcome: "error" }, notFound] }))
+      .toMatch(/did not answer, so this rests on SEF's repository, a mirror/)
+  })
+
+  it("says nothing when the dataset was not tried, answered 404 too, or the source is unknown", () => {
+    expect(proofAbsenceCaveat({ base: REPOSITORY_REWARDS_BASE, tried: [notFound] })).toBeUndefined()
+    expect(proofAbsenceCaveat({ base: REPOSITORY_REWARDS_BASE, tried: [{ base: DATASET, outcome: "not found" }, notFound] }))
+      .toBeUndefined()
+    expect(proofAbsenceCaveat(undefined)).toBeUndefined()
   })
 })

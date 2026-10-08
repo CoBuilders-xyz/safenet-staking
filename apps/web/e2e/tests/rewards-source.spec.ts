@@ -38,7 +38,7 @@ test.describe("Rewards data source", () => {
     mockChainState,
   }) => {
     mockChainState.ensContenthash = CONTENTHASH
-    mockChainState.failingGateways = ["ipfs.io"]
+    mockChainState.failingGateways = ["ipfs.orbitor.dev"]
     mockChainState.repositoryDown = true
     mockChainState.rewardProof = REWARD_PROOFS.claimable
     const requests = rewardRequests(page)
@@ -46,12 +46,12 @@ test.describe("Rewards data source", () => {
     await page.goto("/#/rewards")
 
     const verify = section(page, "Verifiability")
-    await expect(valueOf(verify, "Source of latest.json")).toHaveText("SEF's IPFS dataset (ENS), through dweb.link", { timeout: 10_000 })
+    await expect(valueOf(verify, "Source of latest.json")).toHaveText("SEF's IPFS dataset (ENS), through ipfs.filebase.io", { timeout: 10_000 })
     await expect(verify.getByText(TEST_MERKLE_ROOT, { exact: true })).toHaveCount(2)
     await expect(verify.getByText("Match", { exact: true })).toBeVisible()
     await expect(verify.getByRole("link", { name: "rewards/latest.json" })).toHaveAttribute(
       "href",
-      `https://dweb.link/ipfs/${CID}/latest.json`,
+      `https://ipfs.filebase.io/ipfs/${CID}/latest.json`,
     )
 
     // The proof came through the same gateway, so the claim is open.
@@ -63,16 +63,18 @@ test.describe("Rewards data source", () => {
     connectedPage: page,
     mockChainState,
   }) => {
-    // The day SEF populates the name: ipfs.io rate-limited, the other gateways and the
-    // repository answer 404 for an address that has no proof.
+    // The day SEF populates the name: the first gateway fails, the second and the repository
+    // answer 404 for an address that has no proof.
     mockChainState.ensContenthash = CONTENTHASH
-    mockChainState.failingGateways = ["ipfs.io"]
+    mockChainState.failingGateways = ["ipfs.orbitor.dev"]
 
     await page.goto("/#/rewards")
 
     const yours = section(page, "Your rewards")
     await expect(yours.getByText(/has not earned Safenet rewards/)).toBeVisible({ timeout: 10_000 })
     await expect(yours.getByText(/could not be loaded/)).toHaveCount(0)
+    // One gateway did not answer, so the absence rests on the mirror, and the page says so.
+    await expect(yours.getByText(/did not answer, so this rests on SEF's repository, a mirror/)).toBeVisible()
     await expect(section(page, "Actions").getByText("This address has nothing to claim.")).toBeVisible()
   })
 

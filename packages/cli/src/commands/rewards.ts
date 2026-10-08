@@ -67,7 +67,7 @@ export function renderRewardsCheck(r: RewardsCheck): string {
       "",
       "Never earned: SEF published no reward proof for this address (the file is a 404).",
       `Claimed on chain: ${formatSafe(r.claimed.value)} (${r.claimed.source}).`,
-      `Proof read from: ${describeRewardsSource(r.proofSource)}.`,
+      `No proof at ${r.proofUrl}; settled by ${describeRewardsSource(r.proofSource)}.`,
     ]
     return lines.join("\n")
   }

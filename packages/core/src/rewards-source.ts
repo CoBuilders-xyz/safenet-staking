@@ -29,15 +29,22 @@ export const SEF_REWARDS_ENS_NAME = "rewards.safenet-gov.eth"
 
 /**
  * Public IPFS gateways, tried in this order after a configured one. Each serves path-style
- * URLs, `<gateway>/ipfs/<cid>/<path>`, with the file's own bytes and CORS open to any origin.
+ * URLs, `<gateway>/ipfs/<cid>/<path>`, with the file's own bytes, and sends
+ * `access-control-allow-origin: *` on a 404 as well, so a browser sees the 404 and not a CORS
+ * failure. Checked on 2026-10-08 against the Uniswap token list, a 667 kB JSON file, by CID:
  *
- * ipfs.io and dweb.link sit behind one rate-limiting edge: on 2026-10-08 both answered 429 from
- * one host at the same moment, within 60 ms each, so a rate-limited pair costs little time.
- * ipfs.filebase.io is operated separately. That day it served a JSON file by CID as
- * `application/json` and a missing path as a 404. cloudflare-ipfs.com, retired by Cloudflare,
- * no longer resolves in DNS and is not listed.
+ * - ipfs.orbitor.dev: 200 `application/json` in 0.11 to 0.17 s, a missing path 404 in 0.06 s.
+ *   Listed by the IPFS project's public-gateway-checker. Its operator is not identified.
+ * - ipfs.filebase.io: operated by Filebase. 200 `application/json` in 1.35 to 1.41 s, a missing
+ *   path 404 in 0.5 s; one request in ten hung past 25 s.
+ *
+ * ipfs.io and dweb.link are retired: since 2026-09-21 both answer every path with a 429 that
+ * points at https://gatewaychanges.ipfs.io, which says the public gateway no longer fetches
+ * content over HTTP. Gateways that redirect to them, such as w3s.link, storacha.link and
+ * nftstorage.link, are retired with them. cloudflare-ipfs.com does not resolve in DNS.
+ * gateway.pinata.cloud serves JSON but took 3.5 to 8.5 s, slower than a gateway's time slice.
  */
-export const IPFS_GATEWAYS: readonly string[] = ["https://ipfs.io", "https://dweb.link", "https://ipfs.filebase.io"]
+export const IPFS_GATEWAYS: readonly string[] = ["https://ipfs.orbitor.dev", "https://ipfs.filebase.io"]
 
 /** How long one resolution of the ENS name is reused. SEF publishes rewards every two weeks. */
 export const REWARDS_SOURCE_STALE_MS = 60 * 60 * 1000
@@ -48,7 +55,9 @@ export const REWARDS_SOURCE_RETRY_MS = 60_000
 /**
  * How long one read waits: the ENS lookup, a file from the repository, or a file from all the
  * gateways together. The gateways share one budget, so dead gateways delay the repository by
- * one timeout, not by one each.
+ * one timeout, not by one each. Within it, each gateway in turn gets the time left divided by
+ * the gateways left: a hang at the first takes its share, not the second's, and time a fast
+ * failure leaves unused passes to the gateways after it.
  */
 export const REWARDS_FETCH_TIMEOUT_MS = 10_000
 
@@ -368,7 +377,7 @@ export interface RewardsRead<T> {
   /** The base that had the file, or, with none, the base whose 404 settled it. */
   readonly base: RewardsDataBase
   readonly url: string
-  /** Every base asked, in order, ending with `base`. */
+  /** Every base, asked or skipped, in order, ending with `base`. */
   readonly tried: readonly RewardsAttempt[]
 }
 
@@ -398,9 +407,10 @@ export async function readRewardsFile<T>(options: {
   if (bases.length === 0) throw new RewardsReadError(path, [])
   const tried: RewardsAttempt[] = []
   const gatewaysUntil = Date.now() + timeoutMs
+  let gatewaysLeft = bases.filter((b) => b.kind === "ens").length
   for (const base of bases) {
     signal?.throwIfAborted()
-    const budget = base.kind === "ens" ? gatewaysUntil - Date.now() : timeoutMs
+    const budget = base.kind === "ens" ? (gatewaysUntil - Date.now()) / gatewaysLeft-- : timeoutMs
     if (budget <= 0) {
       tried.push({ base, outcome: "skipped" })
       continue

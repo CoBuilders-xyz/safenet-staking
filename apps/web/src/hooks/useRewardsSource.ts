@@ -65,7 +65,8 @@ function rewardsSourceQuery(client: EnsReadClient | undefined) {
   }
 }
 
-export type RewardsAttempt<T> = (url: string, signal: AbortSignal) => Promise<T | null>
+/** Fetches one URL: the parsed file, null for a 404, or a throw. Not core's `RewardsAttempt`, the record of one. */
+export type RewardsFetch<T> = (url: string, signal: AbortSignal) => Promise<T | null>
 
 /**
  * Reads one reward file from the first source that has it: SEF's IPFS dataset when its ENS
@@ -75,7 +76,7 @@ export async function readRewardsFileThrough<T>(
   queryClient: QueryClient,
   client: EnsReadClient | undefined,
   path: string,
-  attempt: RewardsAttempt<T>,
+  attempt: RewardsFetch<T>,
   signal?: AbortSignal,
 ): Promise<RewardsFileRead<T>> {
   const source = await queryClient.fetchQuery(rewardsSourceQuery(client))
@@ -96,7 +97,7 @@ export function useRewardsFileReader() {
   const queryClient = useQueryClient()
   const client = usePublicClient()
   return useCallback(
-    <T>(path: string, attempt: RewardsAttempt<T>, signal?: AbortSignal) =>
+    <T>(path: string, attempt: RewardsFetch<T>, signal?: AbortSignal) =>
       readRewardsFileThrough(queryClient, client, path, attempt, signal),
     [queryClient, client],
   )

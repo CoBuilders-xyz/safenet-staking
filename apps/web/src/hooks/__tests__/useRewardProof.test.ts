@@ -10,6 +10,7 @@ let capturedOptions:
   | {
       queryKey?: unknown[]
       queryFn?: (context: { signal: AbortSignal }) => Promise<unknown>
+      select?: (read: unknown) => unknown
       enabled?: boolean
       staleTime?: number
       retry?: boolean
@@ -85,7 +86,7 @@ describe("useRewardProof", () => {
     })
 
     async function callQueryFn() {
-      return capturedOptions!.queryFn!({ signal: new AbortController().signal })
+      return capturedOptions!.select!(await capturedOptions!.queryFn!({ signal: new AbortController().signal }))
     }
 
     it("returns null on 404", async () => {
