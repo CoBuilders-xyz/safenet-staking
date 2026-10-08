@@ -15,12 +15,21 @@ export function useNetworkQuery() {
   return useSubgraphQuery("mainnet", "network", NetworkTotalsDocument)
 }
 
+/** Validators by SEF's `is_active` flag. */
+export interface ValidatorCounts {
+  active: number
+  /** Listed with `is_active: false`: withdrawn, with Aegis participation unconfirmed. */
+  withdrawn: number
+}
+
 /**
- * Network-wide staking figures: total staked, active validators, current stakers.
+ * Network-wide staking figures: total staked, validators, current stakers.
  *
- * From the Mainnet subgraph while it is live. Otherwise total staked comes from
- * `totalStakedAmount()` on the staking contract, active validators from SEF's validator list, and
- * stakers, which no contract read gives, is unavailable with the reason.
+ * Total staked and stakers come from the Mainnet subgraph while it is live. Otherwise total staked
+ * comes from `totalStakedAmount()` on the staking contract, and stakers, which no contract read
+ * gives, is unavailable with the reason. Validators always come from SEF's list: only its
+ * `is_active` flag says which validators still take part, while the contract and the subgraph
+ * count every registered one.
  */
 export function useNetworkTotals() {
   const subgraph = useNetworkQuery()
@@ -30,22 +39,26 @@ export function useNetworkTotals() {
   const validators = useValidators()
 
   let totalStaked: Figure<bigint> = loading()
-  let activeValidators: Figure<number> = loading()
   let stakers: Figure<number> = loading()
+  const validatorCounts: Figure<ValidatorCounts> = validators.error
+    ? unavailable(NETWORK_MESSAGES.validatorListFailed)
+    : validators.data
+      ? ready(
+          {
+            active: validators.data.filter((v) => v.isActive).length,
+            withdrawn: validators.data.filter((v) => !v.isActive).length,
+          },
+          "sef",
+        )
+      : loading()
 
   if (network.status === "live") {
     totalStaked = ready(BigInt(network.value.totalStaked), "subgraph")
-    activeValidators = ready(network.value.activeValidators, "subgraph")
     stakers = ready(network.value.stakersCurrent, "subgraph")
   } else if (network.status === "degraded") {
     totalStaked = fromRead(totalRead, "contract", NETWORK_MESSAGES.stakingReadFailed)
-    activeValidators = validators.error
-      ? unavailable(NETWORK_MESSAGES.validatorListFailed)
-      : validators.data
-        ? ready(validators.data.filter((v) => v.isActive).length, "sef")
-        : loading()
     stakers = unavailable(`${describeDegradation(network.degradation)} No contract read gives this figure.`)
   }
 
-  return { subgraph, totalStaked, activeValidators, stakers }
+  return { subgraph, totalStaked, validatorCounts, stakers }
 }

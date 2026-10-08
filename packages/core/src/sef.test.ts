@@ -2,7 +2,19 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { SEF_DATA, SEF_DATA_REPO } from "./contracts.js"
 import {
-  PARTICIPATION_WINDOW_DAYS, REWARDS_LATEST_PATH, parseSefAmount, participationWindow, rewardProofPath, rewardProofUrl,
+  AEGIS_START_DAY,
+  BETA_END_DAY,
+  GNOSIS_INDEXED_PROGRAMME,
+  PARTICIPATION_WINDOW_DAYS,
+  REWARDS_LATEST_PATH,
+  REWARD_PARTICIPATION_THRESHOLD,
+  REWARD_PERIOD_DAYS,
+  parseSefAmount,
+  participationWindow,
+  programmePhase,
+  rewardProofPath,
+  rewardProofUrl,
+  utcDayMs,
 } from "./sef.js"
 
 // An address made up for the test. Its first four bytes differ, so the radix path is checkable.
@@ -72,4 +84,32 @@ test("an amount with more places than SAFE has, or not a number, is refused", ()
   assert.throws(() => parseSefAmount("1.0000000000000000001"), /more than SAFE's 18/)
   assert.throws(() => parseSefAmount("1e18"), /not a decimal amount/)
   assert.throws(() => parseSefAmount("-1"), /not a decimal amount/)
+})
+
+test("the programme calendar puts each UTC day in Beta, the gap, or Aegis", () => {
+  const at = (iso: string) => programmePhase(new Date(iso))
+  assert.equal(at("2026-09-23T12:00:00Z"), "beta")
+  assert.equal(at(`${BETA_END_DAY}T00:00:00Z`), "beta")
+  assert.equal(at(`${BETA_END_DAY}T23:59:59.999Z`), "beta")
+  assert.equal(at("2026-10-06T00:00:00Z"), "gap")
+  assert.equal(at("2026-10-12T23:59:59.999Z"), "gap")
+  assert.equal(at(`${AEGIS_START_DAY}T00:00:00Z`), "aegis")
+  assert.equal(at("2026-11-01T08:00:00Z"), "aegis")
+})
+
+test("the calendar's days are the ones SEF's transition note gives", () => {
+  assert.equal(BETA_END_DAY, "2026-10-05")
+  assert.equal(AEGIS_START_DAY, "2026-10-13")
+  assert.equal(REWARD_PERIOD_DAYS, 14)
+  assert.equal(REWARD_PARTICIPATION_THRESHOLD, 0.75)
+  assert.ok(utcDayMs(BETA_END_DAY) < utcDayMs(AEGIS_START_DAY))
+})
+
+test("the Gnosis subgraph indexes the Beta contracts until a change indexes Aegis's", () => {
+  assert.equal(GNOSIS_INDEXED_PROGRAMME, "beta")
+})
+
+test("utcDayMs and programmePhase refuse what is not a day", () => {
+  assert.throws(() => utcDayMs("2026-13-40"))
+  assert.throws(() => programmePhase(new Date(Number.NaN)))
 })

@@ -15,7 +15,6 @@ query NetworkTotals {
   }
   network(id: "1") {
     totalStaked
-    activeValidators
     stakersCurrent
     rewardsClaimed
     currentRoot

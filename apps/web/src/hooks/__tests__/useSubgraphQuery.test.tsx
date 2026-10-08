@@ -11,7 +11,7 @@ const { urls } = vi.hoisted(() => ({
 }))
 vi.mock("@/config/subgraphs", () => ({ SUBGRAPH_URLS: urls }))
 
-const NETWORK = { totalStaked: "1", activeValidators: 1, stakersCurrent: 1, rewardsClaimed: "0", currentRoot: null }
+const NETWORK = { totalStaked: "1", stakersCurrent: 1, rewardsClaimed: "0", currentRoot: null }
 
 function render() {
   return renderHook(() => useSubgraphQuery("mainnet", "network", NetworkTotalsDocument), { wrapper: queryWrapper() })

@@ -4,6 +4,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { TooltipProvider } from "@radix-ui/react-tooltip"
 import { ValidatorDetailPage } from "../ValidatorDetailPage"
 import { TEST_ACCOUNTS, MOCK_VALIDATORS } from "@/__tests__/test-data"
+import { useValidators } from "@/hooks/useValidators"
+import { PARTICIPATION_RULE } from "@/lib/programme"
 
 const mockUseAccount = vi.fn()
 
@@ -55,6 +57,11 @@ describe("ValidatorDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockUseAccount.mockReturnValue({ isConnected: true })
+    // Each test starts from the active list; a test that changes it does not leak into the next.
+    vi.mocked(useValidators).mockReturnValue({
+      data: [...MOCK_VALIDATORS],
+      isLoading: false,
+    } as unknown as ReturnType<typeof useValidators>)
   })
 
   it("shows invalid address message for bad address", () => {
@@ -71,10 +78,33 @@ describe("ValidatorDetailPage", () => {
     expect(screen.getByText(/Participation \(14d\)/)).toBeInTheDocument()
   })
 
+  it("shows the 75% reward threshold beside the participation rate, and the rule", () => {
+    renderWithRoute(TEST_ACCOUNTS.validator1)
+
+    expect(screen.getByText("99.9%")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "At or above the 75% reward threshold" })).toBeInTheDocument()
+    expect(screen.getByText(PARTICIPATION_RULE)).toBeInTheDocument()
+  })
+
+  it("says a validator SEF marks inactive is withdrawn, keeps its figures, and turns staking off", () => {
+    vi.mocked(useValidators).mockReturnValue({
+      data: [{ ...MOCK_VALIDATORS[0], isActive: false, participationRate: 70 }],
+      isLoading: false,
+    } as unknown as ReturnType<typeof useValidators>)
+    renderWithRoute(TEST_ACCOUNTS.validator1)
+
+    expect(screen.getByText("Withdrawn")).toBeInTheDocument()
+    expect(screen.getByText(/Withdrawn, Aegis participation unconfirmed/)).toBeInTheDocument()
+    expect(screen.getByText("70%")).toHaveClass("text-warning")
+    expect(screen.getByRole("button", { name: "Below the 75% reward threshold" })).toBeInTheDocument()
+    expect(screen.getByText("5,000")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Stake" })).toBeDisabled()
+  })
+
   it("shows stake and unstake buttons when connected", () => {
     renderWithRoute(TEST_ACCOUNTS.validator1)
 
-    expect(screen.getByRole("button", { name: "Stake" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Stake" })).toBeEnabled()
     expect(screen.getByRole("button", { name: "Unstake" })).toBeInTheDocument()
   })
 

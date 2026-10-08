@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from "vitest"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
+import { TooltipProvider } from "@radix-ui/react-tooltip"
+import type { ReactNode } from "react"
 import { getAddress } from "viem"
 import { TEST_ACCOUNTS } from "@/__tests__/test-data"
 import { Stat } from "../overview/Stat"
@@ -9,6 +11,8 @@ import { Distribution } from "../overview/Distribution"
 import { Validators } from "../overview/Validators"
 import { ChainFreshness } from "../overview/Freshness"
 import { SectionBoundary } from "../overview/OverviewSection"
+import { ParticipationRate } from "../validators/ParticipationRate"
+import { PARTICIPATION_RULE } from "@/lib/programme"
 import { HHI_DEFINITION } from "@/lib/distribution"
 
 const SAFE = 10n ** 18n
@@ -65,28 +69,104 @@ describe("Distribution", () => {
   })
 })
 
+const withRouter = (ui: ReactNode) => (
+  <MemoryRouter>
+    <TooltipProvider>{ui}</TooltipProvider>
+  </MemoryRouter>
+)
+
+describe("ParticipationRate", () => {
+  it("marks a rate at or above the threshold, with SEF's rule in its tooltip", async () => {
+    render(
+      <TooltipProvider delayDuration={0}>
+        <ParticipationRate rate={0.75} />
+      </TooltipProvider>,
+    )
+    expect(screen.getByText("75.00%")).not.toHaveClass("text-warning")
+    const marker = screen.getByRole("button", { name: "At or above the 75% reward threshold" })
+    expect(marker).toHaveTextContent("≥75%")
+    await userEvent.hover(marker)
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(PARTICIPATION_RULE)
+  })
+
+  it("marks a rate below the threshold in words, not colour alone", () => {
+    render(withRouter(<ParticipationRate rate={0.7449} text="74.49%" />))
+    expect(screen.getByText("74.49%")).toHaveClass("text-warning")
+    expect(screen.getByRole("button", { name: "Below the 75% reward threshold" })).toHaveTextContent("<75%")
+  })
+
+  it("states the rule in SEF's words", () => {
+    expect(PARTICIPATION_RULE).toBe(
+      "If a validator's participation is below 75% in a reward period, both the validator and its delegators earn no rewards for that period.",
+    )
+  })
+})
+
 describe("Validators", () => {
-  const row = { address: A, label: "Gnosis", stake: 1500n * SAFE, share: 0.75, stakers: 12, participation: 0.9876, absences: 31n }
+  const row = {
+    address: A,
+    label: "Gnosis",
+    stake: 1500n * SAFE,
+    share: 0.75,
+    stakers: 12,
+    participation: 0.9876,
+    absences: 31n,
+    status: "active" as const,
+  }
 
   it("shows stake, share, stakers, participation and missed ceremonies, and links to the detail page", () => {
-    render(<MemoryRouter><Validators rows={[row]} /></MemoryRouter>)
+    render(withRouter(<Validators rows={[row]} />))
     expect(screen.getByRole("link", { name: "Gnosis" })).toHaveAttribute("href", `/validators/${A}`)
     expect(screen.getByText("1,500")).toBeInTheDocument()
     expect(screen.getByText("75.0%")).toBeInTheDocument()
     expect(screen.getByText("12")).toBeInTheDocument()
     expect(screen.getByText("98.76%")).toBeInTheDocument()
     expect(screen.getByText("31 missed")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "At or above the 75% reward threshold" })).toBeInTheDocument()
+  })
+
+  it("offers to stake with an active validator", () => {
+    render(withRouter(<Validators rows={[row]} />))
+    expect(screen.getByText("Active")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Stake with Gnosis" })).toHaveAttribute("href", `/validators?delegate=${A}`)
+  })
+
+  it("keeps a withdrawn validator's stake and participation, says so, and offers no stake action", () => {
+    render(withRouter(<Validators rows={[{ ...row, address: B, label: "Blockchain Capital", status: "withdrawn" }]} />))
+    const tr = screen.getByRole("link", { name: "Blockchain Capital" }).closest("tr")!
+    expect(tr).toHaveTextContent("Withdrawn, Aegis participation unconfirmed")
+    expect(tr).toHaveTextContent("1,500")
+    expect(tr).toHaveTextContent("98.76%")
+    expect(tr).toHaveTextContent("31 missed")
+    expect(within(tr).queryByRole("link", { name: /^Stake/ })).not.toBeInTheDocument()
+  })
+
+  it("marks a participation below the threshold and keeps the missed count beside it", () => {
+    render(withRouter(<Validators rows={[{ ...row, participation: 0.7, absences: 300n }]} />))
+    expect(screen.getByText("70.00%")).toHaveClass("text-warning")
+    expect(screen.getByRole("button", { name: "Below the 75% reward threshold" })).toBeInTheDocument()
+    expect(screen.getByText("300 missed")).toBeInTheDocument()
+  })
+
+  it("says when SEF's list does not carry a validator, and nothing before it loads", () => {
+    const { unmount } = render(withRouter(<Validators rows={[{ ...row, status: "unlisted" }]} />))
+    expect(screen.getByText("Not in SEF's list")).toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /^Stake/ })).not.toBeInTheDocument()
+    unmount()
+    render(withRouter(<Validators rows={[{ ...row, status: undefined }]} />))
+    expect(screen.queryByText("Not in SEF's list")).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /^Stake/ })).not.toBeInTheDocument()
   })
 
   it("never shows 100.00% beside a missed count", () => {
     const rate = Number((59_190n * 1_000_000_000n) / 59_192n) / 1_000_000_000
-    render(<MemoryRouter><Validators rows={[{ ...row, participation: rate, absences: 2n }]} /></MemoryRouter>)
+    render(withRouter(<Validators rows={[{ ...row, participation: rate, absences: 2n }]} />))
     expect(screen.getByText("99.99%")).toBeInTheDocument()
     expect(screen.getByText("2 missed")).toBeInTheDocument()
   })
 
   it("drops the stakers column when no row has it, and says when participation is missing", () => {
-    render(<MemoryRouter><Validators rows={[{ ...row, stakers: undefined, participation: undefined, absences: undefined }]} /></MemoryRouter>)
+    render(withRouter(<Validators rows={[{ ...row, stakers: undefined, participation: undefined, absences: undefined }]} />))
     expect(screen.queryByRole("columnheader", { name: "Stakers" })).not.toBeInTheDocument()
     expect(screen.getByText("Not available")).toBeInTheDocument()
   })

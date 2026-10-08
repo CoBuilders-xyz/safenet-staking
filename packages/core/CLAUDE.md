@@ -1,7 +1,7 @@
 # packages/core
 
-The only place in this repository where a contract address, a start block, or an event signature
-is written. Everything else imports from here.
+The only place in this repository where a contract address, a start block, an event signature,
+or a programme date is written. Everything else imports from here.
 
 ## Why it exists
 
@@ -46,7 +46,10 @@ legitimately contains none of them.
   decoded error registry, and the ABIs built from them; also `ensUniversalResolverAbi` and
   `ensResolverAbi`, the two standard ENS reads `src/rewards-source.ts` makes.
 - `src/sef.ts` — the shapes of SEF's published files, the paths of the reward files under a
-  rewards data base, and the window a published participation rate covers.
+  rewards data base, the window a published participation rate covers, and the programme
+  calendar: the Beta end, the Aegis start, the reward period and the participation threshold,
+  with `programmePhase()` to place a UTC day in Beta, the gap or Aegis; and
+  `GNOSIS_INDEXED_PROGRAMME`, the programme whose contracts the Gnosis subgraph indexes.
 - `src/rewards-source.ts` — where reward data is read from. The ENS name SEF declares canonical,
   `SEF_REWARDS_ENS_NAME`, and the public gateways, `IPFS_GATEWAYS`, live here and nowhere else.
   It resolves the name's contenthash, lists the bases to try, the IPFS dataset through each

@@ -7,7 +7,7 @@ test.describe("Validator Detail Page", () => {
     const detail = new ValidatorDetailPage(page)
     await detail.goto(VALIDATORS.validatorA)
 
-    await expect(page.getByText("Validator A")).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText("Validator A", { exact: true })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText("Active")).toBeVisible()
   })
 
@@ -15,9 +15,21 @@ test.describe("Validator Detail Page", () => {
     const detail = new ValidatorDetailPage(page)
     await detail.goto(VALIDATORS.validatorA)
 
-    await expect(page.getByText("Validator A")).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText("Validator A", { exact: true })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(/Commission:.*5%/)).toBeVisible()
     await expect(page.getByText(/Participation.*99\.9%/)).toBeVisible()
+  })
+
+  test("a withdrawn validator says so, keeps its figures and the threshold, and cannot be staked with", async ({ connectedPage: page }) => {
+    const detail = new ValidatorDetailPage(page)
+    await detail.goto(VALIDATORS.validatorC)
+
+    await expect(page.getByText("Validator C", { exact: true })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/Withdrawn, Aegis participation unconfirmed/)).toBeVisible()
+    await expect(page.getByText("97.5%", { exact: true })).toBeVisible()
+    await expect(page.getByRole("button", { name: "At or above the 75% reward threshold" })).toBeVisible()
+    await expect(page.getByText("If a validator's participation is below 75% in a reward period", { exact: false })).toBeVisible()
+    await expect(detail.delegateButton).toBeDisabled()
   })
 
   test("shows total delegated amount", async ({ connectedPage: page }) => {

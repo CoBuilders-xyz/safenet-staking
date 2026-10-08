@@ -11,7 +11,7 @@ vi.mock("@/hooks/useStakingReads", () => ({ useTotalStaked: (o: unknown) => mock
 vi.mock("@/hooks/useValidators", () => ({ useValidators: () => mockValidators() }))
 
 const SAFE = 10n ** 18n
-const NETWORK = { totalStaked: (900n * SAFE).toString(), activeValidators: 6, stakersCurrent: 884, rewardsClaimed: "0", currentRoot: null }
+const NETWORK = { totalStaked: (900n * SAFE).toString(), stakersCurrent: 884, rewardsClaimed: "0", currentRoot: null }
 
 function render() {
   return renderHook(() => useNetworkTotals(), { wrapper: queryWrapper() })
@@ -30,7 +30,7 @@ describe("useNetworkTotals", () => {
     await waitFor(() => expect(result.current.totalStaked.state).toBe("ready"))
 
     expect(result.current.totalStaked).toEqual({ state: "ready", value: 900n * SAFE, source: "subgraph" })
-    expect(result.current.activeValidators).toEqual({ state: "ready", value: 6, source: "subgraph" })
+    expect(result.current.validatorCounts).toEqual({ state: "ready", value: { active: 2, withdrawn: 0 }, source: "sef" })
     expect(result.current.stakers).toEqual({ state: "ready", value: 884, source: "subgraph" })
     expect(mockTotalStaked).toHaveBeenLastCalledWith({ enabled: false })
   })
@@ -42,11 +42,19 @@ describe("useNetworkTotals", () => {
 
     expect(mockTotalStaked).toHaveBeenLastCalledWith({ enabled: true })
     expect(result.current.totalStaked).toEqual({ state: "ready", value: 1000n * SAFE, source: "contract" })
-    expect(result.current.activeValidators).toEqual({ state: "ready", value: 2, source: "sef" })
+    expect(result.current.validatorCounts).toEqual({ state: "ready", value: { active: 2, withdrawn: 0 }, source: "sef" })
     expect(result.current.stakers).toEqual({
       state: "unavailable",
       reason: "The subgraph could not be queried. No contract read gives this figure.",
     })
+  })
+
+  it("counts validators by SEF's flag, not the subgraph's registered count", async () => {
+    answerOperations({ NetworkTotals: { _meta: meta(), network: NETWORK } })
+    mockValidators.mockReturnValue({ data: [MOCK_VALIDATORS[0], { ...MOCK_VALIDATORS[1], isActive: false }], error: null })
+    const { result } = render()
+    await waitFor(() => expect(result.current.totalStaked.state).toBe("ready"))
+    expect(result.current.validatorCounts).toEqual({ state: "ready", value: { active: 1, withdrawn: 1 }, source: "sef" })
   })
 
   it("falls back when the subgraph is stale", async () => {
@@ -70,6 +78,6 @@ describe("useNetworkTotals", () => {
     const { result } = render()
     await waitFor(() => expect(result.current.totalStaked.state).toBe("unavailable"))
     expect(result.current.totalStaked).toEqual({ state: "unavailable", reason: NETWORK_MESSAGES.stakingReadFailed })
-    expect(result.current.activeValidators).toEqual({ state: "unavailable", reason: NETWORK_MESSAGES.validatorListFailed })
+    expect(result.current.validatorCounts).toEqual({ state: "unavailable", reason: NETWORK_MESSAGES.validatorListFailed })
   })
 })

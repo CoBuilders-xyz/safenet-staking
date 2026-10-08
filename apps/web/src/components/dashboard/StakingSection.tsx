@@ -13,6 +13,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { UndelegateDialog } from "@/components/staking/UndelegateDialog"
 import { truncateAddress, formatTokenAmount } from "@/lib/format"
 import Info from "lucide-react/dist/esm/icons/info"
+import { ParticipationRate } from "@/components/validators/ParticipationRate"
+import { AEGIS_UNCONFIRMED, PARTICIPATION_RULE, WITHDRAWN } from "@/lib/programme"
 import type { Address } from "viem"
 
 const rewardsDocsUrl = "https://docs.safefoundation.org/safenet/staking/rewards"
@@ -42,13 +44,20 @@ function PositionRow({ position, validators }: { position: Position; validators?
           {formatTokenAmount(position.amount, 18, 0)}
         </td>
         <td className="py-3 pr-4 text-sm font-mono tabular-nums text-right text-muted-foreground">
-          {metadata ? `${metadata.participationRate}%` : "—"}
+          {metadata ? (
+            <ParticipationRate rate={metadata.participationRate / 100} text={`${metadata.participationRate}%`} />
+          ) : (
+            "—"
+          )}
         </td>
         <td className="py-3 pr-4 text-right">
           {position.isActive ? (
             <Badge variant="secondary">Active</Badge>
           ) : (
-            <Badge className="bg-warning/20 text-warning hover:bg-warning/30">Inactive</Badge>
+            <span className="inline-flex flex-col items-end gap-1">
+              <Badge className="bg-warning/20 text-warning hover:bg-warning/30">{WITHDRAWN}</Badge>
+              <span className="text-xs text-muted-foreground">{AEGIS_UNCONFIRMED}</span>
+            </span>
           )}
         </td>
         <td className="py-3 text-right">
@@ -220,6 +229,7 @@ export function StakingSection() {
                   ))}
                 </tbody>
               </table>
+              <p className="mt-3 text-xs text-muted-foreground">{PARTICIPATION_RULE}</p>
             </div>
           )}
         </CardContent>

@@ -14,7 +14,7 @@ vi.mock("@/hooks/useValidators", () => ({ useValidators: () => ({ data: undefine
 
 const SAFE = 10n ** 18n
 const ROOT = "0x" + "ab".repeat(32)
-const NETWORK = { totalStaked: "0", activeValidators: 0, stakersCurrent: 0, rewardsClaimed: (600n * SAFE).toString(), currentRoot: ROOT }
+const NETWORK = { totalStaked: "0", stakersCurrent: 0, rewardsClaimed: (600n * SAFE).toString(), currentRoot: ROOT }
 
 function programme(overrides: Record<string, unknown> = {}) {
   return {

@@ -5,6 +5,8 @@ import { TooltipProvider } from "@radix-ui/react-tooltip"
 import { StakingSection } from "../dashboard/StakingSection"
 import { MOCK_VALIDATORS } from "@/__tests__/test-data"
 import type { RewardProof } from "@/hooks/useRewardProof"
+import { useValidators } from "@/hooks/useValidators"
+import { PARTICIPATION_RULE } from "@/lib/programme"
 
 const mockUseAccount = vi.fn()
 // vi.hoisted ensures this is initialized before the vi.mock() calls below,
@@ -63,6 +65,7 @@ function renderSection() {
 describe("StakingSection", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(useValidators).mockReturnValue({ data: [MOCK_VALIDATORS[0]] } as unknown as ReturnType<typeof useValidators>)
   })
 
   it("returns null when not connected", () => {
@@ -89,6 +92,25 @@ describe("StakingSection", () => {
 
     expect(screen.getByText("Gnosis")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Unstake" })).toBeInTheDocument()
+  })
+
+  it("states SEF's reward rule as text under the positions, and marks the rate", () => {
+    mockUseAccount.mockReturnValue({ isConnected: true })
+    renderSection()
+
+    expect(screen.getByText(PARTICIPATION_RULE)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "At or above the 75% reward threshold" })).toBeInTheDocument()
+  })
+
+  it("shows a withdrawn validator's status as visible text, not only a tooltip", () => {
+    mockUseAccount.mockReturnValue({ isConnected: true })
+    vi.mocked(useValidators).mockReturnValue({
+      data: [{ ...MOCK_VALIDATORS[0], isActive: false }],
+    } as unknown as ReturnType<typeof useValidators>)
+    renderSection()
+
+    expect(screen.getByText("Withdrawn")).toBeInTheDocument()
+    expect(screen.getByText("Aegis participation unconfirmed")).toBeInTheDocument()
   })
 
   it("shows compliance note when proof has kycAmount > 0 and kyc is not true", () => {

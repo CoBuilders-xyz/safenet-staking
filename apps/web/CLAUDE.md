@@ -103,7 +103,8 @@ Key UI components:
 ### Utility Libraries
 
 - `src/lib/utils.ts` — `cn()` for class merging (clsx + tailwind-merge)
-- `src/lib/format.ts` — `formatTokenAmount`, `truncateAddress`, `formatCountdown`
+- `src/lib/format.ts` — `formatTokenAmount`, `truncateAddress`, `formatCountdown`, `formatParticipation`, `formatUtcDateTime` ("Tue 22 Sep 2026, 00:00 UTC") and `formatUtcDayLong` ("5 October 2026")
+- `src/lib/programme.ts` — the copy built on the programme calendar in `@cobuilders/safenet-core`: SEF's 75% reward rule (`PARTICIPATION_RULE`), `belowThreshold`, the dated notice shown while the Gnosis figures describe Beta, and the withdrawn status for a validator SEF lists with `is_active: false`
 - `src/lib/errorFormat.ts` — `formatContractError` for user-friendly contract error messages, `revertedErrorName` for the custom error a revert carries
 - `src/lib/clipboard.ts` — `copyToClipboard()` with navigator.clipboard API + textarea fallback
 
@@ -118,8 +119,9 @@ Key UI components:
 
 ### Validator Components
 
-- `ValidatorList` — Grid of ValidatorCards. Accepts optional `autoOpenDelegate` prop for deep-linking. Batches `useReadContracts` for user stakes and passes data as props to cards.
-- `ValidatorCard` — Per-validator card with metadata, stakes, delegate/undelegate buttons, copy address, and link to detail page. Receives `userStake`/`loadingUserStake` props; dialogs render conditionally only when open.
+- `ValidatorList` — Grid of ValidatorCards. Accepts optional `autoOpenDelegate` prop for deep-linking. Batches `useReadContracts` for user stakes and passes data as props to cards. States SEF's reward rule as text under the grid.
+- `ValidatorCard` — Per-validator card with metadata, stakes, delegate/undelegate buttons, copy address, and link to detail page. Receives `userStake`/`loadingUserStake` props; dialogs render conditionally only when open. A validator SEF lists as inactive reads "Withdrawn".
+- `ParticipationRate` — A participation rate with the 75% reward threshold marker ("≥75%" or "<75%") and SEF's rule in its tooltip. Every screen that shows a rate uses it; the screens also state the rule as text, because a tooltip does not open on touch.
 
 ### Staking Components
 

@@ -46,6 +46,14 @@ const MOCK_VALIDATORS = [
     commission: 0.03,
     participation_rate_14d: 0.985,
   },
+  {
+    address: VALIDATORS.validatorC,
+    is_active: false,
+    label: "Validator C",
+    commission: 0.05,
+    // Differs from the Gnosis subgraph mock's 980 of 1,000, so a test can tell the two sources apart.
+    participation_rate_14d: 0.975,
+  },
 ]
 
 async function setupPage(page: Page, options: SetupPageOptions, state: MockChainState, subgraph: MockSubgraphState): Promise<Page> {

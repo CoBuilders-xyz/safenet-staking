@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 interface StatProps<T> {
   label: string
   figure: Figure<T>
-  format: (value: T) => string
+  format: (value: T) => ReactNode
   /** A line under the value: its window, its range, its date. */
   detail?: (value: T) => ReactNode
   /** Names where the value was read from. */

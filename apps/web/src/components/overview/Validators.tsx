@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom"
 import type { Address } from "viem"
+import { ParticipationRate } from "@/components/validators/ParticipationRate"
 import { formatParticipation, formatTokenAmount, truncateAddress } from "@/lib/format"
+import { WITHDRAWN_STATUS } from "@/lib/programme"
 
 export interface ValidatorTableRow {
   address: Address
@@ -15,12 +17,17 @@ export interface ValidatorTableRow {
   participationSource?: "subgraph" | "sef"
   /** Ceremonies missed in the same window. Only the subgraph counts them. */
   absences: bigint | undefined
+  /** From SEF's `is_active` flag; "unlisted" when SEF's list does not carry it. Undefined until the list loads. */
+  status?: "active" | "withdrawn" | "unlisted"
 }
 
 /**
  * Validators by stake. Participation shows the rate and, when the subgraph has it, the raw count
  * of missed ceremonies: the count is what a staker can act on. A rate beside a missed count is
  * floored, so it never reads 100.00% above "2 missed".
+ *
+ * A withdrawn validator keeps its stake and its past participation, says it is withdrawn, and
+ * offers no way to stake with it. An active one links to staking with it.
  */
 export function Validators({ rows }: { rows: readonly ValidatorTableRow[] }) {
   const showStakers = rows.some((r) => r.stakers !== undefined)
@@ -28,14 +35,15 @@ export function Validators({ rows }: { rows: readonly ValidatorTableRow[] }) {
   const mixed = new Set(rows.map((r) => r.participationSource).filter(Boolean)).size > 1
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] text-sm">
+      <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr className="border-b border-border text-xs uppercase tracking-[0.06em] text-faint">
             <th scope="col" className="py-2.5 pr-3 text-left font-normal">Validator</th>
             <th scope="col" className="px-3 py-2.5 text-right font-normal">Staked</th>
             <th scope="col" className="px-3 py-2.5 text-right font-normal">Share</th>
             {showStakers && <th scope="col" className="px-3 py-2.5 text-right font-normal">Stakers</th>}
-            <th scope="col" className="py-2.5 pl-3 text-right font-normal">Participation</th>
+            <th scope="col" className="px-3 py-2.5 text-right font-normal">Participation</th>
+            <th scope="col" className="py-2.5 pl-3 text-right font-normal">Status</th>
           </tr>
         </thead>
         <tbody>
@@ -56,17 +64,37 @@ export function Validators({ rows }: { rows: readonly ValidatorTableRow[] }) {
                   {v.stakers === undefined ? "—" : v.stakers.toLocaleString("en-US")}
                 </td>
               )}
-              <td className="py-3 pl-3 text-right font-mono tabular-nums">
+              <td className="px-3 py-3 text-right font-mono tabular-nums">
                 {v.participation === undefined ? (
                   <span className="text-muted-foreground">Not available</span>
                 ) : (
                   <>
-                    {formatParticipation(v.participation, v.absences)}
+                    <ParticipationRate rate={v.participation} text={formatParticipation(v.participation, v.absences)} />
                     {v.absences !== undefined && (
                       <div className="text-xs text-faint">{v.absences.toLocaleString("en-US")} missed</div>
                     )}
                     {mixed && v.participationSource === "sef" && <div className="text-xs text-faint">SEF file</div>}
                   </>
+                )}
+              </td>
+              <td className="py-3 pl-3 text-right">
+                {v.status === "withdrawn" ? (
+                  <span className="text-xs text-warning">{WITHDRAWN_STATUS}</span>
+                ) : v.status === "active" ? (
+                  <span className="inline-flex items-center gap-3">
+                    <span className="text-xs text-success">Active</span>
+                    <Link
+                      to={`/validators?delegate=${v.address}`}
+                      aria-label={`Stake with ${v.label ?? truncateAddress(v.address)}`}
+                      className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                    >
+                      Stake
+                    </Link>
+                  </span>
+                ) : v.status === "unlisted" ? (
+                  <span className="text-xs text-muted-foreground">Not in SEF&apos;s list</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
                 )}
               </td>
             </tr>

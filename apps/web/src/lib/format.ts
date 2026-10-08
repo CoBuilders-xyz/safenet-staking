@@ -64,6 +64,16 @@ export function formatCountdown(seconds: number): string {
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const LONG_MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+]
+
+/** Format a UTC day in words, e.g. "5 October 2026". */
+export function formatUtcDayLong(ms: number): string {
+  const d = new Date(ms)
+  return `${d.getUTCDate()} ${LONG_MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+}
 
 /**
  * Format an ISO timestamp in UTC, e.g. "Tue 22 Sep 2026, 00:00 UTC".
