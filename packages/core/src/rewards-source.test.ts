@@ -1,4 +1,4 @@
-import { test } from "node:test"
+import { mock, test } from "node:test"
 import assert from "node:assert/strict"
 import { bytesToHex, numberToHex, pad, stringToBytes, zeroAddress, type Hex } from "viem"
 import { normalize } from "viem/ens"
@@ -288,6 +288,30 @@ test("with the mirror down and the dataset answering 404, the read fails: a gate
       },
     )
   }
+})
+
+test("a gateway whose timer overran the shared budget leaves the next one skipped", async (t) => {
+  // Date.now() is mocked; setTimeout stays real. When the first gateway's slice ends, the clock
+  // jumps past the gateways' deadline, as a timer firing late would, so none is left for b.
+  mock.timers.enable({ apis: ["Date"], now: 1_800_000_000_000 })
+  t.after(() => mock.timers.reset())
+  const asked: string[] = []
+  const attempt = async (url: string, signal: AbortSignal) => {
+    const host = new URL(url).host
+    asked.push(host)
+    if (host === "raw.githubusercontent.com") return { from: "repo" }
+    return new Promise<never>((_, reject) =>
+      signal.addEventListener("abort", () => {
+        mock.timers.tick(1_000)
+        reject(new Error("aborted"))
+      }),
+    )
+  }
+  const read = await readRewardsFile({ bases: BASES, path: "latest.json", attempt, timeoutMs: 40 })
+  assert.deepEqual(read.tried.map((a) => a.outcome), ["timeout", "skipped", "found"])
+  assert.deepEqual(asked, ["a.example", "raw.githubusercontent.com"])
+  assert.deepEqual(read.value, { from: "repo" })
+  assert.equal(datasetMiss(read.tried), "unanswered")
 })
 
 test("hanging gateways share one budget, and the repository still gets its own", async () => {

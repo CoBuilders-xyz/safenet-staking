@@ -34,9 +34,17 @@ export const SEF_REWARDS_ENS_NAME = "rewards.safenet-gov.eth"
  * failure. Checked on 2026-10-08 against the Uniswap token list, a 667 kB JSON file, by CID:
  *
  * - ipfs.orbitor.dev: 200 `application/json` in 0.11 to 0.17 s, a missing path 404 in 0.06 s.
- *   Listed by the IPFS project's public-gateway-checker. Its operator is not identified.
+ *   ChainSafe's Orbitor gateway, behind Cloudflare: an inference from ChainSafe's own pages,
+ *   about.orbitor.dev and its announcement of 2025-12-09, which names this host the global
+ *   endpoint of latam, eu and apac.orbitor.dev.
  * - ipfs.filebase.io: operated by Filebase. 200 `application/json` in 1.35 to 1.41 s, a missing
- *   path 404 in 0.5 s; one request in ten hung past 25 s.
+ *   path 404 in 0.5 s; one request in ten hung past 25 s. Its 404 arrives as headers and then
+ *   an HTTP/2 stream reset with no body: `fetch` resolves with status 404, and reading the body
+ *   fails. Every attempt in this repository returns on the status before it reads a body, which
+ *   both gateways need.
+ *
+ * The IPFS project's public-gateway-checker lists both, and still lists the retired ipfs.io and
+ * dweb.link, so a listing there is not evidence that a gateway serves content.
  *
  * ipfs.io and dweb.link are retired: since 2026-09-21 both answer every path with a 429 that
  * points at https://gatewaychanges.ipfs.io, which says the public gateway no longer fetches
@@ -411,6 +419,8 @@ export async function readRewardsFile<T>(options: {
   for (const base of bases) {
     signal?.throwIfAborted()
     const budget = base.kind === "ens" ? (gatewaysUntil - Date.now()) / gatewaysLeft-- : timeoutMs
+    // The slices never run out by themselves: only a gateway whose timer fired late, past the
+    // gatewaysUntil instant, leaves nothing for the gateways after it.
     if (budget <= 0) {
       tried.push({ base, outcome: "skipped" })
       continue
