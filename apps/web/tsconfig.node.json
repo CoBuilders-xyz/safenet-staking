@@ -30,6 +30,7 @@
     "scripts/codegen-live-check.ts",
     "scripts/fork-env/*.ts",
     "scripts/release.ts",
-    "scripts/release-pin.ts"
+    "scripts/release-pin.ts",
+    "scripts/release-gateways.ts"
   ]
 }
