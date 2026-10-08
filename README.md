@@ -55,7 +55,11 @@ Production is IPFS. Vercel serves previews only.
 A release is a tag `v*`, or a manual run of the `Release` workflow. The workflow builds the
 interface from the committed public values in `apps/web/build.env`, packs it into a CAR and
 pins that CAR to Pinata. Then it checks that the dedicated Pinata gateway and each public
-gateway in `packages/core` serve it. A manual run pins only from `main`.
+gateway in `packages/core` serve it.
+
+A manual run has a boolean input `pin`, on by default. With `pin` off, the workflow builds,
+records the CID and uploads the CAR as an artifact, and pins nothing. The pin job also refuses
+any ref other than `main` or a `v*` tag, so a manual run from another branch never pins.
 
 The build job receives no secret, so none can reach the bundle. That is the guarantee in CI.
 The browser-safety check also runs there, but its bundle half compares the build with
