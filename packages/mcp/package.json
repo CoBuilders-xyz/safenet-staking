@@ -49,9 +49,9 @@
   "devDependencies": {
     "@cobuilders/safenet-cli": "workspace:*",
     "@cobuilders/safenet-core": "workspace:*",
-    "@types/node": "22.19.2",
+    "@types/node": "26.6.4",
     "tsup": "8.5.1",
     "tsx": "4.23.15",
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   }
 }
