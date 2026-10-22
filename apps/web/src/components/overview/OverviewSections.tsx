@@ -212,9 +212,10 @@ export function ValidatorsPanel() {
   const fromSubgraph = participation && window && rows.state === "ready" && rows.value.some((r) => participation.has(r.address.toLowerCase()))
   const sefRows = rows.state === "ready" ? rows.value.filter((r) => !participation?.has(r.address.toLowerCase())) : []
   const fromSef = sefRows.length > 0
-  // SEF's file can list every validator with a null rate. Then no row carries SEF's figure.
-  const sefPublishesNone =
-    sef.data !== undefined && sefRows.every((r) => findValidator(sef.data, r.address)?.participationRate == null)
+  // SEF's file can list every validator with a null rate. Then no row carries SEF's figure. A
+  // validator SEF does not list says nothing about its rates, so only listed ones count.
+  const sefListed = sefRows.map((r) => findValidator(sef.data, r.address)).filter((v) => v !== null)
+  const sefPublishesNone = sefListed.length > 0 && sefListed.every((v) => v.participationRate === null)
   const subgraphWords = !window
     ? ""
     : betaOnly

@@ -193,6 +193,13 @@ describe("OverviewPage", () => {
     )
   })
 
+  it("does not read a validator SEF does not list as SEF publishing no rate", () => {
+    // Gnosis is listed with a null rate but read from the subgraph; Greenfield is not listed.
+    mocks.validators.mockReturnValue({ data: [{ ...MOCK_VALIDATORS[0], participationRate: null }], error: null })
+    renderPage()
+    expect(screen.getByRole("region", { name: "Validators" })).not.toHaveTextContent("SEF publishes no 14-day figure")
+  })
+
   it("shows no APY and no SAFE price", () => {
     renderPage()
     expect(screen.queryByText(/APY|APR|price/i)).not.toBeInTheDocument()

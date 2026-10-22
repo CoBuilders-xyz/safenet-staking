@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { renderHook } from "@testing-library/react"
 import { SEF_DATA } from "@cobuilders/safenet-core"
+import { TEST_ACCOUNTS } from "@/__tests__/test-data"
 import { findValidator } from "../useValidators"
 
 const mockFetch = vi.fn()
@@ -151,10 +152,10 @@ describe("useValidators", () => {
 
   it("queryFn keeps a null rate null, as SEF publishes it since 2026-10-20, never 0", async () => {
     // validator-info.json as live on 2026-10-22: labels, flags, commissions and the null rates
-    // copied from the file; two of its six entries, with stand-in addresses.
+    // copied from the file; two of its six entries, at the shared fixture addresses.
     const live = [
-      { address: "0x1111111111111111111111111111111111111111", commission: 0.05, is_active: true, label: "Gnosis", participation_rate_14d: null },
-      { address: "0x2222222222222222222222222222222222222222", commission: 0.05, is_active: false, label: "RockawayX", participation_rate_14d: null },
+      { address: TEST_ACCOUNTS.validator1, commission: 0.05, is_active: true, label: "Gnosis", participation_rate_14d: null },
+      { address: TEST_ACCOUNTS.validator2, commission: 0.05, is_active: false, label: "RockawayX", participation_rate_14d: null },
     ]
     mockFetch.mockResolvedValue({ ok: true, text: () => Promise.resolve(JSON.stringify(live)) })
 
