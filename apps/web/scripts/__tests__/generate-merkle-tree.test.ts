@@ -41,7 +41,6 @@ describe("generateRewards", () => {
       rewardsUntil: now.toISOString(),
       tokenTotal: (25n * 10n ** 17n).toString(),
       unpaidAmount: "0",
-      updatedAt: now.toISOString(),
     })
   })
 

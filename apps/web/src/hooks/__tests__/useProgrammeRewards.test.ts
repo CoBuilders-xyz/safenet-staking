@@ -21,7 +21,18 @@ const LATEST = {
   rewardsUntil: "2026-09-22T00:00:00.000Z",
   tokenTotal: (1000n * SAFE).toString(),
   unpaidAmount: "15",
-  updatedAt: "2026-09-22T08:55:44.268Z",
+}
+
+/**
+ * SEF's latest.json as live on 2026-10-22, after it removed `updatedAt` on 2026-10-21: the
+ * file's five fields and values, with a stand-in root.
+ */
+const LIVE_2026_10_22 = {
+  epoch: 0,
+  merkleRoot: ROOT_A,
+  rewardsUntil: "2026-10-06T00:00:00.000Z",
+  tokenTotal: "4499987774807670271201970",
+  unpaidAmount: "12225192329728798030",
 }
 
 const mockUseReadContract = vi.fn()
@@ -54,13 +65,22 @@ describe("parseRewardsLatest", () => {
     expect(parseRewardsLatest(LATEST)).toEqual(LATEST)
   })
 
+  it("accepts the file as live on 2026-10-22, which has no updatedAt", () => {
+    expect(parseRewardsLatest(LIVE_2026_10_22)).toEqual(LIVE_2026_10_22)
+  })
+
+  it.each(Object.keys(LIVE_2026_10_22))("rejects the live file without %s", (field) => {
+    const rest: Record<string, unknown> = { ...LIVE_2026_10_22 }
+    delete rest[field]
+    expect(() => parseRewardsLatest(rest)).toThrow("Invalid rewards file format")
+  })
+
   it.each([
     ["a non-numeric epoch", { epoch: "0" }],
     ["a short root", { merkleRoot: "0xab" }],
     ["an unparseable period end", { rewardsUntil: "soon" }],
     ["a total that is not a decimal string", { tokenTotal: 1000 }],
     ["an unpaid amount with a decimal point", { unpaidAmount: "1.5" }],
-    ["a missing update time", { updatedAt: undefined }],
   ])("rejects %s", (_, patch) => {
     expect(() => parseRewardsLatest({ ...LATEST, ...patch })).toThrow("Invalid rewards file format")
   })

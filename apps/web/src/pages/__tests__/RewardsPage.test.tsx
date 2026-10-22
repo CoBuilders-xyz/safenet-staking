@@ -74,7 +74,6 @@ const LATEST = {
   rewardsUntil: "2026-09-22T00:00:00.000Z",
   tokenTotal: (1000n * SAFE).toString(),
   unpaidAmount: "0",
-  updatedAt: "2026-09-22T08:55:44.268Z",
 }
 
 /** Only the fields the page reads; the casts stand in for TanStack's large result types. */
@@ -133,6 +132,8 @@ describe("RewardsPage", () => {
     expect(within(section("Actions")).getByText(/MerkleDrop contract on Ethereum/)).toBeInTheDocument()
     expect(within(section("Programme")).getByRole("link", { name: "rewards/latest.json" })).toBeInTheDocument()
     expect(within(section("Verifiability")).getByText(/On-chain root and balance/)).toBeInTheDocument()
+    // SEF's latest.json carries no update time since 2026-10-21, so none is shown.
+    expect(section("Programme")).not.toHaveTextContent("File updated")
   })
 
   describe("Your rewards", () => {

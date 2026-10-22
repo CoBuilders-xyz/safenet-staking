@@ -1,5 +1,5 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { PARTICIPATION_RULE, THRESHOLD_LABEL, belowThreshold } from "@/lib/programme"
+import { PARTICIPATION_RULE, RATE_NOT_PUBLISHED, THRESHOLD_LABEL, belowThreshold } from "@/lib/programme"
 import { cn } from "@/lib/utils"
 
 interface ParticipationRateProps {
@@ -41,4 +41,13 @@ export function ParticipationRate({ rate, text, className }: ParticipationRatePr
       </Tooltip>
     </span>
   )
+}
+
+/**
+ * SEF's published rate, in percent as `useValidators` gives it. SEF's file can list a validator
+ * with no rate; that reads "Not published", with no threshold marker, and never as 0.00%.
+ */
+export function PublishedParticipationRate({ percent, className }: { percent: number | null; className?: string }) {
+  if (percent === null) return <span className={cn("text-muted-foreground", className)}>{RATE_NOT_PUBLISHED}</span>
+  return <ParticipationRate className={className} rate={percent / 100} text={`${percent}%`} />
 }

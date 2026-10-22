@@ -121,14 +121,12 @@ export function generateRewards(config: MerkleConfig, outDir: string, now = new 
   console.log(`Wrote ${written} proof files to ${proofsDir}`)
 
   // Write latest.json
-  const updatedAt = now.toISOString()
   const latest: SefRewardsLatest = {
     epoch: config.epoch,
     merkleRoot: tree.root,
-    rewardsUntil: config.rewardsUntil === undefined ? updatedAt : toIsoDate(config.rewardsUntil),
+    rewardsUntil: config.rewardsUntil === undefined ? now.toISOString() : toIsoDate(config.rewardsUntil),
     tokenTotal: total.toString(),
     unpaidAmount: config.unpaidAmount ?? "0",
-    updatedAt,
   }
 
   const latestPath = resolve(outDir, "latest.json")

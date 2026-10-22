@@ -20,7 +20,7 @@ export interface NetworkStatus {
    * chain differs: then the contract does not pay out that allocation yet.
    */
   readonly rewardsAllocated: DerivedFigure
-  readonly rewardsEpoch: Figure<{ epoch: number; rewardsUntil: string; updatedAt: string }>
+  readonly rewardsEpoch: Figure<{ epoch: number; rewardsUntil: string }>
   /**
    * Allocated and not yet claimed: the MerkleDrop balance, but only while the root on chain is
    * the published one. Otherwise the balance still funds the old root and is not this figure.
@@ -94,8 +94,8 @@ export async function getStatus(ctx: Context): Promise<NetworkStatus> {
       ? figure(allocated, "SEF: rewards/latest.json tokenTotal")
       : { ...figure(null, "SEF: rewards/latest.json tokenTotal"), reason: ROOT_DIFFERS },
     rewardsEpoch: figure(
-      { epoch: latest.epoch, rewardsUntil: latest.rewardsUntil, updatedAt: latest.updatedAt },
-      "SEF: rewards/latest.json epoch, rewardsUntil, updatedAt",
+      { epoch: latest.epoch, rewardsUntil: latest.rewardsUntil },
+      "SEF: rewards/latest.json epoch, rewardsUntil",
     ),
     rewardsUnclaimed: rootMatches
       ? figure(balance, "chain: SAFE.balanceOf(MerkleDrop), while its root is the published one")

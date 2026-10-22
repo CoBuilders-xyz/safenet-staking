@@ -87,6 +87,14 @@ describe("ValidatorCard", () => {
     expect(screen.getByRole("button", { name: "Below the 75% reward threshold" })).toBeInTheDocument()
   })
 
+  it("says Not published, with no threshold marker, when SEF publishes no rate", () => {
+    renderCard({ validators: [{ ...MOCK_VALIDATORS[0], participationRate: null }] })
+
+    expect(screen.getByText("Not published")).toBeInTheDocument()
+    expect(screen.queryByText("0%")).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /reward threshold/ })).not.toBeInTheDocument()
+  })
+
   it("shows Stake and Unstake buttons when connected", () => {
     renderCard()
 

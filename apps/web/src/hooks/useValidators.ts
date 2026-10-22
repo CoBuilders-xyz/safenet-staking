@@ -7,7 +7,8 @@ export interface ValidatorInfo {
   isActive: boolean
   label: string
   commission: number
-  participationRate: number
+  /** SEF's 14-day rate in percent, two decimals. Null when SEF publishes no rate, never 0. */
+  participationRate: number | null
 }
 
 interface RawValidator {
@@ -15,7 +16,7 @@ interface RawValidator {
   label: string
   commission: number
   is_active: boolean
-  participation_rate_14d: number
+  participation_rate_14d: number | null
 }
 
 function isValidEntry(v: unknown): v is RawValidator {
@@ -53,9 +54,9 @@ async function fetchValidators(): Promise<ValidatorInfo[]> {
     commission:
       Math.round((v.commission ?? 0) * 100 * 100) / 100,
     participationRate:
-      Math.round(
-        (v.participation_rate_14d ?? 0) * 100 * 100
-      ) / 100,
+      typeof v.participation_rate_14d === "number"
+        ? Math.round(v.participation_rate_14d * 100 * 100) / 100
+        : null,
   }))
 }
 

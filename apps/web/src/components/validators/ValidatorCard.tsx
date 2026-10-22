@@ -14,7 +14,7 @@ import { useWrongNetwork } from "@/hooks/useWrongNetwork"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Info } from "lucide-react"
 import { WITHDRAWN } from "@/lib/programme"
-import { ParticipationRate } from "./ParticipationRate"
+import { PublishedParticipationRate } from "./ParticipationRate"
 
 interface ValidatorCardProps {
   validator: Address
@@ -177,7 +177,7 @@ export function ValidatorCard({
             </span>
             <span className={`text-xl font-mono leading-none uppercase ${valueColor}`}>
               {metadata ? (
-                <ParticipationRate rate={metadata.participationRate / 100} text={`${metadata.participationRate}%`} />
+                <PublishedParticipationRate percent={metadata.participationRate} />
               ) : (
                 "—"
               )}

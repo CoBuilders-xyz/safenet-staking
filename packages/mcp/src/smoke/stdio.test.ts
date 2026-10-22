@@ -46,10 +46,16 @@ test("status over stdio", { skip, timeout: TIMEOUT }, async () => {
 test("validators_list over stdio", { skip, timeout: TIMEOUT }, async () => {
   const r = await server!.call("validators_list", { all: true })
   assert.ok(!r.isError, JSON.stringify(r.content))
-  const l = r.structuredContent as { filter: string; validators: { address: string; stake: string }[] }
+  const l = r.structuredContent as {
+    filter: string; validators: { address: string; stake: string; participation: number | null }[]
+  }
   assert.equal(l.filter, "all")
   assert.ok(l.validators.length > 0)
-  for (const v of l.validators) assert.ok(isWei(v.stake), v.address)
+  for (const v of l.validators) {
+    assert.ok(isWei(v.stake), v.address)
+    // SEF has published a null rate for every validator since 2026-10-20.
+    assert.ok(v.participation === null || (v.participation >= 0 && v.participation <= 1), v.address)
+  }
 })
 
 test("the server's log names where the RPC comes from, and no URL", { skip, timeout: TIMEOUT }, () => {

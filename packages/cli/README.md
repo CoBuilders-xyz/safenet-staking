@@ -42,7 +42,7 @@ npx @cobuilders/safenet-cli status
 | Command | What it does | Kind |
 |---|---|---|
 | `safenet status` | Network totals: stake, validators, withdrawals, rewards and the Merkle root | read |
-| `safenet validators list` | Every validator SEF lists, with stake from the chain. `--active` (the default) or `--all`; `--sort stake` (the default) or `--sort participation` | read |
+| `safenet validators list` | Every validator SEF lists, with stake from the chain. `--active` (the default) or `--all`; `--sort stake` (the default) or `--sort participation`. A rate SEF does not publish prints as "not published", and as `null` with `--json` | read |
 | `safenet validators show <address>` | One validator, with its delegators count | read |
 | `safenet withdrawals list` | Pending withdrawals: the network figure and count, or one staker's queue with `--address <address>` | read |
 | `safenet rewards check <address>` | Claimable, earned, claimed and held amounts, and whether the proof is current | read |

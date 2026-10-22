@@ -71,8 +71,11 @@ test("safenet status", { skip, timeout: TIMEOUT }, async () => {
   const s = await json<{
     totalStaked: { value: string }; rewardsAllocated: { value: string }; merkleRoot: { match: boolean }
     rewardsSource: { kind: string; ens: { status: string } }
+    rewardsEpoch: { value: Record<string, unknown> }
   }>("status")
   assert.ok(isWei(s.totalStaked.value) && BigInt(s.totalStaked.value) > 0n)
+  // SEF removed updatedAt from latest.json on 2026-10-21; the figure carries the two fields left.
+  assert.deepEqual(Object.keys(s.rewardsEpoch.value).sort(), ["epoch", "rewardsUntil"])
   assert.ok(isWei(s.rewardsAllocated.value))
   assert.equal(typeof s.merkleRoot.match, "boolean")
   // The real Universal Resolver and resolver calls: "empty" on 2026-10-08, "set" once SEF
@@ -92,8 +95,12 @@ test("safenet validators list", { skip, timeout: TIMEOUT }, async () => {
   assert.ok(list.validators.length > 0)
   for (const v of list.validators) {
     assert.ok(isWei(v.stake))
+    // SEF has published a null rate for every validator since 2026-10-20.
     if (v.participation !== null) assert.ok(v.participation >= 0 && v.participation <= 1)
   }
+  const text = await safenet("validators", "list", "--all")
+  assert.equal(text.code, 0)
+  if (list.validators.some((v) => v.participation === null)) assert.match(text.stdout, /not published/)
 })
 
 test("safenet validators show", { skip, timeout: TIMEOUT }, async () => {

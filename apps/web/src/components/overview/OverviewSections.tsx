@@ -198,7 +198,9 @@ export function ValidatorsPanel() {
       const published = findValidator(sef.data, r.address)
       return {
         ...r,
-        participation: ours ? ours.rate : published ? published.participationRate / 100 : undefined,
+        participation: ours
+          ? ours.rate
+          : published?.participationRate != null ? published.participationRate / 100 : undefined,
         participationSource: ours ? "subgraph" : published ? "sef" : undefined,
         absences: ours?.absences,
         status: !sef.data ? undefined : !published ? "unlisted" : published.isActive ? "active" : "withdrawn",
@@ -208,18 +210,25 @@ export function ValidatorsPanel() {
   // The caption names the sources the rows actually use. A validator with no ValidatorDay row in
   // the window falls back to SEF's figure even while the subgraph is live; such rows are marked.
   const fromSubgraph = participation && window && rows.state === "ready" && rows.value.some((r) => participation.has(r.address.toLowerCase()))
-  const fromSef = rows.state === "ready" && rows.value.some((r) => !participation?.has(r.address.toLowerCase()))
+  const sefRows = rows.state === "ready" ? rows.value.filter((r) => !participation?.has(r.address.toLowerCase())) : []
+  const fromSef = sefRows.length > 0
+  // SEF's file can list every validator with a null rate. Then no row carries SEF's figure.
+  const sefPublishesNone =
+    sef.data !== undefined && sefRows.every((r) => findValidator(sef.data, r.address)?.participationRate == null)
   const subgraphWords = !window
     ? ""
     : betaOnly
       ? `${betaWindow(window)}: the Gnosis subgraph, attestation ceremonies attended over ${window.days} complete UTC days`
       : `the Gnosis subgraph, attestation ceremonies attended over ${window.days} complete UTC days to ${dayOf(window.to)}`
+  const sefWords = sefPublishesNone ? "SEF publishes no 14-day figure at present" : "SEF's published 14-day figure"
   const participationSource =
     fromSubgraph && fromSef
-      ? `Participation: ${subgraphWords}; rows marked "SEF file" use SEF's published 14-day figure.`
+      ? sefPublishesNone
+        ? `Participation: ${subgraphWords}; for the other rows, ${sefWords}.`
+        : `Participation: ${subgraphWords}; rows marked "SEF file" use ${sefWords}.`
       : fromSubgraph
         ? `Participation: ${subgraphWords}.`
-        : "Participation: SEF's published 14-day figure."
+        : `Participation: ${sefWords}.`
 
   return (
     <OverviewSection

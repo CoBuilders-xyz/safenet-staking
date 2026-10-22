@@ -102,6 +102,18 @@ describe("StakingSection", () => {
     expect(screen.getByRole("button", { name: "At or above the 75% reward threshold" })).toBeInTheDocument()
   })
 
+  it("says Not published for a position whose validator SEF publishes no rate for", () => {
+    mockUseAccount.mockReturnValue({ isConnected: true })
+    vi.mocked(useValidators).mockReturnValue({
+      data: [{ ...MOCK_VALIDATORS[0], participationRate: null }],
+    } as unknown as ReturnType<typeof useValidators>)
+    renderSection()
+
+    expect(screen.getByText("Not published")).toBeInTheDocument()
+    expect(screen.queryByText("0%")).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /reward threshold/ })).not.toBeInTheDocument()
+  })
+
   it("shows a withdrawn validator's status as visible text, not only a tooltip", () => {
     mockUseAccount.mockReturnValue({ isConnected: true })
     vi.mocked(useValidators).mockReturnValue({

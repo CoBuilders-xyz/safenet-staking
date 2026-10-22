@@ -13,7 +13,7 @@
  */
 
 import { encodeAbiParameters, encodeErrorResult, encodeEventTopics, type Hex } from "viem"
-import { merkleDropAbi, safeTokenEventsAbi } from "@cobuilders/safenet-core"
+import { merkleDropAbi, safeTokenEventsAbi, type SefValidator } from "@cobuilders/safenet-core"
 import {
   AMOUNTS,
   VALIDATORS,
@@ -21,6 +21,7 @@ import {
   TEST_MERKLE_ROOT,
   MERKLE_DROP_BALANCE,
   REWARDS_LATEST,
+  SEF_VALIDATOR_INFO,
   MERKLE_DROP_CONTRACT,
   TOKEN_CONTRACT,
   BLOCK_NUMBER,
@@ -61,6 +62,8 @@ export interface MockChainState {
   merkleDropBalance: bigint
   /** SEF's rewards/latest.json; null is served as a 404 */
   rewardsLatest: typeof REWARDS_LATEST | null
+  /** SEF's validator-info.json */
+  sefValidators: SefValidator[]
   /** When true, the next eth_sendTransaction simulates the user rejecting the wallet prompt. */
   rejectNextTx: boolean
   /** Logs of transactions that emitted any, by hash. Every other receipt has none. */
@@ -113,6 +116,7 @@ export function createMockChainState(overrides: MockChainStateOverrides = {}): M
     merkleRoot: overrides.merkleRoot ?? TEST_MERKLE_ROOT,
     merkleDropBalance: overrides.merkleDropBalance ?? MERKLE_DROP_BALANCE,
     rewardsLatest: overrides.rewardsLatest === undefined ? { ...REWARDS_LATEST } : overrides.rewardsLatest,
+    sefValidators: SEF_VALIDATOR_INFO.map((v) => ({ ...v })),
     rejectNextTx: false,
     receiptLogs: new Map(),
     claims: 0,

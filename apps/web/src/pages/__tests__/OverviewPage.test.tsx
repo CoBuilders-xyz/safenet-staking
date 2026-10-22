@@ -176,6 +176,23 @@ describe("OverviewPage", () => {
     expect(screen.getByRole("region", { name: "Validators" })).toHaveTextContent("Participation: SEF's published 14-day figure.")
   })
 
+  it("says SEF publishes no rate, and shows no 0.00%, when SEF's file lists every rate as null", () => {
+    mocks.validators.mockReturnValue({ data: MOCK_VALIDATORS.map((v) => ({ ...v, participationRate: null })), error: null })
+    renderPage()
+    const validators = screen.getByRole("region", { name: "Validators" })
+    // Gnosis keeps the subgraph's rate; Greenfield falls back to SEF's file, which has none.
+    expect(within(validators).getByText("99.50%")).toBeInTheDocument()
+    expect(within(validators).getByText("Not published")).toBeInTheDocument()
+    expect(validators).not.toHaveTextContent("0.00%")
+    expect(validators).toHaveTextContent("for the other rows, SEF publishes no 14-day figure at present.")
+
+    mocks.consensus.mockReturnValue({ ...mocks.consensus(), participation: undefined, window: undefined })
+    renderPage()
+    expect(screen.getAllByRole("region", { name: "Validators" })[1]).toHaveTextContent(
+      "Participation: SEF publishes no 14-day figure at present.",
+    )
+  })
+
   it("shows no APY and no SAFE price", () => {
     renderPage()
     expect(screen.queryByText(/APY|APR|price/i)).not.toBeInTheDocument()

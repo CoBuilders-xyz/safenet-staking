@@ -20,7 +20,10 @@ export interface Validator {
   readonly stake: bigint
   /** stake / Staking.totalStakedAmount(), a fraction. */
   readonly share: number
-  /** SEF's participation_rate_14d, a fraction, over `window`. Null when SEF does not list it. */
+  /**
+   * SEF's participation_rate_14d, a fraction, over `window`. Null when SEF does not list the
+   * address, or lists it and publishes no rate.
+   */
   readonly participation: number | null
 }
 

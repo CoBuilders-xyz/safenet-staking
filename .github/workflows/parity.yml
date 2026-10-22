@@ -68,7 +68,7 @@ jobs:
             echo "- PASS: identical to SEF's figure. Exit 0."
             echo "- FAIL: a real difference, a broken or lagging subgraph, SEF's data over 24 hours old, or an error. Exit 1."
             echo "- STALE: SEF's file is over 9 hours old, so nothing is compared. Exit 0."
-            echo "- NOT COMPARABLE: our deployment cannot answer at SEF's instant. Exit 0."
+            echo "- NOT COMPARABLE: our deployment cannot answer at SEF's instant, or SEF publishes no value. Exit 0."
             echo
           } >> "$GITHUB_STEP_SUMMARY"
           pnpm test:parity

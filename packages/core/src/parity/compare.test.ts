@@ -3,8 +3,8 @@ import assert from "node:assert/strict"
 import type { SefValidator } from "../sef.js"
 import {
   EXIT_CODE, agrees, compareAmount, compareParticipation, compareStakedTotal, formatAge, freshness,
-  NEEDS_HOURLY_BUCKETS, lacksHourlyBuckets, notComparable, overall, parseLastCommit, participationFromHours,
-  renderMarkdown, renderText, sefRunSpan, staleOutcome, totalsBetween,
+  NEEDS_HOURLY_BUCKETS, SEF_PUBLISHES_NO_RATE, lacksHourlyBuckets, notComparable, overall, parseLastCommit,
+  participationFromHours, renderMarkdown, renderText, sefRunSpan, staleOutcome, totalsBetween,
 } from "./compare.js"
 
 // Made-up validators. The addresses are test fixtures, not contracts.
@@ -75,6 +75,39 @@ test("a signer SEF does not list fails, and a validator with no attendance reads
 test("a window with no ceremonies fails rather than dividing by zero", () => {
   const rows = compareParticipation({ sef: SEF, attended: attended(0n, 0n), ceremonies: 0n })
   assert.equal(overall(rows), "FAIL")
+})
+
+// validator-info.json as SEF published it at cce3fc2, 2026-10-20 09:01 UTC, and still on
+// 2026-10-22: every rate null. Addresses, labels and flags copied from the file.
+const LIVE_2026_10_22: SefValidator[] = [
+  { address: "0x3D58a5475c1336b0A755c3aBd298CeB9b7BB9CDe", commission: 0.05, is_active: true, label: "Gnosis", participation_rate_14d: null },
+  { address: "0x7B0A8EFA45dE81F11F2846EC28259B62155a2b37", commission: 0.05, is_active: true, label: "Greenfield", participation_rate_14d: null },
+  { address: "0xb0E735D4a3b70195420E0ae933689A55750CFcd2", commission: 0.05, is_active: false, label: "RockawayX", participation_rate_14d: null },
+  { address: "0xCc00DE0eA14c08669b26DcBFE365dBD9890B04D9", commission: 0.05, is_active: true, label: "Core Contributors", participation_rate_14d: null },
+  { address: "0xD8997c2a94052C4FB79B53b3e255c1F07c99305B", commission: 0.05, is_active: false, label: "Blockchain Capital", participation_rate_14d: null },
+  { address: "0xF6EA21D702983c443f58A267265912FE03D2FF0b", commission: 0.05, is_active: true, label: "Safe Labs", participation_rate_14d: null },
+]
+
+test("a null SEF rate is NOT COMPARABLE, says why, and exits 0, even over a window with no ceremonies", () => {
+  for (const ceremonies of [0n, CEREMONIES]) {
+    const rows = compareParticipation({ sef: LIVE_2026_10_22, attended: new Map(), ceremonies })
+    assert.equal(rows.length, 6)
+    assert.ok(rows.every((r) => r.verdict === "NOT COMPARABLE" && r.note === SEF_PUBLISHES_NO_RATE))
+    assert.equal(rows[2]!.figure, "RockawayX participation_rate_14d")
+    const state = overall(rows)
+    assert.equal(state, "NOT COMPARABLE")
+    assert.equal(EXIT_CODE[state], 0)
+  }
+})
+
+test("a null rate beside a published one still compares the published one", () => {
+  const mixed = [validator(A, "Alpha", 30_412 / 31_153), { ...validator(B, "Bravo", 0), participation_rate_14d: null }]
+  const pass = compareParticipation({ sef: mixed, attended: attended(30_412n, 31_152n), ceremonies: CEREMONIES })
+  assert.deepEqual(pass.map((r) => r.verdict), ["PASS", "NOT COMPARABLE"])
+  const fail = compareParticipation({ sef: mixed, attended: attended(30_413n, 31_152n), ceremonies: CEREMONIES })
+  assert.equal(overall(fail), "FAIL")
+  // With a rate published, a window the subgraph counts no ceremony in still fails.
+  assert.equal(overall(compareParticipation({ sef: mixed, attended: new Map(), ceremonies: 0n })), "FAIL")
 })
 
 test("amounts compare to the wei", () => {

@@ -149,7 +149,25 @@ describe("useValidators", () => {
     expect(result).toHaveLength(2)
   })
 
-  it("queryFn defaults missing commission and participation to 0", async () => {
+  it("queryFn keeps a null rate null, as SEF publishes it since 2026-10-20, never 0", async () => {
+    // validator-info.json as live on 2026-10-22: labels, flags, commissions and the null rates
+    // copied from the file; two of its six entries, with stand-in addresses.
+    const live = [
+      { address: "0x1111111111111111111111111111111111111111", commission: 0.05, is_active: true, label: "Gnosis", participation_rate_14d: null },
+      { address: "0x2222222222222222222222222222222222222222", commission: 0.05, is_active: false, label: "RockawayX", participation_rate_14d: null },
+    ]
+    mockFetch.mockResolvedValue({ ok: true, text: () => Promise.resolve(JSON.stringify(live)) })
+
+    renderHook(() => useValidators())
+    const result = (await capturedQueryFn!()) as Array<{ label: string; isActive: boolean; participationRate: number | null }>
+
+    expect(result.map((v) => [v.label, v.isActive, v.participationRate])).toEqual([
+      ["Gnosis", true, null],
+      ["RockawayX", false, null],
+    ])
+  })
+
+  it("queryFn defaults missing commission to 0 and a missing rate to null", async () => {
     const rawData = [
       {
         address: "0x1111111111111111111111111111111111111111",
@@ -164,12 +182,12 @@ describe("useValidators", () => {
     renderHook(() => useValidators())
     const result = (await capturedQueryFn!()) as Array<{
       commission: number
-      participationRate: number
+      participationRate: number | null
       isActive: boolean
     }>
 
     expect(result[0].commission).toBe(0)
-    expect(result[0].participationRate).toBe(0)
+    expect(result[0].participationRate).toBeNull()
     expect(result[0].isActive).toBe(true)
   })
 })

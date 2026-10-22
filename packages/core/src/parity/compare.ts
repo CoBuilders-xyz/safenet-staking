@@ -8,8 +8,9 @@ import { SEF_DATA } from "../contracts.js"
 import type { SefValidator } from "../sef.js"
 
 /**
- * One row's verdict. NOT COMPARABLE: our deployment cannot answer at SEF's instant, which is a
- * known limit and not a disagreement. NOT COMPARED: a figure SEF publishes that we do not hold.
+ * One row's verdict. NOT COMPARABLE: our deployment cannot answer at SEF's instant, or SEF
+ * publishes no value for the figure; a known limit, not a disagreement. NOT COMPARED: a figure
+ * SEF publishes that we do not hold.
  */
 export type Verdict = "PASS" | "FAIL" | "NOT COMPARABLE" | "NOT COMPARED"
 
@@ -20,7 +21,8 @@ export type Verdict = "PASS" | "FAIL" | "NOT COMPARABLE" | "NOT COMPARED"
  *   FAIL            a figure differs, the subgraph is broken or behind, SEF's
  *                   data is over 24 hours old, or the run hit an error            exit 1
  *   STALE           SEF's file is over 9 hours old, so nothing is compared         exit 0
- *   NOT COMPARABLE  our deployment cannot answer at SEF's instant                  exit 0
+ *   NOT COMPARABLE  our deployment cannot answer at SEF's instant, or SEF
+ *                   publishes no value for a figure                               exit 0
  *
  * Only FAIL exits 1, so the daily job turns red only on something someone can act on.
  */
@@ -38,6 +40,9 @@ export const EXIT_CODE: Readonly<Record<ParityState, 0 | 1>> = {
  * rows filed by the hour each ceremony was attested in, and an older schema has none.
  */
 export const NEEDS_HOURLY_BUCKETS = "hourly buckets with completion semantics are needed to compare this window"
+
+/** Why a validator SEF lists with a null `participation_rate_14d` is not compared. */
+export const SEF_PUBLISHES_NO_RATE = "SEF publishes no rate"
 
 /**
  * How a figure is compared. SEF's participation rates are doubles and its staked total is
@@ -80,6 +85,9 @@ export function agrees(ours: number, sef: number, p: Precision): boolean {
  *
  * Every validator SEF lists gets a row. A signer with attendance in the window that SEF does
  * not list also gets one, and fails: the two sets must be the same.
+ *
+ * A validator SEF lists with a null rate is NOT COMPARABLE: there is no figure to agree or
+ * disagree with. A window with no ceremonies fails only when SEF publishes some rate for it.
  */
 export function compareParticipation(input: {
   sef: readonly SefValidator[]
@@ -89,7 +97,7 @@ export function compareParticipation(input: {
 }): ParityRow[] {
   const precision = input.precision ?? "exact"
   const shown = describePrecision(precision)
-  if (input.ceremonies <= 0n) {
+  if (input.ceremonies <= 0n && input.sef.some((v) => v.participation_rate_14d !== null)) {
     return [{
       figure: "attestation ceremonies in the window", ours: input.ceremonies.toString(), sef: "",
       precision: shown, verdict: "FAIL",
@@ -98,10 +106,12 @@ export function compareParticipation(input: {
   }
   const listed = new Set(input.sef.map((v) => v.address.toLowerCase()))
   const rows: ParityRow[] = input.sef.map((v) => {
+    const figure = `${v.label} participation_rate_14d`
+    if (v.participation_rate_14d === null) return notComparable(figure, SEF_PUBLISHES_NO_RATE)
     const n = input.attended.get(v.address.toLowerCase()) ?? 0n
     const ours = Number(n) / Number(input.ceremonies)
     return {
-      figure: `${v.label} participation_rate_14d`,
+      figure,
       ours: String(ours),
       sef: String(v.participation_rate_14d),
       precision: shown,

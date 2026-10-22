@@ -13,7 +13,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { UndelegateDialog } from "@/components/staking/UndelegateDialog"
 import { truncateAddress, formatTokenAmount } from "@/lib/format"
 import Info from "lucide-react/dist/esm/icons/info"
-import { ParticipationRate } from "@/components/validators/ParticipationRate"
+import { PublishedParticipationRate } from "@/components/validators/ParticipationRate"
 import { AEGIS_UNCONFIRMED, PARTICIPATION_RULE, WITHDRAWN } from "@/lib/programme"
 import type { Address } from "viem"
 
@@ -45,7 +45,7 @@ function PositionRow({ position, validators }: { position: Position; validators?
         </td>
         <td className="py-3 pr-4 text-sm font-mono tabular-nums text-right text-muted-foreground">
           {metadata ? (
-            <ParticipationRate rate={metadata.participationRate / 100} text={`${metadata.participationRate}%`} />
+            <PublishedParticipationRate percent={metadata.participationRate} />
           ) : (
             "—"
           )}

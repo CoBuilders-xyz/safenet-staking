@@ -82,7 +82,6 @@ export async function writeRewards(
     rewardsUntil: published.rewardsUntil,
     tokenTotal: (BigInt(published.tokenTotal) + amount).toString(),
     unpaidAmount: published.unpaidAmount,
-    updatedAt: new Date().toISOString(),
   }
   writeFileSync(resolve(outDir, "latest.json"), JSON.stringify(latest, null, 2) + "\n")
 

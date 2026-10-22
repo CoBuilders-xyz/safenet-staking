@@ -8,7 +8,7 @@ import { createEthereumProviderScript, createDisconnectedProviderScript } from "
 import { createRpcHandler } from "../mocks/rpc-handler"
 import { createMockChainState, applyMockTx, type MockChainState } from "../mocks/mock-chain-state"
 import { createMockSubgraphState, createSubgraphHandler, type MockSubgraphState } from "../mocks/subgraph-handler"
-import { CHAIN_ID_HEX, WRONG_CHAIN_ID_HEX, TEST_USER, VALIDATORS } from "./test-data"
+import { CHAIN_ID_HEX, WRONG_CHAIN_ID_HEX, TEST_USER } from "./test-data"
 
 export type TestFixtures = {
   /** Mutable mock chain state (balances, stakes, withdrawals, rewards) for this test. */
@@ -30,31 +30,6 @@ interface SetupPageOptions {
   chainIdHex?: string
   supportsBatching?: boolean
 }
-
-const MOCK_VALIDATORS = [
-  {
-    address: VALIDATORS.validatorA,
-    is_active: true,
-    label: "Validator A",
-    commission: 0.05,
-    participation_rate_14d: 0.999,
-  },
-  {
-    address: VALIDATORS.validatorB,
-    is_active: true,
-    label: "Validator B",
-    commission: 0.03,
-    participation_rate_14d: 0.985,
-  },
-  {
-    address: VALIDATORS.validatorC,
-    is_active: false,
-    label: "Validator C",
-    commission: 0.05,
-    // Differs from the Gnosis subgraph mock's 980 of 1,000, so a test can tell the two sources apart.
-    participation_rate_14d: 0.975,
-  },
-]
 
 async function setupPage(page: Page, options: SetupPageOptions, state: MockChainState, subgraph: MockSubgraphState): Promise<Page> {
   const { connected, chainIdHex = CHAIN_ID_HEX, supportsBatching } = options
@@ -92,12 +67,13 @@ async function setupPage(page: Page, options: SetupPageOptions, state: MockChain
   // Both subgraphs (see mocks/subgraph-handler.ts), so the overview never leaves the machine.
   await page.route("**/mock-subgraph.test/**", createSubgraphHandler(subgraph))
 
-  // Intercept validator info endpoint with test data so tests use known addresses
+  // SEF's validator-info.json, `state.sefValidators`, so tests use known addresses and can set
+  // a validator's rate before navigating.
   await page.route("**/mock-validators.test/**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(MOCK_VALIDATORS),
+      body: JSON.stringify(state.sefValidators),
     })
   })
 
