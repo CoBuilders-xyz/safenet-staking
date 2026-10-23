@@ -175,6 +175,17 @@ export type Programme = Exclude<ProgrammePhase, "gap">
  */
 export const GNOSIS_INDEXED_PROGRAMME: Programme = "beta"
 
+/**
+ * The UTC day from which a programme is closed, for each programme that has ended. A programme
+ * still running has no entry. verify:abis anchors its fast scan of a closed programme's
+ * contracts at the last block before this day, because they will log none of its events again.
+ * Beta closes on AEGIS_START_DAY rather than the day after BETA_END_DAY, so the stray ceremony of
+ * 6 October stays inside it.
+ */
+export const PROGRAMME_CLOSED_FROM: Readonly<Partial<Record<Programme, UtcDay>>> = {
+  beta: AEGIS_START_DAY,
+}
+
 const DAY_MS = 86_400_000
 
 /** Milliseconds of a UTC day's midnight. */

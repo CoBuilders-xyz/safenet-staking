@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import { getAddress } from "viem"
 import { INDEXED_EVENTS } from "./abis.js"
 import { CONTRACTS, type ContractName, type ContractRef } from "./contracts.js"
+import { GNOSIS_INDEXED_PROGRAMME } from "./sef.js"
 
 const refs = Object.entries(CONTRACTS) as [ContractName, ContractRef][]
 
@@ -33,5 +34,21 @@ test("no two contracts on one chain share an address", () => {
     const key = `${ref.chain}:${ref.address.toLowerCase()}`
     assert.ok(!seen.has(key), `${name} repeats an address`)
     seen.add(key)
+  }
+})
+
+test("the Gnosis contracts belong to the programme the Gnosis subgraph indexes", () => {
+  // verify:abis anchors their fast scan at that programme's end once it closes.
+  for (const [name, ref] of refs) {
+    if (ref.chain !== "gnosis") continue
+    assert.equal(ref.programme, GNOSIS_INDEXED_PROGRAMME, name)
+  }
+})
+
+test("a contract with a programme can be searched for that programme's end", () => {
+  // verify:abis searches a closed programme's last block from the deploy block or the scan floor.
+  for (const [name, ref] of refs) {
+    if (ref.programme === undefined) continue
+    assert.notEqual(ref.deployBlock ?? ref.startBlock, undefined, name)
   }
 })
