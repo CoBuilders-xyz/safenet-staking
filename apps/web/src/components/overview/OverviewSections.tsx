@@ -217,12 +217,17 @@ export function ValidatorsPanel() {
   const sefListed = sefRows.map((r) => findValidator(sef.data, r.address)).filter((v) => v !== null)
   const fromSef = sefListed.length > 0
   const sefPublishesNone = fromSef && sefListed.every((v) => v.participationRate === null)
+  const sefPublishesSome = !sefPublishesNone && sefListed.some((v) => v.participationRate === null)
   const subgraphWords = !window
     ? ""
     : betaOnly
       ? `${betaWindow(window)}: the Gnosis subgraph, attestation ceremonies attended over ${window.days} complete UTC days`
       : `the Gnosis subgraph, attestation ceremonies attended over ${window.days} complete UTC days to ${dayOf(window.to)}`
-  const sefWords = sefPublishesNone ? "SEF publishes no 14-day figure at present" : "SEF's published 14-day figure"
+  const sefWords = sefPublishesNone
+    ? "SEF publishes no 14-day figure at present"
+    : sefPublishesSome
+      ? "SEF's published 14-day figure, where SEF publishes one"
+      : "SEF's published 14-day figure"
   const participationSource =
     fromSubgraph && fromSef
       ? sefPublishesNone

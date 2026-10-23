@@ -193,6 +193,15 @@ describe("OverviewPage", () => {
     )
   })
 
+  it("says SEF publishes a figure only where it does, when some of SEF's rates are null", () => {
+    mocks.consensus.mockReturnValue({ ...mocks.consensus(), participation: undefined, window: undefined })
+    mocks.validators.mockReturnValue({ data: [MOCK_VALIDATORS[0], { ...MOCK_VALIDATORS[1], participationRate: null }], error: null })
+    renderPage()
+    const validators = screen.getByRole("region", { name: "Validators" })
+    expect(validators).toHaveTextContent("Participation: SEF's published 14-day figure, where SEF publishes one.")
+    expect(within(validators).getByText("Not published")).toBeInTheDocument()
+  })
+
   it("does not read a validator SEF does not list as SEF publishing no rate", () => {
     // Gnosis is listed with a null rate but read from the subgraph; Greenfield is not listed.
     mocks.validators.mockReturnValue({ data: [{ ...MOCK_VALIDATORS[0], participationRate: null }], error: null })
