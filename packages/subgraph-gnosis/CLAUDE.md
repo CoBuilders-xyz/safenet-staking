@@ -85,6 +85,19 @@ COMPARABLE, exits 0, and says why in one line. So does a deployment that starts 
 blocks before the window: a ceremony attested at the window's first block counts shares from
 before it. A real difference still fails.
 
+Two more cases are NOT COMPARABLE, with exit 0 and the reason in the job summary, because SEF
+gives nothing to compare:
+
+- SEF's window lies after the programme this deployment indexes, `GNOSIS_INDEXED_PROGRAMME` in
+  `packages/core`: the window starts after that programme's last day. SEF computes its rates over
+  the programme running when it publishes, and from 22 October 2026 that is Aegis, while this
+  deployment indexes Beta. `windowOutsideProgramme` in `packages/core/src/parity/compare.ts`
+  decides it from the calendar in `src/sef.ts`. It stops applying by itself once
+  `GNOSIS_INDEXED_PROGRAMME` names Aegis, which has no last day. A window that still holds an
+  hour of Beta is compared as before, and a lagging or broken subgraph still fails.
+- SEF lists a validator with `participation_rate_14d: null`. That row reads "SEF publishes no
+  rate".
+
 Studio keeps about 1,000 blocks of history: `historyBlocks: 1000` in the indexing status, about
 1.4 hours here. `indexerHints: prune: never` does not change that. Measured on 2026-10-05: version
 `edc2588-prune-never`, built with `pnpm generate --days 16 --prune-never`, synced 16 days and then

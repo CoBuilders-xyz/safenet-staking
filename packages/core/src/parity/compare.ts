@@ -5,12 +5,13 @@
  * fetch the inputs through ./sources.ts and hand them here.
  */
 import { SEF_DATA } from "../contracts.js"
-import type { SefValidator } from "../sef.js"
+import { BETA_END_DAY, utcDayMs, type Programme, type SefValidator, type UtcDay } from "../sef.js"
 
 /**
- * One row's verdict. NOT COMPARABLE: our deployment cannot answer at SEF's instant, or SEF
- * publishes no value for the figure; a known limit, not a disagreement. NOT COMPARED: a figure
- * SEF publishes that we do not hold.
+ * One row's verdict. NOT COMPARABLE: our deployment cannot answer at SEF's instant, SEF's
+ * window lies after the programme our deployment indexes, or SEF publishes no value for the
+ * figure; a known limit, not a disagreement. NOT COMPARED: a figure SEF publishes that we do not
+ * hold.
  */
 export type Verdict = "PASS" | "FAIL" | "NOT COMPARABLE" | "NOT COMPARED"
 
@@ -21,8 +22,9 @@ export type Verdict = "PASS" | "FAIL" | "NOT COMPARABLE" | "NOT COMPARED"
  *   FAIL            a figure differs, the subgraph is broken or behind, SEF's
  *                   data is over 24 hours old, or the run hit an error            exit 1
  *   STALE           SEF's file is over 9 hours old, so nothing is compared         exit 0
- *   NOT COMPARABLE  our deployment cannot answer at SEF's instant, or SEF
- *                   publishes no value for a figure                               exit 0
+ *   NOT COMPARABLE  our deployment cannot answer at SEF's instant, SEF's window
+ *                   lies after the programme it indexes, or SEF publishes no
+ *                   value for a figure                                            exit 0
  *
  * Only FAIL exits 1, so the daily job turns red only on something someone can act on.
  */
@@ -275,6 +277,35 @@ export function participationFromHours(input: {
     attended.set(id, (attended.get(id) ?? 0n) + BigInt(share(r.hour, r.attended, r.attendedOnTheHour)))
   }
   return { ceremonies, attended }
+}
+
+// ------------------------------------------------------------------ the programme calendar
+
+const PROGRAMME_NAME: Readonly<Record<Programme, string>> = { beta: "Beta", aegis: "Aegis" }
+
+/** The last UTC day of each programme, from the calendar in ../sef.ts. Undefined while it runs. */
+const PROGRAMME_LAST_DAY: Readonly<Record<Programme, UtcDay | undefined>> = { beta: BETA_END_DAY, aegis: undefined }
+
+const DAY_MS = 86_400_000
+
+/**
+ * Why SEF's participation window cannot be compared with a deployment that indexes the
+ * programme `indexed`, or undefined when it can.
+ *
+ * SEF computes its rates over the programme running when it publishes. A window that starts
+ * after the last day of the programme the deployment indexes holds no ceremony the deployment
+ * counts, so every validator would FAIL with no real difference behind it. A window that still
+ * holds an hour of that programme is compared as before. The caller keeps every FAIL from
+ * another cause, which still wins over this.
+ *
+ * Aegis has no last day, so when the Aegis contracts land in core and GNOSIS_INDEXED_PROGRAMME
+ * moves to it, this returns undefined and the rule stops applying by itself.
+ */
+export function windowOutsideProgramme(window: { start: Date }, indexed: Programme): string | undefined {
+  const lastDay = PROGRAMME_LAST_DAY[indexed]
+  if (lastDay === undefined || window.start.getTime() < utcDayMs(lastDay) + DAY_MS) return undefined
+  const name = PROGRAMME_NAME[indexed]
+  return `SEF's window holds no day of ${name}, the programme this deployment indexes; ${name} ended on ${lastDay}`
 }
 
 /** A row that says why a figure cannot be compared today. Never a pass, never a failure. */
