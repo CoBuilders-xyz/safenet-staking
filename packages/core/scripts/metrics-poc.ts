@@ -269,7 +269,7 @@ async function run() {
   // -------------------------------------------------------------- SEF sources
   const [sefValidators, sefNet, sefRewards] = await Promise.all([
     fetch(sefRatesUrl).then((r) => r.json()) as Promise<
-      { address: Address; label: string; is_active: boolean; participation_rate_14d: number; commission: number }[]>,
+      { address: Address; label: string; is_active: boolean; participation_rate_14d: number | null; commission: number }[]>,
     fetch(sefNetUrl).then((r) => r.json()) as Promise<{ total_staked_amount: string; total_transactions_checked: number }>,
     fetch(sefRewardsUrl).then((r) => r.json()) as Promise<{ merkleRoot: Hex; tokenTotal: string; unpaidAmount: string; epoch: number; rewardsUntil: string }>,
   ])
@@ -593,8 +593,12 @@ async function run() {
   })
   const worst = participation.reduce((a, b) => (a.ours < b.ours ? a : b))
   const best = participation.reduce((a, b) => (a.ours > b.ours ? a : b))
-  const maxDelta = Math.max(...participation.map((p) => Math.abs(p.ours - p.sef)))
-  const bitExact = participation.every((p) => p.ours === p.sef)
+  // SEF can publish a null rate. There is nothing to compare it with, so it is no gap, and a run
+  // where SEF published none proves nothing: it is not bit-exact.
+  const published = participation.filter((p): p is typeof p & { sef: number } => p.sef !== null)
+  const unpublished = participation.length - published.length
+  const maxDelta = Math.max(0, ...published.map((p) => Math.abs(p.ours - p.sef)))
+  const bitExact = published.length === participation.length && published.every((p) => p.ours === p.sef)
   add({
     group: "Participation", metric: "Participation rate, reproduced",
     value: `${participation.length} validators over ${ceremoniesAttest.toLocaleString("en-US")} ceremonies`,
@@ -606,7 +610,10 @@ async function run() {
     note: bitExact
       ? `EXACT: all ${participation.length} rates are bit-identical to SEF's published doubles ` +
         `(same numerators over denominator ${ceremoniesAttest}).`
-      : (windowAligned ? "" : "NOT ALIGNED to SEF's publish hour, so this comparison is not meaningful. ") +
+      : published.length === 0
+        ? `NOT COMPARED: SEF publishes no rate for any of the ${participation.length} validators.`
+        : (unpublished ? `${unpublished} of ${participation.length} validators have no published rate and are not compared. ` : "") +
+        (windowAligned ? "" : "NOT ALIGNED to SEF's publish hour, so this comparison is not meaningful. ") +
         `largest gap vs SEF's published figure: ${(maxDelta * 100).toFixed(4)} percentage points. ` +
         `A residual here is window misalignment, not necessarily a formula error. Measured over 14 ` +
         `consecutive SEF publications, a single three-hour step moves a validator's rate by up to ` +
@@ -835,8 +842,9 @@ async function run() {
   console.log(`  ${pad("VALIDATOR", 22)}${pad("OURS", 10)}${pad("SEF", 10)}${pad("DELTA", 10)}ABSENCES`)
   for (const p of participation.sort((a, b) => b.ours - a.ours)) {
     console.log(
-      `  ${pad(p.label, 22)}${pad((p.ours * 100).toFixed(3) + "%", 10)}${pad((p.sef * 100).toFixed(3) + "%", 10)}` +
-      `${pad(((p.ours - p.sef) * 100).toFixed(3) + "pp", 10)}${(ceremoniesAttest - p.rounds).toLocaleString("en-US")}`,
+      `  ${pad(p.label, 22)}${pad((p.ours * 100).toFixed(3) + "%", 10)}` +
+      `${pad(p.sef === null ? "not published" : (p.sef * 100).toFixed(3) + "%", 10)}` +
+      `${pad(p.sef === null ? "" : ((p.ours - p.sef) * 100).toFixed(3) + "pp", 10)}${(ceremoniesAttest - p.rounds).toLocaleString("en-US")}`,
     )
   }
 

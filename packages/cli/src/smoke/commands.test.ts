@@ -95,7 +95,8 @@ test("safenet validators list", { skip, timeout: TIMEOUT }, async () => {
   assert.ok(list.validators.length > 0)
   for (const v of list.validators) {
     assert.ok(isWei(v.stake))
-    // SEF has published a null rate for every validator since 2026-10-20.
+    // SEF published a null rate for every validator from cce3fc2, 2026-10-20 09:01 UTC, until 88bf9d9, 2026-10-22 14:33 UTC.
+    // It can do so again.
     if (v.participation !== null) assert.ok(v.participation >= 0 && v.participation <= 1)
   }
   const text = await safenet("validators", "list", "--all")

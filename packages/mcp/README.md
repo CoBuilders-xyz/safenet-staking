@@ -19,7 +19,7 @@ turn them on, and no key or password ever goes through a tool.
 |---|---|---|
 | `status` | none | read |
 | `validators_list` | `active` (boolean), `all` (boolean), `sort` (`"stake"` or `"participation"`, default `"stake"`). A rate SEF does not publish is `null` | read |
-| `validators_show` | `address` | read |
+| `validators_show` | `address`. A rate SEF does not publish is `null` | read |
 | `withdrawals_list` | `address` (optional: one staker's queue; without it, the network total and count) | read |
 | `rewards_check` | `address` | read |
 | `rewards_history` | `address`, `all` (boolean: every claim, not only the newest 20) | read |

@@ -150,8 +150,9 @@ describe("useValidators", () => {
     expect(result).toHaveLength(2)
   })
 
-  it("queryFn keeps a null rate null, as SEF publishes it since 2026-10-20, never 0", async () => {
-    // validator-info.json as live on 2026-10-22: labels, flags, commissions and the null rates
+  it("queryFn keeps a null rate null, as SEF published it from 2026-10-20 to 2026-10-22, never 0", async () => {
+    // validator-info.json as SEF published it from cce3fc2, 2026-10-20 09:01 UTC, until 88bf9d9, 2026-10-22 14:33 UTC: labels, flags,
+    // commissions and the null rates
     // copied from the file; two of its six entries, at the shared fixture addresses.
     const live = [
       { address: TEST_ACCOUNTS.validator1, commission: 0.05, is_active: true, label: "Gnosis", participation_rate_14d: null },

@@ -21,8 +21,8 @@ export const VALIDATORS = {
 
 /**
  * SEF's validator-info.json as the mock serves it by default: the live file's fields, with a rate
- * per validator. SEF has published a null rate for every validator since 2026-10-20; a test sets
- * one to null through `mockChainState.sefValidators`.
+ * per validator. SEF published a null rate for every validator from cce3fc2, 2026-10-20 09:01 UTC, until 88bf9d9, 2026-10-22 14:33 UTC;
+ * a test sets one to null through `mockChainState.sefValidators`.
  */
 export const SEF_VALIDATOR_INFO: readonly SefValidator[] = [
   {

@@ -197,7 +197,11 @@ describe("OverviewPage", () => {
     // Gnosis is listed with a null rate but read from the subgraph; Greenfield is not listed.
     mocks.validators.mockReturnValue({ data: [{ ...MOCK_VALIDATORS[0], participationRate: null }], error: null })
     renderPage()
-    expect(screen.getByRole("region", { name: "Validators" })).not.toHaveTextContent("SEF publishes no 14-day figure")
+    const validators = screen.getByRole("region", { name: "Validators" })
+    expect(validators).not.toHaveTextContent("SEF publishes no 14-day figure")
+    // No row carries SEF's figure, so the caption points at no "SEF file" rows.
+    expect(validators).not.toHaveTextContent("SEF file")
+    expect(within(validators).getByText("Not available")).toBeInTheDocument()
   })
 
   it("shows no APY and no SAFE price", () => {

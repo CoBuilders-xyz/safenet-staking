@@ -232,11 +232,11 @@ const latestFile = (epoch: number) => ({
 })
 
 /**
- * SEF's validator-info.json as published at cce3fc2, 2026-10-20 09:01 UTC, and still live on
- * 2026-10-22: every rate null. Labels, flags and commissions copied from the file; the
+ * SEF's validator-info.json as published at cce3fc2, 2026-10-20 09:01 UTC, and live until 88bf9d9,
+ * 2026-10-22 14:33 UTC: every rate null. Labels, flags and commissions copied from the file; the
  * addresses are this file's fixtures, in the same places.
  */
-export const SEF_VALIDATORS_2026_10_22 = [
+export const SEF_VALIDATORS_AT_CCE3FC2 = [
   { address: VALIDATOR_A, commission: 0.05, is_active: true, label: "Gnosis", participation_rate_14d: null },
   { address: VALIDATOR_B, commission: 0.05, is_active: false, label: "RockawayX", participation_rate_14d: null },
 ]

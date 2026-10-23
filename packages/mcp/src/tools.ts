@@ -118,7 +118,8 @@ export const TOOLS: readonly Tool[] = [
   read({
     name: "validators_list",
     command: ["validators", "list"],
-    description: "Every validator SEF lists, with stake and registration from the chain and participation, commission and active from SEF.",
+    description: "Every validator SEF lists, with stake and registration from the chain and participation, commission and active from SEF. " +
+      "Participation is null when SEF publishes no rate, never 0.",
     input: z
       .strictObject({
         active: flag("Only validators SEF marks active (the default)"),
@@ -136,7 +137,8 @@ export const TOOLS: readonly Tool[] = [
   read({
     name: "validators_show",
     command: ["validators", "show"],
-    description: "One validator, with its delegators count. The count needs an archive RPC endpoint; without one it is marked unavailable.",
+    description: "One validator, with its delegators count. The count needs an archive RPC endpoint; without one it is marked unavailable. " +
+      "Participation is null when SEF publishes no rate, never 0.",
     input: z.strictObject({ address: address("address", "The validator's address") }),
     run: (lib, ctx, args) => lib.showValidator(ctx, args.address),
     summary: validatorSummary,

@@ -47,7 +47,7 @@ export function FreshnessPanel() {
       <ChainFreshness
         chain="Gnosis"
         result={gnosis}
-        fallback={`Attestation figures come from a snapshot measured ${formatUtcDateTime(snapshot.runAt)}, and participation from SEF's published figure.`}
+        fallback={`Attestation figures come from a snapshot measured ${formatUtcDateTime(snapshot.runAt)}, and participation from SEF's published figure where SEF publishes one.`}
       />
     </section>
   )
@@ -210,12 +210,13 @@ export function ValidatorsPanel() {
   // The caption names the sources the rows actually use. A validator with no ValidatorDay row in
   // the window falls back to SEF's figure even while the subgraph is live; such rows are marked.
   const fromSubgraph = participation && window && rows.state === "ready" && rows.value.some((r) => participation.has(r.address.toLowerCase()))
+  // The rows that fall back to SEF's file are the ones it lists. A validator SEF does not list has
+  // no SEF figure and says nothing about SEF's rates. SEF's file can also list every validator with
+  // a null rate; then no row carries SEF's figure.
   const sefRows = rows.state === "ready" ? rows.value.filter((r) => !participation?.has(r.address.toLowerCase())) : []
-  const fromSef = sefRows.length > 0
-  // SEF's file can list every validator with a null rate. Then no row carries SEF's figure. A
-  // validator SEF does not list says nothing about its rates, so only listed ones count.
   const sefListed = sefRows.map((r) => findValidator(sef.data, r.address)).filter((v) => v !== null)
-  const sefPublishesNone = sefListed.length > 0 && sefListed.every((v) => v.participationRate === null)
+  const fromSef = sefListed.length > 0
+  const sefPublishesNone = fromSef && sefListed.every((v) => v.participationRate === null)
   const subgraphWords = !window
     ? ""
     : betaOnly

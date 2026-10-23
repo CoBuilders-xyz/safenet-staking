@@ -2,10 +2,11 @@
  * The shape of the JSON SEF publishes at `safe-fndn/safenet-data`.
  *
  * These are not our types to choose. Each one was read off the live file on
- * 2026-10-22 and must be re-checked, not assumed, when `verify:abis` or
+ * 2026-10-23 and must be re-checked, not assumed, when `verify:abis` or
  * `test:parity` starts failing for a reason that is not a contract change. SEF removed
- * `updatedAt` from rewards/latest.json on 2026-10-21 and has published a null
- * `participation_rate_14d` for every validator since 2026-10-20.
+ * `updatedAt` from rewards/latest.json on 2026-10-21. validator-info.json carried a null
+ * `participation_rate_14d` for every validator from cce3fc2, 2026-10-20 09:01 UTC, until 88bf9d9, 2026-10-22 14:33 UTC, which
+ * published Aegis rates.
  *
  * Their cron overwrites validator-info.json and network-info.json every three hours, so a
  * parity run pins those two to the commit that last wrote them. rewards/latest.json is written
@@ -20,9 +21,11 @@ export interface SefValidator {
   is_active: boolean
   label: string
   /**
-   * A double. Our own computation reproduces this bit-for-bit on an aligned run. Null when SEF
-   * publishes no rate. SEF's pull request that moved its data job to Aegis says the Beta job
-   * writes null once Beta's last attestation leaves the window, and the Aegis job replaces it.
+   * A double, over the programme running when SEF publishes: Beta consensus up to the switch,
+   * Aegis consensus since 88bf9d9, 2026-10-22, per SEF's README. Our own computation reproduces
+   * it bit-for-bit on an aligned run of the same programme. Null when SEF publishes no rate. SEF's
+   * pull request that moved its data job to Aegis says the Beta job writes null once Beta's last
+   * attestation leaves the window, and the Aegis job replaces it.
    */
   participation_rate_14d: number | null
 }

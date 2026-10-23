@@ -36,7 +36,7 @@ test.describe("Validators Page", () => {
   })
 
   test("a rate SEF publishes as null reads Not published, never 0.00%", async ({ disconnectedPage: page, mockChainState }) => {
-    // validator-info.json as live on 2026-10-22: every rate null.
+    // validator-info.json as SEF published it from cce3fc2, 2026-10-20 09:01 UTC, until 88bf9d9, 2026-10-22 14:33 UTC: every rate null.
     mockChainState.sefValidators = mockChainState.sefValidators.map((v) => ({ ...v, participation_rate_14d: null }))
     const validators = new ValidatorsPage(page)
     await validators.goto()

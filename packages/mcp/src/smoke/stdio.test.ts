@@ -53,7 +53,8 @@ test("validators_list over stdio", { skip, timeout: TIMEOUT }, async () => {
   assert.ok(l.validators.length > 0)
   for (const v of l.validators) {
     assert.ok(isWei(v.stake), v.address)
-    // SEF has published a null rate for every validator since 2026-10-20.
+    // SEF published a null rate for every validator from cce3fc2, 2026-10-20 09:01 UTC, until 88bf9d9, 2026-10-22 14:33 UTC.
+    // It can do so again.
     assert.ok(v.participation === null || (v.participation >= 0 && v.participation <= 1), v.address)
   }
 })

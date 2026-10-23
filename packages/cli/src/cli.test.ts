@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { errorSentence, run } from "./cli.js"
 import { SafenetError } from "./lib/index.js"
 import {
-  fakeRoot, fakeRuntime, SEF_LATEST_2026_10_22, SEF_VALIDATORS_2026_10_22, STAKER, VALIDATOR_A, VALIDATOR_B,
+  fakeRoot, fakeRuntime, SEF_LATEST_2026_10_22, SEF_VALIDATORS_AT_CCE3FC2, STAKER, VALIDATOR_A, VALIDATOR_B,
 } from "./test-support.js"
 
 // Every command runs end to end here, against the fake chain and fake SEF files in
@@ -87,18 +87,18 @@ test("latest.json without any one of its five fields exits 1", async () => {
 
 test("a rate that is neither a number nor null is still refused", async () => {
   const r = await cli(["validators", "list"], {
-    validatorInfo: [{ ...SEF_VALIDATORS_2026_10_22[0], participation_rate_14d: "1" }],
+    validatorInfo: [{ ...SEF_VALIDATORS_AT_CCE3FC2[0], participation_rate_14d: "1" }],
   })
   assert.equal(r.code, 1)
   assert.equal(r.err, "error: SEF's validator-info.json no longer has the shape this tool reads.\n")
 })
 
-// --- SEF's files as live on 2026-10-22 ------------------------------------------
+// --- latest.json without updatedAt, and every rate null, as from 2026-10-20 to 2026-10-22
 
-const live = { rewardsLatest: SEF_LATEST_2026_10_22, validatorInfo: SEF_VALIDATORS_2026_10_22 }
+const nullRates = { rewardsLatest: SEF_LATEST_2026_10_22, validatorInfo: SEF_VALIDATORS_AT_CCE3FC2 }
 
 test("status reads latest.json without updatedAt and reports no update time", async () => {
-  const r = await cli(["status", "--json"], live)
+  const r = await cli(["status", "--json"], nullRates)
   assert.equal(r.code, 0, r.err)
   const s = JSON.parse(r.out)
   assert.deepEqual(s.rewardsEpoch, {
@@ -107,25 +107,25 @@ test("status reads latest.json without updatedAt and reports no update time", as
   })
   assert.equal(s.rewardsAllocated.value, "4499987774807670271201970")
   assert.equal(s.activeValidators.value, 1)
-  const text = await cli(["status"], live)
+  const text = await cli(["status"], nullRates)
   assert.equal(text.code, 0, text.err)
   assert.match(text.out, /Rewards period\s+epoch 0, rewards until 2026-10-06 00:00 UTC/)
   assert.doesNotMatch(text.out, /updatedAt/)
 })
 
 test("validators prints a null rate as not published, and null in --json", async () => {
-  const table = await cli(["validators", "list", "--all"], live)
+  const table = await cli(["validators", "list", "--all"], nullRates)
   assert.equal(table.code, 0, table.err)
   const rows = table.out.split("\n").filter((l) => /^(Gnosis|RockawayX) /.test(l))
   assert.equal(rows.length, 2)
   for (const row of rows) assert.match(row, /not published/)
   assert.doesNotMatch(table.out, /0\.000%/)
-  const list = JSON.parse((await cli(["validators", "list", "--all", "--sort", "participation", "--json"], live)).out)
+  const list = JSON.parse((await cli(["validators", "list", "--all", "--sort", "participation", "--json"], nullRates)).out)
   assert.deepEqual(list.validators.map((v: { participation: unknown }) => v.participation), [null, null])
-  const show = await cli(["validators", "show", VALIDATOR_A], live)
+  const show = await cli(["validators", "show", VALIDATOR_A], nullRates)
   assert.equal(show.code, 0, show.err)
   assert.match(show.out, /Participation \(14d\)\s+not published/)
-  assert.equal(JSON.parse((await cli(["validators", "show", VALIDATOR_A, "--json"], live)).out).validator.participation, null)
+  assert.equal(JSON.parse((await cli(["validators", "show", VALIDATOR_A, "--json"], nullRates)).out).validator.participation, null)
 })
 
 test("a validator that SEF does not list and the chain does not know exits 1", async () => {
