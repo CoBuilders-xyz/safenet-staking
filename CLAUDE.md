@@ -38,7 +38,7 @@ the current count.
 
 Scope to one package with `pnpm --filter <name> check`. The names are
 `@cobuilders/safenet-core`, `@cobuilders/safenet-cli`, `@cobuilders/safenet-mcp`,
-`@cobuilders/safenet-web`, `@cobuilders/safenet-subgraph-mainnet` and
+`@cobuilders/safenet-snapshots`, `@cobuilders/safenet-web`, `@cobuilders/safenet-subgraph-mainnet` and
 `@cobuilders/safenet-subgraph-gnosis`.
 
 Specific commands, only where they apply:
@@ -60,6 +60,9 @@ Specific commands, only where they apply:
 | `release:build` | `apps/web`, through `pnpm --filter` | The production bundle builds from `apps/web/build.env` alone, passes the browser-safety check, and packs into `apps/web/release/app.car` with its root CID in `apps/web/release/CID`. Two clean builds give the same CID; `VERIFY.md` has the steps | works; needs no secret |
 | `budget:bundle`, `budget:lighthouse` | `apps/web`, through `pnpm --filter` | The built `dist/` is within `apps/web/performance-budget.json`: the bundle sizes, and Lighthouse mobile scores and metrics, the median of three runs per route. `release:build` runs the bundle check. `apps/web/PERFORMANCE.md` explains each limit | works; `budget:lighthouse` needs the network and a Chrome, Playwright's by default |
 | `release:pin` | `apps/web`, through `pnpm --filter` | Pinata stores the CAR under the same CID, and each gateway answers 200 for `index.html` and serves one `.js` file of the release byte for byte | needs `PINATA_JWT` and `PINATA_GATEWAY`, and fails when either is empty. Not yet run against Pinata |
+| `pnpm snapshot:build` | root, `packages/snapshots` | Today's snapshot of the validator dataset builds: every figure read at one Mainnet block, one Gnosis block and SEF's latest commits, the chain and the Mainnet subgraph agree to the wei where both hold a figure, and the day is written whole to `packages/snapshots/out/<day>`. Pins nothing | works; needs the archive `MAINNET_RPC_URL` |
+| `pnpm snapshot:verify <CID \| directory>` | root, `packages/snapshots` | A snapshot's files, local or fetched by path through a gateway, hash to its CID. Needs no secret | works |
+| `snapshot:publish` | `packages/snapshots`, through `pnpm --filter` | Pinata stores the day's CAR and the new date index under the CIDs built here, and the dedicated gateway and both public gateways serve `manifest.json` and `index.json` byte for byte. The workflow commits the index to the branch `snapshots` | needs `PINATA_JWT` and `PINATA_GATEWAY`; runs in `snapshots.yml` |
 | `pnpm test:parity` | both subgraph packages | Our deployed subgraphs agree with SEF's published JSON at the instant SEF published it, the commit that last wrote each file: the Mainnet staked total to the wei, and each validator's Gnosis participation rate as the identical double. Four states per chain: PASS, exit 0; FAIL, exit 1, for a real difference, a broken or lagging subgraph, SEF's data over 24 hours old, or an error; STALE, exit 0, when SEF's file is over 9 hours old; NOT COMPARABLE, exit 0, when our deployment cannot answer at SEF's instant, when SEF's window lies after the programme the Gnosis deployment indexes, or when SEF publishes a null rate for a validator. Subgraph URLs from `SUBGRAPH_URL_MAINNET` and `SUBGRAPH_URL_GNOSIS`, else the defaults in `packages/core`, the Studio deployment of each chain | Both chains failed on 21 and 22 October 2026 because SEF's data was over 24 hours old: SEF's update job was off from 21 October until it moved to Aegis on 22 October. Mainnet passes against Studio when SEF's data is fresh. Gnosis is NOT COMPARABLE while this deployment indexes Beta and SEF publishes Aegis rates. Gnosis sums hourly buckets filed by the attestation block from a current query, so Studio keeping about 1,000 blocks of history does not matter; a deployment without the buckets is NOT COMPARABLE. Daily in `parity.yml`, which also fails when a chain wrote no state |
 
 `turbo run <task>` with no package implementing the task reports a success while running nothing.
@@ -86,7 +89,7 @@ fork suite Anvil 8546, the manual QA fork 8547, 5179 and 5180, and `pnpm dev` us
 
 ## Layout
 
-The target layout has nine packages. **Six exist on `main`.** The rest are listed so the shape is
+The target layout has ten packages. **Seven exist on `main`.** The rest are listed so the shape is
 known, not to suggest they are there:
 
 ```
@@ -101,6 +104,9 @@ packages/cli                EXISTS   safenet-cli: the `safenet` binary, six read
 packages/mcp                EXISTS   safenet-mcp: an MCP server over stdio, one tool per CLI command.
                                      Calls the shared library, not the CLI binary. Writes are dry
                                      runs unless the operator allows them at start
+packages/snapshots          EXISTS   the daily snapshot of the validator dataset on IPFS, its date
+                                     index and its verifier; and the CAR, pin and gateway path the
+                                     release shares, exported as ./ipfs
 tools/                      EXISTS   edit hook, task guard, browser-safety check, metrics report
 docs/                       EXISTS   the manual QA fork guide and the translation guide
 scripts/setup.sh            EXISTS   what `pnpm bootstrap` runs
@@ -115,8 +121,8 @@ packages/testing            planned  shared fixtures: anvil, RPC mocks, Playwrig
 
 Do not infer that a planned package exists because this file names it. Check.
 
-`packages/core`, `packages/cli`, `packages/mcp`, `apps/web` and both subgraph packages each own a
-`CLAUDE.md`.
+`packages/core`, `packages/cli`, `packages/mcp`, `packages/snapshots`, `apps/web` and both subgraph
+packages each own a `CLAUDE.md`.
 Read the one for the package you are in, not all of them. Run a package's scripts from the root
 as `pnpm --filter <name> <script>`.
 
@@ -152,6 +158,12 @@ Studio with the `GRAPH_DEPLOY_KEY` secret. `parity.yml` runs `pnpm test:parity` 
 demand against the Studio deployments that `packages/core` names as the default endpoints, writes
 the comparison to the job summary, and drives the badge in `README.md`. It stays out of per-PR CI
 because its result depends on SEF's data and the deployed subgraphs, not on the code under review.
+`snapshots.yml` runs daily at 00:37 UTC and by hand: it builds the day's snapshot with
+`MAINNET_RPC_URL`, pins it and the new date index with `PINATA_JWT` and `PINATA_GATEWAY`, checks
+the gateways, verifies both CIDs through a public gateway, and writes both CIDs to the job summary.
+A second job, the only one with write access and running no repository code, commits the index to
+the orphan branch `snapshots`. Only a run on `main` writes that branch; a pull request that
+changes `packages/snapshots` or the workflow runs one real snapshot into `snapshots-preview`.
 `release.yml` runs on a tag `v*` or by hand: its `build` job receives no secret, builds from
 `apps/web/build.env`, packs `apps/web/release/app.car` and prints the CID; its `pin` job runs only
 from `main` or a `v*` tag, needs `PINATA_JWT` and `PINATA_GATEWAY`, and fails when they are empty.

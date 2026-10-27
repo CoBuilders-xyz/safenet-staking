@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // "source" resolves @cobuilders/safenet-cli/lib to its TypeScript, so checking needs no build.
+  "compilerOptions": { "noEmit": true, "types": ["node"], "customConditions": ["source"] },
+  "include": ["src/**/*.ts"]
+}

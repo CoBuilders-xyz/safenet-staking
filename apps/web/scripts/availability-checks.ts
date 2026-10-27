@@ -3,7 +3,7 @@
  * the network. Each check returns an outcome; none throws for a target that is down.
  */
 import { CID } from "multiformats/cid"
-import { gatewayUrl } from "./release-gateways"
+import { gatewayUrl } from "@cobuilders/safenet-snapshots/ipfs"
 
 /** One pinned release, as `deployments.json` at the repository root records it. */
 export interface Deployment {

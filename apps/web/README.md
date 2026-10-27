@@ -235,7 +235,7 @@ scripts/
 ├── merkle-tree.ts, generate-merkle-tree.ts, merkle-config.json   reward proofs
 ├── fork-env/     the manual QA fork behind fork:up, fork:reset and fork:down
 ├── codegen-check.ts, codegen-live-check.ts, subgraph-api-schema.ts   GraphQL codegen
-├── release.ts, release-pin.ts, release-gateways.ts   the IPFS release
+├── release.ts, release-pin.ts   the IPFS release, over packages/snapshots' IPFS module
 └── i18n-extract.ts, i18n-catalogues.ts   the catalogue extraction and check
 public/           static files, including the Safe App manifest
 ```
@@ -362,7 +362,8 @@ pnpm --filter @cobuilders/safenet-web release:pin
   `.env` file and every `VITE_` variable in the shell is ignored. That file is committed and
   public, holds only `VITE_` keys, and never a secret. The script builds in production mode,
   runs the browser-safety check over `dist/`, packs `dist/` into `release/app.car` and writes the
-  root CID to `release/CID`. `release/` is git-ignored. Set `VITE_APP_URL` in `build.env` so that
+  root CID to `release/CID`. The packing, the Pinata upload and the gateway checks live in
+  `@cobuilders/safenet-snapshots/ipfs`, which the daily snapshots publish through too. `release/` is git-ignored. Set `VITE_APP_URL` in `build.env` so that
   the social preview tags carry an absolute URL.
 - `release:pin` (`scripts/release-pin.ts`) uploads the CAR to Pinata and fails if Pinata reports
   another CID. It then checks the dedicated Pinata gateway and each gateway in `IPFS_GATEWAYS`

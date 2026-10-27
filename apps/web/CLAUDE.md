@@ -310,13 +310,13 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
   `merkle-tree.ts`.
 - `scripts/codegen-check.ts`, `scripts/codegen-live-check.ts`, `scripts/subgraph-api-schema.ts`:
   GraphQL codegen and its checks.
-- `scripts/release.ts`, `scripts/release-pin.ts`, `scripts/release-gateways.ts`: the IPFS
-  release behind `release:build` and `release:pin`. `build.env` is the release build's only env
-  input; it is public and holds no secret.
+- `scripts/release.ts`, `scripts/release-pin.ts`: the IPFS release behind `release:build` and
+  `release:pin`. They pack, pin and check gateways through `@cobuilders/safenet-snapshots/ipfs`,
+  shared with daily snapshots. Its tests live there. `build.env` is the release build's only
+  env input; it is public and holds no secret.
 - `scripts/availability.ts`, `scripts/availability-checks.ts`: `availability`. The checks take
   `fetch` as an argument, so each branch is unit-tested.
-- `scripts/__tests__/`: Vitest tests for the tree, the generator, the release gateways and the
-  availability checks.
+- `scripts/__tests__/`: Vitest tests for the tree, generator and availability checks.
 
 To use generated proofs, serve the output and point `VITE_REWARDS_BASE_URL` at it, then set the
 MerkleDrop's root. This repository sets a root only on an Anvil fork.
