@@ -103,7 +103,9 @@ pnpm --filter @cobuilders/safenet-web release:pin     # needs PINATA_JWT and PIN
 ### deployments.json
 
 `deployments.json` at the repository root records each pinned release, so the availability check
-knows which CID the gateways must serve. It is a JSON array, one object per release:
+knows which CID the gateways must serve. Nothing in the repository writes it: after `release:pin`
+succeeds, whoever ran the release adds the entry by hand, in a pull request. It is a JSON array,
+one object per release:
 
 ```json
 [

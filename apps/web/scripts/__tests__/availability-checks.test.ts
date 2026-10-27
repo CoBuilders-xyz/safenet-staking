@@ -1,5 +1,7 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process"
+import { createServer } from "node:http"
+import type { AddressInfo } from "node:net"
 import { resolve } from "node:path"
 import { describe, it, expect } from "vitest"
 import {
@@ -36,6 +38,20 @@ function fakeFetch(routes: Record<string, Response | Error>): Fetch & { urls: st
 const html = (body: string, status = 200) => new Response(body, { status, headers: { "content-type": "text/html" } })
 const js = (body: string, type = "text/javascript") => new Response(body, { status: 200, headers: { "content-type": type } })
 const timeout = () => Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" })
+/**
+ * A 200 whose headers arrived and whose body stream then fails with `error`, as undici's body does
+ * when the timeout signal fires mid-body. `new Response(text)` cannot fail, so it needs a stream.
+ */
+const stalled = (error: Error, type = "text/html") =>
+  new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(`<title>${TITLE.slice(0, 4)}`))
+        controller.error(error)
+      },
+    }),
+    { status: 200, headers: { "content-type": type } },
+  )
 
 describe("parseDeployments", () => {
   it("reads an array of records", () => {
@@ -166,6 +182,47 @@ describe("checkProduction", () => {
   })
 })
 
+describe("a body that stalls after the headers", () => {
+  it("is a FAIL outcome for the production index, not a rejection", async () => {
+    const outcomes = await checkProduction(fakeFetch({ [BASE]: stalled(timeout()) }), BASE, TITLE, 2_000)
+    expect(outcomes).toEqual([{ target: "production", ok: false, detail: "index: answered, but the body did not finish in 2 s" }])
+  })
+
+  it("is a FAIL outcome for the entry script, after the index passed", async () => {
+    const asset = `${BASE}assets/index-AbC123.js`
+    const outcomes = await checkProduction(fakeFetch({ [BASE]: html(INDEX), [asset]: stalled(timeout(), "text/javascript") }), BASE, TITLE, 2_000)
+    expect(outcomes.map((o) => o.ok)).toEqual([true, false])
+    expect(outcomes[1].detail).toBe("./assets/index-AbC123.js: answered, but the body did not finish in 2 s")
+  })
+
+  it("is a FAIL outcome for a gateway", async () => {
+    const url = "https://gw.example.test/ipfs/bafy1/index.html"
+    const outcome = await checkGateway(fakeFetch({ [url]: stalled(timeout()) }), "https://gw.example.test", "bafy1", TITLE, 60_000)
+    expect(outcome).toMatchObject({ ok: false, detail: "answered, but the body did not finish in 60 s" })
+  })
+
+  it("names another body error as such", async () => {
+    const outcome = await checkGateway(fakeFetch({ "https://gw.example.test/ipfs/bafy1/index.html": stalled(new TypeError("terminated")) }), "https://gw.example.test", "bafy1", TITLE)
+    expect(outcome).toMatchObject({ ok: false, detail: "answered, but the body failed: terminated" })
+  })
+
+  it("is a FAIL outcome against a real server that stalls mid-body, with the real fetch", async () => {
+    const server = createServer((_request, response) => {
+      response.writeHead(200, { "content-type": "text/html" })
+      response.write(`<title>${TITLE}</title>`) // and never ends
+    })
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+    try {
+      const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`
+      const outcomes = await checkProduction(fetch, base, TITLE, 500)
+      expect(outcomes).toEqual([{ target: "production", ok: false, detail: "index: answered, but the body did not finish in 0.5 s" }])
+    } finally {
+      server.closeAllConnections()
+      server.close()
+    }
+  })
+})
+
 describe("checkGateway", () => {
   const gateway = "https://gw.example.test"
   const url = `${gateway}/ipfs/bafy1/index.html`
@@ -222,6 +279,12 @@ describe("summary", () => {
     expect(text).toContain("| production | OK | fine |")
     expect(text).toContain("| https://gw.example.test | FAIL | a \\| b |")
     expect(text).toContain("release `v1`, `bafy1`")
+  })
+
+  it("escapes what a target served, so a detail cannot add a link, an image or a row", () => {
+    const text = summary([{ target: "https://gw.example.test", ok: false, detail: 'title "![x](https://evil.test/a.png) [y](z)"\n| new | row |' }], undefined)
+    expect(text).toContain('title "!\\[x\\]\\(https://evil.test/a.png\\) \\[y\\]\\(z\\)" \\| new \\| row \\|')
+    expect(text.split("\n").filter((line) => line.startsWith("| https://gw.example.test"))).toHaveLength(1)
   })
 
   it("says IPFS was not checked when no release is recorded", () => {

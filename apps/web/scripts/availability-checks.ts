@@ -74,11 +74,34 @@ export function entryAsset(html: string): string | undefined {
   return undefined
 }
 
-async function get(fetchImpl: Fetch, url: string, timeoutMs: number): Promise<Response | string> {
+/** An answer read to its end: the status, the final URL, the headers and the whole body. */
+interface Answer {
+  status: number
+  url: string
+  headers: Headers
+  text: string
+}
+
+/**
+ * GETs a URL and reads the body inside the same try, because the timeout signal also aborts the
+ * body: a 200 that stalls mid-body rejects `.text()`, and outside the try that rejection would end
+ * the run with no outcome for any target. Returns the answer, or why there is none.
+ */
+async function get(fetchImpl: Fetch, url: string, timeoutMs: number): Promise<Answer | string> {
+  let headersArrived = false
   try {
-    return await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) })
+    const response = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) })
+    headersArrived = true
+    const text = await response.text()
+    return { status: response.status, url: response.url, headers: response.headers, text }
   } catch (error) {
-    return error instanceof Error && error.name === "TimeoutError"
+    const timedOut = error instanceof Error && error.name === "TimeoutError"
+    if (headersArrived) {
+      return timedOut
+        ? `answered, but the body did not finish in ${timeoutMs / 1000} s`
+        : `answered, but the body failed: ${error instanceof Error ? error.message : String(error)}`
+    }
+    return timedOut
       ? `no answer in ${timeoutMs / 1000} s`
       : `request failed: ${error instanceof Error ? error.message : String(error)}`
   }
@@ -94,7 +117,7 @@ export async function checkProduction(fetchImpl: Fetch, baseUrl: string, title: 
   const index = await get(fetchImpl, baseUrl, timeoutMs)
   if (typeof index === "string") return [{ target, ok: false, detail: `index: ${index}` }]
   if (index.status !== 200) return [{ target, ok: false, detail: `index answered ${index.status}` }]
-  const html = await index.text()
+  const html = index.text
   const served = pageTitle(html)
   const outcomes: Outcome[] = [
     served === title
@@ -108,7 +131,7 @@ export async function checkProduction(fetchImpl: Fetch, baseUrl: string, title: 
   const script = await get(fetchImpl, assetUrl, timeoutMs)
   if (typeof script === "string") return [...outcomes, { target, ok: false, detail: `${asset}: ${script}` }]
   const type = script.headers.get("content-type") ?? ""
-  const body = script.status === 200 ? await script.text() : ""
+  const body = script.status === 200 ? script.text : ""
   outcomes.push(
     script.status === 200 && /javascript/i.test(type) && body.length > 0
       ? { target, ok: true, detail: `${asset} answered 200 as JavaScript, ${body.length} bytes` }
@@ -126,7 +149,7 @@ export async function checkGateway(fetchImpl: Fetch, gateway: string, cid: strin
   const response = await get(fetchImpl, gatewayUrl(gateway, cid, "index.html"), timeoutMs)
   if (typeof response === "string") return { target, ok: false, detail: response }
   if (response.status !== 200) return { target, ok: false, detail: `answered ${response.status}` }
-  const served = pageTitle(await response.text())
+  const served = pageTitle(response.text)
   return served === title
     ? { target, ok: true, detail: `index.html of ${cid} answered 200 with the title` }
     : { target, ok: false, detail: `index.html of ${cid} has the title ${served === undefined ? "missing" : `"${served}"`}` }
@@ -144,9 +167,13 @@ export function annotation({ target, ok, detail }: Outcome): string {
   return `::${ok ? "notice" : "error"} title=${title}::${escape(detail)}`
 }
 
-/** The job summary: one row per outcome, and a line when no release is recorded. */
+/**
+ * The job summary: one row per outcome, and a line when no release is recorded. A detail can
+ * quote what a target served, so it is escaped: a parked gateway's title cannot add a link, an
+ * image or a row.
+ */
 export function summary(outcomes: readonly Outcome[], release: Deployment | undefined): string {
-  const escape = (text: string) => text.replace(/\|/g, "\\|")
+  const escape = (text: string) => text.replace(/[\\|[\]()]/g, "\\$&").replace(/\r?\n|\r/g, " ")
   return [
     "## Availability",
     "",

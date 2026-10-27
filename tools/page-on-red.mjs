@@ -80,6 +80,8 @@ export function findOpenIssue(issues, title) {
 async function call(fetchImpl, { api, token }, method, path, body) {
   const response = await fetchImpl(`${api}${path}`, {
     method,
+    // A hung API call must not hold the job to its own timeout with nobody paged.
+    signal: AbortSignal.timeout(30_000),
     headers: {
       accept: "application/vnd.github+json",
       authorization: `Bearer ${token}`,

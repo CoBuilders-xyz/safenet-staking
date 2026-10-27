@@ -18,7 +18,7 @@ function fakeGitHub(routes) {
   const calls = []
   const fetch = async (url, init) => {
     const key = `${init.method} ${url.slice(API.length)}`
-    calls.push({ key, body: init.body ? JSON.parse(init.body) : undefined, headers: init.headers })
+    calls.push({ key, body: init.body ? JSON.parse(init.body) : undefined, headers: init.headers, signal: init.signal })
     const route = routes[key] ?? { status: 500, body: {} }
     return {
       ok: route.status >= 200 && route.status < 300,
@@ -84,6 +84,17 @@ test("never closes or edits an issue: only GET and POST", async () => {
   })
   await page({ ...RUN, fetch: gh.fetch })
   assert.ok(gh.calls.every((c) => c.key.startsWith("GET ") || c.key.startsWith("POST ")))
+})
+
+test("every API call carries a timeout signal, so a hung call cannot hold the job", async () => {
+  const gh = fakeGitHub({
+    ...LABEL_OK,
+    [OPEN_ISSUES]: { status: 200, body: [] },
+    [`POST /repos/${REPO}/issues`]: { status: 201, body: { number: 1 } },
+  })
+  await page({ ...RUN, fetch: gh.fetch })
+  assert.ok(gh.calls.length > 0)
+  for (const call of gh.calls) assert.ok(call.signal instanceof AbortSignal, `${call.key} has no signal`)
 })
 
 test("a missing label is created before the lookup", async () => {

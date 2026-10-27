@@ -31,6 +31,8 @@
     "scripts/fork-env/*.ts",
     "scripts/release.ts",
     "scripts/release-pin.ts",
-    "scripts/release-gateways.ts"
+    "scripts/release-gateways.ts",
+    "scripts/availability.ts",
+    "scripts/availability-checks.ts"
   ]
 }
