@@ -248,8 +248,9 @@ MerkleDrop's root. This repository sets a root only on an Anvil fork.
   shared test data.
 - `e2e/tests/`: Playwright against a mocked RPC, mocked subgraphs, mocked SEF files and mocked
   gateways (`e2e/mocks/`, `e2e/fixtures/`). Page objects in `e2e/pages/`. WalletConnect is
-  only smoke-tested. `safe-app.spec.ts` frames the app from another origin under a stand-in parent
-  that answers `getSafeInfo`, and checks that the Safe connector connects; no real Safe is involved.
+  only smoke-tested. `safe-app.spec.ts` frames the app from another origin and checks that the
+  Connect control is hidden and the Safe connector asks the parent for `getSafeInfo`; no real Safe
+  is involved, and the connection itself is not asserted.
 - `e2e/fork/`: Playwright against Anvil. `e2e/smoke/`: Playwright against production.
   `e2e/playwright.config.ts` switches suites on `E2E_SUITE`, `fork` or `smoke`, which `test:fork`
   and `test:smoke:web` set.

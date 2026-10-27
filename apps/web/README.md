@@ -127,10 +127,11 @@ See [`MANUAL_TESTING.md`](./MANUAL_TESTING.md) for the pre-release manual checkl
   listening there. An injected test wallet answers from a mocked RPC, and the subgraphs, SEF's
   files and the gateways are mocked too, so the suite needs no network and no secret. It proves
   the interface behaves, not that a transaction works. WalletConnect is only smoke-tested there.
-  For the Safe App, one test frames the app from another origin under a parent that answers the
-  Safe Apps SDK's `getSafeInfo` request, and checks that the app connects the Safe connector to
-  the address the parent names. It proves the app's side of the handshake, not that Safe{Wallet}
-  answers the same way, and no transaction goes through a Safe.
+  For the Safe App, one test frames the app from another origin and checks that it takes the Safe
+  connector path: the Connect control is hidden, and the app asks its parent for the Safe's
+  details with the Safe Apps SDK's `getSafeInfo`. It proves the app's side, not that Safe{Wallet}
+  answers, and no transaction goes through a Safe. It does not assert that the connection
+  completes: wagmi's Safe connector waits 10 ms for the answer, which a loaded runner can miss.
 - **Fork**: below.
 - **Production smoke**: below.
 
