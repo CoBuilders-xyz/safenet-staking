@@ -49,7 +49,7 @@ export function localSubgraphUrl(chain: ChainKey, port: number | string = DEFAUL
  */
 export const SUBGRAPH_ENDPOINTS: Record<ChainKey, string> = {
   mainnet: "https://api.studio.thegraph.com/query/1762768/safenet-mainnet/0abe5fb",
-  gnosis: "https://api.studio.thegraph.com/query/1762768/safenet-gnosis/edc2588",
+  gnosis: "https://api.studio.thegraph.com/query/1762768/safenet-gnosis/efeed7c",
 }
 
 /** True for a URL on this machine, whatever its port and path. */
