@@ -5,8 +5,8 @@ name: Availability
 # each public IPFS gateway in packages/core serves that release's index.html. The table goes to
 # the job summary, and the badge in README.md shows the last result.
 #
-# On a pull request only when the check itself changes, so a change to it runs once before it
-# merges. A red scheduled or dispatched run pages; a red pull request run is seen by its author.
+# On a pull request only when the check or the release record changes, so either runs once
+# before it merges. A red scheduled or dispatched run pages; a red pull request run is seen by its author.
 
 on:
   schedule:
@@ -18,6 +18,7 @@ on:
       - .github/workflows/availability.yml
       - apps/web/scripts/availability.ts
       - apps/web/scripts/availability-checks.ts
+      - deployments.json
 
 concurrency:
   group: availability-${{ github.ref }}

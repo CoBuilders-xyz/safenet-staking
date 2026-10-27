@@ -3,6 +3,9 @@ import { spawnSync } from "node:child_process"
 import { createServer } from "node:http"
 import type { AddressInfo } from "node:net"
 import { resolve } from "node:path"
+import { CID } from "multiformats/cid"
+import * as raw from "multiformats/codecs/raw"
+import { sha256 } from "multiformats/hashes/sha2"
 import { describe, it, expect } from "vitest"
 import {
   annotation,
@@ -15,6 +18,11 @@ import {
   summary,
   type Fetch,
 } from "../availability-checks"
+
+/** A CIDv1 of the given text, so fixtures pass the parser's CID check without a real release. */
+const cidOf = async (text: string) => CID.create(1, raw.code, await sha256.digest(new TextEncoder().encode(text))).toString()
+const CID_A = await cidOf("a")
+const CID_V0 = CID.createV0(await sha256.digest(new TextEncoder().encode("a"))).toString()
 
 const TITLE = "Safenet Staking"
 const BASE = "https://app.example.test/"
@@ -55,12 +63,12 @@ const stalled = (error: Error, type = "text/html") =>
 
 describe("parseDeployments", () => {
   it("reads an array of records", () => {
-    const text = JSON.stringify([{ cid: "bafy1", tag: "v1.0.0", pinnedAt: "2026-11-01T00:00:00Z" }])
-    expect(parseDeployments(text)).toEqual([{ cid: "bafy1", tag: "v1.0.0", pinnedAt: "2026-11-01T00:00:00Z" }])
+    const text = JSON.stringify([{ cid: CID_A, tag: "v1.0.0", pinnedAt: "2026-11-01T00:00:00Z" }])
+    expect(parseDeployments(text)).toEqual([{ cid: CID_A, tag: "v1.0.0", pinnedAt: "2026-11-01T00:00:00Z" }])
   })
 
   it("drops fields it does not know", () => {
-    const text = JSON.stringify([{ cid: "bafy1", tag: "v1", pinnedAt: "2026-11-01", note: "x" }])
+    const text = JSON.stringify([{ cid: CID_A, tag: "v1", pinnedAt: "2026-11-01", note: "x" }])
     expect(parseDeployments(text)[0]).not.toHaveProperty("note")
   })
 
@@ -73,26 +81,36 @@ describe("parseDeployments", () => {
   })
 
   it("rejects JSON that is not an array", () => {
-    expect(() => parseDeployments('{"cid":"bafy1"}')).toThrow("deployments.json is not an array")
+    expect(() => parseDeployments('{"cid":"x"}')).toThrow("deployments.json is not an array")
   })
 
   it.each(["cid", "tag", "pinnedAt"])("rejects an entry without %s, naming it", (field) => {
-    const entry: Record<string, unknown> = { cid: "bafy1", tag: "v1", pinnedAt: "2026-11-01" }
+    const entry: Record<string, unknown> = { cid: CID_A, tag: "v1", pinnedAt: "2026-11-01" }
     delete entry[field]
     expect(() => parseDeployments(JSON.stringify([entry]))).toThrow(`entry 0 has no ${field}`)
   })
 
   it("rejects an empty string and a non-string", () => {
     expect(() => parseDeployments(JSON.stringify([{ cid: " ", tag: "v1", pinnedAt: "2026-11-01" }]))).toThrow("has no cid")
-    expect(() => parseDeployments(JSON.stringify([{ cid: "bafy1", tag: 1, pinnedAt: "2026-11-01" }]))).toThrow("has no tag")
+    expect(() => parseDeployments(JSON.stringify([{ cid: CID_A, tag: 1, pinnedAt: "2026-11-01" }]))).toThrow("has no tag")
   })
 
   it("rejects a null entry", () => {
     expect(() => parseDeployments("[null]")).toThrow("entry 0 has no cid")
   })
 
+  it("rejects a cid that is not a CID", () => {
+    expect(() => parseDeployments(JSON.stringify([{ cid: "bafy-not-a-cid", tag: "v1", pinnedAt: "2026-11-01" }]))).toThrow(
+      "entry 0 has a cid that is not a CID",
+    )
+  })
+
+  it("accepts a CIDv0 as well as a CIDv1", () => {
+    expect(parseDeployments(JSON.stringify([{ cid: CID_V0, tag: "v1", pinnedAt: "2026-11-01" }]))[0].cid).toBe(CID_V0)
+  })
+
   it("rejects a pinnedAt that is not a date", () => {
-    expect(() => parseDeployments(JSON.stringify([{ cid: "bafy1", tag: "v1", pinnedAt: "yesterday" }]))).toThrow(
+    expect(() => parseDeployments(JSON.stringify([{ cid: CID_A, tag: "v1", pinnedAt: "yesterday" }]))).toThrow(
       "entry 0 has a pinnedAt that is not a date",
     )
   })

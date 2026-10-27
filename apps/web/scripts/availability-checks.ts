@@ -2,6 +2,7 @@
  * The checks behind availability.ts, with fetch passed in, so each branch is unit-tested without
  * the network. Each check returns an outcome; none throws for a target that is down.
  */
+import { CID } from "multiformats/cid"
 import { gatewayUrl } from "./release-gateways"
 
 /** One pinned release, as `deployments.json` at the repository root records it. */
@@ -23,7 +24,7 @@ export type Fetch = (url: string, init?: { signal?: AbortSignal }) => Promise<Re
 
 /**
  * Parses `deployments.json`: an array of `{ "cid", "tag", "pinnedAt" }`, each a non-empty string,
- * `pinnedAt` a date. Throws naming the first entry that is not, because a malformed record would
+ * `cid` a CID and `pinnedAt` a date. Throws naming the first entry that is not, because a malformed record would
  * otherwise check the wrong release, or none, and pass.
  */
 export function parseDeployments(text: string): Deployment[] {
@@ -40,6 +41,11 @@ export function parseDeployments(text: string): Deployment[] {
       if (typeof record[field] !== "string" || (record[field] as string).trim() === "") {
         throw new Error(`deployments.json entry ${index} has no ${field}`)
       }
+    }
+    try {
+      CID.parse(record.cid as string)
+    } catch {
+      throw new Error(`deployments.json entry ${index} has a cid that is not a CID`)
     }
     if (Number.isNaN(Date.parse(record.pinnedAt as string))) {
       throw new Error(`deployments.json entry ${index} has a pinnedAt that is not a date`)

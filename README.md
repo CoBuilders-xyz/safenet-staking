@@ -114,13 +114,19 @@ one object per release:
 ```
 
 - `cid`: the root CID that `release:build` wrote to `apps/web/release/CID` and Pinata confirmed.
-- `tag`: the git tag of the release, or the ref of a manual run.
-- `pinnedAt`: when the pin was confirmed, ISO 8601.
+  Rebuild it as `VERIFY.md` shows before recording it: the same commit gives the same CID.
+- `tag`: the git tag of the release. A manual run without a tag records the branch and the
+  commit it built, as `main@<short sha>`.
+- `pinnedAt`: when the pin was confirmed, ISO 8601, in UTC. When only the release run is known,
+  the time that run ended.
 
-The check reads the entry with the latest `pinnedAt`, not the last one in the file, and fails
-when an entry lacks a field or `pinnedAt` is not a date. Without the file, it checks the gateways
-for nothing and says so in its summary. No release has been pinned yet, so the file does not
-exist.
+The check reads the entry with the latest `pinnedAt`, not the last one in the file. It fails
+when an entry lacks a field, when `cid` is not a CID, or when `pinnedAt` is not a date, and a
+unit test reads the committed file so a bad edit fails its pull request first. Without the file,
+it checks no gateway and says so in its summary.
+
+The record names no ENS name. The interface's ENS name is recorded here only once its
+contenthash points at a recorded CID on chain.
 
 ## License
 
