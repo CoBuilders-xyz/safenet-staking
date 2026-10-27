@@ -7,7 +7,8 @@ import { CONSENSUS_MESSAGES, useConsensusFigures } from "../useConsensusFigures"
 
 vi.mock("graphql-request", () => ({ request: (o: unknown) => mockRequest(o) }))
 
-// The programme the Gnosis subgraph indexes, switchable per test. Beta, as in core, by default.
+// The programme the Gnosis figures describe, switchable per test. Beta by default, the state most
+// of these tests describe; core names Aegis.
 const indexed = vi.hoisted(() => ({ programme: "beta" as "beta" | "aegis" }))
 vi.mock("@cobuilders/safenet-core", async (importOriginal) => {
   const core = await importOriginal<typeof import("@cobuilders/safenet-core")>()
@@ -71,7 +72,7 @@ describe("useConsensusFigures", () => {
     const { result } = render()
     await waitFor(() => expect(result.current.attestations.state).toBe("ready"))
     expect(mockRequest).toHaveBeenCalledWith(
-      expect.objectContaining({ variables: { days: CONSENSUS_QUERY_DAYS, until: utcDayMs(BETA_END_DAY) / 1000 } }),
+      expect.objectContaining({ variables: { days: CONSENSUS_QUERY_DAYS, until: utcDayMs(BETA_END_DAY) / 1000, programme: "beta" } }),
     )
   })
 
@@ -158,7 +159,9 @@ describe("useConsensusFigures", () => {
     await waitFor(() => expect(result.current.attestations.state).toBe("ready"))
     expect(result.current.betaOnly).toBe(false)
     expect(result.current.window?.to).toBe(START + 6 * DAY)
-    expect(mockRequest).toHaveBeenCalledWith(expect.objectContaining({ variables: { days: CONSENSUS_QUERY_DAYS, until: 2_147_483_647 } }))
+    expect(mockRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ variables: { days: CONSENSUS_QUERY_DAYS, until: 2_147_483_647, programme: "aegis" } }),
+    )
   })
 
   it("says the snapshot describes Beta: it was measured before Aegis", async () => {

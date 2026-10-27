@@ -223,6 +223,19 @@ export function lacksHourlyBuckets(message: string): boolean {
   return /has no field `consensusHours`/.test(message)
 }
 
+/** Why a Gnosis deployment without a `programme` on its rows is not compared. */
+export const NEEDS_PROGRAMMES = "rows filed under their programme are needed to sum one programme's window"
+
+/**
+ * Whether a subgraph error says a `programme` filter is not in the schema: a Gnosis deployment
+ * built before it indexed two programmes. Its rows mix nothing, but nothing says which programme
+ * they are, so they are not summed. graph-node words it "Invalid value provided for argument
+ * `where`" and quotes the filter, as version edc2588 answered on 2026-10-27.
+ */
+export function lacksProgrammes(message: string): boolean {
+  return /Invalid value provided for argument `where`: .*"programme"/.test(message)
+}
+
 /** One ConsensusHour row, as the Gnosis subgraph returns it. See its schema. */
 export interface ConsensusHourRow {
   hour: number
@@ -303,8 +316,8 @@ const DAY_MS = 86_400_000
  * holds an hour of that programme is compared as before. The caller keeps every FAIL from
  * another cause, which still wins over this.
  *
- * Aegis has no last day, so when the Aegis contracts land in core and GNOSIS_INDEXED_PROGRAMME
- * moves to it, this returns undefined and the rule stops applying by itself.
+ * Aegis has no last day, so with GNOSIS_INDEXED_PROGRAMME on Aegis this returns undefined and the
+ * rule does not apply.
  */
 export function windowOutsideProgramme(window: { start: Date }, indexed: Programme): string | undefined {
   const lastDay = PROGRAMME_LAST_DAY[indexed]

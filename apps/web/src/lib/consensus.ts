@@ -34,11 +34,15 @@ export const CONSENSUS_QUERY_DAYS = CONSENSUS_WINDOW_DAYS + 2
 const NO_BOUND = 2_147_483_647
 
 /**
- * The window query's variables. While the subgraph indexes Beta, which has ended, rows are read
- * up to Beta's last day only.
+ * The window query's variables: the rows of one programme, and for Beta, which has ended, up to
+ * its last day only.
  */
 export function consensusQueryVariables(programme: Programme = GNOSIS_INDEXED_PROGRAMME) {
-  return { days: CONSENSUS_QUERY_DAYS, until: programme === "beta" ? utcDayMs(BETA_END_DAY) / 1000 : NO_BOUND }
+  return {
+    days: CONSENSUS_QUERY_DAYS,
+    until: programme === "beta" ? utcDayMs(BETA_END_DAY) / 1000 : NO_BOUND,
+    programme,
+  }
 }
 
 /**

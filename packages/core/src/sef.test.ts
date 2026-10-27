@@ -106,8 +106,9 @@ test("the calendar's days are the ones SEF's transition note gives", () => {
   assert.ok(utcDayMs(BETA_END_DAY) < utcDayMs(AEGIS_START_DAY))
 })
 
-test("the Gnosis subgraph indexes the Beta contracts until a change indexes Aegis's", () => {
-  assert.equal(GNOSIS_INDEXED_PROGRAMME, "beta")
+test("the Gnosis figures describe Aegis, the programme running", () => {
+  assert.equal(GNOSIS_INDEXED_PROGRAMME, "aegis")
+  assert.equal(PROGRAMME_CLOSED_FROM[GNOSIS_INDEXED_PROGRAMME], undefined)
 })
 
 test("Beta is closed from the Aegis start, so its stray ceremony in the gap stays inside it", () => {

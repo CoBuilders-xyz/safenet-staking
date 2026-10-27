@@ -104,7 +104,8 @@ Without `SUBGRAPH_URL_GNOSIS` it reads the default in `packages/core/src/subgrap
 Studio deployment. `scripts/parity.ts` compares each validator's participation with
 `participation_rate_14d` in SEF's `validator-info.json`, at the commit that last wrote the file.
 The window is SEF's: 14 days ending at the top of that hour, both ends included, by the block the
-ceremony was attested in. The run sums the hourly rows inside that window from a current query,
+ceremony was attested in. The run sums the hourly rows of `GNOSIS_INDEXED_PROGRAMME`, Aegis, inside
+that window from a current query,
 with `participationFromHours` in `packages/core`: SEF's numerator and denominator. The rate is the
 same division, and is compared as the identical double.
 
@@ -114,16 +115,16 @@ COMPARABLE, exits 0, and says why in one line. So does a deployment that starts 
 blocks before the window: a ceremony attested at the window's first block counts shares from
 before it. A real difference still fails.
 
+A deployment that files no `programme` on its rows, built before it indexed Aegis, is NOT
+COMPARABLE too: `lacksProgrammes` in `packages/core` recognises graph-node's answer to the filter.
+
 Two more cases are NOT COMPARABLE, with exit 0 and the reason in the job summary, because SEF
 gives nothing to compare:
 
-- SEF's window lies after the programme this deployment indexes, `GNOSIS_INDEXED_PROGRAMME` in
-  `packages/core`: the window starts after that programme's last day. SEF computes its rates over
-  the programme running when it publishes, and from 22 October 2026 that is Aegis, while this
-  deployment indexes Beta. `windowOutsideProgramme` in `packages/core/src/parity/compare.ts`
-  decides it from the calendar in `src/sef.ts`. It stops applying by itself once
-  `GNOSIS_INDEXED_PROGRAMME` names Aegis, which has no last day. A window that still holds an
-  hour of Beta is compared as before, and a lagging or broken subgraph still fails.
+- SEF's window lies after the programme `GNOSIS_INDEXED_PROGRAMME` names: the window starts after
+  that programme's last day. `windowOutsideProgramme` in `packages/core/src/parity/compare.ts`
+  decides it from the calendar in `src/sef.ts`. Aegis has no last day, so it does not apply while
+  the programme is Aegis.
 - SEF lists a validator with `participation_rate_14d: null`. That row reads "SEF publishes no
   rate".
 

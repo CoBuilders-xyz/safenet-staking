@@ -52,13 +52,13 @@ describe("utcDayStart and consensusQueryVariables", () => {
     expect(utcDayStart(NOON)).toBe(TODAY)
   })
 
-  it("reads the newest days up to Beta's last while the subgraph indexes Beta", () => {
-    expect(consensusQueryVariables("beta")).toEqual({ days: CONSENSUS_QUERY_DAYS, until: utcDayMs(BETA_END_DAY) / 1000 })
-    expect(consensusQueryVariables()).toEqual(consensusQueryVariables("beta"))
+  it("reads Beta's rows up to its last day", () => {
+    expect(consensusQueryVariables("beta")).toEqual({ days: CONSENSUS_QUERY_DAYS, until: utcDayMs(BETA_END_DAY) / 1000, programme: "beta" })
   })
 
-  it("reads the newest days with no date bound once it indexes Aegis", () => {
-    expect(consensusQueryVariables("aegis").until).toBe(2_147_483_647)
+  it("reads Aegis's rows with no date bound, and Aegis by default", () => {
+    expect(consensusQueryVariables("aegis")).toEqual({ days: CONSENSUS_QUERY_DAYS, until: 2_147_483_647, programme: "aegis" })
+    expect(consensusQueryVariables()).toEqual(consensusQueryVariables("aegis"))
   })
 })
 
@@ -167,7 +167,7 @@ describe("the window at the end of Beta", () => {
   const lastDays = { firstDay: [{ date: END - 14 * DAY }], validatorDays: [], consensusDays: [...beta, row(END, 1210), row(STRAY, 1)] }
 
   it("drops a gap day: the window ends on Beta's last day and the stray is not in the range", () => {
-    const w = deriveConsensusWindow(query(lastDays), checked)!
+    const w = deriveConsensusWindow(query(lastDays), checked, "beta")!
     expect(w.from).toBe(END - 13 * DAY)
     expect(w.to).toBe(END)
     expect(w.days).toBe(14)
@@ -178,10 +178,10 @@ describe("the window at the end of Beta", () => {
 
   it("drops a stray on the Beta contract dated after Aegis started", () => {
     const after = START + 7 * DAY
-    const w = deriveConsensusWindow(query({ ...lastDays, consensusDays: [...lastDays.consensusDays, row(after, 1)] }), noonOf(after + 2 * DAY))!
+    const w = deriveConsensusWindow(query({ ...lastDays, consensusDays: [...lastDays.consensusDays, row(after, 1)] }), noonOf(after + 2 * DAY), "beta")!
     expect(w.to).toBe(END)
     expect(w.attestationsPerDay.min).toBe(1210)
-    expect(describesBeta(w.lastCeremonyDay)).toBe(true)
+    expect(describesBeta(w.lastCeremonyDay, "beta")).toBe(true)
   })
 
   it("counts only consecutive calendar days: a day with no row inside them is not counted", () => {

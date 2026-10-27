@@ -18,11 +18,13 @@
  * deployment keeps. Studio keeps about 1,000 blocks. A deployment built before the hourly
  * buckets has no rows to sum, and the run reports it as NOT COMPARABLE.
  *
- * This deployment indexes the programme GNOSIS_INDEXED_PROGRAMME in packages/core names, and SEF
- * computes its rates over the programme running when it publishes. A window that starts after
- * the indexed programme's last day holds no ceremony this deployment counts, so the run reports
- * NOT COMPARABLE with the reason, not a FAIL per validator: windowOutsideProgramme in
- * packages/core. A validator SEF lists with a null rate is NOT COMPARABLE too.
+ * The deployment files every row under its programme, and the run sums the rows of
+ * GNOSIS_INDEXED_PROGRAMME in packages/core: SEF computes its rates over the programme running
+ * when it publishes. A deployment that files no programme, built before it indexed Aegis, is NOT
+ * COMPARABLE. A window that starts after the indexed programme's last day holds no ceremony of
+ * it, so the run reports NOT COMPARABLE with the reason, not a FAIL per validator:
+ * windowOutsideProgramme in packages/core. A validator SEF lists with a null rate is NOT
+ * COMPARABLE too.
  *
  * The states, from ParityState in packages/core:
  *   PASS            every rate is SEF's double                                     exit 0
@@ -30,8 +32,9 @@
  *                   reports indexing errors or is behind the window, SEF's file is
  *                   over 24 hours old, or the run hit an error                     exit 1
  *   STALE           SEF's file is over 9 hours old; nothing is compared            exit 0
- *   NOT COMPARABLE  the deployment has no hourly buckets or starts after the window,
- *                   SEF's window lies after the programme it indexes, or SEF
+ *   NOT COMPARABLE  the deployment has no hourly buckets or no programme on its rows,
+ *                   or starts after the window, SEF's window lies after the
+ *                   programme it indexes, or SEF
  *                   publishes a null rate                                          exit 0
  *
  *   pnpm --filter @cobuilders/safenet-subgraph-gnosis test:parity
@@ -44,8 +47,8 @@ import {
   GNOSIS_INDEXED_PROGRAMME, SEF_DATA, SHARE_LOOKBACK_BLOCKS, participationWindow, type SefNetworkInfo, type SefValidator,
 } from "@cobuilders/safenet-core"
 import {
-  EXIT_CODE, NEEDS_HOURLY_BUCKETS, appendSummary, chainReader, compareParticipation, formatAge, freshness,
-  githubToken, lacksHourlyBuckets, lastSefCommit, notComparable, overall, participationFromHours, querySubgraph,
+  EXIT_CODE, NEEDS_HOURLY_BUCKETS, NEEDS_PROGRAMMES, appendSummary, chainReader, compareParticipation, formatAge, freshness,
+  githubToken, lacksHourlyBuckets, lacksProgrammes, lastSefCommit, notComparable, overall, participationFromHours, querySubgraph,
   recordState, redact, renderMarkdown, renderText, sefAsset, staleOutcome, subgraphEndpoint, windowOutsideProgramme,
   type ConsensusHourRow, type ParityRow, type ValidatorHourRow,
 } from "@cobuilders/safenet-core/parity"
@@ -61,14 +64,16 @@ const PAGE = 1000
  * the subgraph. That block is the head the deployment reported a moment ago, inside the history
  * any deployment keeps.
  *
- * Returns the reason line instead when the deployment has no hourly buckets.
+ * Only the rows of GNOSIS_INDEXED_PROGRAMME are read. Returns the reason line instead when the
+ * deployment has no hourly buckets, or files no programme on them.
  */
 async function windowCounts(
   endpoint: string, indexed: bigint, window: { start: Date; end: Date },
 ): Promise<{ attended: Map<string, bigint>; ceremonies: bigint } | string> {
   const from = window.start.getTime() / 1000
   const to = window.end.getTime() / 1000
-  const where = (after: string) => `where: { hour_gte: ${from}, hour_lte: ${to}, id_gt: "${after}" }`
+  const where = (after: string) =>
+    `where: { programme: "${GNOSIS_INDEXED_PROGRAMME}", hour_gte: ${from}, hour_lte: ${to}, id_gt: "${after}" }`
   const page = async <T extends { id: string }>(entity: string, fields: string): Promise<T[]> => {
     const rows: T[] = []
     for (let after = ""; ;) {
@@ -89,8 +94,10 @@ async function windowCounts(
     consensus = await page("consensusHours", "hour attestationCeremonies attestationCeremoniesOnTheHour")
     validators = await page("validatorHours", "validator { id } hour attended attendedOnTheHour")
   } catch (e) {
-    if (!lacksHourlyBuckets(e instanceof Error ? e.message : "")) throw e
-    return `this deployment has no hourly buckets; ${NEEDS_HOURLY_BUCKETS}`
+    const message = e instanceof Error ? e.message : ""
+    if (lacksHourlyBuckets(message)) return `this deployment has no hourly buckets; ${NEEDS_HOURLY_BUCKETS}`
+    if (lacksProgrammes(message)) return `this deployment files no programme on its rows; ${NEEDS_PROGRAMMES}`
+    throw e
   }
   return participationFromHours({
     window,

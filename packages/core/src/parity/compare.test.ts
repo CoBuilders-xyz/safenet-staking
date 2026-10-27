@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { AEGIS_START_DAY, BETA_END_DAY, participationWindow, utcDayMs, type SefValidator } from "../sef.js"
 import {
   EXIT_CODE, agrees, compareAmount, compareParticipation, compareStakedTotal, formatAge, freshness,
-  NEEDS_HOURLY_BUCKETS, SEF_PUBLISHES_NO_RATE, lacksHourlyBuckets, notComparable, overall, parseLastCommit,
+  NEEDS_HOURLY_BUCKETS, SEF_PUBLISHES_NO_RATE, lacksHourlyBuckets, lacksProgrammes, notComparable, overall, parseLastCommit,
   participationFromHours, renderMarkdown, renderText, sefRunSpan, staleOutcome, totalsBetween, windowOutsideProgramme,
 } from "./compare.js"
 
@@ -252,6 +252,17 @@ test("a deployment without hourly buckets is NOT COMPARABLE, exits 0, and says w
   const state = overall(rows)
   assert.equal(state, "NOT COMPARABLE")
   assert.equal(EXIT_CODE[state], 0)
+})
+
+// graph-node's answer to a `programme` filter, as the Gnosis deployment edc2588, built before it
+// indexed two programmes, answered it on 2026-10-27.
+const NO_PROGRAMMES = 'Invalid value provided for argument `where`: Object({"programme": String("aegis")})'
+
+test("a deployment without programmes is recognised, and other errors are not", () => {
+  assert.equal(lacksProgrammes(`the gnosis subgraph: ${NO_PROGRAMMES}`), true)
+  assert.equal(lacksProgrammes('Invalid value provided for argument `where`: Object({"hour_gte": Int(1)})'), false)
+  assert.equal(lacksProgrammes(NO_BUCKETS), false)
+  assert.equal(lacksHourlyBuckets(NO_PROGRAMMES), false)
 })
 
 test("another subgraph error is not mistaken for missing buckets", () => {
