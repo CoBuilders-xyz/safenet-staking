@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="547" viewBox="0 0 980 547" role="img" aria-label="safenet-mcp over stdio, Ethereum Mainnet">
+<title>safenet-mcp over stdio, Ethereum Mainnet</title>
+<style>
+.bg{fill:#0d1117}.bar{fill:#161b22}.dot{fill:#30363d}
+text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;white-space:pre}
+.title{fill:#8b949e}.call{fill:#79c0ff}.answer{fill:#c9d1d9}.footer{fill:#8b949e}
+.l{opacity:0;animation:show .25s ease-out forwards}
+@keyframes show{to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.l{opacity:1;animation:none}}
+</style>
+<rect class="bg" width="980" height="547" rx="8"/>
+<rect class="bar" width="980" height="30" rx="8"/>
+<circle class="dot" cx="18" cy="15" r="5"/><circle class="dot" cx="36" cy="15" r="5"/><circle class="dot" cx="54" cy="15" r="5"/>
+<text class="title" x="74" y="19">safenet-mcp over stdio, Ethereum Mainnet</text>
+<text class="l call" x="20" y="52" style="animation-delay:0.4s">› tools/list</text>
+<text class="l answer" x="20" y="71" style="animation-delay:1.1s">  11 tools: status, validators_list, validators_show, withdrawals_list, rewards_check, rewards_history, stake,</text>
+<text class="l answer" x="20" y="90" style="animation-delay:1.1s">  unstake, withdrawals_claim, rewards_claim, rewards_claim_and_stake</text>
+<text class="l call" x="20" y="128" style="animation-delay:2.7s">› status {}</text>
+<text class="l answer" x="20" y="147" style="animation-delay:3.4s">  Safenet at Ethereum Mainnet block 26287277: 69560833.162022313723058414 SAFE staked, 4 active validators,</text>
+<text class="l answer" x="20" y="166" style="animation-delay:3.4s">  5924343.977566872354969673 SAFE in pending withdrawals. The Merkle root on chain matches the one in SEF's</text>
+<text class="l answer" x="20" y="185" style="animation-delay:3.4s">  latest.json.</text>
+<text class="l call" x="20" y="223" style="animation-delay:5.0s">› validators_list {}</text>
+<text class="l answer" x="20" y="242" style="animation-delay:5.7s">  4 validators, active only, sorted by stake, at Ethereum Mainnet block 26287277. Participation covers 14 days.</text>
+<text class="l answer" x="20" y="261" style="animation-delay:5.7s">  Gnosis 28.74% of stake, participation 100.0% · Core Contributors 22.46% of stake, participation 99.8% · Safe</text>
+<text class="l answer" x="20" y="280" style="animation-delay:5.7s">  Labs 21.05% of stake, participation 100.0% · Greenfield 19.37% of stake, participation 100.0%</text>
+<text class="l call" x="20" y="318" style="animation-delay:7.3s">› rewards_check {"address": "&lt;claimant&gt;"}</text>
+<text class="l answer" x="20" y="337" style="animation-delay:8.0s">  &lt;claimant&gt; at block 26287277: earned 1793.986407841197543837 SAFE, claimed 218.56999494138645867 SAFE,</text>
+<text class="l answer" x="20" y="356" style="animation-delay:8.0s">  claimable 1575.416412899811085167 SAFE; can claim: yes.</text>
+<text class="l call" x="20" y="394" style="animation-delay:9.6s">› stake {"validator": "&lt;validator Gnosis&gt;", "amount": "1", "from": "&lt;staker&gt;", "dryRun": false}</text>
+<text class="l answer" x="20" y="413" style="animation-delay:10.3s">  dryRun was forced to true: the server was started without SAFENET_MCP_ALLOW_WRITES=1 and a signer. Dry run</text>
+<text class="l answer" x="20" y="432" style="animation-delay:10.3s">  from &lt;staker&gt; at block 26287277: 2 transactions would be sent (SAFE token.approve, Staking.stake); nothing was</text>
+<text class="l answer" x="20" y="451" style="animation-delay:10.3s">  signed or sent.</text>
+<text class="l footer" x="20" y="489" style="animation-delay:11.9s">Recorded 2026-10-27 at block 26287277, Node.js v22.14.0, with the MCP SDK's client. Writes were off, so the</text>
+<text class="l footer" x="20" y="508" style="animation-delay:11.9s">stake is a dry run. Addresses are labels.</text>
+</svg>

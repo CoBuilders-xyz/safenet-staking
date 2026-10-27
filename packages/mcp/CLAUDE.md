@@ -101,6 +101,13 @@ too, and no tool takes one. A new CLI command needs a tool: `src/parity.test.ts`
 skips, with the reason, without it. Under the root `pnpm test` it always skips; the nightly
 workflow runs it next to the CLI smoke tests.
 
+`pnpm demo <staker> <claimant>` records one session over stdio against Mainnet, `status`,
+`validators_list`, `rewards_check` and a dry-run `stake`, and writes `docs/demo.svg`, an animated
+terminal of each call and the summary returned. `scripts/demo-svg.ts` lays it out and redacts every
+address to a label, every 32-byte value and every URL; `scripts/demo-svg.test.ts` checks that, and
+that the committed SVG carries no address. `pnpm test` runs `scripts/` as well as `src/`.
+`docs/claude-desktop.md` is the integration guide.
+
 `pnpm client <tool> '<json arguments>'` runs one call through the SDK's client, with this shell's
 environment; `pnpm client --list` lists the tools.
 

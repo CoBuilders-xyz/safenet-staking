@@ -69,6 +69,10 @@ the fields the "Reward data" section of the safenet-cli README describes.
 
 ## Claude Desktop
 
+The [Claude Desktop guide](docs/claude-desktop.md) walks through the setup step by step, with the
+exact config, how to check that the tools load, and how to allow writes without a secret in the
+config file. It opens with [a recorded session](docs/demo.svg) against Mainnet.
+
 Add the server to `claude_desktop_config.json`. On macOS it is in
 `~/Library/Application Support/Claude/`; on Windows, in `%APPDATA%\Claude\`. Restart Claude Desktop.
 
