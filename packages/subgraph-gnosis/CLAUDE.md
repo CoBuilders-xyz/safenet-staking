@@ -3,6 +3,23 @@
 Consensus and signing on Gnosis Chain. The manifest and ABIs are generated from `packages/core`;
 the root `CLAUDE.md` explains why and lists the commands.
 
+## Two programmes
+
+One deployment indexes both programmes, each from its own contracts in `GNOSIS_CONTRACTS` in
+`packages/core`: Beta, which ended, through the data sources `Consensus` and `FROSTCoordinator`,
+and Aegis through `AegisConsensus` and `AegisFROSTCoordinator`. Each mapping file passes its
+programme, `"beta"` or `"aegis"`, to the shared handlers in `src/handlers.ts`. Every counting row
+carries it in `programme` and starts its id with it, and the `Consensus` row of a programme has
+the programme as its id. The two programmes never share a validator list, a ceremony or a
+bucket: a validator of both is one `SigningValidator`, listed by each programme from the first
+time that programme's contracts show it. So a query for one programme filters on `programme`.
+
+Aegis changed the two transaction events, so each consensus data source has its own mapping;
+the coordinator's events are Beta's. Every one of 474 Aegis attestations to 2026-10-27 named the
+sid of a `SignCompleted` earlier in the same transaction, as on Beta, so the counting rules below
+hold unchanged. They reproduce SEF's Aegis `participation_rate_14d` bit for bit: recomputed from
+the logs at SEF's data commit 99963fb, all six validators matched as the identical double.
+
 ## Deploy to Studio
 
 ```
@@ -14,12 +31,14 @@ It generates the manifest with `--days 16`, runs `codegen` and `build`, then run
 is the short git SHA, with `-dirty` when the tree has uncommitted changes; set `VERSION_LABEL` to
 override it.
 
-Why 16 days and not the full history: the full history is about 15 million logs, which takes an
+Aegis always starts at each contract's deploy block: its three weeks to 2026-10-27 held 18,268
+logs. `--days 16` applies to Beta only, and starts it 16 days before the end of its last day,
+`BETA_END_DAY`, found by timestamp; its data sources run on from there, so a stray ceremony after
+the end is still seen. Why not Beta's full history: it is about 15 million logs, which takes an
 indexer far longer to sync. The Network Overview reads a 14-day window and drops the partial first
-day, so 16 days cover it with a day to spare. The start block is fixed when the manifest is
-generated, so the deployment keeps every block from then on; it does not roll. A windowed
-deployment cannot answer validator registration history or the epoch record. Those need `--full`,
-as a separate deployment.
+day, so 16 days of Beta cover its history with a day to spare. A windowed deployment cannot answer
+Beta's validator registration history or epoch record. Those need `--full`, as a separate
+deployment.
 
 The deploy key is `GRAPH_DEPLOY_KEY`. Locally it comes from `.env.local` (`pnpm env:pull`), which
 the script reads itself. In CI it is the secret of the same name, and
@@ -31,7 +50,9 @@ version. A deploy retires older version labels of the slug, so the same change m
 chain's default query URL in `packages/core/src/subgraphs.ts`; the web app and the parity run
 read it from there.
 
-To compare a deployed version with the oracle, generate the oracle over the same window and point
+`metrics-poc.ts` scans Beta's contracts, so the differential compares the Beta rows, or the
+programme in `PROGRAMME`. Aegis is compared with SEF's published rates by `test:parity`. To
+compare a deployed version with the oracle, generate the oracle over the same window and point
 the differential at the query URL:
 
 ```

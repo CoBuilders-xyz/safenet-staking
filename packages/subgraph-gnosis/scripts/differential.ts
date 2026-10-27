@@ -17,6 +17,10 @@
  * subgraph indexes from whatever block the manifest names. So counts are
  * compared as ratios and orderings, not as equal integers. What must match exactly is the
  * ORDER of validators by participation. Each rate must agree within RATE_TOLERANCE.
+ *
+ * The oracle scans Beta's contracts, so this compares the subgraph's Beta rows: the Consensus row
+ * and the daily rows of the programme in PROGRAMME, "beta" by default. Aegis is compared with
+ * SEF's published rates instead, by `pnpm test:parity`.
  */
 import { readFileSync } from "node:fs"
 import { localSubgraphUrl } from "@cobuilders/safenet-core"
@@ -26,6 +30,7 @@ import { localSubgraphUrl } from "@cobuilders/safenet-core"
 const PORT = process.env.GRAPH_NODE_PORT ?? "8000"
 const ENDPOINT = process.env.SUBGRAPH_URL || localSubgraphUrl("gnosis", PORT)
 const ORACLE = process.env.ORACLE ?? "/tmp/oracle-2d.json"
+const PROGRAMME = process.env.PROGRAMME ?? "beta"
 
 // The oracle records the chain head at the moment it ran. The subgraph follows the head too, so
 // the two heads differ by however long passed between the runs. 720 Gnosis blocks is about one
@@ -56,7 +61,8 @@ interface SubgraphState {
     attestations: string; proposals: string; latencySamples: string
     openCeremonies: number; validatorCount: number
   } | null
-  signingValidators: { id: string; attended: string }[]
+  /** One programme's daily rows. A validator's attended is their sum. */
+  validatorDays: { attended: string; validator: { id: string } }[]
 }
 
 // Studio answers an unknown slug or version with HTTP 200 and {"message":"Not found"}, and a
@@ -72,14 +78,15 @@ async function query(): Promise<SubgraphState> {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      query: `{
+      query: `query ($programme: String!) {
         _meta { block { number } }
-        consensus(id: "1") {
+        consensus(id: $programme) {
           attestationCeremonies nonAttestationCeremonies attestations proposals
           latencySamples openCeremonies validatorCount
         }
-        signingValidators(orderBy: attended, orderDirection: desc) { id attended }
+        validatorDays(first: 1000, where: { programme: $programme }) { attended validator { id } }
       }`,
+      variables: { programme: PROGRAMME },
     }),
   })
   if (!r.ok) unreachable(`HTTP ${r.status}`)
@@ -101,8 +108,15 @@ function check(label: string, ok: boolean, detail: string): void {
 async function main(): Promise<void> {
   const oracle = JSON.parse(readFileSync(ORACLE, "utf8")) as OracleRun
   const sg = await query()
-  if (!sg.consensus) throw new Error("no Consensus entity: the subgraph indexed nothing")
+  if (!sg.consensus) throw new Error(`no Consensus entity for ${PROGRAMME}: the subgraph indexed nothing of it`)
   const c = sg.consensus
+  // A full page may have cut rows off, and a validator's sum would then be short.
+  if (sg.validatorDays.length >= 1000) throw new Error("1,000 validator days or more: the sums would be partial")
+  const attended = new Map<string, bigint>()
+  for (const d of sg.validatorDays) attended.set(d.validator.id, (attended.get(d.validator.id) ?? 0n) + BigInt(d.attended))
+  const signingValidators = [...attended]
+    .map(([id, a]) => ({ id, attended: a }))
+    .sort((a, b) => (a.attended === b.attended ? 0 : a.attended > b.attended ? -1 : 1))
 
   // `pnpm metrics --days 2` does NOT work: pnpm appends arguments to the end of the whole
   // script string, and that script ends with `&& node render-metrics-report.mjs`, so the
@@ -157,14 +171,14 @@ async function main(): Promise<void> {
 
   console.log("\n  Validators. The set and its ORDER must match exactly.\n")
   const oracleOrder = [...oracle.participation].sort((a, b) => b.ours - a.ours)
-  check("validator count", oracle.participation.length === sg.signingValidators.length,
-    `oracle ${oracle.participation.length}  subgraph ${sg.signingValidators.length}`)
+  check("validator count", oracle.participation.length === signingValidators.length,
+    `oracle ${oracle.participation.length}  subgraph ${signingValidators.length}`)
 
   const byAddress = new Map(oracle.participation.map((p) => [p.address.toLowerCase(), p]))
   console.log(`\n  Rates, each within ${RATE_TOLERANCE} of the oracle. oracle, subgraph, attended / ceremonies\n`)
   let orderOk = true
-  for (let i = 0; i < sg.signingValidators.length; i++) {
-    const v = sg.signingValidators[i]!
+  for (let i = 0; i < signingValidators.length; i++) {
+    const v = signingValidators[i]!
     const theirs = byAddress.get(v.id)
     const name = theirs?.label ?? v.id.slice(0, 10)
     const rate = Number(v.attended) / sgAttest
