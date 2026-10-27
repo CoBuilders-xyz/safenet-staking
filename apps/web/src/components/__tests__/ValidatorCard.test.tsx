@@ -122,4 +122,29 @@ describe("ValidatorCard", () => {
     expect(screen.getByText("Total SAFE Staked")).toBeInTheDocument()
     expect(screen.getByText("Your Stake")).toBeInTheDocument()
   })
+
+  it("shows delegators, the registration day and the misses with their window", () => {
+    renderCard({ delegators: 446, registeredAt: 1_774_529_219, missed: 1_252n, missedLabel: "Missed, Beta's last 14 days" })
+
+    expect(screen.getByText("446")).toBeInTheDocument()
+    expect(screen.getByText("26 Mar 2026")).toBeInTheDocument()
+    expect(screen.getByText("Missed, Beta's last 14 days")).toBeInTheDocument()
+    expect(screen.getByText("1,252")).toBeInTheDocument()
+  })
+
+  it("shows a dash for each figure it does not have", () => {
+    renderCard()
+
+    expect(screen.getByText("Delegators:")).toBeInTheDocument()
+    expect(screen.getByText("Missed ceremonies")).toBeInTheDocument()
+    expect(screen.getAllByText("—")).toHaveLength(3)
+  })
+
+  it("names the validator by its ENS primary name, marked ENS, with SEF's label beside it", () => {
+    renderCard({ ensName: "gnosis.eth" })
+
+    expect(screen.getByRole("link", { name: "gnosis.eth" })).toBeInTheDocument()
+    expect(screen.getByText("ENS")).toHaveAttribute("title", "Ethereum Name Service primary name")
+    expect(screen.getByText(/SEF: Gnosis/)).toBeInTheDocument()
+  })
 })

@@ -18,8 +18,13 @@ import { useToast } from "@/hooks/useToast"
 import { Term } from "@/components/ui/term"
 import { useWrongNetwork } from "@/hooks/useWrongNetwork"
 import { PublishedParticipationRate } from "@/components/validators/ParticipationRate"
+import { SectionBoundary } from "@/components/overview/OverviewSection"
+import { ParticipationHistory } from "@/components/validators/ParticipationHistory"
+import { ValidatorActivitySections } from "@/components/validators/ValidatorActivitySections"
+import { displayName, nameSourceCaption, useEnsNames } from "@/hooks/useEnsNames"
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left"
 import Copy from "lucide-react/dist/esm/icons/copy"
+
 export function ValidatorDetailPage() {
   const { t } = useTranslation()
   const { address: validatorAddress } = useParams<{ address: string }>()
@@ -36,6 +41,7 @@ export function ValidatorDetailPage() {
   const { data: userStake, isLoading: loadingUser } = useUserStakeOnValidator(validator)
   const [delegateOpen, setDelegateOpen] = useState(false)
   const [undelegateOpen, setUndelegateOpen] = useState(false)
+  const ens = useEnsNames(isValidAddress ? [validator] : []).get(validator.toLowerCase())
 
   const userStakeAmount = typeof userStake === "bigint" ? userStake : undefined
   const hasStake = userStakeAmount !== undefined && userStakeAmount > 0n
@@ -80,13 +86,16 @@ export function ValidatorDetailPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle className="text-2xl tracking-tight">
-                {validatorInfo.label}
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 space-y-1">
+              <CardTitle role="heading" aria-level={1} className="break-words text-2xl tracking-tight">
+                {displayName(ens, validatorInfo.label).name}
               </CardTitle>
+              {ens?.status === "found" && ens.name !== validatorInfo.label && (
+                <p className="text-sm text-muted-foreground">{t("selector.sefLabel", "SEF lists it as {{name}}", { name: validatorInfo.label })}</p>
+              )}
               <div className="flex items-center gap-2">
-                <span className="text-sm font-mono text-muted-foreground">{validator}</span>
+                <span className="min-w-0 break-all text-sm font-mono text-muted-foreground">{validator}</span>
                 <button
                   onClick={async () => {
                     const ok = await copyToClipboard(validator)
@@ -98,6 +107,7 @@ export function ValidatorDetailPage() {
                   <Copy className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </div>
+              <p className="text-xs text-muted-foreground">{nameSourceCaption([ens], t)}</p>
             </div>
             {isActive ? (
               <Badge variant="secondary" className="text-sm">{t("validators.active", "Active")}</Badge>
@@ -110,7 +120,7 @@ export function ValidatorDetailPage() {
           {!isActive && (
             <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">{t("validators.itsStakeAndPastParticipationStayShownStaking", "{{WITHDRAWN_STATUS}}. Its stake and past participation stay shown; staking with it is off.", { WITHDRAWN_STATUS: t("programme.withdrawnStatus", "Withdrawn, Aegis participation unconfirmed") })}</p>
           )}
-          <div className="flex gap-6 text-sm">
+          <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
             <div className="flex items-center gap-1">
               <span className="text-muted-foreground">
                 <Term term="commission">{t("onboarding.commission", "Commission")}</Term>:{" "}
@@ -153,6 +163,13 @@ export function ValidatorDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <SectionBoundary title={t("selector.participationTitle", "Participation over time")}>
+        <ParticipationHistory key={validator} address={validator} />
+      </SectionBoundary>
+      <SectionBoundary title={t("selector.activityTitle", "Delegators and event history")}>
+        <ValidatorActivitySections key={validator} address={validator} />
+      </SectionBoundary>
 
       {delegateOpen && <DelegateDialog validator={validator} open={delegateOpen} onOpenChange={setDelegateOpen} />}
       {undelegateOpen && <UndelegateDialog validator={validator} open={undelegateOpen} onOpenChange={setUndelegateOpen} />}

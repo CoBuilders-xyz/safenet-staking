@@ -17,8 +17,9 @@ export class ValidatorsPage {
     await this.page.goto("/#/validators")
   }
 
+  /** One card: its rounded box, not the grid that holds every card. */
   getValidatorCard(name: string): Locator {
-    return this.page.locator("div").filter({ has: this.page.getByRole("link", { name }) }).filter({ has: this.page.getByText("Total SAFE Staked") })
+    return this.page.locator("div.rounded-lg").filter({ has: this.page.getByRole("link", { name }) }).filter({ has: this.page.getByText("Total SAFE Staked") })
   }
 
   getDelegateButton(cardLocator: Locator): Locator {

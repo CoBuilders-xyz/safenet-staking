@@ -46,11 +46,12 @@ for (const chain of ["mainnet", "gnosis"] as ChainKey[]) {
   }
   const schema = buildClientSchema(body.data)
   const dir = join(ROOT, "src/graphql", chain)
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".graphql"))) {
-    const errors = validate(schema, parse(readFileSync(join(dir, file), "utf8")))
-    for (const e of errors) console.error(`  FAIL ${chain}/${file}: ${e.message}`)
-    failures += errors.length
-    if (errors.length === 0) console.log(`  OK   ${chain}/${file}`)
-  }
+  // Documents share freshness fragments across files. Validate them together, as codegen does.
+  const document = parse(readdirSync(dir).filter((f) => f.endsWith(".graphql"))
+    .map((file) => readFileSync(join(dir, file), "utf8")).join("\n"))
+  const errors = validate(schema, document)
+  for (const e of errors) console.error(`  FAIL ${chain}: ${e.message}`)
+  failures += errors.length
+  if (errors.length === 0) console.log(`  OK   ${chain}: all documents and shared fragments`)
 }
 if (failures > 0) process.exitCode = 1

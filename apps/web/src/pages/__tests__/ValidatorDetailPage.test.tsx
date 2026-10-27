@@ -41,6 +41,20 @@ vi.mock("@/components/staking/UndelegateDialog", () => ({
   UndelegateDialog: () => null,
 }))
 
+const mockEns = vi.fn()
+vi.mock("@/hooks/useEnsNames", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/useEnsNames")>()),
+  useEnsNames: (addresses: string[]) => mockEns(addresses),
+}))
+
+// The sections have their own tests; here they only need to be placed.
+vi.mock("@/components/validators/ParticipationHistory", () => ({
+  ParticipationHistory: ({ address }: { address: string }) => <div data-testid="participation-history">{address}</div>,
+}))
+vi.mock("@/components/validators/ValidatorActivitySections", () => ({
+  ValidatorActivitySections: ({ address }: { address: string }) => <div data-testid="activity-sections">{address}</div>,
+}))
+
 function renderWithRoute(address: string) {
   return render(
     <MemoryRouter initialEntries={[`/validators/${address}`]}>
@@ -57,6 +71,7 @@ describe("ValidatorDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockUseAccount.mockReturnValue({ isConnected: true })
+    mockEns.mockImplementation((addresses: string[]) => new Map(addresses.map((a) => [a.toLowerCase(), { status: "none" }])))
     // Each test starts from the active list; a test that changes it does not leak into the next.
     vi.mocked(useValidators).mockReturnValue({
       data: [...MOCK_VALIDATORS],
@@ -144,5 +159,36 @@ describe("ValidatorDetailPage", () => {
     renderWithRoute("0x0000000000000000000000000000000000000001")
 
     expect(screen.getByText("Validator not found.")).toBeInTheDocument()
+  })
+
+  it("places the participation, delegators and history sections for the validator", () => {
+    renderWithRoute(TEST_ACCOUNTS.validator1)
+
+    expect(screen.getByTestId("participation-history")).toHaveTextContent(TEST_ACCOUNTS.validator1)
+    expect(screen.getByTestId("activity-sections")).toHaveTextContent(TEST_ACCOUNTS.validator1)
+  })
+
+  it("names the validator by SEF's label when it has no ENS primary name, and says so", () => {
+    renderWithRoute(TEST_ACCOUNTS.validator1)
+
+    expect(screen.getByText("Gnosis")).toBeInTheDocument()
+    expect(screen.getByText("Names: SEF labels. No ENS primary name is set.")).toBeInTheDocument()
+  })
+
+  it("names the validator by its ENS primary name when one is set, and keeps SEF's label beside it", () => {
+    mockEns.mockImplementation((addresses: string[]) => new Map(addresses.map((a) => [a.toLowerCase(), { status: "found", name: "gnosis-validator.eth" }])))
+    renderWithRoute(TEST_ACCOUNTS.validator1)
+
+    expect(screen.getByText("gnosis-validator.eth")).toBeInTheDocument()
+    expect(screen.getByText("SEF lists it as Gnosis")).toBeInTheDocument()
+    expect(screen.getByText("Names: ENS primary names, verified by reverse resolution; SEF labels where no name is set.")).toBeInTheDocument()
+  })
+
+  it("falls back to SEF's label when ENS cannot be read", () => {
+    mockEns.mockImplementation((addresses: string[]) => new Map(addresses.map((a) => [a.toLowerCase(), { status: "failed" }])))
+    renderWithRoute(TEST_ACCOUNTS.validator1)
+
+    expect(screen.getByText("Gnosis")).toBeInTheDocument()
+    expect(screen.getByText("Names: SEF labels. ENS could not be read.")).toBeInTheDocument()
   })
 })

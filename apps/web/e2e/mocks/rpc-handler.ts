@@ -15,7 +15,7 @@ import {
   MERKLE_DROP_CONTRACT,
   SANCTIONS_ORACLE_CONTRACT,
 } from "../fixtures/test-data"
-import { buildCallResponses, SELECTORS } from "./rpc-responses"
+import { buildCallResponses, SELECTORS, ENS_UNIVERSAL_RESOLVER, reverseResolution } from "./rpc-responses"
 import { matchGetLogs } from "./event-logs"
 import { claimRevert, TX_SELECTORS, type MockChainState } from "./mock-chain-state"
 
@@ -50,7 +50,12 @@ interface JsonRpcResponse {
  * - for each call: offset to tuple data
  * - for each tuple: target (32b), allowFailure (32b), offset to callData, callData length, callData bytes
  */
-function handleMulticall3(data: string, callResponses: Map<string, (data: string) => string>, fails: (target: string, selector: string) => boolean): string {
+function handleMulticall3(
+  data: string,
+  callResponses: Map<string, (data: string) => string>,
+  fails: (target: string, selector: string) => boolean,
+  answerOther: (target: string, data: string) => string | undefined,
+): string {
   // Strip 0x prefix and selector
   const hex = data.slice(10)
 
@@ -95,7 +100,7 @@ function handleMulticall3(data: string, callResponses: Map<string, (data: string
     if (handler) {
       returnData = handler(callData)
     } else {
-      returnData = "0x" + "0".repeat(64)
+      returnData = answerOther(target, callData) ?? "0x" + "0".repeat(64)
     }
 
     results.push({ success: true, returnData })
@@ -146,6 +151,10 @@ export function createRpcHandler(userAddress: string, state: MockChainState) {
   // A read the test set to fail, whether sent alone or inside a Multicall3 batch.
   const fails = (target: string, selector: string) =>
     target === SANCTIONS_ORACLE_CONTRACT && selector === SELECTORS.isSanctioned && state.walletSanctioned === "error"
+  // Any other call to the Universal Resolver is viem's reverse resolution, getEnsName, sent alone
+  // or inside a Multicall3 batch.
+  const answerOther = (target: string, data: string) =>
+    target === ENS_UNIVERSAL_RESOLVER ? reverseResolution(state, data) : undefined
 
   function handleSingleRequest(req: JsonRpcRequest): JsonRpcResponse {
     const base = { jsonrpc: "2.0", id: req.id }
@@ -186,7 +195,7 @@ export function createRpcHandler(userAddress: string, state: MockChainState) {
 
         // Handle Multicall3 aggregate3 calls
         if (contractAddr === MULTICALL3 && selector === AGGREGATE3_SELECTOR) {
-          return { ...base, result: handleMulticall3(data, callResponses, fails) }
+          return { ...base, result: handleMulticall3(data, callResponses, fails, answerOther) }
         }
 
         // The wallet screening gate: a failed oracle read must close the interface, not open it.
@@ -209,6 +218,9 @@ export function createRpcHandler(userAddress: string, state: MockChainState) {
           const result = handler(data)
           return { ...base, result }
         }
+
+        const other = answerOther(contractAddr, data)
+        if (other) return { ...base, result: other }
 
         // Log unmatched calls for debugging
         console.log(`[RPC] Unmatched eth_call: to=${contractAddr} selector=${selector} data=${data.slice(0, 20)}...`)
