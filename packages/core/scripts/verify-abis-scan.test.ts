@@ -1,14 +1,16 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { toEventSelector, type AbiEvent, type Address } from "viem"
+import { BlockNotFoundError, toEventSelector, type AbiEvent, type Address } from "viem"
 import { indexedEvent } from "../src/abis.js"
-import { CONTRACTS } from "../src/contracts.js"
+import { CONTRACTS, type ContractName, type ContractRef } from "../src/contracts.js"
+import { AEGIS_START_DAY, PROGRAMME_CLOSED_FROM, utcDayMs } from "../src/sef.js"
 import {
-  CEILING, WINDOW, lastBlockBefore, scanBeforeClose, scanFromDeploy, scanRecent,
+  CEILING, WINDOW, closeOf, lastBlockBefore, scanBeforeClose, scanFromDeploy, scanRecent,
   type BlocksClient, type LogsClient,
 } from "./verify-abis-scan.js"
 
-// The scans against a mocked getLogs. No network: the chain here is a list of logs.
+// The scans against a mocked getLogs, and the anchor search against a mocked getBlock. No
+// network: the chain here is a list of logs, and block timestamps are a formula.
 
 const address = CONTRACTS.consensus.address
 const attested = indexedEvent("consensus", "TransactionAttested") as AbiEvent
@@ -191,33 +193,95 @@ test("the head-anchored scan of the same chain reports a closed contract as NO A
   assert.equal(scan.status, "NO ACTIVITY")
 })
 
-/** Blocks five seconds apart from `genesis`, as on Gnosis, counting the lookups. */
-function mockBlocks(genesis: bigint) {
-  let lookups = 0
+/**
+ * Blocks `spacing` seconds apart from `genesis`, counting the lookups. A block above `behind`
+ * throws BlockNotFoundError on its first lookup, as viem does when a backend of a public pool
+ * that has not seen it yet answers null.
+ */
+function mockBlocks(genesis: bigint, spacing = 5n, behind?: bigint) {
+  const asked: bigint[] = []
   const client: BlocksClient = {
     getBlock({ blockNumber }) {
-      lookups++
-      return Promise.resolve({ timestamp: genesis + blockNumber * 5n })
+      const first = !asked.includes(blockNumber)
+      asked.push(blockNumber)
+      if (behind !== undefined && blockNumber > behind && first) {
+        return Promise.reject(new BlockNotFoundError({ blockNumber }))
+      }
+      return Promise.resolve({ timestamp: genesis + blockNumber * spacing })
     },
   }
-  return { client, lookups: () => lookups }
+  return { client, asked }
 }
 
+const genesis = 1_600_000_000n
+/** The highest block the anchor search reads: the head less the window. */
+const top = latest - window
+const at = (seconds: bigint) => new Date(Number(seconds) * 1000)
+
 test("the anchor is the last block stamped strictly before the close", async () => {
-  const genesis = 1_600_000_000n
   // A block lands exactly on the close: it belongs to the next programme, so the one before is the anchor.
   const onTheSecond = mockBlocks(genesis)
-  const closedAt = new Date(Number(genesis + 40_000_000n * 5n) * 1000)
-  assert.equal(await lastBlockBefore(onTheSecond.client, closedAt, 1_000n, latest), 39_999_999n)
-  assert.ok(onTheSecond.lookups() < 64, "a binary search, not a walk")
+  const closedAt = at(genesis + 40_000_000n * 5n)
+  assert.equal(await lastBlockBefore(onTheSecond.client, closedAt, 1_000n, latest, window), 39_999_999n)
+  assert.ok(onTheSecond.asked.length < 64, "a binary search, not a walk")
 
   // No block on the close: the anchor is the last one before it.
-  const between = new Date(Number(genesis + 40_000_000n * 5n + 3n) * 1000)
-  assert.equal(await lastBlockBefore(mockBlocks(genesis).client, between, 1_000n, latest), 40_000_000n)
+  const between = at(genesis + 40_000_000n * 5n + 3n)
+  assert.equal(await lastBlockBefore(mockBlocks(genesis).client, between, 1_000n, latest, window), 40_000_000n)
 })
 
-test("the anchor search refuses a close the head has not reached", async () => {
-  const genesis = 1_600_000_000n
-  const future = new Date(Number(genesis + (latest + 10n) * 5n) * 1000)
-  await assert.rejects(lastBlockBefore(mockBlocks(genesis).client, future, 1_000n, latest), /node is behind/)
+test("the anchor is exact to the second around the close and the top of the search", async () => {
+  const blocks = () => mockBlocks(genesis, 1n).client
+  // A block one second before the close is the anchor.
+  assert.equal(await lastBlockBefore(blocks(), at(genesis + 40_000_001n), 1_000n, latest, window), 40_000_000n)
+  // A close one second after the top block returns the top block.
+  assert.equal(await lastBlockBefore(blocks(), at(genesis + top + 1n), 1_000n, latest, window), top)
+  // Two seconds after it, the close is past every block searched, and the search refuses.
+  await assert.rejects(lastBlockBefore(blocks(), at(genesis + top + 2n), 1_000n, latest, window), /below the head/)
+})
+
+test("the anchor search never asks for the head, so a backend a block behind cannot fail it", async () => {
+  // Every block above `top` is unknown to the first backend asked, the head among them.
+  const lagging = mockBlocks(genesis, 5n, top)
+  const closedAt = at(genesis + 40_000_000n * 5n)
+  assert.equal(await lastBlockBefore(lagging.client, closedAt, 1_000n, latest, window), 39_999_999n)
+  assert.ok(lagging.asked.every((b) => b <= top), "reads no block above the head less the window")
+  assert.ok(!lagging.asked.includes(latest))
+})
+
+test("the anchor search refuses a close the searched blocks have not reached", async () => {
+  // Within the window of the head: refused, not clamped to a block the close may not precede.
+  const recent = at(genesis + (latest - 10n) * 5n)
+  await assert.rejects(lastBlockBefore(mockBlocks(genesis).client, recent, 1_000n, latest, window), /below the head/)
+  const future = at(genesis + (latest + 10n) * 5n)
+  await assert.rejects(lastBlockBefore(mockBlocks(genesis).client, future, 1_000n, latest, window), /below the head/)
+})
+
+test("closeOf anchors the Gnosis Beta contracts at the Aegis start, from their deploy block", () => {
+  for (const name of ["consensus", "frostCoordinator"] as const) {
+    const close = closeOf(CONTRACTS[name], PROGRAMME_CLOSED_FROM)
+    assert.deepEqual(close, {
+      programme: "beta",
+      closedAt: new Date(utcDayMs(AEGIS_START_DAY)),
+      floor: CONTRACTS[name].deployBlock,
+    }, name)
+  }
+})
+
+test("closeOf leaves every Mainnet contract on the head-anchored scan", () => {
+  assert.equal(closeOf(CONTRACTS.staking, PROGRAMME_CLOSED_FROM), undefined)
+  assert.equal(closeOf(CONTRACTS.merkleDrop, PROGRAMME_CLOSED_FROM), undefined)
+  for (const [name, ref] of Object.entries(CONTRACTS) as [ContractName, ContractRef][]) {
+    if (ref.chain === "mainnet") assert.equal(closeOf(ref, PROGRAMME_CLOSED_FROM), undefined, name)
+  }
+})
+
+test("closeOf leaves an open programme on the head-anchored scan, and refuses a closed one with no floor", () => {
+  const { address, chain } = CONTRACTS.consensus
+  assert.equal(closeOf({ address, chain, programme: "aegis" }, PROGRAMME_CLOSED_FROM), undefined)
+  assert.equal(closeOf({ address, chain, programme: "beta", startBlock: 1n }, {}), undefined)
+  assert.throws(() => closeOf({ address, chain, programme: "beta" }, PROGRAMME_CLOSED_FROM), /no block to search its end from/)
+  // The deploy block wins over the scan floor.
+  assert.equal(closeOf({ address, chain, programme: "beta", startBlock: 1n, deployBlock: 2n }, PROGRAMME_CLOSED_FROM)?.floor, 2n)
+  assert.equal(closeOf({ address, chain, programme: "beta", startBlock: 1n }, PROGRAMME_CLOSED_FROM)?.floor, 1n)
 })

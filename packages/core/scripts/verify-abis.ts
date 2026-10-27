@@ -18,7 +18,8 @@
  *              A contract of a programme that has ended (since 2026-10-23: `programme` in
  *              contracts.ts, closed by PROGRAMME_CLOSED_FROM in sef.ts) will log none of its
  *              events again, so its scan starts instead at the last block before the close,
- *              found by timestamp, and widens back from there. It reports "match (programme
+ *              found by timestamp among blocks at least WINDOW below the head, and widens
+ *              back from there. It reports "match (programme
  *              ended)" and how many blocks before the end the event was last seen.
  *   --deep     every event from its deploy block. Slow. Nightly. The real proof.
  *
@@ -39,12 +40,12 @@ import {
 } from "viem"
 import { CHAINS, RPC_URLS } from "../src/chains.js"
 import { CONTRACTS, type ContractName, type ContractRef } from "../src/contracts.js"
-import { PROGRAMME_CLOSED_FROM, utcDayMs, type Programme } from "../src/sef.js"
+import { PROGRAMME_CLOSED_FROM, type Programme } from "../src/sef.js"
 import {
   DECODED_ERRORS, INDEXED_EVENTS, erc20Abi, merkleDropAbi, sanctionsOracleAbi, stakingAbi,
 } from "../src/abis.js"
 import {
-  CEILING, WINDOW, lastBlockBefore, scanBeforeClose, scanFromDeploy, scanRecent, type Status,
+  CEILING, WINDOW, closeOf, lastBlockBefore, scanBeforeClose, scanFromDeploy, scanRecent, type Status,
 } from "./verify-abis-scan.js"
 
 const deep = process.argv.includes("--deep")
@@ -81,18 +82,13 @@ const anchors = new Map<string, Promise<Anchor>>()
 
 function anchorOf(contract: ContractName, latest: bigint): Promise<Anchor> | undefined {
   const ref: ContractRef = CONTRACTS[contract]
-  const closedFrom = ref.programme === undefined ? undefined : PROGRAMME_CLOSED_FROM[ref.programme]
-  if (ref.programme === undefined || closedFrom === undefined) return undefined
-  const floor = ref.deployBlock ?? ref.startBlock
-  if (floor === undefined) {
-    throw new Error(`${contract} belongs to a closed programme, and contracts.ts gives no block to search its end from.`)
-  }
-  const key = `${ref.chain}:${ref.programme}`
+  const close = closeOf(ref, PROGRAMME_CLOSED_FROM)
+  if (close === undefined) return undefined
+  const key = `${ref.chain}:${close.programme}`
   let anchor = anchors.get(key)
   if (anchor === undefined) {
-    const programme = ref.programme
-    const closedAt = new Date(utcDayMs(closedFrom))
-    anchor = lastBlockBefore(clients[ref.chain], closedAt, floor, latest)
+    const { programme, closedAt, floor } = close
+    anchor = lastBlockBefore(clients[ref.chain], closedAt, floor, latest, WINDOW[ref.chain])
       .then((block) => ({ programme, chain: ref.chain, closedAt, block }))
     anchors.set(key, anchor)
   }

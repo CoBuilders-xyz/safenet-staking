@@ -3,7 +3,6 @@ import assert from "node:assert/strict"
 import { getAddress } from "viem"
 import { INDEXED_EVENTS } from "./abis.js"
 import { CONTRACTS, type ContractName, type ContractRef } from "./contracts.js"
-import { GNOSIS_INDEXED_PROGRAMME } from "./sef.js"
 
 const refs = Object.entries(CONTRACTS) as [ContractName, ContractRef][]
 
@@ -37,11 +36,13 @@ test("no two contracts on one chain share an address", () => {
   }
 })
 
-test("the Gnosis contracts belong to the programme the Gnosis subgraph indexes", () => {
-  // verify:abis anchors their fast scan at that programme's end once it closes.
+test("every Gnosis contract names the programme it belongs to", () => {
+  // verify:abis reads `programme` and, once PROGRAMME_CLOSED_FROM closes it, scans the contract
+  // back from that programme's end. A Gnosis contract with none would be scanned from the head
+  // for ever, and fail once its programme ended.
   for (const [name, ref] of refs) {
     if (ref.chain !== "gnosis") continue
-    assert.equal(ref.programme, GNOSIS_INDEXED_PROGRAMME, name)
+    assert.notEqual(ref.programme, undefined, name)
   }
 })
 
