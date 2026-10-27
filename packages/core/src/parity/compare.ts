@@ -283,7 +283,12 @@ export function participationFromHours(input: {
 
 const PROGRAMME_NAME: Readonly<Record<Programme, string>> = { beta: "Beta", aegis: "Aegis" }
 
-/** The last UTC day of each programme, from the calendar in ../sef.ts. Undefined while it runs. */
+/**
+ * The last UTC day of each programme, from the calendar in ../sef.ts. Undefined while it runs.
+ * Not PROGRAMME_CLOSED_FROM: that closes Beta on AEGIS_START_DAY so verify:abis keeps the stray
+ * ceremony of 6 October, but SEF publishes Aegis rates from 22 October, whose windows start
+ * 8 October on. Comparing those with Beta counts would fail every validator for no real difference.
+ */
 const PROGRAMME_LAST_DAY: Readonly<Record<Programme, UtcDay | undefined>> = { beta: BETA_END_DAY, aegis: undefined }
 
 const DAY_MS = 86_400_000
