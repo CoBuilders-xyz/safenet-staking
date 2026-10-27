@@ -185,8 +185,9 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
 - `src/components/overview/`: the Network Overview sections.
 - `src/components/dashboard/`: `StatsOverview`, `QuickActions`, `StakingSection`,
   `StakeDistribution`, `ClaimRewardsDialog`.
-- `src/components/rewards/`: the Rewards page sections and `ClaimAndStakeDialog`, which stakes
-  exactly what the claim paid. The user picks a validator and may lower the amount. A
+- `src/components/rewards/`: the Rewards page sections and `ClaimAndStakeDialog`. Its stake amount
+  starts at what the claim paid and cannot exceed it; the user picks a validator and may lower
+  the amount, and the rest stays in the wallet. A
   `MerkleRootWasUpdated` revert offers to reload the proof and retry. Once nothing is left to
   claim, it opens as "Stake your balance".
 - `src/components/validators/`: `ValidatorList`, `ValidatorCard`, and `ParticipationRate`, which

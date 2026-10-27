@@ -68,7 +68,7 @@ with an account you are willing to transact from.
 | 5 | Withdrawals: Claim after the cooldown empties that entry | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
 | 6 | Validator detail: your delegation to that validator is shown | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
 | 7 | Rewards: Claim pays the available amount, and Your rewards and Programme update | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
-| 8 | Rewards: Claim & Stake runs Claim → Stake → Done, staking what the claim paid | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
+| 8 | Rewards: Claim & Stake runs Claim → Stake → Done; the stake amount starts at what the claim paid | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
 | 9 | Rewards: an address without rewards says so, with no Claim | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
 
 On the fork, row 5 needs the chain's clock moved past the cooldown. Anvil's clock starts at the
