@@ -24,8 +24,10 @@ Some values in the samples are replaced with a label in angle brackets:
   from is the contract's deploy block, such as `<Staking deploy block>`. A validator's address is
   `<validator NAME>`, after the label SEF gives it.
 - The staker in the examples is `<staker>`, and the address with rewards to claim is `<claimant>`.
-  Their transaction hashes and Merkle proof nodes are hidden too, because each leads back to the
-  address.
+  Their transaction hashes and Merkle proof nodes are labels too. Both addresses are public data
+  on chain, and the labels only keep the samples readable: they hide nothing from a reader who
+  looks the figures up. A claim's block and amount find its `Claimed` log, and a cumulative amount
+  finds the claimant in SEF's public proof files.
 - In `--json`, the `data` of a transaction keeps the 4-byte function selector only; the rest of the
   calldata repeats the arguments shown above it. Where a long array is cut, the section says so.
 
@@ -893,7 +895,9 @@ it. Only withdrawals past their delay are claimed; the others are named.
 | `[id]` | Claim up to and including this withdrawal |
 | `--all` | Claim every withdrawal past its delay |
 
-Give `[id]` or `--all`, not both; with neither, it exits 2.
+Give `[id]` or `--all`, not both; with neither, it exits 2. The id is the withdrawal's id in the
+staker's queue: the `ID` column below, and the `withdrawalId` of its `WithdrawalInitiated` log. It
+is not the row number in the `#` column of `withdrawals list --address`.
 
 ```sh
 safenet withdrawals claim --all --dry-run --from <staker>

@@ -140,14 +140,14 @@ workflow `.github/workflows/subgraphs-deploy.yml`. Its `CLAUDE.md` has the slug 
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs four jobs on every pull request and on every push to `main`:
-`check`, `test`, `e2e` and `verify-abis`. The `test` job also runs `pnpm test:coverage`. `nightly.yml` runs the deep ABI scan, the unit tests,
-both fork suites and the CLI and MCP smoke tests daily; all but the unit tests need the `MAINNET_RPC_URL`
-secret, and fail without it. Its `web-smoke` job runs `pnpm test:smoke:web` against the
-repository variable `PRODUCTION_URL`, and fails without it; a dispatch with `suite: web-smoke` runs
-that job alone. The fork suites stay out of per-PR CI because every run reads from
-the archive node. `security.yml` runs a
-dependency review on pull requests, skipped until the repository is public, and `pnpm audit`
-weekly. `subgraphs-deploy.yml` runs only by hand: it deploys one or both subgraphs to
+`check`, `test`, `e2e` and `verify-abis`. The `test` job also runs `pnpm test:coverage`.
+`nightly.yml` runs the deep ABI scan, the unit tests, both fork suites and the CLI and MCP smoke
+tests daily; all but the unit tests need the `MAINNET_RPC_URL` secret, and fail without it. Its
+`web-smoke` job runs `pnpm test:smoke:web` against the repository variable `PRODUCTION_URL`, and
+fails without it; a dispatch with `suite: web-smoke` runs that job alone. The fork suites stay out
+of per-PR CI because every run reads from the archive node. `security.yml` runs a dependency
+review on pull requests, skipped until the repository is public, and `pnpm audit` weekly.
+`subgraphs-deploy.yml` runs only by hand: it deploys one or both subgraphs to
 Studio with the `GRAPH_DEPLOY_KEY` secret. `parity.yml` runs `pnpm test:parity` daily and on
 demand against the Studio deployments that `packages/core` names as the default endpoints, writes
 the comparison to the job summary, and drives the badge in `README.md`. It stays out of per-PR CI

@@ -103,6 +103,19 @@ test("a signer setting that holds a secret instead of a name is refused without 
   }
 })
 
+test("writes allowed with a key from the environment say once that a keystore is safer, naming no variable", () => {
+  const withKey = readConfig({ SAFENET_MCP_ALLOW_WRITES: "1", SAFENET_MCP_PRIVATE_KEY_ENV: "MY_SIGNING_KEY", MY_SIGNING_KEY: TEST_KEY })
+  assert.deepEqual(withKey.notices, [
+    "writes are allowed with a signing key read from an environment variable; a keystore, " +
+      "SAFENET_MCP_KEYSTORE with SAFENET_MCP_PASSWORD_ENV, is safer, because the key stays encrypted on disk",
+  ])
+  assert.doesNotMatch(withKey.notices.join(" "), /MY_SIGNING_KEY/)
+  const withKeystore = readConfig({
+    SAFENET_MCP_ALLOW_WRITES: "1", SAFENET_MCP_KEYSTORE: KEYSTORE, SAFENET_MCP_PASSWORD_ENV: "PW", PW: KEYSTORE_PASSWORD,
+  })
+  assert.deepEqual(withKeystore.notices, [])
+})
+
 test("signer settings that do not fit together, or point at nothing, stop the server", () => {
   refused({ SAFENET_MCP_PRIVATE_KEY_ENV: "A", SAFENET_MCP_KEYSTORE: KEYSTORE }, /cannot be used together/)
   refused({ SAFENET_MCP_PASSWORD_ENV: "PW" }, /only works with SAFENET_MCP_KEYSTORE/)

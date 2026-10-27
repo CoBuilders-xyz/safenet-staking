@@ -88,15 +88,15 @@ const run = spawnSync(
   { stdio: "inherit" },
 )
 
-let report
+// The directory goes before any exit: process.exit inside a try would skip its finally.
+let report = null
 try {
   report = readFileSync(lcov, "utf8")
 } catch {
   // No report: the run itself failed before writing one, and said why.
-  process.exit(run.status || 1)
-} finally {
-  rmSync(out, { recursive: true, force: true })
 }
+rmSync(out, { recursive: true, force: true })
+if (report === null) process.exit(run.status || 1)
 const reported = new Set(report.split("\n").filter((l) => l.startsWith("SF:")).map((l) => resolve(l.slice(3))))
 const missing = measured.filter((f) => !reported.has(f) && !unmeasured.includes(f))
 if (missing.length > 0) {

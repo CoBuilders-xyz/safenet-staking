@@ -72,7 +72,9 @@ too, and so are its compliance flags: no tool takes one. A new CLI command needs
   Environment-key configuration emits an exposure warning at server startup.
   While writes are on, the key is loaded for every write call, dry runs
   included, because a dry run simulates from the signer's address; it is kept nowhere between
-  calls. While writes are off, it is never loaded.
+  calls. While writes are off, it is never loaded. Writes allowed with
+  `SAFENET_MCP_PRIVATE_KEY_ENV` log one notice at start that a keystore is safer, as the CLI
+  warns for `--private-key-env`; it names no variable.
 
 ## Rules the server keeps
 

@@ -109,6 +109,13 @@ export function readConfig(env: Env): ServerConfig {
       }
     }
     writes = { allowed: true, signer }
+    // The CLI warns the same way. It names no variable: the name given could be the key itself.
+    if (signer.kind === "private-key-env") {
+      notices.push(
+        "writes are allowed with a signing key read from an environment variable; a keystore, " +
+          "SAFENET_MCP_KEYSTORE with SAFENET_MCP_PASSWORD_ENV, is safer, because the key stays encrypted on disk",
+      )
+    }
   } else if (allow === "1") {
     writes = { allowed: false, reason: "SAFENET_MCP_ALLOW_WRITES=1 is set, but no signer is: set SAFENET_MCP_PRIVATE_KEY_ENV, or SAFENET_MCP_KEYSTORE and SAFENET_MCP_PASSWORD_ENV" }
     notices.push(`writes are off: ${writes.reason}`)
