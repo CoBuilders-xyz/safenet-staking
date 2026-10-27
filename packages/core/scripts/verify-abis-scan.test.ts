@@ -3,7 +3,10 @@ import assert from "node:assert/strict"
 import { toEventSelector, type AbiEvent, type Address } from "viem"
 import { indexedEvent } from "../src/abis.js"
 import { CONTRACTS } from "../src/contracts.js"
-import { CEILING, WINDOW, scanFromDeploy, scanRecent, type LogsClient } from "./verify-abis-scan.js"
+import {
+  CEILING, WINDOW, lastBlockBefore, scanBeforeClose, scanFromDeploy, scanRecent,
+  type BlocksClient, type LogsClient,
+} from "./verify-abis-scan.js"
 
 // The scans against a mocked getLogs. No network: the chain here is a list of logs.
 
@@ -140,4 +143,81 @@ test("the deep scan reports the first log from the deploy block", async () => {
   const scan = await scanFromDeploy(client, address, attested, start, latest)
   assert.equal(scan.logs, 1)
   assert.equal(scan.firstSeen, start + 10n)
+})
+
+// A closed programme: the scan counts back from the programme's last block, the anchor, and never
+// reads past it. The head sits well beyond the ceiling, as it does once a programme has been
+// closed for longer than the ceiling spans.
+const anchor = latest - 3n * ceiling
+
+test("a closed programme's scan widens back from the anchor and reports a match before the end", async () => {
+  const { client, calls } = mockChain([
+    log(attested, anchor - 5_000n),
+    // A log after the close is not the programme's, and the scan must not reach it.
+    log(attested, anchor + 10n),
+  ])
+  const scan = await scanBeforeClose(client, address, attested, anchor, window, ceiling)
+
+  assert.equal(scan.status, "match (programme ended)")
+  assert.equal(scan.logs, 1)
+  assert.equal(scan.lastSeen, 5_000n)
+  assert.equal(scan.depth, 8_000n)
+  assert.deepEqual(calls, [
+    { event: true, fromBlock: anchor - 2_000n, toBlock: anchor },
+    { event: true, fromBlock: anchor - 4_000n, toBlock: anchor - 2_001n },
+    { event: true, fromBlock: anchor - 8_000n, toBlock: anchor - 4_001n },
+  ])
+})
+
+test("a closed programme's event silent before the anchor fails as NO MATCH while the contract logged others", async () => {
+  const { client, calls } = mockChain([log(rolledOver, anchor - 150_000n), log(attested, anchor + 1n)])
+  const scan = await scanBeforeClose(client, address, attested, anchor, window, ceiling)
+  assert.equal(scan.status, "NO MATCH")
+  assert.equal(scan.depth, ceiling)
+  assert.ok(calls.every((c) => c.toBlock <= anchor && c.fromBlock >= anchor - ceiling), "stays inside the ceiling before the anchor")
+})
+
+test("a closed programme's contract silent before the anchor fails as NO ACTIVITY, whatever it logged after", async () => {
+  const { client } = mockChain([log(attested, anchor + 1n), log(rolledOver, latest - 1n)])
+  const scan = await scanBeforeClose(client, address, attested, anchor, window, ceiling)
+  assert.equal(scan.status, "NO ACTIVITY")
+  assert.equal(scan.logs, 0)
+})
+
+test("the head-anchored scan of the same chain reports a closed contract as NO ACTIVITY", async () => {
+  // Why the anchor exists: from the head, a programme closed longer ago than the ceiling is silent.
+  const { client } = mockChain([log(attested, anchor - 5_000n)])
+  const scan = await scanRecent(client, address, attested, latest, window, ceiling)
+  assert.equal(scan.status, "NO ACTIVITY")
+})
+
+/** Blocks five seconds apart from `genesis`, as on Gnosis, counting the lookups. */
+function mockBlocks(genesis: bigint) {
+  let lookups = 0
+  const client: BlocksClient = {
+    getBlock({ blockNumber }) {
+      lookups++
+      return Promise.resolve({ timestamp: genesis + blockNumber * 5n })
+    },
+  }
+  return { client, lookups: () => lookups }
+}
+
+test("the anchor is the last block stamped strictly before the close", async () => {
+  const genesis = 1_600_000_000n
+  // A block lands exactly on the close: it belongs to the next programme, so the one before is the anchor.
+  const onTheSecond = mockBlocks(genesis)
+  const closedAt = new Date(Number(genesis + 40_000_000n * 5n) * 1000)
+  assert.equal(await lastBlockBefore(onTheSecond.client, closedAt, 1_000n, latest), 39_999_999n)
+  assert.ok(onTheSecond.lookups() < 64, "a binary search, not a walk")
+
+  // No block on the close: the anchor is the last one before it.
+  const between = new Date(Number(genesis + 40_000_000n * 5n + 3n) * 1000)
+  assert.equal(await lastBlockBefore(mockBlocks(genesis).client, between, 1_000n, latest), 40_000_000n)
+})
+
+test("the anchor search refuses a close the head has not reached", async () => {
+  const genesis = 1_600_000_000n
+  const future = new Date(Number(genesis + (latest + 10n) * 5n) * 1000)
+  await assert.rejects(lastBlockBefore(mockBlocks(genesis).client, future, 1_000n, latest), /node is behind/)
 })

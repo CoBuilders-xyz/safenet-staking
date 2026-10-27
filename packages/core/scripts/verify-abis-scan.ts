@@ -4,6 +4,7 @@
  */
 import type { AbiEvent, Address } from "viem"
 import type { ChainKey } from "../src/chains.js"
+import { blockAtTimestamp } from "../src/parity/blocks.js"
 
 /**
  * First window scanned back from the head, per chain. Gnosis blocks are ~5s, Mainnet ~12s, so
@@ -26,6 +27,11 @@ export interface LogsClient {
     fromBlock: bigint
     toBlock: bigint
   }): Promise<readonly { blockNumber: bigint | null }[]>
+}
+
+/** The one client method the anchor search needs. A viem PublicClient satisfies it. */
+export interface BlocksClient {
+  getBlock(args: { blockNumber: bigint }): Promise<{ timestamp: bigint }>
 }
 
 type Log = { blockNumber: bigint | null }
@@ -105,19 +111,22 @@ export async function newestLogs(
 
 /**
  * match        the event was emitted within the ceiling.
+ * match (programme ended)
+ *              the same, for a contract of a closed programme, counted back from the
+ *              programme's last block instead of the head.
  * NO MATCH     the contract emitted other logs within the ceiling, never this topic0. The
  *              signature is wrong, or the event is not high-frequency.
  * NO ACTIVITY  the contract emitted no log of any kind within the ceiling. The signature is
  *              untested: the contract is idle, or it was redeployed to a new address.
  */
-export type Status = "match" | "NO MATCH" | "NO ACTIVITY"
+export type Status = "match" | "match (programme ended)" | "NO MATCH" | "NO ACTIVITY"
 
 export interface RecentScan {
   status: Status
   logs: number
-  /** Blocks between the head and the newest log of this event. Set only on a match. */
+  /** Blocks between the head, or the anchor, and the newest log of this event. Set only on a match. */
   lastSeen?: bigint | undefined
-  /** How many blocks back from the head the scan reached. */
+  /** How many blocks back from the head, or the anchor, the scan reached. */
   depth: bigint
 }
 
@@ -140,6 +149,47 @@ export async function scanRecent(
   // signature on a live contract reads differently from a contract that went quiet.
   const any = await newestLogs(client, { address }, latest, window, ceiling)
   return { status: any.logs.length > 0 ? "NO MATCH" : "NO ACTIVITY", logs: 0, depth: found.depth }
+}
+
+/**
+ * The last block before `closedAt`, the instant a programme closed: the newest block a closed
+ * programme's contracts can hold a log of it in. A binary search on block timestamps, from
+ * `floor`, a block known to be earlier such as the deploy block, up to the head. Found at run
+ * time, so no block number is written down for it.
+ */
+export async function lastBlockBefore(
+  client: BlocksClient,
+  closedAt: Date,
+  floor: bigint,
+  latest: bigint,
+): Promise<bigint> {
+  return blockAtTimestamp({
+    timestampOf: async (blockNumber) => (await client.getBlock({ blockNumber })).timestamp,
+    lo: floor,
+    hi: latest,
+    // The last block stamped strictly before the instant. Timestamps are whole seconds.
+    target: BigInt(Math.ceil(closedAt.getTime() / 1000)) - 1n,
+    side: "last",
+  })
+}
+
+/**
+ * The fast mode for one event of a closed programme. Its contracts will log none of its events
+ * again, so a scan back from the head can only report silence once the ceiling passes the close.
+ * This is scanRecent anchored at the programme's last block instead: the same window, doubling
+ * and ceiling, with lastSeen and depth counted back from the anchor. NO MATCH and NO ACTIVITY
+ * keep their meaning, within the ceiling before the anchor.
+ */
+export async function scanBeforeClose(
+  client: LogsClient,
+  address: Address,
+  event: AbiEvent,
+  anchor: bigint,
+  window: bigint,
+  ceiling: bigint,
+): Promise<RecentScan> {
+  const scan = await scanRecent(client, address, event, anchor, window, ceiling)
+  return scan.status === "match" ? { ...scan, status: "match (programme ended)" } : scan
 }
 
 /** The deep mode for one event: from the deploy block, oldest first, stopping at the first log. */

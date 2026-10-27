@@ -1,93 +1,147 @@
-# Safe{Staking}
+# Safenet staking interface
 
-A web application for delegating SAFE tokens to validators on Ethereum. Built as a [Safe App](https://docs.safe.global/apps/overview) that runs natively inside Safe Wallet, with full support for EOA wallets via injected providers and WalletConnect.
+The web interface for staking SAFE to Safenet validators on Ethereum Mainnet. It runs in any
+browser with an injected wallet or WalletConnect, and inside Safe{Wallet} as a Safe App. It
+reads the staking and MerkleDrop contracts directly, the two subgraphs in this repository for
+the Network Overview, and the files the Safe Ecosystem Foundation (SEF) publishes for validator
+metadata and rewards.
 
-## Features
+This package is `@cobuilders/safenet-web` in the repository's pnpm workspace. It derives from
+Safe Foundation's safenet-staking-ui; see [License](#license).
 
-- **Stake & Unstake** SAFE tokens to validators with a multi-step approval flow
-- **Batch transactions** for Safe wallets — approve + stake in a single multisig proposal via [EIP-5792](https://eips.ethereum.org/EIPS/eip-5792)
-- **Withdrawal queue** with FIFO ordering, cooldown progress bars, and claim actions
-- **Dashboard** with staking stats, rewards calculator, and stake distribution chart
-- **Validator discovery** with delegate/undelegate actions per validator
-- **Deep-linking** — open the stake dialog for a specific validator via `?delegate=0x...`
-- **Dark mode** with system preference detection and manual toggle
-- **Geo-blocking** and sanctions compliance checks
-- **IPFS deployable** for censorship-resistant hosting
+## Screens
 
-## Quick Start
+| Path | Page | What it shows |
+|------|------|---------------|
+| `/` | `OverviewPage` | Network Overview, no wallet needed: headline figures, stake distribution, rewards with the root check, the validator table, the last 30 days, and the freshness of each subgraph |
+| `/dashboard` | `DashboardPage` | Staking stats, the claimable banners, quick actions, the staking section and the stake distribution chart |
+| `/validators` | `ValidatorsPage` | Validator cards with Delegate and Undelegate. `?delegate=<address>` opens the delegate dialog for that validator |
+| `/validators/:address` | `ValidatorDetailPage` | One validator's figures and actions |
+| `/withdrawals` | `WithdrawalsPage` | The withdrawal queue, oldest first, with cooldowns and Claim |
+| `/rewards` | `RewardsPage` | Your rewards, Claim, Claim & Stake, the programme totals, and the root on chain checked against SEF's published one |
+| `*` | `NotFoundPage` | 404 |
+
+The router is `HashRouter` (`src/App.tsx`), so every path is served from one `index.html`
+under `#/`, which a static host and an IPFS gateway can both serve.
+
+## Quick start
+
+You need the Node version in the repository's `.nvmrc` and pnpm. From the repository root:
 
 ```bash
 pnpm install
 pnpm --filter @cobuilders/safenet-web dev
 ```
 
-The app will be available at `http://localhost:5173`, or on `WEB_PORT` from the repository-root
-`.env.ports` when `pnpm bootstrap` has written one.
+Vite serves the app on its default port, 5173, or on `WEB_PORT` from the repository-root
+`.env.ports` when `pnpm bootstrap` has written one. No environment variable is needed: the chain,
+the contract addresses, the RPC endpoints, the scan floor and the subgraph endpoints all default
+to the values in `packages/core`.
+
+`pnpm bootstrap` prepares everything in one step, including the Playwright browser and the
+per-worktree ports, but it also requires Foundry, Docker and the GitHub CLI to be installed.
+For this package alone, `pnpm install` is enough.
+
+To run the tests:
+
+```bash
+pnpm --filter @cobuilders/safenet-web test                                 # Vitest unit tests
+pnpm --filter @cobuilders/safenet-web exec playwright install chromium     # once, for e2e
+pnpm --filter @cobuilders/safenet-web test:e2e                             # Playwright, mocked RPC
+```
+
+Run every script in this package as `pnpm --filter @cobuilders/safenet-web <script>` from the
+repository root, or as `pnpm <script>` from `apps/web`.
+
+## Environment variables
 
 Vite reads env from the repository root, not from this directory: the root `.env`, and the root
-`.env.local` that `pnpm env:pull` writes. Every value is optional. To set one by hand, copy it
-from [`.env.example`](.env.example) into the root `.env`.
+`.env.local` that `pnpm env:pull` writes. Every variable is optional. To set one by hand, copy
+it from [`.env.example`](.env.example) into the root `.env`.
 
-## Environment Variables
+Vite writes every `VITE_` value into the public bundle. Never put a key in one.
+`pnpm check:browser`, part of `pnpm check`, fails when a value from `.env.local` that is not a
+`VITE_` value turns up in a build.
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `VITE_CHAIN_ID` | No | Target chain ID (defaults to Mainnet, from `@cobuilders/safenet-core`) |
-| `VITE_RPC_URL` | No | JSON-RPC endpoint (defaults to the public list in `@cobuilders/safenet-core`) |
-| `VITE_STAKING_DEPLOY_BLOCK` | No | Block number to start scanning validator events from (defaults to the scan floor in `@cobuilders/safenet-core`) |
-| `VITE_WALLETCONNECT_PROJECT_ID` | No | Enables WalletConnect connector |
-| `VITE_MERKLE_DROP_ADDRESS` | No | Merkle drop contract address for rewards claiming |
-| `VITE_SANCTIONS_API_URL` | No | Sanctions check endpoint (HTTP 403 = blocked) |
-| `VITE_GEOBLOCK_CACHE_DAYS` | No | Geo-block cache duration in days (defaults to 7) |
-| `VITE_VALIDATOR_INFO_URL` | No | Validator info JSON endpoint (defaults to SEF's published file, `SEF_DATA.validatorInfo` in `@cobuilders/safenet-core`) |
-| `VITE_REWARDS_BASE_URL` | No | Base URL for `latest.json` and the reward proof files. Replaces every source when set; unset, the interface reads SEF's IPFS dataset and then the repository (see [Where reward data comes from](#where-reward-data-comes-from)) |
-| `VITE_IPFS_GATEWAY` | No | An IPFS gateway, tried before the public gateways for SEF's reward dataset. Only its origin is used: a path such as `/ipfs/` is dropped |
-| `VITE_DOCS_URL` | No | Documentation link in footer (defaults to Safe docs) |
-| `VITE_TERMS_URL` | No | Footer terms link (hidden if unset) |
-| `VITE_PRIVACY_URL` | No | Footer privacy link (hidden if unset) |
-| `VITE_IMPRINT_URL` | No | Footer imprint link (hidden if unset) |
-| `VITE_APP_URL` | No | Canonical app URL for social preview meta tags (`og:image`, `twitter:image`); absolute URLs are required for social crawlers (no trailing slash) |
-| `PINATA_JWT` | No | Pinata API JWT for IPFS deployment |
-| `PINATA_GATEWAY` | No | Pinata gateway domain for IPFS deployment |
+| Variable | Effect when set | Unset |
+|----------|-----------------|-------|
+| `VITE_RPC_URL`, `VITE_RPC_URL_FALLBACK_1`, `VITE_RPC_URL_FALLBACK_2` | JSON-RPC endpoints, tried in this order. They replace the built-in list; they do not extend it | The Mainnet list in `packages/core` |
+| `VITE_CHAIN_ID` | Selects which chain's default RPC list and scan floor are read from `packages/core`. Contract addresses and the wallet chain stay Mainnet whatever its value | `DEFAULT_CHAIN_ID` in `packages/core`. Core configures Mainnet only, so leave it unset |
+| `VITE_STAKING_DEPLOY_BLOCK` | Block to start historical log scans from | The scan floor in `packages/core` |
+| `VITE_MERKLE_DROP_ADDRESS` | Overrides the MerkleDrop contract address | The address in `packages/core` |
+| `VITE_WALLETCONNECT_PROJECT_ID` | Enables the WalletConnect connector | No WalletConnect option |
+| `VITE_VALIDATOR_INFO_URL` | Validator metadata JSON | SEF's published file, `SEF_DATA.validatorInfo` in `packages/core` |
+| `VITE_REWARDS_BASE_URL` | Base for `latest.json` and the proof files. Replaces every other source | SEF's IPFS dataset, then the repository; see [Where reward data comes from](#where-reward-data-comes-from) |
+| `VITE_IPFS_GATEWAY` | A gateway tried before the public ones for SEF's dataset. Only its origin is used | Only the gateways in `packages/core` |
+| `VITE_SUBGRAPH_URL_MAINNET`, `VITE_SUBGRAPH_URL_GNOSIS` | Subgraph query URLs. Public in the bundle: never a URL with a key | The Studio deployments in `packages/core/src/subgraphs.ts`, in development and production builds alike. That is Studio's development endpoint, rate-limited and not a production read path |
+| `VITE_SANCTIONS_API_URL` | Fetched on load; an HTTP 403 blocks the app, and so does a failed request | No IP sanctions check |
+| `VITE_GEOBLOCK_CACHE_DAYS` | Days the country lookup is cached in `localStorage` | 7 |
+| `VITE_PLAUSIBLE_DOMAIN`, `VITE_PLAUSIBLE_ENDPOINT` | Enables Plausible page views, to that domain and optionally that endpoint | No analytics |
+| `VITE_APP_URL` | Canonical URL for the `og:url`, `og:image` and `twitter:image` tags in `index.html`, absolute, no trailing slash | The tags carry no origin |
+| `VITE_DOCS_URL` | Footer documentation link | Safe Foundation's Safenet documentation, set in `src/components/layout/Footer.tsx` |
+| `VITE_TERMS_URL`, `VITE_PRIVACY_URL`, `VITE_IMPRINT_URL` | Footer links | Hidden |
 
-See [`.env.example`](.env.example) for a template.
+`GRAPH_NODE_PORT` from `.env.ports` reaches the app as `VITE_GRAPH_NODE_PORT` through
+`vite.config.ts`. `packages/core` uses it only for a chain whose default endpoint is a local
+graph-node; both defaults are Studio deployments today, so to read the local node from
+`pnpm graph:up`, set the two `VITE_SUBGRAPH_URL_` variables to its URLs.
+
+The release build reads none of this. It reads [`build.env`](build.env) only; see
+[Deployment](#deployment).
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `yarn dev` | Start development server |
-| `yarn build` | Type-check and production build |
-| `yarn lint` | Run ESLint |
-| `yarn preview` | Preview production build locally |
-| `yarn test` | Run unit/integration tests (vitest) |
-| `yarn test:watch` | Run tests in watch mode |
-| `yarn test:coverage` | Run tests with coverage report |
-| `yarn test:e2e` | Run Playwright end-to-end tests |
-| `pnpm test:fork` | Run the staking flows against real contracts on an Anvil Mainnet fork (see below) |
-| `yarn deploy:ipfs` | Deploy build to IPFS via Pinata |
-| `yarn generate:proofs` | Generate Merkle proofs for reward distribution |
+| Script | What it does |
+|--------|--------------|
+| `dev` | Vite dev server |
+| `build` | `tsc -b`, then the production build into `dist/` |
+| `preview` | Serves `dist/` |
+| `lint` | ESLint |
+| `check` | `codegen:check`, ESLint, `tsc -b --noEmit`, and the e2e TypeScript project. Also run by the root `pnpm check` |
+| `test` | Vitest, once: the tests under `src/` and `scripts/` |
+| `test:watch`, `test:coverage` | Vitest in watch mode, and with a coverage report |
+| `test:e2e` | Playwright against mocked RPC, `e2e/tests/` |
+| `test:e2e:ui`, `test:e2e:headed` | The same suite in Playwright's UI, or in a visible browser |
+| `test:fork` | Playwright against the real contracts on an Anvil Mainnet fork, `e2e/fork/`; see [Fork suite](#fork-suite) |
+| `fork:up`, `fork:reset`, `fork:down` | The manual QA fork for Claim & Stake; see [`docs/manual-qa-fork.md`](../../docs/manual-qa-fork.md) |
+| `codegen` | Regenerates the typed GraphQL in `src/graphql/<chain>/generated.ts` from each subgraph package's `schema.graphql` |
+| `codegen:check` | Fails when the committed GraphQL types differ from a fresh `codegen` |
+| `codegen:live-check` | Validates the GraphQL documents against a running graph-node, the Studio deployments by default |
+| `generate:proofs` | Builds a reward Merkle tree and its files; see [Reward proofs](#reward-proofs) |
+| `release:build` | The reproducible production build from `build.env`, packed into `release/app.car` with its root CID in `release/CID`; see [Deployment](#deployment) |
+| `release:pin` | Pins `release/app.car` to Pinata and checks that the gateways serve it |
 
-See [`MANUAL_TESTING.md`](./MANUAL_TESTING.md) for the pre-release manual QA checklist
-(covers scenarios not automated by the e2e suite, e.g. WalletConnect and Safe App flows).
+The root also has `pnpm test:e2e`, `pnpm test:fork`, `pnpm fork:up`, `pnpm fork:reset` and
+`pnpm fork:down`, which run the same scripts.
 
-## Fork suite
+See [`MANUAL_TESTING.md`](./MANUAL_TESTING.md) for the pre-release manual checklist.
 
-`pnpm test:e2e` mocks every RPC call. It proves the interface behaves, not that a transaction
-works. `pnpm test:fork` drives the same interface against the real contracts: Anvil forks
-Mainnet at a pinned block, the injected test wallet forwards every call to Anvil, and each test
-reads the chain after the UI action to prove the transaction did what the screen says.
+## Tests
+
+- **Unit**: Vitest with jsdom, `pnpm --filter @cobuilders/safenet-web test`. Tests sit next to
+  the code in `src/**/__tests__/` and `scripts/__tests__/`.
+- **End-to-end**: Playwright, `pnpm --filter @cobuilders/safenet-web test:e2e`. It starts its
+  own Vite on `E2E_PORT` (5174 without `.env.ports`), and outside CI reuses a server already
+  listening there. An injected test wallet answers from a mocked RPC, and the subgraphs, SEF's
+  files and the gateways are mocked too, so the suite needs no network and no secret. It proves
+  the interface behaves, not that a transaction works. The Safe App and WalletConnect are only
+  smoke-tested there.
+- **Fork**: below.
+
+### Fork suite
+
+`pnpm test:fork` drives the same interface against the real contracts: Anvil forks Mainnet at a
+pinned block, the injected test wallet forwards every call to Anvil, and each test reads the chain
+after the UI action to prove the transaction did what the screen says.
 
 It covers approve then stake, initiating a withdrawal, claiming one after the cooldown (the
 chain's clock is moved forward, and the page's clock with it), and claiming rewards with SEF's
 real proof as an impersonated address. Each test runs inside an Anvil snapshot that is reverted
 after it.
 
-Run it locally:
-
 ```bash
-pnpm env:pull     # once: writes MAINNET_RPC_URL to the root .env.local
-pnpm test:fork    # from the root, or from apps/web
+pnpm env:pull                                        # once: writes MAINNET_RPC_URL to the root .env.local
+pnpm --filter @cobuilders/safenet-web test:fork
 ```
 
 - **Needs** Foundry (`anvil` on the `PATH`) and `MAINNET_RPC_URL`, an archive endpoint, in the
@@ -99,140 +153,181 @@ pnpm test:fork    # from the root, or from apps/web
   data repository from the same moment. Move them together, or the reward proofs stop matching
   the root on chain.
 - **Anvil** starts and stops with the run, pass or fail. Its output is shown with URLs redacted.
-- **The fork URL is on Anvil's command line**, because Anvil 1.8.4 reads it from no environment
+- **The fork URL is on Anvil's command line**, because Anvil reads it from no environment
   variable. On a shared machine, anyone who can list processes can read the URL, key included,
-  while the suite runs. On a CI runner this does not matter.
+  while the suite runs.
 
-It runs nightly in CI, not on pull requests, because every run reads from the archive node.
+CI runs it nightly, not on pull requests, because every run reads from the archive node.
 
-## Tech Stack
+## Tech stack
 
-- **React 19** with TypeScript
-- **Vite 7** with Tailwind CSS 4
-- **wagmi 3** / **viem** for wallet and contract interactions
-- **React Router 7** with hash-based routing (for IPFS compatibility)
-- **Radix UI** primitives (dialog, tabs, tooltip) styled with [shadcn/ui](https://ui.shadcn.com/) conventions
-- **Recharts** for data visualization
-- **Vitest** for unit/integration tests
-- **Playwright** for end-to-end testing
+- React 19 and TypeScript
+- Vite 7 and Tailwind CSS 4
+- wagmi 3 and viem
+- TanStack Query
+- React Router 7, hash-based routing
+- Radix UI primitives styled after shadcn/ui
+- graphql-request with GraphQL Code Generator
+- Recharts
+- Vitest and Playwright
 
-## Architecture
+## Layout
 
 ```
 src/
-├── abi/            # Contract ABIs (parseAbi with human-readable signatures)
-├── components/
-│   ├── dashboard/  # Stats, rewards, staking section
-│   ├── layout/     # Header, footer, shared layout
-│   ├── staking/    # DelegateDialog, UndelegateDialog, AmountInput
-│   ├── ui/         # Radix + CVA primitives (button, card, dialog, etc.)
-│   ├── validators/ # ValidatorCard, ValidatorList
-│   ├── wallet/     # ConnectButton
-│   └── withdrawals/# WithdrawalQueue, WithdrawalCard, CountdownTimer
-├── config/         # Chain, contract addresses, wagmi config
-├── data/           # Static validator metadata (JSON)
-├── hooks/          # Contract reads, writes, gas estimation, rewards
-├── lib/            # Utilities (formatting, error handling, clipboard)
-└── pages/          # Route components
-e2e/                # Playwright suites: tests/ against mocked RPC, fork/ against an Anvil Mainnet fork
-scripts/            # Off-chain tooling (Merkle proof generation)
-admin/              # Admin panel (validator proposals, contract management)
+├── abi/          contract ABIs; the MerkleDrop ABI comes from packages/core
+├── assets/       images bundled with the app
+├── components/   dashboard, layout, overview, rewards, staking, ui, validators, wallet, withdrawals
+├── config/       chain and transports, contract addresses, wagmi, QueryClient, subgraph endpoints
+├── graphql/      GraphQL documents per chain and their generated types
+├── hooks/        contract reads and writes, subgraph queries, rewards, compliance checks
+├── lib/          formatting, errors, figures, programme copy, Safe detection
+└── pages/        one component per route
+e2e/
+├── tests/        the mocked suite
+├── fork/         the fork suite
+├── mocks/        mocked RPC, event logs and subgraphs
+├── fixtures/     Playwright fixtures and test data
+└── pages/        page objects
+scripts/
+├── merkle-tree.ts, generate-merkle-tree.ts, merkle-config.json   reward proofs
+├── fork-env/     the manual QA fork behind fork:up, fork:reset and fork:down
+├── codegen-check.ts, codegen-live-check.ts, subgraph-api-schema.ts   GraphQL codegen
+└── release.ts, release-pin.ts, release-gateways.ts   the IPFS release
+public/           static files, including the Safe App manifest
 ```
 
-### Routes
+## Wallets
 
-| Path | Page | Description |
-|------|------|-------------|
-| `/` | `DashboardPage` | Stats, rewards, staking section, stake distribution chart |
-| `/validators` | `ValidatorsPage` | Validator discovery and delegate/undelegate actions |
-| `/validators/:address` | `ValidatorDetailPage` | Individual validator info and actions |
-| `/withdrawals` | `WithdrawalsPage` | Pending withdrawals queue and claims |
-| `*` | `NotFoundPage` | 404 catch-all |
+`src/config/wagmi.ts` configures one chain, Mainnet, and these connectors:
 
-### Wallet Support
+1. **Safe**, `safe()`. Inside a Safe{Wallet} iframe, `useAutoConnect` connects it on load, so a
+   Safe App always uses the Safe, not the last wallet used.
+2. **Browser Wallet**, `injected()` on `window.ethereum`: MetaMask, Rabby and other extensions.
+3. **WalletConnect**, only when `VITE_WALLETCONNECT_PROJECT_ID` is set.
 
-The app connects via three wagmi connectors, resolved in order:
+A wallet on another chain sees a "Switch to Ethereum" prompt in place of its actions.
 
-1. **Safe** — auto-detected when running inside the Safe Wallet iframe
-2. **Injected** — MetaMask, Rabby, and other browser extension wallets
-3. **WalletConnect** — enabled when `VITE_WALLETCONNECT_PROJECT_ID` is set
+When the wallet supports EIP-5792 atomic batching, as a Safe does, approve and stake go out as
+one batch, and two or more ready withdrawals can be claimed with one Claim All.
 
-When connected through Safe, the app detects [EIP-5792](https://eips.ethereum.org/EIPS/eip-5792) `atomicBatch` capability and batches approve + stake into a single transaction proposal, reducing multisig signing rounds from 2 to 1.
+The interface says Delegate and Undelegate; the contract and the hooks say stake
+(`stake()`, `initiateWithdrawal()`, `claimWithdrawal()`).
 
-### Contract Integration
+## Compliance gates
 
-The UI uses "delegation" terminology (Delegate/Undelegate) but the smart contract uses "stake" terminology internally. Write hooks wrap `stake()`, `initiateWithdrawal()`, and `claimWithdrawal()` contract functions.
+- `useGeoblockCheck` looks up the visitor's country and blocks the app with "Access Restricted"
+  for the countries listed in `src/hooks/useGeoblockCheck.ts`. A failed lookup blocks too.
+- `useSanctionsCheck` blocks the app when `VITE_SANCTIONS_API_URL` is set and answers 403 or
+  fails.
+- `useWalletSanctionsCheck` asks the sanctions oracle named in `packages/core` about the
+  connected address, and shows "Wallet Restricted" unless it answers no.
 
-- **Read hooks** (`useStakingReads.ts`) poll every 15 seconds via `refetchInterval`
-- **Write hooks** (`useStakingWrites.ts`) return a unified `{ action, isSigningTx, isConfirmingTx, isSuccess, error, reset, txHash }` interface
-- **Validator discovery** fetches `ValidatorUpdated` events from the deploy block with automatic chunked fallback for RPC block-range limits
-- **Rewards** — Merkle-proof-based reward claiming via a MerkleDrop contract. Proofs are generated off-chain (see below) and served as static JSON files
+## Where reward data comes from
 
-### Where reward data comes from
+SEF names the IPFS dataset behind the ENS name `SEF_REWARDS_ENS_NAME` in
+`packages/core/src/rewards-source.ts` the canonical source of reward data, and keeps its data
+repository as a temporary mirror. The interface reads `latest.json` and each proof in this order,
+and the first source that answers wins:
 
-SEF declares the IPFS dataset behind the ENS name `rewards.safenet-gov.eth` the canonical source of reward data, and keeps the repository `safe-fndn/safenet-data` as a temporary mirror. The interface reads `latest.json` and each proof in this order, and the first source that answers wins. First, `VITE_REWARDS_BASE_URL` when it is set: it replaces every other source, for the manual QA fork and the fork suite. Next, SEF's dataset through each IPFS gateway, `VITE_IPFS_GATEWAY` first and then ipfs.orbitor.dev and ipfs.filebase.io, but only when the name's contenthash is set. ipfs.io and dweb.link are not listed: they retired on 2026-09-21 and now answer every path with a 429 pointing at https://gatewaychanges.ipfs.io. Last, the repository. A source that fails, answers 404, serves a file of the wrong shape or does not answer within 10 seconds falls through to the next. The gateways share one 10-second budget, so dead gateways delay the repository by one timeout, not one each; each gateway in turn gets the time left divided by the gateways left, so a hang at the first does not take the second's share. The paths under the contenthash are assumed to repeat the repository's `assets/rewards` layout, which is checked when SEF populates the name; until then a gateway's 404 proves nothing, and an address has no proof only when the repository, or the configured override, answers 404, whatever the gateways did. The name is resolved once an hour per session, kept in the query cache for that hour, and read again after a minute when the chain could not be read. The resolution takes the name's own resolver: a name served by a parent's wildcard resolver reads as unsupported and falls back to the repository. On 2026-10-08 its contenthash was empty, so the interface read the repository; when SEF populates it, the interface reads the dataset with no deploy. The Verifiability section names the source of `latest.json`, and so of the published root, with the gateway it came through, or why the repository was read: the name is empty, set in a form the page cannot read, or could not be read; or the dataset did not answer, or answered without the file at the expected path. Each address's proof is read the same way, on its own. When the repository's 404 settles that an address has no proof while the dataset did not answer, Your rewards adds that this rests on the mirror.
+1. `VITE_REWARDS_BASE_URL`, when set. It replaces every other source; the manual QA fork and the
+   fork suite use it.
+2. SEF's dataset through each IPFS gateway, `VITE_IPFS_GATEWAY` first and then `IPFS_GATEWAYS`
+   in `packages/core`, but only when the name's contenthash is set. The gateways share one
+   10-second budget, and each in turn gets the time left divided by the gateways left.
+3. The repository mirror, `SEF_DATA` in `packages/core`.
 
-### Merkle Proof Generation
+A source that fails, answers 404, serves a file of the wrong shape or does not answer in time
+falls through to the next. A gateway's 404 proves nothing: an address has no proof only when the
+repository, or the override, answers 404. The name is resolved through its own resolver once an
+hour per session, and again after a minute when the chain could not be read. When the
+contenthash is empty, the interface reads the repository; when SEF sets it, the interface reads
+the dataset with no new deploy.
 
-The `scripts/` directory contains tooling for generating Merkle proofs compatible with the MerkleDrop contract:
+The Verifiability section of the Rewards page names the source of `latest.json`, and the gateway
+it came through, or why the repository was read. When the repository's 404 settles that an
+address has no proof while the dataset did not answer, Your rewards adds that this rests on the
+mirror.
 
-1. Edit `scripts/merkle-config.json` with wallet addresses and cumulative reward amounts (in wei):
+SEF's `latest.json` carries exactly `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal` and
+`unpaidAmount`. In this tree, `parseRewardsLatest` in `src/hooks/useProgrammeRewards.ts` also
+requires an `updatedAt` date, so it treats a file without one as the wrong shape.
+
+## Reward proofs
+
+`scripts/generate-merkle-tree.ts` builds the files SEF publishes, for a test environment:
+
+1. Edit `scripts/merkle-config.json`: an epoch and each address's cumulative reward in wei.
    ```json
    {
      "epoch": 1,
      "entries": {
        "0xWalletAddress": "1000000000000000000000"
-     }
+     },
+     "rewardsUntil": "2026-01-01T00:00:00.000Z",
+     "unpaidAmount": "0"
    }
    ```
-   Two optional fields complete `latest.json`: `rewardsUntil` (ISO 8601, defaults to the time
-   of the run) and `unpaidAmount` (wei, defaults to `"0"`).
-2. Run `pnpm generate:proofs`. It writes to `.rewards/`, which git ignores; `--out <dir>` names
-   another directory.
-3. Output, in the shape SEF publishes:
-   - `proofs/<radix>/{lowercase_address}.json` — per-address proof files
-   - `latest.json` — `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal`, `unpaidAmount`, `updatedAt`
-4. Serve the output directory and point `VITE_REWARDS_BASE_URL` at it. `useRewardProof` fetches each proof from `${VITE_REWARDS_BASE_URL}/proofs/<radix>/{lowercase_address}.json`, and `useProgrammeRewards` reads `${VITE_REWARDS_BASE_URL}/latest.json`.
-5. Only then set the Merkle root on-chain via the admin panel. In the other order the app still serves the old proofs against the new root, and `useRewards` disables Claim because the roots differ.
+   `rewardsUntil` (ISO 8601) and `unpaidAmount` (wei) are optional; they default to the time of
+   the run and `"0"`.
+2. Run `pnpm --filter @cobuilders/safenet-web generate:proofs`. It writes to `apps/web/.rewards/`,
+   which git ignores; `--out <dir>` names another directory.
+3. The output is `proofs/<radix>/<lowercase address>.json` for each address and `latest.json`
+   with `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal`, `unpaidAmount` and an `updatedAt`
+   set to the time of the run.
+4. Serve the directory and point `VITE_REWARDS_BASE_URL` at it.
+5. Then set the MerkleDrop's root to the generated one. In the other order the app serves the old
+   proofs against the new root, and Claim stays disabled because the roots differ. This
+   repository sets a root only on an Anvil fork, as the MerkleDrop's owner, in
+   `scripts/fork-env/chain.ts`.
 
-The tree uses sorted-pair hashing (OpenZeppelin convention) and viem for encoding.
-
-### Adding a New Chain
-
-1. Add the chain object to `chainMap` in `src/config/chains.ts`
-2. Add contract addresses for the chain ID in `src/config/contracts.ts`
-3. Set `VITE_CHAIN_ID` and `VITE_RPC_URL` in your environment
-
-## Admin Panel
-
-The `admin/` directory is a separate Vite app for contract administration. Run it independently with `cd admin && yarn dev`.
-
-**Sections:**
-- **Withdraw Delay** — Propose and execute delay changes (timelocked)
-- **Validator Management** — Propose and execute validator registration/deregistration (timelocked)
-- **Token Operations** — Mint test tokens, recover tokens from the staking contract
-- **Merkle Drop** — Set the Merkle root on the MerkleDrop contract (shown when `VITE_MERKLE_DROP_ADDRESS` is set)
-- **Event Log** — View contract events
+The tree uses sorted-pair hashing, the OpenZeppelin convention, with viem for the encoding
+(`scripts/merkle-tree.ts`).
 
 ## Deployment
 
-### IPFS
+Production is IPFS. The Release section of the [repository README](../../README.md#release)
+describes the workflow, and [`VERIFY.md`](../../VERIFY.md) shows how to rebuild a release and
+compare its CID.
+
+### Build
+
+`pnpm --filter @cobuilders/safenet-web build` writes a static site to `apps/web/dist/` with
+relative asset paths and hash routing, so it works from any path on any static host or IPFS
+gateway. It reads the same env as `dev`.
+
+### Release to IPFS
 
 ```bash
-yarn build
-yarn deploy:ipfs
+pnpm --filter @cobuilders/safenet-web release:build
+pnpm --filter @cobuilders/safenet-web release:pin
 ```
 
-Requires `PINATA_JWT` and `PINATA_GATEWAY` environment variables. The build uses hash-based routing (`HashRouter`) for compatibility with IPFS gateways. Set `VITE_APP_URL` to the canonical URL so that `og:image` and `twitter:image` meta tags resolve correctly for social crawlers.
+- `release:build` (`scripts/release.ts`) reads [`build.env`](build.env) and nothing else: every
+  `.env` file and every `VITE_` variable in the shell is ignored. That file is committed and
+  public, holds only `VITE_` keys, and never a secret. The script builds in production mode,
+  runs the browser-safety check over `dist/`, packs `dist/` into `release/app.car` and writes the
+  root CID to `release/CID`. `release/` is git-ignored. Set `VITE_APP_URL` in `build.env` so that
+  the social preview tags carry an absolute URL.
+- `release:pin` (`scripts/release-pin.ts`) uploads the CAR to Pinata and fails if Pinata reports
+  another CID. It then checks the dedicated Pinata gateway and each gateway in `IPFS_GATEWAYS`
+  in `packages/core`: each must serve `index.html` and the release's smallest `.js` file byte for
+  byte. It needs `PINATA_JWT` and `PINATA_GATEWAY`, from the environment or the root
+  `.env.local`, and fails when either is missing. `RELEASE_NAME` and `GATEWAY_TIMEOUT_SECONDS`
+  are optional.
+
+`.github/workflows/release.yml` runs both on a `v*` tag or by hand. Its build job receives no
+secret. Its pin job takes the two Pinata secrets and runs only from `main` or a `v*` tag.
 
 ### Safe App
 
-The app includes a `/manifest.json` for Safe App discovery. To run inside Safe Wallet:
-
-1. Deploy to any static host (Vercel, IPFS, etc.)
-2. In Safe Wallet, go to Apps > Add Custom App
-3. Enter the deployment URL
+`public/manifest.json` is the Safe App manifest: name, description and icons. The dev and
+preview servers send the CORS headers Safe{Wallet} needs to read it, and a
+`frame-ancestors` policy that lets Safe{Wallet} frame the app (`vite.config.ts`). Wherever the app
+is served, Safe{Wallet} must be able to read the manifest. In Safe{Wallet}, add the app's URL as
+a custom Safe App and open it from the Safe; the Safe connector connects by itself.
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+MIT, see [LICENSE](LICENSE). The app derives from Safe Foundation's safenet-staking-ui, also
+MIT; its copyright notice stays in that file.

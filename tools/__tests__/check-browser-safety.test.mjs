@@ -5,18 +5,22 @@ import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 
 const SCRIPT = resolve(import.meta.dirname, "../check-browser-safety.mjs")
 
-/** Writes .env.local and one bundle file into a fresh tree, runs the check there. */
-function check(envLocal, bundle) {
+/**
+ * Writes .env.local and one bundle file into a fresh tree, runs the check there. `file` is the
+ * bundle file's path under dist; `buildEnv`, when given, is written to apps/web/build.env.
+ */
+function check(envLocal, bundle, { file = "assets/index.js", buildEnv } = {}) {
   const root = mkdtempSync(join(tmpdir(), "browser-safety-"))
   try {
     mkdirSync(join(root, "apps/web/src"), { recursive: true })
-    mkdirSync(join(root, "apps/web/dist/assets"), { recursive: true })
+    mkdirSync(dirname(join(root, "apps/web/dist", file)), { recursive: true })
     writeFileSync(join(root, ".env.local"), envLocal)
-    writeFileSync(join(root, "apps/web/dist/assets/index.js"), bundle)
+    writeFileSync(join(root, "apps/web/dist", file), bundle)
+    if (buildEnv !== undefined) writeFileSync(join(root, "apps/web/build.env"), buildEnv)
     const run = spawnSync(process.execPath, [SCRIPT], {
       env: { ...process.env, BROWSER_SAFETY_ROOT: root },
       encoding: "utf8",
@@ -67,4 +71,53 @@ test("two keys that leak are each named once", () => {
   assert.equal(status, 1)
   assert.equal(output.match(/The value of ONE /g)?.length, 1)
   assert.equal(output.match(/The value of TWO /g)?.length, 1)
+})
+
+test("a secret in index.html, outside assets, fails", () => {
+  const { status, output } = check('SECRET="plantedvalue456"\n', "<script>plantedvalue456</script>\n", {
+    file: "index.html",
+  })
+  assert.equal(status, 1)
+  assert.match(output, /The value of SECRET from \.env\.local appears/)
+})
+
+test("a secret in a file that is not JavaScript, deeper in dist, fails", () => {
+  const { status } = check('SECRET="plantedvalue456"\n', '{"k":"plantedvalue456"}\n', {
+    file: "assets/data/manifest.json",
+  })
+  assert.equal(status, 1)
+})
+
+test("a non-VITE_ value that build.env also holds passes, because the release ships it", () => {
+  const { status } = check('PROJECT_ID="publicvalue0123"\n', 'const p="publicvalue0123";\n', {
+    buildEnv: "# public\nVITE_PROJECT_ID=publicvalue0123\n",
+  })
+  assert.equal(status, 0)
+})
+
+test("with build.env present, a value it does not hold still fails, naming only that key", () => {
+  const { status, output } = check(
+    'PROJECT_ID="publicvalue0123"\nSECRET="plantedvalue456"\n',
+    "publicvalue0123 plantedvalue456\n",
+    { buildEnv: "VITE_PROJECT_ID=publicvalue0123\n" },
+  )
+  assert.equal(status, 1)
+  assert.match(output, /The value of SECRET /)
+  assert.doesNotMatch(output, /PROJECT_ID/)
+})
+
+test("a key that shares its stem with a build.env key but leaks another value fails, naming it", () => {
+  const { status, output } = check('PROJECT_ID="plantedvalue456"\n', "const p=plantedvalue456;\n", {
+    buildEnv: "VITE_PROJECT_ID=publicvalue0123\n",
+  })
+  assert.equal(status, 1)
+  assert.match(output, /The value of PROJECT_ID from \.env\.local appears/)
+})
+
+test("a value build.env holds under a key without VITE_ earns no exemption", () => {
+  const { status, output } = check('PROJECT_ID="publicvalue0123"\n', 'const p="publicvalue0123";\n', {
+    buildEnv: "PROJECT_ID=publicvalue0123\n",
+  })
+  assert.equal(status, 1)
+  assert.match(output, /The value of PROJECT_ID /)
 })

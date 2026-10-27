@@ -4,6 +4,7 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs"
 import { execSync } from "node:child_process"
 import { resolve, join } from "node:path"
+import { parseEnv } from "node:util"
 
 // BROWSER_SAFETY_ROOT points the check at another tree. Only its regression test sets it.
 const ROOT = process.env.BROWSER_SAFETY_ROOT
@@ -21,11 +22,21 @@ if (hits) {
   failed = true
 }
 
-// 2. build: no secret from .env.local may appear in dist. VITE_ values are skipped: Vite puts
-// every one of them into the bundle by design, so they are public by definition.
+// 2. build: no secret from .env.local may appear anywhere in dist, index.html and every asset
+// included. VITE_ values are skipped: Vite puts every one of them into the bundle by design, so
+// they are public by definition. So is any value that apps/web/build.env holds under a VITE_ key:
+// the release build ships those on purpose, whatever key .env.local stores the same value under.
+// A non-VITE_ key in build.env breaks that file's own rule, so its value earns no exemption.
 const envPath = join(ROOT, ".env.local")
-const distDir = join(ROOT, "apps/web/dist/assets")
+const distDir = join(ROOT, "apps/web/dist")
+const buildEnvPath = join(ROOT, "apps/web/build.env")
 if (existsSync(envPath) && existsSync(distDir)) {
+  // The release build reads build.env with parseEnv, so read it the same way here.
+  const published = new Set(
+    Object.entries(existsSync(buildEnvPath) ? parseEnv(readFileSync(buildEnvPath, "utf8")) : {})
+      .filter(([key]) => key.startsWith("VITE_"))
+      .map(([, value]) => value),
+  )
   const secrets = readFileSync(envPath, "utf8")
     .split("\n")
     .map((l) => {
@@ -35,10 +46,11 @@ if (existsSync(envPath) && existsSync(distDir)) {
       const value = rest.join("=").trim().replace(/^["']/, "").replace(/["']$/, "")
       return { key: key.trim(), value }
     })
-    .filter(({ key, value }) => !key.startsWith("VITE_") && value.length > 12)
-  const bundle = readdirSync(distDir)
-    .filter((f) => f.endsWith(".js"))
-    .map((f) => readFileSync(join(distDir, f), "utf8"))
+    .filter(({ key, value }) => !key.startsWith("VITE_") && value.length > 12 && !published.has(value))
+  // UTF-8, so a value with non-ASCII characters matches the bytes Vite wrote.
+  const bundle = readdirSync(distDir, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => readFileSync(join(e.parentPath, e.name), "utf8"))
     .join("\n")
   // Name each leaked key once, and never print its value.
   const leaked = new Set(secrets.filter(({ value }) => bundle.includes(value)).map(({ key }) => key))

@@ -45,7 +45,7 @@ Specific commands, only where they apply:
 
 | Command | Where | What it proves | Today |
 |---|---|---|---|
-| `pnpm verify:abis` | `packages/core` | The high-frequency event signatures still match the chain. It scans a recent window and, when an event is quiet there, widens back in doubling steps to a ceiling of about 11.5 days on Gnosis and 14 on Mainnet. It prints how many blocks ago each event was last seen, and fails only when the ceiling holds no log of it: NO MATCH when the contract emitted other logs, NO ACTIVITY when it emitted none | works |
+| `pnpm verify:abis` | `packages/core` | The high-frequency event signatures still match the chain. It scans a recent window and, when an event is quiet there, widens back in doubling steps to a ceiling of about 11.5 days on Gnosis and 14 on Mainnet. It prints how many blocks ago each event was last seen, and fails only when the ceiling holds no log of it: NO MATCH when the contract emitted other logs, NO ACTIVITY when it emitted none. Since 2026-10-23, a contract of a programme that has ended, as `packages/core` records it, is scanned back from that programme's last block instead of the chain head, and matches as `match (programme ended)` | works |
 | `pnpm verify:abis:deep` | `packages/core` | Every signature, including rare events, scanned from each deploy block | needs the archive `MAINNET_RPC_URL` from `pnpm env:pull` |
 | `pnpm metrics` | `packages/core` | The 24 metrics, computed against live chains and compared with SEF's published JSON. Writes `packages/core/.metrics/`, which is git-ignored | needs an archive node. With public RPC only, it stopped on a failed Mainnet log range when this file was written |
 | `pnpm check:browser` | root | `apps/web/src` reads no `process.env`, and a built bundle contains no value from `.env.local` other than the public `VITE_` ones | works, part of `check` |
@@ -54,6 +54,8 @@ Specific commands, only where they apply:
 | `pnpm test:fork` | `apps/web`, `packages/cli` | Against the real contracts on an Anvil Mainnet fork at a pinned block, each effect checked by reading the chain. `apps/web`: the staking flows in the interface, in Playwright, about 1.5 minutes. `packages/cli`: the five write commands sent for real, then each with `--dry-run`, which must change nothing, in node:test; one of those tests needs no Anvil and also runs under `pnpm test`; about 20 seconds | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
 | `pnpm fork:up`, `pnpm fork:reset`, `pnpm fork:down` | root | The manual QA fork for Claim & Stake: Anvil on a fork of Mainnet at a pinned block, a test account with SAFE in its wallet and a reward to claim under a root built from every real claimer's proof at the SEF data commit core pins, and the interface, the proofs and the RPC served on one loopback origin for a browser and MetaMask. `up` is idempotent, `reset` reverts to the baseline snapshot, `down` stops only what `up` started. The guide is `docs/manual-qa-fork.md` | works; needs `anvil` and the archive `MAINNET_RPC_URL` |
 | `deploy:studio` | each subgraph package, through `pnpm --filter` | The subgraph builds and Studio accepts it as a new version under its slug. Not that it syncs: watch it by deployment hash, then run `differential` with `SUBGRAPH_URL` | works; needs `GRAPH_DEPLOY_KEY` |
+| `release:build` | `apps/web`, through `pnpm --filter` | The production bundle builds from `apps/web/build.env` alone, passes the browser-safety check, and packs into `apps/web/release/app.car` with its root CID in `apps/web/release/CID`. Two clean builds give the same CID; `VERIFY.md` has the steps | works; needs no secret |
+| `release:pin` | `apps/web`, through `pnpm --filter` | Pinata stores the CAR under the same CID, and each gateway answers 200 for `index.html` and serves one `.js` file of the release byte for byte | needs `PINATA_JWT` and `PINATA_GATEWAY`, and fails when either is empty. Not yet run against Pinata |
 | `pnpm test:parity` | both subgraph packages | Our deployed subgraphs agree with SEF's published JSON at the instant SEF published it, the commit that last wrote each file: the Mainnet staked total to the wei, and each validator's Gnosis participation rate as the identical double. Four states per chain: PASS, exit 0; FAIL, exit 1, for a real difference, a broken or lagging subgraph, SEF's data over 24 hours old, or an error; STALE, exit 0, when SEF's file is over 9 hours old; NOT COMPARABLE, exit 0, when our deployment cannot answer at SEF's instant. Subgraph URLs from `SUBGRAPH_URL_MAINNET` and `SUBGRAPH_URL_GNOSIS`, else the defaults in `packages/core`, the Studio deployment of each chain | Both pass against Studio. Gnosis sums hourly buckets filed by the attestation block from a current query, so Studio keeping about 1,000 blocks of history does not matter; a deployment without the buckets is NOT COMPARABLE. Daily in `parity.yml`, which also fails when a chain wrote no state |
 
 `turbo run <task>` with no package implementing the task reports a success while running nothing.
@@ -111,9 +113,8 @@ Do not infer that a planned package exists because this file names it. Check.
 
 `packages/core`, `packages/cli`, `packages/mcp`, `apps/web` and both subgraph packages each own a
 `CLAUDE.md`.
-Read the one for the package you are in, not all of them. `apps/web/CLAUDE.md` came with the fork
-and names `yarn`. This repository uses pnpm, so run its scripts as
-`pnpm --filter @cobuilders/safenet-web <script>`.
+Read the one for the package you are in, not all of them. Run a package's scripts from the root
+as `pnpm --filter <name> <script>`.
 
 ## Subgraphs
 
@@ -145,6 +146,9 @@ Studio with the `GRAPH_DEPLOY_KEY` secret. `parity.yml` runs `pnpm test:parity` 
 demand against the Studio deployments that `packages/core` names as the default endpoints, writes
 the comparison to the job summary, and drives the badge in `README.md`. It stays out of per-PR CI
 because its result depends on SEF's data and the deployed subgraphs, not on the code under review.
+`release.yml` runs on a tag `v*` or by hand: its `build` job receives no secret, builds from
+`apps/web/build.env`, packs `apps/web/release/app.car` and prints the CID; its `pin` job runs only
+from `main` or a `v*` tag, needs `PINATA_JWT` and `PINATA_GATEWAY`, and fails when they are empty.
 
 ## What happens when you edit
 

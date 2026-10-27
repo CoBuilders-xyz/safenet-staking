@@ -9,6 +9,7 @@
  */
 import type { Address } from "viem"
 import type { ChainKey } from "./chains.js"
+import type { Programme } from "./sef.js"
 
 export interface ContractRef {
   readonly address: Address
@@ -24,6 +25,12 @@ export interface ContractRef {
    * or it reads blocks where the contract does not exist.
    */
   readonly deployBlock?: bigint
+  /**
+   * The programme a contract belongs to, when one programme owns it. Once PROGRAMME_CLOSED_FROM
+   * in sef.ts closes that programme, verify:abis scans the contract back from the programme's
+   * last block instead of the chain head.
+   */
+  readonly programme?: Programme
 }
 
 export const CONTRACTS = {
@@ -63,6 +70,7 @@ export const CONTRACTS = {
     chain: "gnosis",
     startBlock: 45_210_396n,
     deployBlock: 45_210_396n,
+    programme: "beta",
   },
   frostCoordinator: {
     // SEF publishes no start block for this one, and we asked on 2026-08-27. We then found it
@@ -72,6 +80,7 @@ export const CONTRACTS = {
     chain: "gnosis",
     startBlock: 45_210_395n,
     deployBlock: 45_210_395n,
+    programme: "beta",
   },
 } as const satisfies Record<string, ContractRef>
 

@@ -1,117 +1,154 @@
-# Manual QA Plan
+# Manual testing
 
-A pre-release checklist for the Safenet Staking UI, covering scenarios that are either not
-automated or only smoke-tested by the Playwright e2e suite (`e2e/`). See "Automation status"
-at the bottom for what's already covered by `yarn test:e2e`.
+A pre-release checklist for the Safenet staking interface. It covers what the automated suites
+do not: a real wallet extension, WalletConnect, the Safe App, and a look at every screen.
 
-## Setup
+What is automated already:
 
-You'll need, on Sepolia (or whichever chain `VITE_CHAIN_ID` targets):
+- `pnpm --filter @cobuilders/safenet-web test:e2e` drives every screen with an injected test
+  wallet against a mocked RPC. The Safe App and WalletConnect are only smoke-tested there: inside
+  an iframe the Connect and Disconnect buttons are hidden and public data still renders, and
+  WalletConnect appears in the connector menu.
+- `pnpm --filter @cobuilders/safenet-web test:fork` sends approve and stake, a withdrawal, a
+  withdrawal claim and a reward claim to the real contracts on an Anvil Mainnet fork.
+- The compliance hooks, `useGeoblockCheck`, `useSanctionsCheck` and `useWalletSanctionsCheck`,
+  have unit tests in `src/hooks/__tests__/`.
 
-- A test wallet funded with Sepolia ETH for gas (any public faucet) and the Sepolia test SAFE
-  token (`0xef98bcc90b1373b2ae0d23ec318d3ee70ea61af4`, configured in `src/config/contracts.ts`).
-  Mint test tokens to your address via the admin panel's Token Operations section
-  (see "Admin Panel" in `CLAUDE.md`).
-- A validator address registered on the staking contract to delegate to — once connected,
-  any address shown on the Validators page for the environment under test works.
-- For rewards testing:
-  - **TODO — no testnet MerkleDrop contract exists yet.** One needs to be manually deployed
-    to Sepolia and its address set as `VITE_MERKLE_DROP_ADDRESS` before this can be tested.
-  - Generate a proof for your test address via `scripts/merkle-config.json` +
-    `yarn generate:proofs` (see "Merkle Proof Generation" in `CLAUDE.md`), then upload the
-    output files to a testing branch of the rewards data repo and point
-    `VITE_REWARDS_BASE_URL` at that branch.
-  - Set the Merkle root on-chain via the admin panel to match the root you just generated —
-    if it doesn't match, `useRewards` treats the proof as stale and silently disables the
-    Claim button (see `src/hooks/useRewards.ts`).
+## Where to test
 
-How to reach each connection mode:
+The interface targets Ethereum Mainnet only. There is no testnet deployment.
 
-- **Browser wallet**: open the app directly with MetaMask (or similar) installed.
-- **WalletConnect**: requires `VITE_WALLETCONNECT_PROJECT_ID` set (get one from
-  [WalletConnect Cloud](https://cloud.walletconnect.com) if you don't have one); open the app,
-  click Connect Wallet → WalletConnect, and pair with a mobile wallet (or a second desktop
-  wallet) by scanning the QR code / following the URI.
-- **Safe App**: open [Safe{Wallet}](https://app.safe.global), go to Apps → "My custom apps",
-  add the app URL — this works fine pointed at a local dev server (`yarn dev`) too — and open
-  it from inside the Safe.
+- **The manual QA fork**, for anything that sends a transaction. `pnpm fork:up` at the
+  repository root starts Anvil on a fork of Mainnet, gives a test account SAFE and a reward to
+  claim, and serves the interface for a browser and MetaMask. `pnpm fork:reset` returns to the
+  start; `pnpm fork:down` stops it. It needs Foundry and the archive `MAINNET_RPC_URL`. The guide,
+  with the MetaMask setup and the Claim & Stake walk-through, is
+  [`docs/manual-qa-fork.md`](../../docs/manual-qa-fork.md).
+- **A Mainnet build**, for read-only checks, WalletConnect pairing and the Safe App. Any
+  transaction there spends real SAFE and ETH.
+
+The connection modes:
+
+- **Browser Wallet**: MetaMask or another extension.
+- **WalletConnect**: needs `VITE_WALLETCONNECT_PROJECT_ID` in the build. Connect Wallet, then
+  WalletConnect, then pair a mobile wallet.
+- **Safe App**: see [Safe App](#safe-app).
+
+Note the transaction hash of everything you send, for debugging later.
 
 ## No wallet connected
 
-Without connecting anything, confirm:
+- [ ] Network Overview (`/`) renders every section: Data freshness, Headline figures, Stake
+      distribution, Rewards, Validators, Recent activity.
+- [ ] Each figure names its source, and Data freshness gives each subgraph's last indexed block
+      and age.
+- [ ] Dashboard (`/dashboard`) shows the total delegated; quick actions are hidden.
+- [ ] Validators (`/validators`) lists the validator cards with name, participation rate and
+      total stake, and states SEF's 75% participation rule as text.
+- [ ] A validator's detail page (`/validators/<address>`) shows its figures; an unknown address
+      shows not found.
+- [ ] Withdrawals (`/withdrawals`) asks to connect.
+- [ ] Rewards (`/rewards`) explains that a wallet is needed and still shows Programme and
+      Verifiability.
+- [ ] No button anywhere sends a transaction.
+- [ ] An unknown path shows the 404 page with a link back to the overview.
+- [ ] The theme toggle switches light and dark and survives a reload.
 
-- [ ] Total SAFE staked is visible on the dashboard
-- [ ] The active validators list is visible on the Validators page
-- [ ] Per-validator stats (name, participation rate, total stake) are visible
-- [ ] No delegate/undelegate/claim buttons or other transaction-triggering UI is present anywhere
+## Per connection mode
 
-## Per-connection-mode checklist
-
-Repeat this checklist once per connection mode. Note the tx hash for anything that submits a
-transaction, for easier debugging if something looks off later.
+On the manual QA fork for Browser Wallet. On a Mainnet build for WalletConnect and the Safe App,
+with an account you are willing to transact from.
 
 | # | Scenario | Browser Wallet | WalletConnect | Safe App |
 |---|---|---|---|---|
-| 1 | SAFE token balance is displayed | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
-| 2 | Staking (delegate) works | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
-| 3 | Initiating unstaking (undelegate) works | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
-| 4 | Withdrawing stake after the cooldown delay works | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
-| 5 | Overview of own stake per validator is displayed | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
-| 6 | Rewards: Claim button enabled and claiming works (address has rewards) | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
-| 7 | Rewards: Claim button disabled (address has no rewards) | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
+| 1 | The header shows the account and its SAFE balance | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
+| 2 | Dashboard: your stats and the quick actions appear | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
+| 3 | Delegate from a validator card: approve, then stake; Your Stake updates | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
+| 4 | Undelegate: the withdrawal appears in the queue with its cooldown | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
+| 5 | Withdrawals: Claim after the cooldown empties that entry | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
+| 6 | Validator detail: your delegation to that validator is shown | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
+| 7 | Rewards: Claim pays the available amount, and Your rewards and Programme update | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
+| 8 | Rewards: Claim & Stake runs Claim → Stake → Done; the stake amount starts at what the claim paid | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
+| 9 | Rewards: an address without rewards says so, with no Claim | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
 
-Notes / tx hashes:
+On the fork, row 5 needs the chain's clock moved past the cooldown. Anvil's clock starts at the
+pinned fork block, which is older than your computer's clock, and the interface times the
+cooldown by your computer's clock. So the page can offer Claim before the chain allows it, and a
+claim sent then reverts. After step 4, move the chain forward by at least the unstaking period
+the Undelegate dialog showed, in seconds, and mine a block. With `<rpc>` the MetaMask RPC URL
+`pnpm fork:up` printed, for a period of two days:
+
+```sh
+cast rpc evm_increaseTime 172860 --rpc-url <rpc>
+cast rpc evm_mine --rpc-url <rpc>
+```
+
+Then reload the Withdrawals page and claim. `cast` comes with Foundry, which the fork already
+needs. The fork suite moves the clock the same way, through `warp()` in `e2e/fork/chain.ts`.
+
+Notes and transaction hashes:
 
 ```
-(free-form notes per release go here)
+(free-form notes per release)
 ```
 
-## Edge cases
+## Staking details
 
-Check every release, alongside the table above:
+- [ ] `?delegate=<address>` on `/validators` opens the delegate dialog for that validator.
+- [ ] The 25%, 50%, 75% and MAX shortcuts fill the amount; Delegate stays disabled without one.
+- [ ] The dialog shows a gas estimate and the unstaking period.
+- [ ] With an allowance below the amount, both Approve exact amount and Approve unlimited unlock
+      Stake, each on a separate run.
+- [ ] Rejecting the wallet prompt shows an error and leaves the dialog usable.
+- [ ] A validator SEF lists as inactive reads Withdrawn, keeps its figures, and cannot be staked
+      with.
+- [ ] With two or more pending withdrawals, only the oldest has Claim; claiming it reveals the
+      next.
 
-- [ ] **Wrong network** (Browser Wallet / WalletConnect only — a Safe is pinned to one chain):
-  connect while on an unsupported chain, or switch networks mid-session. The header should
-  show a "Switch to {chain}" button and hide balance/actions until you switch back.
-  *(automated for Browser Wallet)*
-- [ ] **Both approval types**: with an allowance below the amount you're staking, try both
-  "Approve exact amount" and "Approve unlimited" (on separate occasions) and confirm each
-  correctly unlocks the Stake button afterwards. *(automated for Browser Wallet)*
-- [ ] **Atomic batching** (only if your wallet/Safe advertises EIP-5792 `atomicBatch` support):
-  delegating with insufficient allowance should collapse into a single "Stake" click (approve +
-  stake in one signature) instead of two separate steps; with 2+ withdrawals ready to claim, a
-  "Claim All (N)" button should appear on the Withdrawals page. *(automated — simulated wallet
-  capability, still worth a real check against an actual batching-capable wallet/Safe)*
-- [ ] **Rejected signature**: reject a signing request in the wallet (or close the Safe
-  confirmation popup) and confirm an error toast appears and the dialog is left in a usable
-  state (not stuck spinning). *(automated for Browser Wallet)*
-- [ ] **Safe multisig queueing** (Safe App only, needs a Safe with threshold ≥ 2): submitting a
-  transaction should show "sent to Safe Wallet for signing" rather than an immediate success
-  toast; after a second owner confirms and it executes, reloading the app should reflect the
-  updated state. *(manual-only, see Automation status)*
-- [ ] **FIFO withdrawal order**: with 2+ pending withdrawals, only the oldest should show a
-  Claim button; claiming it should reveal the next one. *(automated for Browser Wallet)*
-- [ ] **Partial-KYC rewards note**: for a test address whose reward proof has a `kycAmount`
-  greater than zero and `kyc` not `true`, confirm the "pending compliance checks" banner shows
-  on the dashboard (this is independent of whether the Claim button itself is enabled).
-  *(automated for Browser Wallet)*
-- [ ] **Compliance gates**, only if configured in the environment under test: a sanctioned
-  wallet address is denied access after connecting, and (if `VITE_SANCTIONS_API_URL` /
-  geoblocking are set) the app is blocked entirely from a restricted IP/country. *(the
-  underlying hooks are unit-tested — `useSanctionsCheck`, `useGeoblockCheck`,
-  `useWalletSanctionsCheck` — this row is manual-only at the e2e level)*
+## Claim & Stake
 
-## Automation status
+Follow the walk-through and the abandon path in
+[`docs/manual-qa-fork.md`](../../docs/manual-qa-fork.md). Also:
 
-- **Browser wallet**: rows 1–7 and all edge cases except Safe multisig queueing and compliance
-  gates are automated (`e2e/tests/wallet-connection.spec.ts`, `delegation.spec.ts`,
-  `undelegation.spec.ts`, `withdrawals.spec.ts`, `rewards.spec.ts`). Withdrawal cooldown and
-  EIP-5792 wallet capabilities are simulated (mocked timestamps / mocked
-  `wallet_getCapabilities`), not exercised against a real batching-capable wallet.
-- **Safe App**: only smoke-tested (`e2e/tests/safe-app.spec.ts` — Connect/Disconnect UI is
-  correctly hidden inside an iframe, public data still renders). Rows 1–7 and the Safe multisig
-  queueing edge case are manual-only: a full postMessage-protocol simulation of the Safe Apps
-  SDK was scoped out as not worth the effort relative to just running this checklist by hand.
-- **WalletConnect**: only smoke-tested (`e2e/tests/wallet-connection.spec.ts` — the connector
-  option appears in the menu). Real pairing requires a live relay/wallet and can't be
-  automated; rows 1–7 are manual-only.
+- [ ] Lowering the amount on the Stake step stakes less and leaves the rest in the wallet.
+- [ ] With an allowance that already covers the amount, the Stake step skips approval.
+- [ ] After a claim, closing the dialog warns that the SAFE is in the wallet and not staked.
+- [ ] Once nothing is left to claim, the action reads Stake your balance.
+- [ ] Verifiability names the MerkleDrop contract, the source of `latest.json`, and whether the
+      root on chain matches SEF's published root.
+
+## Restricted and wrong-network states
+
+- [ ] **Wrong network**, Browser Wallet and WalletConnect: connect on another chain, or switch
+      chains during the session. The header shows "Switch to Ethereum", the actions are blocked,
+      and Rewards says why Claim is unavailable. Switching back restores them.
+- [ ] **Access Restricted**, the country check: block requests to the two country lookup
+      services named in `src/hooks/useGeoblockCheck.ts` in the browser's developer tools, clear
+      the `geoblock_check` key in `localStorage`, and reload. The check fails closed, so the app
+      shows Access Restricted. Remove the block and the key, and reload: the app returns.
+- [ ] **Access Restricted**, the sanctions endpoint, only for a build with
+      `VITE_SANCTIONS_API_URL`: the app opens when the endpoint allows the visitor. A 403 or a
+      failed request shows Access Restricted.
+- [ ] **Wallet Restricted** needs an address the sanctions oracle in `packages/core` lists, so it
+      is left to the unit tests. A connected test address must not see it.
+
+## Safe App
+
+The Safe App entry point, the URL to add in Safe{Wallet}, is published with each release. A
+local `pnpm --filter @cobuilders/safenet-web dev` or `preview` server is configured to be framed
+by Safe{Wallet} as well: `vite.config.ts` sends the CORS, private-network and `frame-ancestors`
+headers for it.
+
+- [ ] In Safe{Wallet}, on Ethereum, add the entry point as a custom Safe App. Safe{Wallet} reads
+      the manifest and shows the name, description and icon in `apps/web/public/manifest.json`.
+- [ ] Open the app from the Safe. It connects through the Safe connector by itself: no Connect
+      Wallet button, no connector menu, and the header shows the Safe's address.
+- [ ] Public data renders inside the iframe, as outside it.
+- [ ] Delegate with an allowance below the amount. A Safe that supports atomic batching proposes
+      approve and stake as one transaction.
+- [ ] With a threshold of two or more, a submitted transaction shows a toast that it was sent to
+      Safe{Wallet} for signing, not a success. After the other owners confirm and it executes, a
+      reload shows the new state.
+- [ ] Claim & Stake inside a Safe: when the claim is queued, the dialog says so and tells the
+      user to come back to Stake your balance once it executes.
+- [ ] With two or more withdrawals ready, Withdrawals offers Claim All.
