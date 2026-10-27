@@ -139,7 +139,7 @@ export function ValidatorCard({
         <div className="flex flex-1 min-h-0">
           {/* Left column — Commission */}
           <div className="flex-1 flex flex-col gap-1 px-6 py-4">
-            <span className="text-base font-heading text-faint leading-none flex items-center gap-1">
+            <span className="text-base font-heading text-faint leading-none">
               <Term term="commission">Commission</Term>:
             </span>
             <span className={`text-xl font-mono leading-none uppercase ${valueColor}`}>
