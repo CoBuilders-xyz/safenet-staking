@@ -35,6 +35,18 @@ test("SAFENET_MCP_RPC_URL is taken when set; GITHUB_TOKEN, else GH_TOKEN", () =>
   refused({ SAFENET_MCP_RPC_URL: "ws://rpc.invalid/key" }, /^SAFENET_MCP_RPC_URL must be an http or https URL$/)
 })
 
+test("the compliance gates are settings: off by default, the endpoint an http or https URL, the geo check 1 or 0", () => {
+  assert.deepEqual(readConfig({}).compliance, { sanctionsEndpoint: null, geoCheck: false })
+  assert.deepEqual(
+    readConfig({ SAFENET_MCP_SANCTIONS_ENDPOINT: "https://sanctions.invalid/check", SAFENET_MCP_GEO_CHECK: "1" }).compliance,
+    { sanctionsEndpoint: "https://sanctions.invalid/check", geoCheck: true },
+  )
+  assert.equal(readConfig({ SAFENET_MCP_GEO_CHECK: "0" }).compliance.geoCheck, false)
+  // The value is not repeated: it may be a key typed where the URL belongs.
+  refused({ SAFENET_MCP_SANCTIONS_ENDPOINT: "Hunter2_not_a_url" }, /^SAFENET_MCP_SANCTIONS_ENDPOINT must be an http or https URL$/)
+  refused({ SAFENET_MCP_GEO_CHECK: "yes" }, /^SAFENET_MCP_GEO_CHECK takes 1 to refuse writes from a blocked country, or 0 or nothing to skip the check$/)
+})
+
 test("writes are allowed only with SAFENET_MCP_ALLOW_WRITES=1 and a signer", () => {
   const key = { SAFENET_MCP_PRIVATE_KEY_ENV: "SAFENET_TEST_KEY", SAFENET_TEST_KEY: TEST_KEY }
   assert.deepEqual(readConfig({ SAFENET_MCP_ALLOW_WRITES: "1", ...key }).writes, {

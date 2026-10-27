@@ -211,14 +211,14 @@ export function createServer(config: ServerConfig, deps: Dependencies): Server {
     }
 
     // The gates run in both: a refusal stops the dry run, and a live run reads them again.
-    const dryRun: WriteResultBase = await tool.run(deps.lib, context(), dryMode, args, { compliance: request.compliance })
+    const dryRun: WriteResultBase = await tool.run(deps.lib, context(), dryMode, args, { compliance: config.compliance })
     let execution: WriteResultBase | null = null
     if (signer) {
       const live: WriteMode = { dryRun: false, signer }
       execution = await exclusive(() =>
         tool.run(deps.lib, context(), live, args, {
           onProgress: (e) => deps.log(progressLine(tool.name, e)),
-          compliance: request.compliance,
+          compliance: config.compliance,
         }),
       )
     }

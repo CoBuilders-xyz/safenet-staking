@@ -337,21 +337,42 @@ test("the rewards_history summary says how many periods the subgraph gave, and w
 
 // --- compliance gates --------------------------------------------------------------------
 
-test("sanctionsEndpoint and geoCheck reach the library's write options, for the dry run and the live run", async () => {
-  const gates = { sanctionsEndpoint: "https://sanctions.invalid/check", geoCheck: true }
+/** WRITES_ON's settings, plus both opt-in gates. */
+const GATES_ON = readConfig({
+  SAFENET_MCP_ALLOW_WRITES: "1",
+  SAFENET_MCP_PRIVATE_KEY_ENV: "SAFENET_TEST_KEY",
+  SAFENET_TEST_KEY: "set",
+  SAFENET_MCP_SANCTIONS_ENDPOINT: "https://sanctions.invalid/check",
+  SAFENET_MCP_GEO_CHECK: "1",
+})
+
+test("the operator's gate settings reach the library's write options, for the dry run and the live run", async () => {
   for (const [name, args] of WRITES) {
     const fake = fakeLibrary()
     const trip = tripwire()
-    const s = await connect(WRITES_ON, { fake, trip })
+    const s = await connect(GATES_ON, { fake, trip })
     // The tripwire signer refuses the live send, after the library was called with its options.
-    const r = await s.call(name, { ...args, ...gates, dryRun: false })
+    const r = await s.call(name, { ...args, dryRun: false })
     assert.equal(textOf(r), "the signer was reached.", name)
     const writes = fake.calls.filter((c) => c.fn !== "createContext")
     assert.equal(writes.length, 2, name)
     for (const call of writes) {
       const options = call.args.at(-1) as { compliance: unknown }
-      assert.deepEqual(options.compliance, gates, name)
+      assert.deepEqual(options.compliance, { sanctionsEndpoint: "https://sanctions.invalid/check", geoCheck: true }, name)
     }
+    await s.close()
+  }
+})
+
+test("a tool call cannot set or skip a gate: a gate argument is refused as unknown, and not repeated", async () => {
+  for (const extra of [{ sanctionsEndpoint: "https://user:key@internal.invalid/" }, { geoCheck: false }]) {
+    const fake = fakeLibrary()
+    const s = await connect(WRITES_OFF, { fake })
+    const r = await s.call("stake", { validator: VALIDATOR, amount: "1", from: STAKER, ...extra })
+    assert.equal(r.isError, true)
+    assert.match(textOf(r), /^stake got 1 argument it does not take; it takes validator, amount, approve, dryRun, from/)
+    assert.doesNotMatch(textOf(r), /internal\.invalid|user:key|sanctionsEndpoint|geoCheck/)
+    assert.deepEqual(fake.calls.filter((c) => c.fn !== "createContext"), [], "the library was called")
     await s.close()
   }
 })
@@ -364,10 +385,11 @@ test("a refused gate is a tool error: one sentence, and the report as structured
   const refuse = async () => {
     throw new ComplianceRefusal(report as never)
   }
+  const config = readConfig({ SAFENET_MCP_SANCTIONS_ENDPOINT: "https://user:key@sanctions.invalid/check" })
   for (const [name, args] of WRITES) {
     const fake = fakeLibrary({ stake: refuse, unstake: refuse, claimWithdrawals: refuse, claimRewards: refuse, claimAndStake: refuse })
-    const s = await connect(WRITES_OFF, { fake })
-    const r = await s.call(name, { ...args, from: STAKER, sanctionsEndpoint: "https://user:key@sanctions.invalid/check" })
+    const s = await connect(config, { fake })
+    const r = await s.call(name, { ...args, from: STAKER })
     assert.equal(r.isError, true, name)
     assert.equal(textOf(r),
       `A compliance gate refused ${STAKER}, so nothing was signed or sent: sanctions oracle: the address is on the sanctions list.`)
@@ -378,13 +400,4 @@ test("a refused gate is a tool error: one sentence, and the report as structured
     assert.doesNotMatch(JSON.stringify(r), /sanctions\.invalid|user:key/)
     await s.close()
   }
-})
-
-test("sanctionsEndpoint takes an http or https URL, and a wrong value is not repeated", async () => {
-  const s = await connect(WRITES_OFF)
-  const r = await s.call("stake", { validator: VALIDATOR, amount: "1", from: STAKER, sanctionsEndpoint: "Hunter2_not_a_url" })
-  assert.equal(r.isError, true)
-  assert.match(textOf(r), /sanctionsEndpoint must be an http or https URL/)
-  assert.doesNotMatch(textOf(r), /Hunter2/)
-  await s.close()
 })

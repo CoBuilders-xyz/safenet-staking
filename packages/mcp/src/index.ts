@@ -32,6 +32,12 @@ const rpc = config.rpcUrl
     : "the public list"
 for (const notice of config.notices) log(notice)
 log(`RPC from ${rpc}; writes ${config.writes.allowed ? "allowed" : "off, every write is a dry run"}.`)
+// Which gates every write passes; the endpoint is named by its setting, never by its URL.
+log(
+  "compliance gates on every write: the sanctions oracle; " +
+    `the sanctions endpoint ${config.compliance.sanctionsEndpoint ? "in SAFENET_MCP_SANCTIONS_ENDPOINT" : "not set"}; ` +
+    `the geo check ${config.compliance.geoCheck ? "on" : "off"}.`,
+)
 
 const server = createServer(config, { lib: library, loadSigner: signerLoader(process.env), log })
 await server.connect(new StdioServerTransport())

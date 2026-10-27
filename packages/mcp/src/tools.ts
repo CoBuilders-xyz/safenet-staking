@@ -10,7 +10,7 @@ import { getAddress, isAddress, parseUnits, type Address } from "viem"
 import { z } from "zod"
 import {
   DEFAULT_HISTORY_LIMIT,
-  type ApprovalKind, type ComplianceOptions, type Context, type NetworkWithdrawals, type StakerWithdrawals,
+  type ApprovalKind, type Context, type NetworkWithdrawals, type StakerWithdrawals,
   type WriteMode, type WriteOptions, type WriteResultBase,
 } from "@cobuilders/safenet-cli/lib"
 import type { Library } from "./library.js"
@@ -60,24 +60,6 @@ const writeArgs = {
     "from",
     "The address a dry run simulates from. Required when the server has no signer; when it has one, it must be the signer's address",
   ).optional(),
-  sanctionsEndpoint: z
-    .string()
-    .refine(
-      (s) => {
-        try {
-          return ["http:", "https:"].includes(new URL(s).protocol)
-        } catch {
-          return false
-        }
-      },
-      { error: "sanctionsEndpoint must be an http or https URL" },
-    )
-    .optional()
-    .describe(
-      "Also GET this URL before signing, dry runs included, and refuse when it answers 403 or fails. " +
-        "The sanctions oracle on chain is always read, whatever this says.",
-    ),
-  geoCheck: flag("Also refuse when the server's IP address is in a country the web interface blocks"),
 }
 
 export type Kind = "read" | "write"
@@ -102,20 +84,11 @@ export interface ReadTool<S extends z.ZodType = z.ZodType, R = unknown> extends 
 export interface WriteRequest {
   readonly dryRun: boolean
   readonly from: Address | undefined
-  readonly sanctionsEndpoint?: string | undefined
-  readonly geoCheck?: boolean | undefined
-}
-
-/** What a write request asks of the compliance gates. */
-export interface WriteGates {
-  readonly dryRun: boolean
-  readonly from: Address | undefined
-  readonly compliance: ComplianceOptions
 }
 
 export interface WriteTool<S extends z.ZodType = z.ZodType> extends BaseTool<S> {
   readonly kind: "write"
-  readonly request: (args: z.output<S>) => WriteGates
+  readonly request: (args: z.output<S>) => WriteRequest
   readonly run: (lib: Library, ctx: Context, mode: WriteMode, args: z.output<S>, options: WriteOptions) => Promise<WriteResultBase>
 }
 
@@ -127,11 +100,7 @@ const write = <S extends z.ZodType>(tool: Omit<WriteTool<S>, "kind" | "request">
   ({
     ...tool,
     kind: "write",
-    request: (args: WriteRequest) => ({
-      dryRun: args.dryRun,
-      from: args.from,
-      compliance: { sanctionsEndpoint: args.sanctionsEndpoint ?? null, geoCheck: args.geoCheck ?? false },
-    }),
+    request: (args: WriteRequest) => ({ dryRun: args.dryRun, from: args.from }),
   }) as unknown as Tool
 
 const validatorArg = address("validator", "The validator's address")
