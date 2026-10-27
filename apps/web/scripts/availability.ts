@@ -21,6 +21,7 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { IPFS_GATEWAYS } from "@cobuilders/safenet-core"
 import {
+  annotation,
   checkGateway,
   checkProduction,
   latestDeployment,
@@ -54,7 +55,10 @@ const outcomes: Outcome[] = [
   ...(release ? await Promise.all(IPFS_GATEWAYS.map((g) => checkGateway(fetch, g, release.cid, title))) : []),
 ]
 
-for (const { target, ok, detail } of outcomes) console.log(`${ok ? "OK  " : "FAIL"} ${target}: ${detail}`)
+for (const outcome of outcomes) {
+  const { target, ok, detail } = outcome
+  console.log(process.env.GITHUB_ACTIONS === "true" ? annotation(outcome) : `${ok ? "OK  " : "FAIL"} ${target}: ${detail}`)
+}
 if (!release) console.log("IPFS: not checked. No release is recorded in deployments.json.")
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary(outcomes, release))
 

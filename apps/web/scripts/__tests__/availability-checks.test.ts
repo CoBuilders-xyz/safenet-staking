@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process"
 import { resolve } from "node:path"
 import { describe, it, expect } from "vitest"
 import {
+  annotation,
   checkGateway,
   checkProduction,
   entryAsset,
@@ -193,6 +194,19 @@ describe("checkGateway", () => {
       ok: false,
       detail: "no answer in 60 s",
     })
+  })
+})
+
+describe("annotation", () => {
+  it("is a notice for a pass and an error for a failure", () => {
+    expect(annotation({ target: "production", ok: true, detail: "fine" })).toBe("::notice title=Availability%3A production::fine")
+    expect(annotation({ target: "production", ok: false, detail: "down" })).toBe("::error title=Availability%3A production::down")
+  })
+
+  it("escapes what the runner would read as syntax", () => {
+    expect(annotation({ target: "https://gw.example.test", ok: false, detail: "50% done\nnext" })).toBe(
+      "::error title=Availability%3A https%3A//gw.example.test::50%25 done%0Anext",
+    )
   })
 })
 

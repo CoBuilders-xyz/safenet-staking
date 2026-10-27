@@ -132,6 +132,18 @@ export async function checkGateway(fetchImpl: Fetch, gateway: string, cid: strin
     : { target, ok: false, detail: `index.html of ${cid} has the title ${served === undefined ? "missing" : `"${served}"`}` }
 }
 
+/**
+ * A GitHub Actions workflow command for one outcome: a notice when it passed, an error when it
+ * failed, so each shows as an annotation on the run. `%`, CR and LF are escaped as the runner
+ * expects.
+ */
+export function annotation({ target, ok, detail }: Outcome): string {
+  const escape = (text: string) => text.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A")
+  // A property value also ends at `:` or `,`.
+  const title = escape(`Availability: ${target}`).replace(/:/g, "%3A").replace(/,/g, "%2C")
+  return `::${ok ? "notice" : "error"} title=${title}::${escape(detail)}`
+}
+
 /** The job summary: one row per outcome, and a line when no release is recorded. */
 export function summary(outcomes: readonly Outcome[], release: Deployment | undefined): string {
   const escape = (text: string) => text.replace(/\|/g, "\\|")
