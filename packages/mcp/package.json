@@ -36,6 +36,7 @@
     "build": "tsup",
     "start": "node --conditions=source --env-file-if-exists=../../.env.local --import tsx src/index.ts",
     "test": "NODE_OPTIONS=--conditions=source node ../../tools/run-node-tests.mjs src",
+    "test:coverage": "NODE_OPTIONS=--conditions=source node ../../tools/run-node-tests.mjs --skip=src/smoke --unmeasured=src/index.ts --unmeasured=src/library.ts --coverage-lines=80 src",
     "test:smoke": "NODE_OPTIONS=--conditions=source node --env-file-if-exists=../../.env.local ../../tools/run-node-tests.mjs src/smoke",
     "client": "node --conditions=source --env-file-if-exists=../../.env.local --import tsx scripts/client.ts",
     "check": "pnpm lint && tsc --noEmit",

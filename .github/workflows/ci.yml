@@ -63,6 +63,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: pnpm test
+      # Line coverage of the CLI and the MCP server, at least 80 percent each, without the smoke
+      # and fork suites, which need Mainnet. tools/run-node-tests.mjs explains the measurement.
+      - name: Coverage of the CLI and the MCP server
+        run: pnpm test:coverage
 
   e2e:
     name: e2e
