@@ -1,0 +1,40 @@
+name: Page on red
+
+# Called as the last job of a scheduled workflow when one of its jobs failed. Opens one issue per
+# workflow, labelled ci-red, or comments on the open one, with the run link and the jobs that
+# failed. It never closes an issue. tools/page-on-red.mjs does the work; its header says why.
+#
+# The caller passes its `needs` context, which names the failed jobs, and grants
+# `issues: write`. The github context here is the caller's, so the issue carries the caller's
+# workflow name and run.
+
+on:
+  workflow_call:
+    inputs:
+      needs:
+        description: The caller's needs context, as JSON
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  page:
+    name: page
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # Pin actions to full SHA: mutable tags can be moved to malicious code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Open or update the ci-red issue
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          NEEDS_JSON: ${{ inputs.needs }}
+        run: node tools/page-on-red.mjs

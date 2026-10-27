@@ -103,6 +103,8 @@ The release build reads none of this. It reads [`build.env`](build.env) only; se
 | `test:e2e` | Playwright against mocked RPC, `e2e/tests/` |
 | `test:e2e:ui`, `test:e2e:headed` | The same suite in Playwright's UI, or in a visible browser |
 | `test:fork` | Playwright against the real contracts on an Anvil Mainnet fork, `e2e/fork/`; see [Fork suite](#fork-suite) |
+| `test:smoke:web` | Playwright against the production deployment at `PRODUCTION_URL`, `e2e/smoke/`; see [Production smoke suite](#production-smoke-suite) |
+| `availability` | Checks that the production deployment, and the gateways for the latest release in the root `deployments.json`, serve the interface; needs `PRODUCTION_URL` |
 | `fork:up`, `fork:reset`, `fork:down` | The manual QA fork for Claim & Stake; see [`docs/manual-qa-fork.md`](../../docs/manual-qa-fork.md) |
 | `codegen` | Regenerates the typed GraphQL in `src/graphql/<chain>/generated.ts` from each subgraph package's `schema.graphql` |
 | `codegen:check` | Fails when the committed GraphQL types differ from a fresh `codegen` |
@@ -111,7 +113,7 @@ The release build reads none of this. It reads [`build.env`](build.env) only; se
 | `release:build` | The reproducible production build from `build.env`, packed into `release/app.car` with its root CID in `release/CID`; see [Deployment](#deployment) |
 | `release:pin` | Pins `release/app.car` to Pinata and checks that the gateways serve it |
 
-The root also has `pnpm test:e2e`, `pnpm test:fork`, `pnpm fork:up`, `pnpm fork:reset` and
+The root also has `pnpm test:e2e`, `pnpm test:fork`, `pnpm test:smoke:web`, `pnpm fork:up`, `pnpm fork:reset` and
 `pnpm fork:down`, which run the same scripts.
 
 See [`MANUAL_TESTING.md`](./MANUAL_TESTING.md) for the pre-release manual checklist.
@@ -124,9 +126,13 @@ See [`MANUAL_TESTING.md`](./MANUAL_TESTING.md) for the pre-release manual checkl
   own Vite on `E2E_PORT` (5174 without `.env.ports`), and outside CI reuses a server already
   listening there. An injected test wallet answers from a mocked RPC, and the subgraphs, SEF's
   files and the gateways are mocked too, so the suite needs no network and no secret. It proves
-  the interface behaves, not that a transaction works. The Safe App and WalletConnect are only
-  smoke-tested there.
+  the interface behaves, not that a transaction works. WalletConnect is only smoke-tested there.
+  For the Safe App, one test frames the app from another origin under a parent that answers the
+  Safe Apps SDK's `getSafeInfo` request, and checks that the app connects the Safe connector to
+  the address the parent names. It proves the app's side of the handshake, not that Safe{Wallet}
+  answers the same way, and no transaction goes through a Safe.
 - **Fork**: below.
+- **Production smoke**: below.
 
 ### Fork suite
 
@@ -158,6 +164,29 @@ pnpm --filter @cobuilders/safenet-web test:fork
   while the suite runs.
 
 CI runs it nightly, not on pull requests, because every run reads from the archive node.
+
+### Production smoke suite
+
+`pnpm test:smoke:web`, from the root or here, opens the production deployment as a visitor
+without a wallet sees it. Nothing is mocked: every figure comes from the RPC, the subgraphs and
+SEF's files the deployment reads.
+
+```bash
+PRODUCTION_URL=<the production deployment> pnpm --filter @cobuilders/safenet-web test:smoke:web
+```
+
+It checks that the index answers with the title, that the Overview shows a total staked figure
+and not "Unavailable", that the validators list shows at least one validator, that the Rewards
+page shows the Programme section without its load error, and that `manifest.json` carries `name`,
+`description` and an `iconPath` that answers as an image.
+
+- **Needs** `PRODUCTION_URL`. It has no default, because it is deployment configuration, not a
+  constant: in GitHub Actions it is a repository variable. The suite fails with a message when
+  it is unset.
+- **Proves** that the deployment works today for a reader. It sends no transaction.
+
+CI runs it nightly in `nightly.yml`, job `web-smoke`, and alone through a manual run of the
+Nightly workflow with `suite: web-smoke`.
 
 ## Tech stack
 
@@ -320,7 +349,9 @@ secret. Its pin job takes the two Pinata secrets and runs only from `main` or a 
 
 ### Safe App
 
-`public/manifest.json` is the Safe App manifest: name, description and icons. The dev and
+`public/manifest.json` is the Safe App manifest. Safe{Wallet} reads `name`, `description` and
+`iconPath`, a path relative to the app; the `icons` array and the other fields serve browsers
+installing the app as a PWA. The dev and
 preview servers send the CORS headers Safe{Wallet} needs to read it, and a
 `frame-ancestors` policy that lets Safe{Wallet} frame the app (`vite.config.ts`). Wherever the app
 is served, Safe{Wallet} must be able to read the manifest. In Safe{Wallet}, add the app's URL as

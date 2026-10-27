@@ -6,10 +6,16 @@ the `safenet` command-line interface, and an MCP server that gives an AI client 
 They share one package of constants, so every address, start block and ABI is written once.
 
 [![Parity with SEF](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml/badge.svg)](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml)
+[![Availability](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/availability.yml/badge.svg)](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/availability.yml)
 
 Each day, the Studio deployments named in `packages/core/src/subgraphs.ts` are compared with
 SEF's published figures at their publish instant: the Mainnet staked total to the wei, and each
 validator's Gnosis participation rate as the identical double.
+
+Every six hours, the production deployment is checked: it answers with the interface's title and
+serves the entry script of its build. Once a release is recorded in `deployments.json`, each
+public IPFS gateway in `packages/core` must also serve it. A red run of the nightly, parity or
+availability workflow opens an issue labelled `ci-red`, or comments on the open one.
 
 ## Layout
 
@@ -93,6 +99,26 @@ and compare. [`VERIFY.md`](VERIFY.md) has the exact commands.
 pnpm --filter @cobuilders/safenet-web release:build   # writes apps/web/release/CID and app.car
 pnpm --filter @cobuilders/safenet-web release:pin     # needs PINATA_JWT and PINATA_GATEWAY
 ```
+
+### deployments.json
+
+`deployments.json` at the repository root records each pinned release, so the availability check
+knows which CID the gateways must serve. It is a JSON array, one object per release:
+
+```json
+[
+  { "cid": "bafy…", "tag": "v1.0.0", "pinnedAt": "2026-11-02T10:00:00Z" }
+]
+```
+
+- `cid`: the root CID that `release:build` wrote to `apps/web/release/CID` and Pinata confirmed.
+- `tag`: the git tag of the release, or the ref of a manual run.
+- `pinnedAt`: when the pin was confirmed, ISO 8601.
+
+The check reads the entry with the latest `pinnedAt`, not the last one in the file, and fails
+when an entry lacks a field or `pinnedAt` is not a date. Without the file, it checks the gateways
+for nothing and says so in its summary. No release has been pinned yet, so the file does not
+exist.
 
 ## License
 

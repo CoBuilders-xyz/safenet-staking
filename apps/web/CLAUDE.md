@@ -20,6 +20,11 @@ as `pnpm <script>` from `apps/web`.
   which `pnpm bootstrap` also runs.
 - **E2E, Anvil fork:** `test:fork` (Playwright, `e2e/fork/`). Needs `anvil` and the archive
   `MAINNET_RPC_URL`.
+- **Production smoke:** `test:smoke:web` (Playwright, `e2e/smoke/`), against `PRODUCTION_URL`,
+  no wallet, no mocks. Fails when `PRODUCTION_URL` is unset.
+- **Availability:** `availability` (`scripts/availability.ts`): production answers with the title
+  and serves its entry script; with a root `deployments.json`, each gateway in core serves the
+  latest release. Needs `PRODUCTION_URL`.
 - **GraphQL types:** `codegen` regenerates them; `codegen:live-check` validates the documents
   against a running graph-node
 - **Reward proofs:** `generate:proofs [--out <dir>]` reads `scripts/merkle-config.json` and writes
@@ -229,7 +234,10 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
 - `scripts/release.ts`, `scripts/release-pin.ts`, `scripts/release-gateways.ts`: the IPFS
   release behind `release:build` and `release:pin`. `build.env` is the release build's only env
   input; it is public and holds no secret.
-- `scripts/__tests__/`: Vitest tests for the tree and the generator.
+- `scripts/availability.ts`, `scripts/availability-checks.ts`: `availability`. The checks take
+  `fetch` as an argument, so each branch is unit-tested.
+- `scripts/__tests__/`: Vitest tests for the tree, the generator, the release gateways and the
+  availability checks.
 
 To use generated proofs, serve the output and point `VITE_REWARDS_BASE_URL` at it, then set the
 MerkleDrop's root. This repository sets a root only on an Anvil fork.
@@ -239,10 +247,12 @@ MerkleDrop's root. This repository sets a root only on an Anvil fork.
 - `src/**/__tests__/`: Vitest with jsdom. `src/__tests__/` holds the wagmi mock, the setup and
   shared test data.
 - `e2e/tests/`: Playwright against a mocked RPC, mocked subgraphs, mocked SEF files and mocked
-  gateways (`e2e/mocks/`, `e2e/fixtures/`). Page objects in `e2e/pages/`. The Safe App and
-  WalletConnect are only smoke-tested.
-- `e2e/fork/`: Playwright against Anvil. `e2e/playwright.config.ts` switches suites on
-  `E2E_SUITE=fork`, which `test:fork` sets.
+  gateways (`e2e/mocks/`, `e2e/fixtures/`). Page objects in `e2e/pages/`. WalletConnect is
+  only smoke-tested. `safe-app.spec.ts` frames the app from another origin under a stand-in parent
+  that answers `getSafeInfo`, and checks that the Safe connector connects; no real Safe is involved.
+- `e2e/fork/`: Playwright against Anvil. `e2e/smoke/`: Playwright against production.
+  `e2e/playwright.config.ts` switches suites on `E2E_SUITE`, `fork` or `smoke`, which `test:fork`
+  and `test:smoke:web` set.
 
 Ports come from `.env.ports` at the repository root: `E2E_PORT`, `FORK_PORT`, `ANVIL_PORT`
 (`e2e/ports.ts`). Without the file, 5174, 5178 and 8545.
