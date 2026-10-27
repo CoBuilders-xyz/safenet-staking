@@ -166,3 +166,7 @@ binary for Linux x64, macOS arm64 and Windows x64, runs each alone against Mainn
 `SHA256SUMS`, verifies all three individual build sums, and attaches them to the GitHub Release
 of a `cli-v<version>` tag. CLI, core, lockfile and runtime changes trigger the platform checks.
 Physical wallet acceptance and a rerun against the final integrated CLI remain release requirements.
+
+`.github/workflows/publish.yml` publishes the package on a tag `cli-v<version>`, after the packed
+tarball, installed outside the monorepo, runs `safenet --help` and `safenet status --json` against
+Mainnet. The root `CLAUDE.md` describes the workflow.

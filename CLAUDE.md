@@ -172,6 +172,16 @@ is empty, and writes `SHA256SUMS`. On a tag `cli-v<version>`, whose version must
 and not 0.0.0, its `release` job, the only one with `contents: write`, attaches them to the tag's
 GitHub Release. On a pull request that changes the build, and by hand, it stops before that job.
 
+`publish.yml` publishes `packages/cli` on a tag `cli-v<version>` and `packages/mcp` on a tag
+`mcp-v<version>`, or one of them by hand. Its `pack` job receives no secret: it runs the package's
+unit tests, builds and packs it. Its `check` job installs the tarball outside the monorepo and runs
+`tools/check-installed-package.mjs` against Mainnet with `MAINNET_RPC_URL`. Its `publish` job sends
+that same tarball with `pnpm publish --provenance --access public` and `NPM_TOKEN`, and fails
+when the token is empty. It refuses version 0.0.0, a tag whose version differs from the package's,
+a dispatch that publishes from a branch other than `main`, and a private repository, from which
+npm does not publish with provenance. A dispatch with `publish` off, and every pull request that
+changes the workflow or the check, stop before the `publish` job.
+
 ## What happens when you edit
 
 `.claude/settings.json` runs `tools/hook-check.mjs` after every Edit or Write. For a TypeScript

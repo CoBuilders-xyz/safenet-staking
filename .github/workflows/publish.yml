@@ -1,0 +1,253 @@
+name: Publish
+
+# Publishes @cobuilders/safenet-cli or @cobuilders/safenet-mcp to npm. The package is built and
+# packed once; the tarball is installed outside the monorepo and run against Mainnet; and the
+# publish step sends that same tarball, with provenance.
+#
+#   tag cli-v<version> or mcp-v<version>   publishes; the tag's version must be package.json's
+#   workflow_dispatch                      one package; publish off stops before publishing
+#   pull_request changing this workflow    both packages, never published
+#
+# Version 0.0.0 is never published. A dispatch publishes from main only.
+
+on:
+  push:
+    tags: ["cli-v*", "mcp-v*"]
+  workflow_dispatch:
+    inputs:
+      package:
+        description: The package to publish
+        required: true
+        type: choice
+        options: [cli, mcp]
+      publish:
+        description: Publish to npm. Off builds, packs and checks the installed tarball, then stops.
+        type: boolean
+        default: true
+  pull_request:
+    paths:
+      - .github/workflows/publish.yml
+      - tools/check-installed-package.mjs
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      packages: ${{ steps.plan.outputs.packages }}
+      publish: ${{ steps.plan.outputs.publish }}
+      tag-version: ${{ steps.plan.outputs.tag-version }}
+    steps:
+      - name: Choose the packages and whether to publish
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_PACKAGE: ${{ inputs.package }}
+          INPUT_PUBLISH: ${{ inputs.publish }}
+          PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          tag_version=""
+          case "$EVENT" in
+            push)
+              packages="[\"${REF_NAME%%-v*}\"]"
+              tag_version="${REF_NAME#*-v}"
+              publish=true ;;
+            workflow_dispatch)
+              packages="[\"$INPUT_PACKAGE\"]"
+              publish="$INPUT_PUBLISH"
+              if [ "$publish" = true ] && [ "$REF" != refs/heads/main ]; then
+                echo "::error::A dispatch publishes from main only, and this run is on $REF. Run it with publish off to check a branch."
+                exit 1
+              fi ;;
+            *)
+              packages='["cli","mcp"]'
+              publish=false ;;
+          esac
+          # npm signs provenance only for a public source repository.
+          if [ "$publish" = true ] && [ "$PRIVATE" = true ]; then
+            echo "::error::npm does not publish with provenance from a private repository. Make the repository public first, or run with publish off."
+            exit 1
+          fi
+          {
+            echo "packages=$packages"
+            echo "publish=$publish"
+            echo "tag-version=$tag_version"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "## Publish"
+            echo ""
+            echo "Trigger: $EVENT on $REF. Packages: $packages."
+            if [ "$publish" = true ]; then
+              echo "Publish: on, after the installed tarball passes its checks."
+            else
+              echo "Publish: off. The run stops after the installed tarball is checked; nothing is published."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  pack:
+    name: pack ${{ matrix.package }}
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.packages) }}
+    # No secret reaches this job, so none can reach the tarball it packs.
+    steps:
+      # Pin actions to full SHA: mutable tags can be moved to malicious code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          # No dependency cache: a cache written by another workflow could feed the build that
+          # becomes the published package.
+          package-manager-cache: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Check the version
+        env:
+          PACKAGE: ${{ matrix.package }}
+          PUBLISH: ${{ needs.plan.outputs.publish }}
+          TAG_VERSION: ${{ needs.plan.outputs.tag-version }}
+        run: |
+          version="$(node -p "require('./packages/$PACKAGE/package.json').version")"
+          if [ -n "$TAG_VERSION" ] && [ "$TAG_VERSION" != "$version" ]; then
+            echo "::error::The tag says $TAG_VERSION and packages/$PACKAGE/package.json says $version. Tag the version the package declares."
+            exit 1
+          fi
+          if [ "$version" = 0.0.0 ]; then
+            if [ "$PUBLISH" = true ]; then
+              echo "::error::Version 0.0.0 is never published. Set the version in packages/$PACKAGE/package.json first."
+              exit 1
+            fi
+            echo "::notice::packages/$PACKAGE is at 0.0.0, which a publishing run would refuse."
+          fi
+      - name: Unit tests
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: pnpm --filter "@cobuilders/safenet-$PACKAGE" test
+      - name: Build
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: pnpm --filter "@cobuilders/safenet-$PACKAGE" build
+      - name: Pack
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          pnpm --filter "@cobuilders/safenet-$PACKAGE" pack --pack-destination "$RUNNER_TEMP/pack"
+          tarball="$(ls "$RUNNER_TEMP"/pack/*.tgz)"
+          {
+            echo "### @cobuilders/safenet-$PACKAGE, packed"
+            echo ""
+            echo "| Tarball | Size | SHA-256 | Files |"
+            echo "|---|---|---|---|"
+            echo "| $(basename "$tarball") | $(stat -c %s "$tarball") bytes | \`$(sha256sum "$tarball" | cut -d' ' -f1)\` | $(tar -tzf "$tarball" | wc -l) |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tarball-${{ matrix.package }}
+          path: ${{ runner.temp }}/pack/*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  check:
+    name: check ${{ matrix.package }}
+    needs: [plan, pack]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.packages) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: tools
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: tarball-${{ matrix.package }}
+          path: ${{ runner.temp }}/pack
+      # RUNNER_TEMP is outside the checkout, so nothing resolves from the workspace: the
+      # package gets its dependencies from npm, as a user's install does.
+      - name: Install the tarball outside the monorepo
+        run: |
+          mkdir "$RUNNER_TEMP/install"
+          cd "$RUNNER_TEMP/install"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund "$RUNNER_TEMP"/pack/*.tgz
+      - name: Run the installed package against Mainnet
+        env:
+          PACKAGE: ${{ matrix.package }}
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+        run: node tools/check-installed-package.mjs "$PACKAGE" "$RUNNER_TEMP/install"
+
+  publish:
+    name: publish ${{ matrix.package }}
+    needs: [plan, check]
+    if: needs.plan.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # Provenance: npm signs the package with this run's OIDC identity.
+      id-token: write
+    strategy:
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.packages) }}
+    steps:
+      # For the pnpm version in package.json and the Node version in .nvmrc.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: tools
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+          # Writes an .npmrc that reads the token from NODE_AUTH_TOKEN.
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: tarball-${{ matrix.package }}
+          path: ${{ runner.temp }}/pack
+      - name: Check the npm token
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::error::The NPM_TOKEN secret is empty. Add an npm token that can publish @cobuilders packages to the repository's secrets, then run this again. Nothing was published."
+            exit 1
+          fi
+      # The tarball the check job installed and ran, byte for byte.
+      - name: Publish
+        working-directory: ${{ runner.temp }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          tarball="$(ls "$RUNNER_TEMP"/pack/*.tgz)"
+          pnpm publish "$tarball" --provenance --access public
+          echo "Published $(basename "$tarball" .tgz) with provenance." >> "$GITHUB_STEP_SUMMARY"
