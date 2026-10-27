@@ -27,6 +27,11 @@ its test scripts, so checking and testing it need no build of this package.
 
 A new operation goes in `src/lib/` first, with its data type, then gets a command.
 
+`docs/commands.md` is the command reference: one section per command with its arguments and
+options, an example, and the output of a real run against Mainnet in both formats, with URLs,
+addresses, deploy blocks and the example stakers' hashes replaced by labels. A change to a
+command's options or output changes its section.
+
 ## Commands
 
 | Command | Reads |
@@ -71,7 +76,7 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   name belongs is refused without being repeated, and no message repeats the name given for a
   variable, which could be the secret typed in its place. Without `--dry-run` and without a signer
   option, a write exits 2. `--from <address>` sets the address of a dry run without a signer.
-  Every environment-key invocation emits an exposure warning, including dry runs.
+  Every environment-key invocation emits `ENV_KEY_WARNING` from `src/cli.ts` on stderr, including dry runs.
 - `--walletconnect --wallet-account <address>` loads the external signer in `commands/walletconnect.ts`.
   It requires a terminal, `WALLETCONNECT_PROJECT_ID`, and WalletConnect v2 `eth_signTransaction` support.
   Pairing URI display requires deliberate confirmation. Never capture the URI in evidence.
@@ -124,6 +129,13 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
 signer whose `signTransaction` throws, and fails if it is reached. `src/fork/redaction.test.ts`
 also runs here: it makes the fork suite's archive read fail and checks that its error carries no
 part of the URL.
+
+`pnpm test:coverage` runs the same unit tests without `src/smoke/` and `src/fork/`, and fails
+below 80 percent of lines, measured by Node's built-in coverage through
+`tools/run-node-tests.mjs`. That runner fails too when a source file is missing from the report
+because no test loads it; `src/index.ts`, which only runs the program, is named as unmeasured in
+the script. Lines that tsx's source maps leave unmapped, such as a leading comment or an import,
+count as uncovered, so the figure is a lower bound. CI runs it in the `test` job.
 
 `pnpm test:smoke` runs `src/smoke/`: one test per command, against Mainnet, through the real
 entry point. It reads `MAINNET_RPC_URL` from `.env.local` and skips each test, with the reason,

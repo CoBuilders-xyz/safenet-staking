@@ -76,6 +76,9 @@ On Windows, compare `(Get-FileHash .\safenet-windows-x64.exe -Algorithm SHA256).
 
 ## Commands
 
+The [command reference](docs/commands.md) gives each command's arguments and options, an example,
+and what it printed against Mainnet, in the human format and with `--json`.
+
 | Command | What it does | Kind |
 |---|---|---|
 | `safenet status` | Network totals: stake, validators, withdrawals, rewards and the Merkle root | read |
@@ -133,7 +136,9 @@ Choose an environment key, a keystore, or an external wallet through WalletConne
 | `--password-env <NAME>` | With `--keystore`: read the password from the environment variable NAME |
 | `--from <address>` | With `--dry-run` and no signer option: the address to simulate from |
 
-The key never comes from a flag value, which would land in the shell history and in `ps`. A
+A key read with `--private-key-env` prints one warning line on stderr: every process the shell
+starts inherits the variable, while a keystore holds the key encrypted. The key never comes from a
+flag value, which would land in the shell history and in `ps`. A
 value that looks like a key where a name belongs is refused, and not repeated. No message prints
 a key, a password, the value of a variable, or the name given for one. Without `--dry-run` and
 without a signer option, a write exits 2.
