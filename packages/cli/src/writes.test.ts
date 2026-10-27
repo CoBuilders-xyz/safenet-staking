@@ -1,4 +1,5 @@
 import { test } from "node:test"
+import { fileURLToPath } from "node:url"
 import assert from "node:assert/strict"
 import { bytesToHex, maxUint256 } from "viem"
 import { mnemonicToAccount, toAccount } from "viem/accounts"
@@ -15,6 +16,8 @@ const SAFE = 10n ** 18n
 const testAccount = mnemonicToAccount(TEST_MNEMONIC)
 const TEST_KEY = bytesToHex(testAccount.getHdKey().privateKey!)
 const KEY_ENV = { SAFENET_TEST_KEY: TEST_KEY }
+// A file path, not a URL pathname, which keeps %20 for a space and a leading / before a Windows drive.
+const KEYSTORE = fileURLToPath(new URL("./fixtures/keystore-anvil-1.json", import.meta.url))
 
 async function cli(argv: string[], options: FakeOptions = {}) {
   const rt = fakeRuntime(options)
@@ -292,9 +295,8 @@ test("a key from --private-key-env prints one warning on stderr, and --json stdo
 })
 
 test("no warning without --private-key-env: a keystore, or a dry run --from an address", async () => {
-  const path = new URL("./fixtures/keystore-anvil-1.json", import.meta.url).pathname
   const keystore = await cli(
-    ["stake", VALIDATOR_A, "1", "--dry-run", "--keystore", path, "--password-env", "PW", "--json"],
+    ["stake", VALIDATOR_A, "1", "--dry-run", "--keystore", KEYSTORE, "--password-env", "PW", "--json"],
     { env: { PW: "safenet fixture" } },
   )
   const from = await cli(["stake", VALIDATOR_A, "1", "--dry-run", "--from", STAKER])
@@ -332,9 +334,8 @@ test("a step that fails after another confirmed names the confirmed one", async 
 })
 
 test("a name given for a secret's variable is never printed back, even when it is the secret", async () => {
-  const path = new URL("./fixtures/keystore-anvil-1.json", import.meta.url).pathname
   for (const argv of [
-    ["stake", VALIDATOR_A, "1", "--keystore", path, "--password-env", "Hunter2_safe"],
+    ["stake", VALIDATOR_A, "1", "--keystore", KEYSTORE, "--password-env", "Hunter2_safe"],
     ["stake", VALIDATOR_A, "1", "--private-key-env", "Hunter2_safe"],
     ["stake", VALIDATOR_A, "1", "--private-key-env", "Hunter2_safe", "--dry-run"],
   ]) {
@@ -378,20 +379,19 @@ test("a sent transaction whose receipt never comes is reported with its hash, no
 })
 
 test("--keystore with --password-env signs as the keystore's account", async () => {
-  const path = new URL("./fixtures/keystore-anvil-1.json", import.meta.url).pathname
   const r = await cli(
-    ["stake", VALIDATOR_A, "1", "--dry-run", "--keystore", path, "--password-env", "PW", "--json"],
+    ["stake", VALIDATOR_A, "1", "--dry-run", "--keystore", KEYSTORE, "--password-env", "PW", "--json"],
     { env: { PW: "safenet fixture" } },
   )
   assert.equal(r.code, 0, r.err)
   assert.equal(JSON.parse(r.out).from, mnemonicToAccount(TEST_MNEMONIC, { addressIndex: 1 }).address)
   const wrong = await cli(
-    ["stake", VALIDATOR_A, "1", "--dry-run", "--keystore", path, "--password-env", "PW"],
+    ["stake", VALIDATOR_A, "1", "--dry-run", "--keystore", KEYSTORE, "--password-env", "PW"],
     { env: { PW: "not it" } },
   )
   assert.equal(wrong.code, 1)
   assert.equal(wrong.err, "error: The keystore password is wrong: the file's MAC does not match.\n")
-  const noTerminal = await cli(["stake", VALIDATOR_A, "1", "--keystore", path])
+  const noTerminal = await cli(["stake", VALIDATOR_A, "1", "--keystore", KEYSTORE])
   assert.equal(noTerminal.code, 2)
   assert.match(noTerminal.err, /--keystore needs its password/)
 })

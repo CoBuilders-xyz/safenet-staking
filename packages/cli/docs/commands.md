@@ -6,8 +6,9 @@ Ethereum Mainnet. The [README](../README.md) covers installation, signing and se
 ## How to read the samples
 
 The samples are real runs against Ethereum Mainnet on 2026-10-27, around block 26,286,990, through
-an archive endpoint in `MAINNET_RPC_URL`, on Node.js 22.14.0. Each shows the human format, then the
-same run with `--json`. Your figures will differ: the chain and SEF's files move on.
+an archive endpoint in `MAINNET_RPC_URL`, on Node.js 22.14.0. Each shows the human format, then a
+separate run of the same command with `--json`, seconds later, so the two can name blocks a few
+apart. Your figures will differ: the chain and SEF's files move on.
 
 Some values in the samples are replaced with a label in angle brackets:
 
