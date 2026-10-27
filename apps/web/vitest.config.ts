@@ -19,7 +19,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/lib/**", "src/hooks/**", "src/components/**", "src/pages/**"],
-      exclude: ["src/config/**", "src/abi/**", "src/data/**"],
+      exclude: ["src/config/**", "src/data/**"],
     },
   },
 })

@@ -7,8 +7,8 @@
 
 import { encodeFunctionResult, numberToHex, pad, toFunctionSelector } from "viem"
 import { mainnet } from "viem/chains"
-import { ensResolverAbi, ensUniversalResolverAbi } from "@cobuilders/safenet-core"
-import { AMOUNTS, STAKING_CONTRACT, TOKEN_CONTRACT, MERKLE_DROP_CONTRACT, VALIDATORS } from "../fixtures/test-data"
+import { ensResolverAbi, ensUniversalResolverAbi, sanctionsOracleAbi } from "@cobuilders/safenet-core"
+import { AMOUNTS, STAKING_CONTRACT, TOKEN_CONTRACT, MERKLE_DROP_CONTRACT, SANCTIONS_ORACLE_CONTRACT, VALIDATORS } from "../fixtures/test-data"
 import type { MockChainState } from "./mock-chain-state"
 
 /** The resolver the mock Universal Resolver names for SEF's ENS name. Made up. */
@@ -63,6 +63,8 @@ export const SELECTORS = {
   // MerkleDrop contract reads
   merkleRoot: "0x2eb4a7ab",
   cumulativeClaimed: "0xa9919576",
+  // Sanctions oracle, from core's ABI
+  isSanctioned: toFunctionSelector(sanctionsOracleAbi[0]),
 } as const
 
 /**
@@ -97,6 +99,12 @@ export function buildCallResponses(userAddress: string, state: MockChainState): 
   // Staking: withdrawDelay() → uint128
   responses.set(key(staking, SELECTORS.withdrawDelay), () =>
     "0x" + toUint256(AMOUNTS.withdrawDelay)
+  )
+
+  // Sanctions oracle: isSanctioned(address) → bool, from the test's state. "error" is answered
+  // by the RPC handler, which fails the call.
+  responses.set(key(SANCTIONS_ORACLE_CONTRACT, SELECTORS.isSanctioned), () =>
+    "0x" + toBool(state.walletSanctioned === true)
   )
 
   // Staking: nextWithdrawalId() → uint64

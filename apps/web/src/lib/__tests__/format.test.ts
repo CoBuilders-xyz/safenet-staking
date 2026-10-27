@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { formatParticipation, formatTokenAmount, truncateAddress, formatCountdown, formatUtcDateTime, formatUtcDayLong } from "../format"
+import { formatParticipation, formatTokenAmount, isRounded, parseAmount, presetAmount, truncateAddress, formatCountdown, formatUtcDateTime, formatUtcDayLong } from "../format"
 
 describe("formatTokenAmount", () => {
   it("formats zero", () => {
@@ -126,5 +126,43 @@ describe("formatUtcDayLong", () => {
 
   it("takes the UTC day, not the local one", () => {
     expect(formatUtcDayLong(Date.UTC(2026, 9, 12, 23, 59))).toBe("12 October 2026")
+  })
+})
+
+describe("presetAmount and parseAmount", () => {
+  const SAFE = 10n ** 18n
+
+  it("shows a wei-precise amount to four decimals and parses its text back to the exact value", () => {
+    const value = 12n * SAFE + 345_678_901_234_567_891n
+    const preset = presetAmount(value)
+    expect(preset.text).toBe("12.3456")
+    expect(isRounded(preset)).toBe(true)
+    expect(parseAmount(preset.text, preset)).toBe(value)
+  })
+
+  it("round-trips amounts at every scale exactly", () => {
+    for (const value of [1n, 999n, SAFE, SAFE + 1n, 10n ** 24n + 7n, 2n ** 128n - 1n]) {
+      const preset = presetAmount(value)
+      expect(parseAmount(preset.text, preset)).toBe(value)
+    }
+  })
+
+  it("parses edited text as typed, not as the preset", () => {
+    const preset = presetAmount(12n * SAFE + 345_678_901_234_567_891n)
+    expect(parseAmount("12.3457", preset)).toBe(12_345_700_000_000_000_000n)
+    expect(parseAmount("12.3456")).toBe(12_345_600_000_000_000_000n)
+  })
+
+  it("keeps whole amounts unrounded", () => {
+    const preset = presetAmount(60n * SAFE)
+    expect(preset.text).toBe("60")
+    expect(isRounded(preset)).toBe(false)
+  })
+
+  it("keeps every decimal of an amount that four decimals would show as 0", () => {
+    const preset = presetAmount(1234n)
+    expect(preset.text).toBe("0.000000000000001234")
+    expect(parseAmount(preset.text, preset)).toBe(1234n)
+    expect(isRounded(preset)).toBe(false)
   })
 })

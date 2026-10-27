@@ -3,7 +3,7 @@ import { TxButton } from "@/components/ui/TxButton"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { AmountInput } from "./AmountInput"
 import type { StakeFormState } from "@/hooks/useStakeForm"
-import { formatCountdown } from "@/lib/format"
+import { formatCountdown, isRounded } from "@/lib/format"
 import Info from "lucide-react/dist/esm/icons/info"
 import Fuel from "lucide-react/dist/esm/icons/fuel"
 
@@ -23,6 +23,8 @@ export function StakeForm({ form, maxLabel, aboveMaxMessage, notes }: StakeFormP
     validator,
     amount,
     setAmount,
+    setPresetAmount,
+    preset,
     parsedAmount,
     balanceValue,
     maxAmount,
@@ -55,10 +57,17 @@ export function StakeForm({ form, maxLabel, aboveMaxMessage, notes }: StakeFormP
       <AmountInput
         value={amount}
         onChange={setAmount}
+        onPreset={setPresetAmount}
         maxAmount={ceiling}
         maxLabel={maxAmount !== undefined ? maxLabel : undefined}
         disabled={hasZeroBalance}
       />
+
+      {preset && isRounded(preset) && (
+        <p className="text-xs text-muted-foreground">
+          Shown rounded down to four decimals. The stake sends the whole amount, to the last wei.
+        </p>
+      )}
 
       {hasZeroBalance && (
         <p className="text-sm text-destructive">

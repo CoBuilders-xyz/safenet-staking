@@ -158,8 +158,9 @@ function signatureOf<C extends ContractName, N extends string>(contract: C, name
 }
 
 /**
- * The staking contract's calls and errors. `verify:abis` checks that every function selector
- * here is in the deployed bytecode; the errors come from DECODED_ERRORS above.
+ * The staking contract's calls, events and errors. `verify:abis` checks that every function
+ * selector here is in the deployed bytecode; the events come from INDEXED_EVENTS and the errors
+ * from DECODED_ERRORS above.
  */
 export const stakingAbi = parseAbi([
   "function totalStakedAmount() view returns (uint256)",
@@ -167,6 +168,12 @@ export const stakingAbi = parseAbi([
   // Verified 2026-10-04 by eth_call on Mainnet: for a staker with one open withdrawal it
   // returned one (amount, claimableAt) pair whose amount equals that WithdrawalInitiated log.
   "function getPendingWithdrawals(address staker) view returns ((uint256 amount, uint256 claimableAt)[])",
+  // The head of the staker's queue, which claimWithdrawal() pays. Verified 2026-10-27 by eth_call
+  // on Mainnet: for six stakers whose withdrawals were all past their delay it returned the head
+  // of getPendingWithdrawals(), the oldest of two for the staker with two, and (0, 0) for nine
+  // addresses with none. No staker had a withdrawal still in its delay that day, so what it
+  // returns then is not proven here.
+  "function getNextClaimableWithdrawal(address staker) view returns (uint256 amount, uint256 claimableAt)",
   "function stakes(address staker, address validator) view returns (uint256)",
   "function totalStakerStakes(address staker) view returns (uint256)",
   "function totalValidatorStakes(address validator) view returns (uint256)",
@@ -184,6 +191,10 @@ export const stakingAbi = parseAbi([
   // Takes no id. It pays the head of the caller's queue: proven on an Anvil fork on 2026-10-05,
   // where with withdrawals 89 and 90 open and 89 past its delay, the call paid 89.
   "function claimWithdrawal()",
+  signatureOf("staking", "StakeIncreased"),
+  signatureOf("staking", "WithdrawalInitiated"),
+  signatureOf("staking", "WithdrawalClaimed"),
+  signatureOf("staking", "ValidatorUpdated"),
   signatureOf("staking", "InvalidAmount"),
   signatureOf("staking", "NotValidator"),
   signatureOf("staking", "InvalidAddress"),

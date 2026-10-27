@@ -2,6 +2,7 @@ import { useAccount } from "wagmi"
 import { usePendingWithdrawals } from "@/hooks/useWithdrawals"
 import { useWithdrawDelay } from "@/hooks/useStakingReads"
 import { useWithdrawalValidators } from "@/hooks/useWithdrawalValidators"
+import { useWrongNetwork } from "@/hooks/useWrongNetwork"
 import { useValidators } from "@/hooks/useValidators"
 import { useClaimWithdrawal, useBatchClaimWithdrawals } from "@/hooks/useStakingWrites"
 import { useToast } from "@/hooks/useToast"
@@ -17,7 +18,8 @@ import Loader2 from "lucide-react/dist/esm/icons/loader-2"
 
 export function WithdrawalQueue() {
   const { isConnected } = useAccount()
-  const { data: withdrawals, isLoading } = usePendingWithdrawals()
+  const { data: withdrawals, isLoading, isError, refetch } = usePendingWithdrawals()
+  const wrongNetwork = useWrongNetwork()
   const { data: withdrawDelay } = useWithdrawDelay()
   const { data: withdrawalValidators } = useWithdrawalValidators()
   const { data: allValidators } = useValidators()
@@ -119,6 +121,17 @@ export function WithdrawalQueue() {
     )
   }
 
+  if (isError && !withdrawals) {
+    return (
+      <div role="alert" className="space-y-3 rounded-lg border p-8 text-center text-muted-foreground">
+        <p>Your withdrawal queue could not be read from Ethereum.</p>
+        <Button variant="outline" size="sm" onClick={() => void refetch()}>
+          Retry
+        </Button>
+      </div>
+    )
+  }
+
   if (!withdrawals || withdrawals.length === 0) {
     return (
       <div className="rounded-lg border p-8 text-center text-muted-foreground">
@@ -147,7 +160,7 @@ export function WithdrawalQueue() {
           <Button
             size="sm"
             onClick={() => batchClaimWithdrawals(claimableCount)}
-            disabled={isBatchBusy}
+            disabled={isBatchBusy || wrongNetwork}
           >
             {isBatchSigning ? (
               <>

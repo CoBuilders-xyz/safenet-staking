@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { TooltipProvider } from "@radix-ui/react-tooltip"
 import { encodeErrorResult, type Hex } from "viem"
-import { merkleDropAbi } from "@/abi/merkleDropAbi"
+import { merkleDropAbi } from "@cobuilders/safenet-core"
 import type { useRewards } from "@/hooks/useRewards"
 import type { RewardProof } from "@/hooks/useRewardProof"
 import { AMOUNTS, MOCK_VALIDATORS, TEST_ACCOUNTS } from "@/__tests__/test-data"
@@ -231,6 +231,39 @@ describe("ClaimAndStakeDialog", () => {
       await userEvent.click(screen.getByRole("button", { name: "Stake" }))
 
       expect(m.stake).toHaveBeenCalledWith(TEST_ACCOUNTS.validator1, 60n * SAFE)
+    })
+
+    it("shows a claim with wei precision as a readable amount and stakes every wei of it", async () => {
+      const paid = 12n * SAFE + 345_678_901_234_567_891n
+      claimed(paid)
+      renderDialog()
+
+      expect(screen.getByLabelText("Amount")).toHaveValue("12.3456")
+      expect(screen.getByText(/Shown rounded down to four decimals/)).toBeInTheDocument()
+
+      await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
+      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+
+      expect(m.stake).toHaveBeenCalledWith(TEST_ACCOUNTS.validator1, paid)
+    })
+
+    it("stakes what the user typed once the rounded amount is edited, and MAX restores every wei", async () => {
+      const paid = 12n * SAFE + 345_678_901_234_567_891n
+      claimed(paid)
+      renderDialog()
+      const amount = screen.getByLabelText("Amount")
+
+      await userEvent.type(amount, "7")
+      expect(amount).toHaveValue("12.34567")
+      expect(screen.queryByText(/Shown rounded down/)).not.toBeInTheDocument()
+      await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
+      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+      expect(m.stake).toHaveBeenLastCalledWith(TEST_ACCOUNTS.validator1, 12_345_670_000_000_000_000n)
+
+      await userEvent.click(screen.getByRole("button", { name: "MAX" }))
+      expect(amount).toHaveValue("12.3456")
+      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+      expect(m.stake).toHaveBeenLastCalledWith(TEST_ACCOUNTS.validator1, paid)
     })
 
     it("says what stays in the wallet when the amount is reduced, and refuses more than was claimed", async () => {

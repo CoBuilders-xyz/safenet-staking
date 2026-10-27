@@ -1,16 +1,14 @@
 import { useQuery } from "@tanstack/react-query"
 import { usePublicClient, useAccount, useReadContract } from "wagmi"
-import { parseAbiItem, type Address } from "viem"
-import { stakingAbi } from "@/abi/stakingAbi"
+import type { Address } from "viem"
+import { indexedEvent, stakingAbi } from "@cobuilders/safenet-core"
 import { getContractAddresses, deployBlock } from "@/config/contracts"
 import { activeChain } from "@/config/chains"
 
 const MAX_BLOCK_RANGE = 49_999n
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address
 
-const WITHDRAWAL_INITIATED_EVENT = parseAbiItem(
-  "event WithdrawalInitiated(address indexed staker, address indexed validator, uint64 indexed withdrawalId, uint256 amount)"
-)
+const WITHDRAWAL_INITIATED_EVENT = indexedEvent("staking", "WithdrawalInitiated")
 
 const addresses = getContractAddresses(activeChain.id)
 

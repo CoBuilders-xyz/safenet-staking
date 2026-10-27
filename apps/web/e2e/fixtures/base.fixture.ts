@@ -115,6 +115,13 @@ async function setupPage(page: Page, options: SetupPageOptions, state: MockChain
     },
   )
 
+  // The sanctions screening endpoint (VITE_SANCTIONS_API_URL in playwright.config.ts).
+  await page.route("**/mock-sanctions.test/**", (route) =>
+    state.sanctionsApi === "fail"
+      ? route.abort("connectionrefused")
+      : route.fulfill({ status: state.sanctionsApi === "refuse" ? 403 : 200, body: "" }),
+  )
+
   await stubGeoCheck(page)
 
   return page

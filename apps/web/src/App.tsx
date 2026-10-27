@@ -1,10 +1,12 @@
 import { lazy, useEffect, useRef, type ReactNode } from "react"
 import { HashRouter, Routes, Route } from "react-router-dom"
-import { useAccount } from "wagmi"
+import { useAccount, useDisconnect } from "wagmi"
 import { Layout } from "@/components/layout/Layout"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { Toaster } from "@/components/ui/toaster"
 import { RestrictedScreen } from "@/components/RestrictedScreen"
+import { Button } from "@/components/ui/button"
+import type { Restriction } from "@/lib/restriction"
 import { Analytics } from "@/components/Analytics"
 import { useAutoConnect } from "@/hooks/useAutoConnect"
 import { useSanctionsCheck } from "@/hooks/useSanctionsCheck"
@@ -67,7 +69,8 @@ function DisconnectWatcher() {
 }
 
 function WalletSanctionsGate({ children }: { children: ReactNode }) {
-  const { allowed, isLoading } = useWalletSanctionsCheck()
+  const { allowed, isLoading, restriction: reported, refetch } = useWalletSanctionsCheck()
+  const { disconnect } = useDisconnect()
 
   if (isLoading) {
     return (
@@ -78,7 +81,19 @@ function WalletSanctionsGate({ children }: { children: ReactNode }) {
   }
 
   if (!allowed) {
-    return <RestrictedScreen title="Wallet Restricted" description="This wallet address has been flagged and cannot use SAFE Staking." />
+    // Blocked without a reason is still blocked: fail closed, and call it a failed check.
+    const restriction: Restriction = reported ?? { gate: "walletSanctions", reason: "unavailable" }
+    return (
+      <RestrictedScreen
+        restriction={restriction}
+        actions={
+          <>
+            {restriction.reason === "unavailable" && <Button onClick={refetch}>Try again</Button>}
+            <Button variant="outline" onClick={() => disconnect()}>Disconnect wallet</Button>
+          </>
+        }
+      />
+    )
   }
 
   return <>{children}</>
@@ -86,8 +101,8 @@ function WalletSanctionsGate({ children }: { children: ReactNode }) {
 
 function App() {
   useAutoConnect()
-  const { allowed: sanctionsAllowed, isLoading: sanctionsLoading } = useSanctionsCheck()
-  const { allowed: geoAllowed, isLoading: geoLoading } = useGeoblockCheck()
+  const sanctions = useSanctionsCheck()
+  const geo = useGeoblockCheck()
 
   // Preload route chunks after first paint so they don't
   // compete with critical initial resources.
@@ -100,7 +115,7 @@ function App() {
     return () => clearTimeout(id)
   }, [])
 
-  if (sanctionsLoading || geoLoading) {
+  if (sanctions.isLoading || geo.isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center" role="status" aria-live="polite">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden="true" />
@@ -108,8 +123,23 @@ function App() {
     )
   }
 
-  if (!sanctionsAllowed || !geoAllowed) {
-    return <RestrictedScreen title="Access Restricted" description="SAFE Staking and Rewards are unavailable in your region." />
+  if (!sanctions.allowed || !geo.allowed) {
+    // When both gates refuse, the sanctions screening is named: it is checked first. Blocked
+    // without a reason is still blocked: fail closed, and call it a failed check.
+    const restriction: Restriction =
+      (!sanctions.allowed && sanctions.restriction) ||
+      (!geo.allowed && geo.restriction) ||
+      (!sanctions.allowed ? { gate: "sanctionsApi", reason: "unavailable" } : { gate: "geoblock", reason: "unavailable" })
+    return (
+      <RestrictedScreen
+        restriction={restriction}
+        actions={
+          restriction.reason === "unavailable" && (
+            <Button onClick={() => window.location.reload()}>Reload</Button>
+          )
+        }
+      />
+    )
   }
 
   return (

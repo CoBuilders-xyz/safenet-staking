@@ -13,8 +13,9 @@ import {
   STAKING_CONTRACT,
   TOKEN_CONTRACT,
   MERKLE_DROP_CONTRACT,
+  SANCTIONS_ORACLE_CONTRACT,
 } from "../fixtures/test-data"
-import { buildCallResponses } from "./rpc-responses"
+import { buildCallResponses, SELECTORS } from "./rpc-responses"
 import { matchGetLogs } from "./event-logs"
 import { claimRevert, TX_SELECTORS, type MockChainState } from "./mock-chain-state"
 
@@ -49,7 +50,7 @@ interface JsonRpcResponse {
  * - for each call: offset to tuple data
  * - for each tuple: target (32b), allowFailure (32b), offset to callData, callData length, callData bytes
  */
-function handleMulticall3(data: string, callResponses: Map<string, (data: string) => string>): string {
+function handleMulticall3(data: string, callResponses: Map<string, (data: string) => string>, fails: (target: string, selector: string) => boolean): string {
   // Strip 0x prefix and selector
   const hex = data.slice(10)
 
@@ -66,7 +67,7 @@ function handleMulticall3(data: string, callResponses: Map<string, (data: string
   }
 
   // Process each subcall
-  const results: string[] = []
+  const results: { success: boolean; returnData: string }[] = []
   for (let i = 0; i < arrayLength; i++) {
     const tupleStart = arrayOffset + 64 + tupleOffsets[i]
 
@@ -85,6 +86,11 @@ function handleMulticall3(data: string, callResponses: Map<string, (data: string
     const responseKey = `${target}:${subSelector}`
     const handler = callResponses.get(responseKey)
 
+    if (fails(target, subSelector)) {
+      results.push({ success: false, returnData: "0x" })
+      continue
+    }
+
     let returnData: string
     if (handler) {
       returnData = handler(callData)
@@ -92,7 +98,7 @@ function handleMulticall3(data: string, callResponses: Map<string, (data: string
       returnData = "0x" + "0".repeat(64)
     }
 
-    results.push(returnData)
+    results.push({ success: true, returnData })
   }
 
   // Encode the aggregate3 return value: (bool success, bytes returnData)[]
@@ -108,12 +114,12 @@ function handleMulticall3(data: string, callResponses: Map<string, (data: string
   // Calculate offsets for each result tuple (relative to array data start)
   // Each result takes variable space, so compute offsets
   const resultEncodings: string[] = []
-  for (const returnData of results) {
+  for (const { success, returnData } of results) {
     const dataBytes = returnData.startsWith("0x") ? returnData.slice(2) : returnData
     // Tuple: success (32b) + offset to bytes (32b) + bytes length (32b) + bytes data (padded to 32b)
     const paddedData = dataBytes.padEnd(Math.ceil(dataBytes.length / 64) * 64, "0")
     let tupleEncoded = ""
-    tupleEncoded += "0".repeat(63) + "1" // success = true
+    tupleEncoded += "0".repeat(63) + (success ? "1" : "0") // success
     tupleEncoded += "0".repeat(62) + "40" // offset to bytes = 64
     tupleEncoded += (dataBytes.length / 2).toString(16).padStart(64, "0") // bytes length
     tupleEncoded += paddedData // bytes data
@@ -137,6 +143,9 @@ function handleMulticall3(data: string, callResponses: Map<string, (data: string
 
 export function createRpcHandler(userAddress: string, state: MockChainState) {
   const callResponses = buildCallResponses(userAddress, state)
+  // A read the test set to fail, whether sent alone or inside a Multicall3 batch.
+  const fails = (target: string, selector: string) =>
+    target === SANCTIONS_ORACLE_CONTRACT && selector === SELECTORS.isSanctioned && state.walletSanctioned === "error"
 
   function handleSingleRequest(req: JsonRpcRequest): JsonRpcResponse {
     const base = { jsonrpc: "2.0", id: req.id }
@@ -177,7 +186,12 @@ export function createRpcHandler(userAddress: string, state: MockChainState) {
 
         // Handle Multicall3 aggregate3 calls
         if (contractAddr === MULTICALL3 && selector === AGGREGATE3_SELECTOR) {
-          return { ...base, result: handleMulticall3(data, callResponses) }
+          return { ...base, result: handleMulticall3(data, callResponses, fails) }
+        }
+
+        // The wallet screening gate: a failed oracle read must close the interface, not open it.
+        if (fails(contractAddr, selector)) {
+          return { ...base, error: { code: -32000, message: "header not found" } }
         }
 
         // The interface simulates a claim before sending it. Revert the way a node does.

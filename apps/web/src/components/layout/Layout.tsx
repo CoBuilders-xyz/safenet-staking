@@ -2,6 +2,7 @@ import { Suspense } from "react"
 import { Outlet } from "react-router-dom"
 import { Header } from "./Header"
 import { Footer } from "./Footer"
+import { WrongNetworkNotice } from "@/components/WrongNetworkNotice"
 import Loader2 from "lucide-react/dist/esm/icons/loader-2"
 
 const tickStyle = {
@@ -36,6 +37,7 @@ export function Layout() {
           />
         </div>
         <main id="main-content" className="container mx-auto max-w-5xl px-4 py-8">
+          <WrongNetworkNotice />
           <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
             <Outlet />
           </Suspense>

@@ -55,6 +55,27 @@ describe("useWalletSanctionsCheck", () => {
     const { result } = renderHook(() => useWalletSanctionsCheck())
 
     expect(result.current.allowed).toBe(false)
+    expect(result.current.restriction).toEqual({ gate: "walletSanctions", reason: "flagged" })
+  })
+
+  it("blocks as a failed check when the oracle read errors (fail-closed)", () => {
+    mockUseAccount.mockReturnValue({ address: TEST_ACCOUNTS.user })
+    mockUseReadContract.mockReturnValue({ data: undefined, isLoading: false, isError: true })
+
+    const { result } = renderHook(() => useWalletSanctionsCheck())
+
+    expect(result.current.allowed).toBe(false)
+    expect(result.current.restriction).toEqual({ gate: "walletSanctions", reason: "unavailable" })
+  })
+
+  it("blocks without naming a reason while the oracle is loading", () => {
+    mockUseAccount.mockReturnValue({ address: TEST_ACCOUNTS.user })
+    mockUseReadContract.mockReturnValue({ data: undefined, isLoading: true })
+
+    const { result } = renderHook(() => useWalletSanctionsCheck())
+
+    expect(result.current.allowed).toBe(false)
+    expect(result.current.restriction).toBeUndefined()
   })
 
   it("returns isLoading=true while oracle is loading", () => {

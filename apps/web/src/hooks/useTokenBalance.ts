@@ -1,5 +1,5 @@
 import { useReadContract, useAccount } from "wagmi"
-import { erc20Abi } from "@/abi/erc20Abi"
+import { erc20Abi } from "@cobuilders/safenet-core"
 import { getContractAddresses } from "@/config/contracts"
 import { activeChain } from "@/config/chains"
 

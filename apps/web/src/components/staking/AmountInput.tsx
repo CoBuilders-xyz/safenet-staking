@@ -5,6 +5,11 @@ import { formatTokenAmount, formatTokenAmountRaw } from "@/lib/format"
 interface AmountInputProps {
   value: string
   onChange: (value: string) => void
+  /**
+   * Receives the exact amount a MAX or percentage shortcut picks. Without it, the shortcut writes
+   * the amount into the input with all 18 decimals.
+   */
+  onPreset?: (value: bigint) => void
   maxAmount?: bigint
   label?: string
   /** What `maxAmount` is, in front of its value. */
@@ -17,6 +22,7 @@ const PERCENTAGES = [25, 50, 75, 100] as const
 export function AmountInput({
   value,
   onChange,
+  onPreset,
   maxAmount,
   label = "Amount",
   maxLabel = "SAFE Balance",
@@ -24,6 +30,10 @@ export function AmountInput({
 }: AmountInputProps) {
   function setPercentage(pct: number) {
     if (maxAmount === undefined) return
+    if (onPreset) {
+      onPreset((maxAmount * BigInt(pct)) / 100n)
+      return
+    }
     if (pct === 100) {
       onChange(formatTokenAmountRaw(maxAmount, 18, 18))
     } else {

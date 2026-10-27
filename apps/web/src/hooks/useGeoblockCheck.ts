@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import type { Restriction } from "@/lib/restriction"
 
 const CACHE_KEY = "geoblock_check"
 const DEFAULT_CACHE_DAYS = 7
@@ -87,6 +88,8 @@ const BLOCKED_COUNTRIES = new Set([
 interface GeoblockResult {
   allowed: boolean
   isLoading: boolean
+  /** Why the gate is closed. Undefined while it is open or loading. */
+  restriction?: Restriction
 }
 
 export function useGeoblockCheck(): GeoblockResult {
@@ -101,6 +104,11 @@ export function useGeoblockCheck(): GeoblockResult {
   if (isLoading) return { allowed: true, isLoading: true }
 
   // Fail-closed: block on error or blocked country
-  const allowed = !isError && !!country && !BLOCKED_COUNTRIES.has(country)
-  return { allowed, isLoading: false }
+  if (isError || !country) {
+    return { allowed: false, isLoading: false, restriction: { gate: "geoblock", reason: "unavailable" } }
+  }
+  if (BLOCKED_COUNTRIES.has(country)) {
+    return { allowed: false, isLoading: false, restriction: { gate: "geoblock", reason: "region", country } }
+  }
+  return { allowed: true, isLoading: false }
 }

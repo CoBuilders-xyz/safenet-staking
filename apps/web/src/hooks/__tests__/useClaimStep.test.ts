@@ -8,8 +8,7 @@ import {
   type Hex,
   type Log,
 } from "viem"
-import { safeTokenEventsAbi } from "@cobuilders/safenet-core"
-import { merkleDropAbi } from "@/abi/merkleDropAbi"
+import { merkleDropAbi, safeTokenEventsAbi } from "@cobuilders/safenet-core"
 import { getContractAddresses } from "@/config/contracts"
 import { activeChain } from "@/config/chains"
 import { revertedErrorName } from "@/lib/errorFormat"

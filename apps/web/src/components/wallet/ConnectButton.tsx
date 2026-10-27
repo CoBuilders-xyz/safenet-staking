@@ -1,9 +1,10 @@
 import { useRef, useState, useEffect, useCallback } from "react"
-import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi"
+import { useAccount, useConnect, useDisconnect } from "wagmi"
 import { Button } from "@/components/ui/button"
 import { truncateAddress, formatTokenAmount } from "@/lib/format"
 import { activeChain } from "@/config/chains"
 import { useTokenBalance } from "@/hooks/useTokenBalance"
+import { useNetworkSwitch } from "@/hooks/useNetworkSwitch"
 import { useToast } from "@/hooks/useToast"
 import { copyToClipboard } from "@/lib/clipboard"
 import Copy from "lucide-react/dist/esm/icons/copy"
@@ -29,7 +30,7 @@ function ConnectWalletButton({ onClick, ref: buttonRef, ...props }: React.Button
 
 export function ConnectButton() {
   const hasInjectedWallet = typeof window.ethereum !== "undefined"
-  const { address, isConnected, chain } = useAccount()
+  const { address, isConnected } = useAccount()
   const { connect: rawConnect, connectors: allConnectors } = useConnect()
   const connectors = allConnectors.filter((c) => {
     if (c.id === "browserWallet") return hasInjectedWallet
@@ -37,7 +38,7 @@ export function ConnectButton() {
     return false
   })
   const { disconnect, disconnectAsync } = useDisconnect()
-  const { switchChain } = useSwitchChain()
+  const { wrongNetwork, canSwitch, switchToActive } = useNetworkSwitch()
   const { data: balance } = useTokenBalance()
   const { toast } = useToast()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -161,11 +162,13 @@ export function ConnectButton() {
     )
   }
 
-  if (chain?.id !== activeChain.id) {
-    return (
-      <Button variant="destructive" onClick={() => switchChain({ chainId: activeChain.id })}>
+  if (wrongNetwork) {
+    return canSwitch ? (
+      <Button variant="destructive" onClick={switchToActive}>
         Switch to {activeChain.name}
       </Button>
+    ) : (
+      <span className="rounded-md border border-destructive/50 px-3 py-1.5 text-sm text-destructive">Wrong network</span>
     )
   }
 

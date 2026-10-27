@@ -95,8 +95,17 @@ export function createEthereumProviderScript(config: MockProviderConfig): string
               return config.chainIdHex;
             case 'net_version':
               return String(parseInt(config.chainIdHex, 16));
-            case 'wallet_switchEthereumChain':
+            case 'wallet_switchEthereumChain': {
+              // Switch for real, the way a wallet does: report the new chain and announce it.
+              const next = params && params[0] && params[0].chainId;
+              if (next && next !== config.chainIdHex) {
+                config.chainIdHex = next;
+                provider.chainId = next;
+                provider.networkVersion = String(parseInt(next, 16));
+                setTimeout(() => provider.emit('chainChanged', next), 0);
+              }
               return null;
+            }
             case 'eth_sendTransaction':
               // Let a test simulate the user rejecting the wallet prompt.
               if (window.__shouldRejectTx && await window.__shouldRejectTx()) {

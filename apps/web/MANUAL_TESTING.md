@@ -12,7 +12,9 @@ What is automated already:
 - `pnpm --filter @cobuilders/safenet-web test:fork` sends approve and stake, a withdrawal, a
   withdrawal claim and a reward claim to the real contracts on an Anvil Mainnet fork.
 - The compliance hooks, `useGeoblockCheck`, `useSanctionsCheck` and `useWalletSanctionsCheck`,
-  have unit tests in `src/hooks/__tests__/`.
+  have unit tests in `src/hooks/__tests__/`. `e2e/tests/restricted.spec.ts` drives each gate's
+  refusal and failed check in the browser, and `e2e/tests/wrong-network.spec.ts` the
+  wrong-network notice on every screen and the switch.
 
 ## Where to test
 
@@ -120,18 +122,119 @@ Follow the walk-through and the abandon path in
 
 ## Restricted and wrong-network states
 
+Each gate fails closed. The restricted screen replaces the whole interface, names the gate that
+closed it ("Closed by: …"), says why, and says what the visitor can do. A gate that refused shows
+"… Restricted" and "This interface cannot lift the restriction." A gate that could not reach an
+answer shows "… Check Failed" and a way to try again. The copy is `src/lib/restriction.ts`.
+
+- [ ] **Location check, refused**: the e2e suite covers it with a mocked country. By hand, only
+      from a location the hook blocks.
+- [ ] **Location check, failed**: block requests to the two country lookup services named in
+      `src/hooks/useGeoblockCheck.ts` in the browser's developer tools, clear the
+      `geoblock_check` key in `localStorage`, and reload. Access Check Failed names the Location
+      check. Remove the block and press Reload: the app returns.
+- [ ] **Sanctions screening**, only for a build with `VITE_SANCTIONS_API_URL`: the app opens when
+      the endpoint allows the visitor. A 403 shows Access Restricted, a failed request Access
+      Check Failed, both naming Sanctions screening.
+- [ ] **Wallet screening** needs an address the sanctions oracle in `packages/core` lists, so its
+      refusal is left to the e2e suite. A connected test address must not see it.
 - [ ] **Wrong network**, Browser Wallet and WalletConnect: connect on another chain, or switch
-      chains during the session. The header shows "Switch to Ethereum", the actions are blocked,
-      and Rewards says why Claim is unavailable. Switching back restores them.
-- [ ] **Access Restricted**, the country check: block requests to the two country lookup
-      services named in `src/hooks/useGeoblockCheck.ts` in the browser's developer tools, clear
-      the `geoblock_check` key in `localStorage`, and reload. The check fails closed, so the app
-      shows Access Restricted. Remove the block and the key, and reload: the app returns.
-- [ ] **Access Restricted**, the sanctions endpoint, only for a build with
-      `VITE_SANCTIONS_API_URL`: the app opens when the endpoint allows the visitor. A 403 or a
-      failed request shows Access Restricted.
-- [ ] **Wallet Restricted** needs an address the sanctions oracle in `packages/core` lists, so it
-      is left to the unit tests. A connected test address must not see it.
+      chains during the session. Every page shows the Wrong network notice with the wallet's
+      chain ID and Switch to Ethereum, the header shows Switch to Ethereum, and every action that
+      sends a transaction is disabled or hidden. The figures stay. Switching from the notice
+      removes it and restores the actions.
+
+## Screen states
+
+What each screen shows in each state. Every row is what the code does today, including where it
+is weaker than it should be. "Restricted" and "Wrong network" are the same on every screen, from
+the gates in `src/App.tsx` and `WrongNetworkNotice` in `src/components/layout/Layout.tsx`, and are
+repeated in each table so a table can be checked alone.
+
+### Before any screen
+
+| State | What shows |
+|---|---|
+| Loading | A spinner, while the sanctions endpoint, the location lookup and, with a wallet, the sanctions oracle answer |
+| Restricted, refused | "Access Restricted" for Sanctions screening or Location check, the latter naming the country; "Wallet Restricted" for Wallet screening, with Disconnect wallet |
+| Restricted, check failed | "Access Check Failed" with Reload, or "Wallet Check Failed" with Try again and Disconnect wallet |
+| Both gates refuse | Sanctions screening is named; it is checked first |
+| Route loading | A spinner in the page area |
+| A page throws | "Something went wrong", "An unexpected error occurred while loading this page." and Try Again; the header and footer stay |
+
+### Network overview, `/`
+
+| State | What shows |
+|---|---|
+| Loading | Skeletons for each figure; Data freshness reads "Mainnet subgraph: checking." and "Gnosis subgraph: checking." |
+| Empty | "No validator holds stake yet." in Stake distribution; "No validator is registered yet." in Validators; "Not compared yet" for the rewards root |
+| Error | A figure shows "Unavailable" and the reason. A subgraph that fails or is stale is replaced by contract reads, SEF's files or the Gnosis snapshot in core, each figure naming its source, and Data freshness says the subgraph is not used. Recent activity shows "Unavailable." and the reason. A section that throws shows "This section could not be shown." and Retry; the others stay |
+| No wallet | The whole page; it needs none |
+| Restricted | The restricted screen, as above |
+| Wrong network | The Wrong network notice above the page; the figures are unchanged |
+
+### Dashboard, `/dashboard`
+
+| State | What shows |
+|---|---|
+| Loading | Skeletons in the stat cards; "Your Rewards" with two skeletons; "Your Stake Distribution" with a skeleton. Claimable SAFE reads 0 until the rewards load |
+| Empty | "You have no active stakes. Visit the Validators page to stake."; no stake distribution chart with fewer than two positions; Total claimed hidden at 0 |
+| Error | A stat card whose read failed shows "Unavailable". SEF's validator list failing shows "SEF's validator list could not be loaded, so your stakes cannot be listed." and Retry. A failed per-validator stake read drops that row and that slice without a note. Claimable SAFE reads 0 when the rewards fail |
+| No wallet | Total SAFE Staked and Active Validators only; no connect prompt |
+| Restricted | The restricted screen, as above |
+| Wrong network | The Wrong network notice; the stats stay; Unstake on a row still opens the dialog, whose submit button is disabled |
+
+### Validators, `/validators`
+
+| State | What shows |
+|---|---|
+| Loading | Four skeleton cards; per-card stake figures as skeletons |
+| Empty | "No validators are currently available." and Refresh |
+| Error | "Failed to load validators: " and the error. A failed stake read on a card shows 0 without a note; missing metadata shows "—" |
+| No wallet | Cards without Your Stake, Stake or Unstake |
+| Restricted | The restricted screen, as above |
+| Wrong network | The Wrong network notice; Stake and Unstake on the cards are disabled |
+
+### Validator detail, `/validators/<address>`
+
+| State | What shows |
+|---|---|
+| Loading | Two skeletons, then skeletons for the stake figures |
+| Empty | "Invalid validator address." for a malformed address; "Validator not found." for one SEF does not list; Your SAFE Staked 0 without a stake |
+| Error | SEF's validator list failing also shows "Validator not found."; a failed stake read shows 0 without a note |
+| No wallet | Without Your SAFE Staked, Stake or Unstake |
+| Restricted | The restricted screen, as above |
+| Wrong network | The Wrong network notice; Stake and Unstake disabled |
+
+### Withdrawals, `/withdrawals`
+
+| State | What shows |
+|---|---|
+| Loading | Two skeletons |
+| Empty | "No pending withdrawals." |
+| Error | "Your withdrawal queue could not be read from Ethereum." and Retry. An unknown unstaking period leaves the progress bar at 0% until the countdown ends; an unresolved validator is left unnamed |
+| No wallet | "Connect your wallet to view withdrawal queue." |
+| Restricted | The restricted screen, as above |
+| Wrong network | The Wrong network notice; the queue stays, with no Claim on a card, and Claim All disabled |
+
+### Rewards, `/rewards`
+
+| State | What shows |
+|---|---|
+| Loading | Skeletons in Your rewards, Programme and Verifiability; "Not compared yet" for the roots; Claim and Claim & Stake disabled without a note |
+| Empty | "This address has not earned Safenet rewards. SEF publishes no reward file for it."; Actions says "This address has nothing to claim." or "Nothing to claim right now."; after a full claim with SAFE in the wallet, Stake your balance; "No rewards contract is configured for this network." without a MerkleDrop |
+| Error | "Your rewards could not be loaded." and Retry; Actions says "Claiming needs your reward data, which did not load."; "SEF's published rewards file could not be loaded." in Programme, with Retry, and in Verifiability; "The MerkleDrop contract could not be read from Ethereum." with Retry, and "Unavailable" for its values |
+| No wallet | Your rewards explains that a wallet is needed and shows Connect Wallet; Actions says "Connect a wallet to claim."; Programme and Verifiability render |
+| Restricted | The restricted screen, as above |
+| Wrong network | The Wrong network notice; Actions says "Your wallet is on another network. Switch to Ethereum to claim." with both buttons disabled; Claim & Stake says "Switch to Ethereum to continue." |
+
+### Not found, any other path
+
+| State | What shows |
+|---|---|
+| Any | "404", "Page not found" and Back to Overview; it reads nothing and has no error boundary |
+| Restricted | The restricted screen, as above |
+| Wrong network | The Wrong network notice, from the layout |
 
 ## Safe App
 

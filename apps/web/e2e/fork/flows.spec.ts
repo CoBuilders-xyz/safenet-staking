@@ -9,6 +9,7 @@ import { MAINNET_FORK } from "@cobuilders/safenet-core"
 import { test, expect, syncBrowserClock } from "./fork.fixture"
 import { ValidatorDetailPage } from "../pages/validator-detail.page"
 import { WithdrawalsPage } from "../pages/withdrawals.page"
+import { presetAmount } from "../../src/lib/format"
 import {
   MERKLE_DROP,
   STAKING,
@@ -175,9 +176,47 @@ test.describe("Mainnet fork", () => {
     }
   })
 
-  // Claim & Stake is not on `main` yet: the Rewards page renders its button disabled, marked
-  // "Coming soon". The plain claim above covers the claim half against the real contract.
-  // Replace this with the end-to-end flow (claim, then stake what arrived, both asserted on
-  // chain) in the change that ships the button.
-  test.skip("claim rewards and stake them in one flow", () => {})
+  test("claim rewards and stake them in one flow", async ({ page, connectAs }) => {
+    const { account, proof, claimable } = await findRewardsClaimer()
+    const validator = getAddress((await activeValidator()).address)
+    await impersonate(account)
+    try {
+      const balanceBefore = await safeBalance(account)
+      const stakeBefore = await stakeOf(account, validator)
+
+      await connectAs(account)
+      await page.goto("/#/rewards")
+      const actions = page.getByRole("region", { name: "Actions" })
+      await actions.getByRole("button", { name: "Claim & Stake" }).click()
+
+      const dialog = page.getByRole("dialog")
+      await dialog.getByRole("button", { name: /^Claim .* SAFE$/ }).click()
+      await expect(page.getByText("Rewards claimed")).toBeVisible()
+      expect(
+        await chain.readContract({ address: MERKLE_DROP, abi: merkleDropAbi, functionName: "cumulativeClaimed", args: [account] }),
+      ).toBe(BigInt(proof.cumulativeAmount))
+
+      // The amount the claim paid, shown as SAFE rounded down, never as a wei-precise string.
+      const amount = dialog.getByLabel("Amount")
+      await expect(amount).toHaveValue(presetAmount(claimable).text)
+      await dialog.getByLabel("Validator").selectOption(validator)
+
+      // A real claimer's allowance does not cover the amount, and this wallet cannot batch.
+      if ((await allowance(account)) < claimable) {
+        await dialog.getByRole("button", { name: "Approve exact amount" }).click()
+        await expect(page.getByText("Approval confirmed")).toBeVisible()
+        expect(await allowance(account)).toBe(claimable)
+      }
+      const stakeButton = dialog.getByRole("button", { name: "Stake", exact: true })
+      await expect(stakeButton).toBeEnabled()
+      await stakeButton.click()
+      await expect(dialog.getByRole("status")).toContainText("Staked")
+
+      // Every wei of the claim is staked, though the input showed it rounded.
+      expect(await stakeOf(account, validator)).toBe(stakeBefore + claimable)
+      expect(await safeBalance(account)).toBe(balanceBefore)
+    } finally {
+      await stopImpersonating(account)
+    }
+  })
 })

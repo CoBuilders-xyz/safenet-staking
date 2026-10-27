@@ -83,7 +83,7 @@ function PositionRow({ position, validators }: { position: Position; validators?
 
 export function StakingSection() {
   const { isConnected, address } = useAccount()
-  const { data: validators } = useValidators()
+  const { data: validators, isError: validatorsFailed, refetch: refetchValidators } = useValidators()
   const validatorAddresses = useMemo(
     () => (validators ?? []).map((v) => v.address),
     [validators],
@@ -94,6 +94,22 @@ export function StakingSection() {
 
   if (!isConnected) {
     return null
+  }
+
+  if (validatorsFailed && !validators) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Rewards</CardTitle>
+        </CardHeader>
+        <CardContent role="alert" className="space-y-3 text-sm text-muted-foreground">
+          <p>SEF's validator list could not be loaded, so your stakes cannot be listed.</p>
+          <Button variant="outline" size="sm" onClick={() => void refetchValidators()}>
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    )
   }
 
   if (isLoading || !validators) {
