@@ -71,9 +71,20 @@ with an account you are willing to transact from.
 | 8 | Rewards: Claim & Stake runs Claim → Stake → Done, staking what the claim paid | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
 | 9 | Rewards: an address without rewards says so, with no Claim | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
 
-On the fork, a withdrawal's cooldown does not pass by itself, so row 5 needs a withdrawal that is
-already claimable, or Anvil's clock moved forward. The fork suite covers this case against the
-real contracts.
+On the fork, row 5 needs the chain's clock moved past the cooldown. Anvil's clock starts at the
+pinned fork block, which is older than your computer's clock, and the interface times the
+cooldown by your computer's clock. So the page can offer Claim before the chain allows it, and a
+claim sent then reverts. After step 4, move the chain forward by at least the unstaking period
+the Undelegate dialog showed, in seconds, and mine a block. With `<rpc>` the MetaMask RPC URL
+`pnpm fork:up` printed, for a period of two days:
+
+```sh
+cast rpc evm_increaseTime 172860 --rpc-url <rpc>
+cast rpc evm_mine --rpc-url <rpc>
+```
+
+Then reload the Withdrawals page and claim. `cast` comes with Foundry, which the fork already
+needs. The fork suite moves the clock the same way, through `warp()` in `e2e/fork/chain.ts`.
 
 Notes and transaction hashes:
 
