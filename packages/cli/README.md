@@ -37,6 +37,26 @@ Or run it once, without installing:
 npx @cobuilders/safenet-cli status
 ```
 
+Or, without Node.js, download the standalone binary for your system from the release of a
+`cli-v<version>` tag on GitHub: `safenet-linux-x64`, `safenet-macos-arm64` or
+`safenet-windows-x64.exe`. Check it against the release's `SHA256SUMS`, then run it:
+
+```sh
+sha256sum --check --ignore-missing SHA256SUMS
+chmod +x safenet-linux-x64
+./safenet-linux-x64 status
+```
+
+The binary carries its own Node.js. The macOS one is signed ad hoc, not by a developer
+certificate, and the Windows one is unsigned, so each system may ask before it runs one
+downloaded from the web.
+
+To build the binary for your own system from this repository:
+
+```sh
+pnpm --filter @cobuilders/safenet-cli build:binary
+```
+
 ## Commands
 
 | Command | What it does | Kind |

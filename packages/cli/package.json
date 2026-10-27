@@ -45,6 +45,7 @@
     "bootstrap": "echo '@cobuilders/safenet-cli: nothing to prepare'",
     "dev": "tsc --noEmit --watch",
     "build": "tsup",
+    "build:binary": "node scripts/build-binary.mjs",
     "start": "node --env-file-if-exists=../../.env.local --import tsx src/index.ts",
     "test": "node ../../tools/run-node-tests.mjs src",
     "test:smoke": "node --env-file-if-exists=../../.env.local ../../tools/run-node-tests.mjs src/smoke",
@@ -62,6 +63,7 @@
   "devDependencies": {
     "@cobuilders/safenet-core": "workspace:*",
     "@types/node": "22.19.2",
+    "postject": "1.0.0-alpha.6",
     "tsup": "8.5.1",
     "tsx": "4.23.15",
     "typescript": "5.9.3"
