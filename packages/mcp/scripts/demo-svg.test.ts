@@ -2,7 +2,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { numberToHex, pad } from "viem"
-import { redact, renderDemoSvg, wrap } from "./demo-svg.js"
+import { redact, renderDemoSvg, validatorLabel, wrap } from "./demo-svg.js"
 
 // The demo's layout and its redaction, without a network. scripts/demo.ts records the session.
 
@@ -13,6 +13,13 @@ test("redact turns known addresses into their labels, others into <address>, has
   const labels = new Map([[address(5).toLowerCase(), "<staker>"]])
   const text = `from ${address(5).toUpperCase().replace("0X", "0x")} to ${address(6)}, tx ${hash}, at https://rpc.invalid/key`
   assert.equal(redact(text, labels), "from <staker> to <address>, tx <hash>, at <redacted-url>")
+})
+
+test("a validator's label is redacted before it replaces an address, since a replacement is not scanned again", () => {
+  assert.equal(validatorLabel("Gnosis"), "<validator Gnosis>")
+  assert.equal(validatorLabel(null), "<validator unlabelled>")
+  const labels = new Map([[address(9).toLowerCase(), validatorLabel(`Ops ${address(5)} https://ops.invalid/key ${hash}`)]])
+  assert.equal(redact(`stake on ${address(9)}`, labels), "stake on <validator Ops <address> <redacted-url> <hash>>")
 })
 
 test("wrap breaks at spaces within the width, and cuts a word longer than it", () => {

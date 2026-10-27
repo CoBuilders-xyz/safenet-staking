@@ -37,6 +37,14 @@ export function redact(text: string, labels: ReadonlyMap<string, string>): strin
     .replace(/0x[0-9a-fA-F]{40}\b/g, (a) => labels.get(a.toLowerCase()) ?? "<address>")
 }
 
+/**
+ * The label drawn for a validator's address. SEF's label is text from outside, and a replacement
+ * is not scanned again, so the label is redacted before it becomes one.
+ */
+export function validatorLabel(label: string | null): string {
+  return `<validator ${redact(label ?? "unlabelled", new Map())}>`
+}
+
 /** Breaks a line at spaces so none is longer than `width`; a word longer than that is cut. */
 export function wrap(text: string, width: number = CHARS): string[] {
   const out: string[] = []

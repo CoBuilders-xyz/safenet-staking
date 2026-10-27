@@ -13,7 +13,7 @@
 import { writeFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { getAddress, isAddress } from "viem"
-import { redact, renderDemoSvg, type DemoStep } from "./demo-svg.js"
+import { redact, renderDemoSvg, validatorLabel, type DemoStep } from "./demo-svg.js"
 import { connectStdio } from "./stdio-client.js"
 
 const [staker, claimant] = process.argv.slice(2)
@@ -48,7 +48,7 @@ try {
 
   const list = await call("validators_list")
   const validators = list.data.validators as { address: string; label: string | null; share: number; participation: number | null }[]
-  for (const v of validators) labels.set(v.address.toLowerCase(), `<validator ${v.label ?? "unlabelled"}>`)
+  for (const v of validators) labels.set(v.address.toLowerCase(), validatorLabel(v.label))
   steps.push({
     call: "validators_list {}",
     lines: [

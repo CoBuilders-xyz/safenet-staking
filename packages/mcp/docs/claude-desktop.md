@@ -80,7 +80,30 @@ Once the package is on npm, the entry needs no clone:
 ```
 
 The config file is plain text. Many RPC providers put the API key in the URL: if yours does, do
-not paste the URL here. Use the wrapper in step 5 instead, which reads it from a secret manager.
+not paste the URL here. Start the server through a wrapper that reads the URL from your secret
+manager, and point `command` at the wrapper. This one keeps writes off, and loads no signer:
+
+```sh
+#!/bin/sh
+# safenet-mcp-read: starts safenet-mcp with the RPC URL from the secret manager. Writes stay off.
+# Replace <command> with the one that prints the secret.
+export MAINNET_RPC_URL="$(<command that prints your RPC URL>)"
+exec /absolute/path/to/node /absolute/path/to/safenet-staking/packages/mcp/dist/index.js
+```
+
+```json
+{
+  "mcpServers": {
+    "safenet": {
+      "command": "/absolute/path/to/safenet-mcp-read"
+    }
+  }
+}
+```
+
+Make it executable with `chmod +x`. On Windows, use the PowerShell form at the end of step 5,
+without the lines that set `SAFENET_SIGNING_KEY`, `SAFENET_MCP_PRIVATE_KEY_ENV` and
+`SAFENET_MCP_ALLOW_WRITES`.
 
 ## 3. Restart and check
 
@@ -119,7 +142,8 @@ turn writes on.
 
 To allow them, the server must start with `SAFENET_MCP_ALLOW_WRITES=1` and a signer, and no key or
 password may sit in the config file. Start the server through a wrapper that reads the secrets
-from your secret manager, and point `command` at the wrapper. On macOS:
+from your secret manager, and point `command` at the wrapper. Use this one only to allow writes;
+for the RPC URL alone, use the read-only wrapper in step 2. On macOS:
 
 ```sh
 #!/bin/sh
@@ -137,6 +161,30 @@ exec /absolute/path/to/node /absolute/path/to/safenet-staking/packages/mcp/dist/
   "mcpServers": {
     "safenet": {
       "command": "/absolute/path/to/safenet-mcp-writes"
+    }
+  }
+}
+```
+
+On Windows, the same wrapper in PowerShell, saved as `safenet-mcp-writes.ps1`. It was written for
+this guide and not run on Windows:
+
+```powershell
+# safenet-mcp-writes.ps1: starts safenet-mcp with writes allowed. Replace each <command> with the
+# one that prints that secret.
+$env:MAINNET_RPC_URL = (<command that prints your RPC URL>)
+$env:SAFENET_SIGNING_KEY = (<command that prints the private key>)
+$env:SAFENET_MCP_PRIVATE_KEY_ENV = "SAFENET_SIGNING_KEY"
+$env:SAFENET_MCP_ALLOW_WRITES = "1"
+& "C:\absolute\path\to\node.exe" "C:\absolute\path\to\safenet-staking\packages\mcp\dist\index.js"
+```
+
+```json
+{
+  "mcpServers": {
+    "safenet": {
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:\\absolute\\path\\to\\safenet-mcp-writes.ps1"]
     }
   }
 }
