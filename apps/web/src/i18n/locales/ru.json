@@ -1,0 +1,228 @@
+{
+  "footer": {
+    "documentation": "Документация",
+    "faq": "Вопросы и ответы",
+    "imprint": "Выходные данные",
+    "privacy": "Конфиденциальность",
+    "terms": "Условия"
+  },
+  "header": {
+    "closeMenu": "Закрыть меню",
+    "darkMode": "Включить тёмную тему",
+    "language": "Язык",
+    "lightMode": "Включить светлую тему",
+    "nav": {
+      "dashboard": "Панель",
+      "overview": "Обзор",
+      "rewards": "Вознаграждения",
+      "validators": "Валидаторы",
+      "withdrawals": "Выводы"
+    },
+    "openMenu": "Открыть меню"
+  },
+  "overview": {
+    "activity": {
+      "boundaryTitle": "Недавняя активность",
+      "rewardsClaimed": "Востребованные вознаграждения",
+      "source": "Сабграф Mainnet, суточные итоги с {{since}}.",
+      "stakedIn": "Внесено в стейкинг",
+      "stakersNow": "Текущие стейкеры",
+      "stakes": "Операции стейкинга",
+      "title_few": "Последние {{count}} дня",
+      "title_many": "Последние {{count}} дней",
+      "title_one": "Последний {{count}} день",
+      "title_other": "Последние {{count}} дня",
+      "unavailable": "Недоступно. {{reason}}",
+      "withdrawals": "Выводы",
+      "withdrawn": "Выведено"
+    },
+    "age": {
+      "days": "{{n}} д",
+      "hours": "{{n}} ч",
+      "minutes": "{{n}} мин",
+      "minutesSeconds": "{{m}} мин {{s}} с",
+      "seconds": "{{n}} с"
+    },
+    "betaWindow": "Beta, с {{from}} по {{to}}",
+    "degradation": {
+      "empty": "Сабграф ещё не проиндексировал эти данные.",
+      "failed": "Не удалось выполнить запрос к сабграфу.",
+      "indexingError": "Сабграф сообщает об ошибке индексации, поэтому он перестал продвигаться.",
+      "stale": "Последний проиндексированный сабграфом блок, {{block}}, создан {{age}} назад, что превышает предел в {{limit}}.",
+      "staleUnknownAge": "Сабграф не сообщает, когда был создан блок {{block}}, поэтому его возраст неизвестен.",
+      "unconfigured": "Для этой сборки не настроен адрес сабграфа."
+    },
+    "distribution": {
+      "barLabel": "Доля стейка по валидаторам",
+      "definition": "Сумма квадратов процентных долей всех валидаторов: 10,000, если бы весь стейк принадлежал одному валидатору, 10,000 ÷ n для n равных валидаторов.",
+      "empty": "Пока ни у одного валидатора нет стейка.",
+      "index": "ИХХ {{index}}",
+      "title": "Распределение стейка"
+    },
+    "figure": {
+      "loading": "Загрузка",
+      "loadingLabel": "Загрузка: {{label}}",
+      "unavailable": "Недоступно"
+    },
+    "freshness": {
+      "chain": "Сабграф {{chain}}:",
+      "checking": "проверка.",
+      "gnosisFallback": "Данные об аттестациях взяты из снимка, сделанного {{runAt}}, а участие — из показателя, опубликованного SEF, если SEF его публикует.",
+      "live": "работает. Последний проиндексированный блок <block>{{block}}</block>, возраст {{age}} на момент проверки {{checkedAt}}.",
+      "mainnetFallback": "Вместо этого данные о стейкинге и вознаграждениях считываются напрямую из контрактов в Ethereum.",
+      "notUsed": "не используется. {{why}} {{fallback}}",
+      "title": "Актуальность данных"
+    },
+    "headline": {
+      "activeCount_few": "{{count}} активных",
+      "activeCount_many": "{{count}} активных",
+      "activeCount_one": "{{count}} активный",
+      "activeCount_other": "{{count}} активных",
+      "activeValidators": "Активные валидаторы",
+      "attestationsDetail_few": "Среднее за {{count}} полных дня, диапазон от {{min}} до {{max}}",
+      "attestationsDetail_many": "Среднее за {{count}} полных дней, диапазон от {{min}} до {{max}}",
+      "attestationsDetail_one": "Среднее за {{count}} полный день, диапазон от {{min}} до {{max}}",
+      "attestationsDetail_other": "Среднее за {{count}} полного дня, диапазон от {{min}} до {{max}}",
+      "attestationsPerDay": "Аттестаций в день",
+      "gnosisSource": "Сабграф Gnosis, полные сутки UTC с {{from}} по {{to}}",
+      "gnosisSourceBeta": "{{beta}}. Сабграф Gnosis, полные сутки UTC.",
+      "latency": "Задержка аттестации",
+      "latencyDetail_few": "Медиана: {{count}} блока от предложения до аттестации",
+      "latencyDetail_many": "Медиана: {{count}} блоков от предложения до аттестации",
+      "latencyDetail_one": "Медиана: {{count}} блок от предложения до аттестации",
+      "latencyDetail_other": "Медиана: {{count}} блока от предложения до аттестации",
+      "latencyValue": "~{{n}} с",
+      "snapshotSource": "Снимок от {{runAt}}.",
+      "snapshotSourceWithReason": "Снимок от {{runAt}}. {{reason}}",
+      "title": "Ключевые показатели",
+      "totalStaked": "Всего SAFE в стейкинге",
+      "withdrawnCount_few": "{{count}} выбыли",
+      "withdrawnCount_many": "{{count}} выбыли",
+      "withdrawnCount_one": "{{count}} выбыл",
+      "withdrawnCount_other": "{{count}} выбыли",
+      "withdrawnDetail": "Выбыл: участие в Aegis не подтверждено."
+    },
+    "hero": {
+      "openDashboard": "Открыть панель стейкинга",
+      "subtitle": "Состояние стейкинга и консенсуса Safenet. Кошелёк не нужен.",
+      "title": "Обзор сети"
+    },
+    "reason": {
+      "balanceExceedsAllocation": "Контракт содержит больше SAFE, чем опубликованное распределение, поэтому разница не отражает востребованные суммы.",
+      "claimsExceedAllocation": "Востребованные суммы превышают опубликованное распределение, поэтому разница не отражает невостребованный остаток.",
+      "latestFileFailed": "Не удалось загрузить опубликованный SEF файл вознаграждений.",
+      "merkleDropReadFailed": "Не удалось прочитать контракт MerkleDrop в Ethereum.",
+      "negativeClaims": "Сабграф сообщает отрицательную востребованную сумму, что невозможно.",
+      "negativeDaily": "Сабграф сообщает отрицательную суточную сумму, что невозможно.",
+      "noCompleteDay": "Сабграф Gnosis ещё не проиндексировал полные сутки UTC.",
+      "noDailyHistory": "{{why}} Ни одно чтение контракта не даёт суточной истории.",
+      "noLatencySample": "Ни одну аттестацию в окне сабграфа Gnosis не удалось сопоставить с её предложением.",
+      "noValidatorList": "{{why}} Без него нет списка валидаторов, для которых можно прочитать стейк.",
+      "rootDiffers": "Корень в блокчейне отличается от опубликованного SEF, поэтому опубликованное распределение не совпадает с тем, что выплачивает контракт.",
+      "stakersUnavailable": "{{why}} Ни одно чтение контракта не даёт этот показатель.",
+      "stakesUnread_few": "Не удалось прочитать {{count}} из {{total}} стейков валидаторов, поэтому доли были бы неверны.",
+      "stakesUnread_many": "Не удалось прочитать {{count}} из {{total}} стейков валидаторов, поэтому доли были бы неверны.",
+      "stakesUnread_one": "Не удалось прочитать {{count}} из {{total}} стейков валидаторов, поэтому доли были бы неверны.",
+      "stakesUnread_other": "Не удалось прочитать {{count}} из {{total}} стейков валидаторов, поэтому доли были бы неверны.",
+      "stakingReadFailed": "Не удалось прочитать контракт стейкинга в Ethereum.",
+      "validatorListFailed": "Не удалось загрузить список валидаторов SEF."
+    },
+    "rewards": {
+      "allocated": "Распределено на сегодня",
+      "claimed": "Востребовано",
+      "percentClaimed": "{{percent}}% востребовано",
+      "percentUnclaimed": "{{percent}}% не востребовано",
+      "progressLabel": "Доля востребованных распределённых вознаграждений",
+      "rootCheck": "Корень Меркла в блокчейне в сравнении с корнем, опубликованным SEF",
+      "rootDiffers": "Различается",
+      "rootMatch": "Совпадает",
+      "rootNotCompared": "Ещё не сравнивался",
+      "sourceAllocated": "Распределено: опубликованный SEF файл вознаграждений.",
+      "sourceClaimedContract": "Востребовано и не востребовано: распределённое минус текущий баланс SAFE контракта MerkleDrop.",
+      "sourceClaimedSubgraph": "Востребовано: сумма событий Claimed по данным сабграфа Mainnet; не востребовано — распределённое минус эта сумма.",
+      "title": "Вознаграждения",
+      "unclaimed": "Не востребовано"
+    },
+    "section": {
+      "failed": "Не удалось показать этот раздел.",
+      "retry": "Повторить"
+    },
+    "source": {
+      "contract": "Прочитано напрямую из контрактов в Ethereum",
+      "mainnetSubgraph": "Сабграф Mainnet",
+      "sef": "Опубликованный SEF список валидаторов",
+      "snapshot": "Снимок"
+    },
+    "sourceSentence": "{{source}}.",
+    "validators": {
+      "active": "Активен",
+      "column": {
+        "participation": "Участие",
+        "share": "Доля",
+        "staked": "В стейкинге",
+        "stakers": "Стейкеры",
+        "status": "Статус",
+        "validator": "Валидатор"
+      },
+      "empty": "Пока не зарегистрировано ни одного валидатора.",
+      "missed_few": "пропущено: {{n}}",
+      "missed_many": "пропущено: {{n}}",
+      "missed_one": "пропущено: {{n}}",
+      "missed_other": "пропущено: {{n}}",
+      "notAvailable": "Недоступно",
+      "participationMarked": "Участие: {{subgraph}}; строки с пометкой «{{marker}}» используют {{sef}}.",
+      "participationNone": "Участие: данных нет. В сабграфе Gnosis нет данных по этим валидаторам, и {{reason}}.",
+      "participationOtherRows": "Участие: {{subgraph}}; для остальных строк — {{sef}}.",
+      "participationSef": "Участие: {{sef}}.",
+      "participationSubgraph": "Участие: {{subgraph}}.",
+      "sefAll": "опубликованный SEF показатель за 14 дней",
+      "sefFile": "файл SEF",
+      "sefListFailed": "не удалось прочитать список валидаторов SEF",
+      "sefListLoading": "список валидаторов SEF не загружен",
+      "sefListOmits": "список валидаторов SEF не включает этих валидаторов",
+      "sefNone": "SEF в настоящее время не публикует показатель за 14 дней",
+      "sefSome": "опубликованный SEF показатель за 14 дней, если SEF его публикует",
+      "source": "Стейк: {{stake}}. {{participation}} {{rule}}",
+      "stake": "Застейкать",
+      "stakeWith": "Застейкать у {{name}}",
+      "subgraphWordsBeta_few": "{{beta}}: сабграф Gnosis, посещённые церемонии аттестации за {{count}} полных суток UTC",
+      "subgraphWordsBeta_many": "{{beta}}: сабграф Gnosis, посещённые церемонии аттестации за {{count}} полных суток UTC",
+      "subgraphWordsBeta_one": "{{beta}}: сабграф Gnosis, посещённые церемонии аттестации за {{count}} полные сутки UTC",
+      "subgraphWordsBeta_other": "{{beta}}: сабграф Gnosis, посещённые церемонии аттестации за {{count}} полных суток UTC",
+      "subgraphWords_few": "сабграф Gnosis, посещённые церемонии аттестации за {{count}} полных суток UTC по {{to}}",
+      "subgraphWords_many": "сабграф Gnosis, посещённые церемонии аттестации за {{count}} полных суток UTC по {{to}}",
+      "subgraphWords_one": "сабграф Gnosis, посещённые церемонии аттестации за {{count}} полные сутки UTC по {{to}}",
+      "subgraphWords_other": "сабграф Gnosis, посещённые церемонии аттестации за {{count}} полных суток UTC по {{to}}",
+      "title": "Валидаторы",
+      "unlisted": "Нет в списке SEF"
+    }
+  },
+  "programme": {
+    "betaEnded": "Beta завершилась {{betaEnd}}. Данные Aegis начинаются с {{aegisStart}}.",
+    "betaEndedLabel": "Beta завершена",
+    "participationRule": "Если участие валидатора в периоде вознаграждения ниже {{threshold}}%, ни валидатор, ни его делегаторы не получают вознаграждений за этот период.",
+    "rateNotPublished": "Не опубликовано",
+    "withdrawnStatus": "Выбыл, участие в Aegis не подтверждено"
+  },
+  "shell": {
+    "accessRestricted": {
+      "description": "SAFE Staking и вознаграждения недоступны в вашем регионе.",
+      "title": "Доступ ограничен"
+    },
+    "byCoBuilders": "от CoBuilders",
+    "disconnected": {
+      "description": "Подключитесь снова, чтобы продолжить.",
+      "title": "Кошелёк отключён"
+    },
+    "error": {
+      "description": "При загрузке этой страницы произошла непредвиденная ошибка.",
+      "retry": "Повторить попытку",
+      "title": "Что-то пошло не так"
+    },
+    "skipToContent": "Перейти к основному содержимому",
+    "walletRestricted": {
+      "description": "Этот адрес кошелька помечен и не может использовать SAFE Staking.",
+      "title": "Кошелёк ограничен"
+    }
+  }
+}

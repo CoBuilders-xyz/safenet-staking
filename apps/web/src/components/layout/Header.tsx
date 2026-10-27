@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, useLocation } from "react-router-dom"
 import { ConnectButton } from "@/components/wallet/ConnectButton"
 import { useDarkMode } from "@/hooks/useDarkMode"
@@ -8,17 +9,23 @@ import X from "lucide-react/dist/esm/icons/x"
 import Sun from "lucide-react/dist/esm/icons/sun"
 import Moon from "lucide-react/dist/esm/icons/moon"
 import { Button } from "@/components/ui/button"
+import { LanguageSwitcher } from "./LanguageSwitcher"
 
-const navItems = [
-  { label: "Overview", path: "/" },
-  { label: "Dashboard", path: "/dashboard" },
-  { label: "Validators", path: "/validators" },
-  { label: "Withdrawals", path: "/withdrawals" },
-  { label: "Rewards", path: "/rewards" },
-]
-
+/**
+ * The full navigation shows from `xl`, below that the menu button. From `md` the five items and
+ * the wallet button overflowed the window even in English; at `lg` German and Russian wrap the
+ * logo and the wallet button. `e2e/tests/language.spec.ts` checks the widths in three languages.
+ */
 export function Header() {
+  const { t } = useTranslation()
   const { pathname } = useLocation()
+  const navItems = [
+    { label: t("header.nav.overview", "Overview"), path: "/" },
+    { label: t("header.nav.dashboard", "Dashboard"), path: "/dashboard" },
+    { label: t("header.nav.validators", "Validators"), path: "/validators" },
+    { label: t("header.nav.withdrawals", "Withdrawals"), path: "/withdrawals" },
+    { label: t("header.nav.rewards", "Rewards"), path: "/rewards" },
+  ]
   const { isDark, toggle } = useDarkMode()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -36,9 +43,9 @@ export function Header() {
             <span className="font-heading text-lg font-semibold leading-none tracking-tight text-foreground">
               Safenet Staking
             </span>
-            <span className="text-xs leading-none text-muted-foreground">by CoBuilders</span>
+            <span className="text-xs leading-none text-muted-foreground">{t("shell.byCoBuilders", "by CoBuilders")}</span>
           </Link>
-          <nav className="hidden md:flex items-stretch h-16 gap-1 -mb-px">
+          <nav className="hidden xl:flex items-stretch h-16 gap-1 -mb-px">
             {navItems.map((item) => (
               <Link
                 key={item.path}
@@ -57,23 +64,24 @@ export function Header() {
           </nav>
         </div>
         <div className="flex items-center gap-2">
+          <LanguageSwitcher />
           <Button
             variant="ghost"
             size="icon"
             onClick={toggle}
-            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            aria-label={isDark ? t("header.lightMode", "Switch to light mode") : t("header.darkMode", "Switch to dark mode")}
           >
             {isDark ? <Sun className="h-5 w-5" aria-hidden="true" /> : <Moon className="h-5 w-5" aria-hidden="true" />}
           </Button>
-          <div className="hidden md:block">
+          <div className="hidden xl:block">
             <ConnectButton />
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
+            className="xl:hidden"
             onClick={() => setMobileMenuOpen((v) => !v)}
-            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-label={mobileMenuOpen ? t("header.closeMenu", "Close menu") : t("header.openMenu", "Open menu")}
             aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
@@ -82,7 +90,7 @@ export function Header() {
       </div>
 
       {mobileMenuOpen && (
-        <div className="border-t md:hidden">
+        <div className="border-t xl:hidden">
           <nav className="container mx-auto flex flex-col gap-1 px-4 py-3">
             {navItems.map((item) => (
               <Link

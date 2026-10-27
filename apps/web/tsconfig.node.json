@@ -31,6 +31,9 @@
     "scripts/fork-env/*.ts",
     "scripts/release.ts",
     "scripts/release-pin.ts",
-    "scripts/release-gateways.ts"
+    "scripts/release-gateways.ts",
+    "scripts/i18n-catalogues.ts",
+    "scripts/i18n-extract.ts",
+    "src/i18n/languages.ts"
   ]
 }

@@ -1,0 +1,201 @@
+{
+  "footer": {
+    "documentation": "文档",
+    "faq": "常见问题",
+    "imprint": "法律声明",
+    "privacy": "隐私",
+    "terms": "条款"
+  },
+  "header": {
+    "closeMenu": "关闭菜单",
+    "darkMode": "切换到深色模式",
+    "language": "语言",
+    "lightMode": "切换到浅色模式",
+    "nav": {
+      "dashboard": "仪表板",
+      "overview": "概览",
+      "rewards": "奖励",
+      "validators": "验证者",
+      "withdrawals": "提取"
+    },
+    "openMenu": "打开菜单"
+  },
+  "overview": {
+    "activity": {
+      "boundaryTitle": "近期活动",
+      "rewardsClaimed": "已领取奖励",
+      "source": "Mainnet 子图，自 {{since}} 起的每日汇总。",
+      "stakedIn": "新增质押",
+      "stakersNow": "当前质押者",
+      "stakes": "质押次数",
+      "title_other": "最近 {{count}} 天",
+      "unavailable": "不可用。{{reason}}",
+      "withdrawals": "提取次数",
+      "withdrawn": "已提取"
+    },
+    "age": {
+      "days": "{{n}} 天",
+      "hours": "{{n}} 小时",
+      "minutes": "{{n}} 分钟",
+      "minutesSeconds": "{{m}} 分 {{s}} 秒",
+      "seconds": "{{n}} 秒"
+    },
+    "betaWindow": "Beta，{{from}} 至 {{to}}",
+    "degradation": {
+      "empty": "子图尚未索引这些数据。",
+      "failed": "无法查询子图。",
+      "indexingError": "子图报告了索引错误，因此已停止推进。",
+      "stale": "子图最后索引的区块 {{block}} 已有 {{age}}，超过 {{limit}} 的上限。",
+      "staleUnknownAge": "子图未报告区块 {{block}} 的产生时间，因此其时效未知。",
+      "unconfigured": "此版本未配置子图端点。"
+    },
+    "distribution": {
+      "barLabel": "各验证者的质押占比",
+      "definition": "各验证者百分比份额的平方和：若一个验证者持有全部质押则为 10,000，n 个份额相同的验证者则为 10,000 ÷ n。",
+      "empty": "尚无验证者持有质押。",
+      "index": "HHI {{index}}",
+      "title": "质押分布"
+    },
+    "figure": {
+      "loading": "加载中",
+      "loadingLabel": "正在加载{{label}}",
+      "unavailable": "不可用"
+    },
+    "freshness": {
+      "chain": "{{chain}} 子图：",
+      "checking": "检查中。",
+      "gnosisFallback": "证明数据来自 {{runAt}} 测得的快照，参与率来自 SEF 公布的数据（如 SEF 有公布）。",
+      "live": "运行中。最后索引的区块 <block>{{block}}</block>，于 {{checkedAt}} 检查时已有 {{age}}。",
+      "mainnetFallback": "质押和奖励数据改为直接从以太坊上的合约读取。",
+      "notUsed": "未使用。{{why}}{{fallback}}",
+      "title": "数据时效"
+    },
+    "headline": {
+      "activeCount_other": "{{count}} 个活跃",
+      "activeValidators": "活跃验证者",
+      "attestationsDetail_other": "{{count}} 个完整日的平均值，范围 {{min}} 至 {{max}}",
+      "attestationsPerDay": "每日证明数",
+      "gnosisSource": "Gnosis 子图，{{from}} 至 {{to}} 的完整 UTC 日",
+      "gnosisSourceBeta": "{{beta}}。Gnosis 子图，完整 UTC 日。",
+      "latency": "证明延迟",
+      "latencyDetail_other": "从提议到证明的中位数为 {{count}} 个区块",
+      "latencyValue": "~{{n}} 秒",
+      "snapshotSource": "快照测于 {{runAt}}。",
+      "snapshotSourceWithReason": "快照测于 {{runAt}}。{{reason}}",
+      "title": "核心数据",
+      "totalStaked": "SAFE 质押总量",
+      "withdrawnCount_other": "{{count}} 个已退出",
+      "withdrawnDetail": "已退出：Aegis 参与情况未确认。"
+    },
+    "hero": {
+      "openDashboard": "打开质押仪表板",
+      "subtitle": "Safenet 质押与共识的状态。无需钱包。",
+      "title": "网络概览"
+    },
+    "reason": {
+      "balanceExceedsAllocation": "合约持有的 SAFE 多于公布的分配额，因此差额不能反映领取情况。",
+      "claimsExceedAllocation": "领取额超过了公布的分配额，因此差额不能反映未领取的数量。",
+      "latestFileFailed": "无法加载 SEF 公布的奖励文件。",
+      "merkleDropReadFailed": "无法从以太坊读取 MerkleDrop 合约。",
+      "negativeClaims": "子图报告的领取总额为负数，这不可能正确。",
+      "negativeDaily": "子图报告的每日金额为负数，这不可能正确。",
+      "noCompleteDay": "Gnosis 子图尚未索引完整的 UTC 日。",
+      "noDailyHistory": "{{why}}没有任何合约读取可提供每日历史。",
+      "noLatencySample": "Gnosis 子图窗口内没有任何证明能与其提议匹配。",
+      "noValidatorList": "{{why}}没有该列表，就无法读取验证者的质押。",
+      "rootDiffers": "链上根与 SEF 公布的根不同，因此公布的分配额与合约实际支付的不一致。",
+      "stakersUnavailable": "{{why}}没有任何合约读取可提供此数据。",
+      "stakesUnread_other": "{{total}} 个验证者质押中有 {{count}} 个无法读取，因此占比将不正确。",
+      "stakingReadFailed": "无法从以太坊读取质押合约。",
+      "validatorListFailed": "无法加载 SEF 的验证者列表。"
+    },
+    "rewards": {
+      "allocated": "截至目前已分配",
+      "claimed": "已领取",
+      "percentClaimed": "{{percent}}% 已领取",
+      "percentUnclaimed": "{{percent}}% 未领取",
+      "progressLabel": "已分配奖励中已领取的比例",
+      "rootCheck": "链上默克尔根与 SEF 公布的根对比",
+      "rootDiffers": "不一致",
+      "rootMatch": "一致",
+      "rootNotCompared": "尚未比较",
+      "sourceAllocated": "已分配：SEF 公布的奖励文件。",
+      "sourceClaimedContract": "已领取与未领取：已分配额减去 MerkleDrop 当前的 SAFE 余额。",
+      "sourceClaimedSubgraph": "已领取：Mainnet 子图中 Claimed 事件的总和；未领取为已分配额减去该总和。",
+      "title": "奖励",
+      "unclaimed": "未领取"
+    },
+    "section": {
+      "failed": "无法显示此部分。",
+      "retry": "重试"
+    },
+    "source": {
+      "contract": "直接从以太坊上的合约读取",
+      "mainnetSubgraph": "Mainnet 子图",
+      "sef": "SEF 公布的验证者列表",
+      "snapshot": "快照"
+    },
+    "sourceSentence": "{{source}}。",
+    "validators": {
+      "active": "活跃",
+      "column": {
+        "participation": "参与率",
+        "share": "占比",
+        "staked": "已质押",
+        "stakers": "质押者",
+        "status": "状态",
+        "validator": "验证者"
+      },
+      "empty": "尚无已注册的验证者。",
+      "missed_other": "缺席 {{n}} 次",
+      "notAvailable": "不可用",
+      "participationMarked": "参与率：{{subgraph}}；标记为“{{marker}}”的行使用{{sef}}。",
+      "participationNone": "参与率：暂无数据。Gnosis 子图没有这些验证者的数据，且{{reason}}。",
+      "participationOtherRows": "参与率：{{subgraph}}；其他行：{{sef}}。",
+      "participationSef": "参与率：{{sef}}。",
+      "participationSubgraph": "参与率：{{subgraph}}。",
+      "sefAll": "SEF 公布的 14 天数据",
+      "sefFile": "SEF 文件",
+      "sefListFailed": "无法读取 SEF 的验证者列表",
+      "sefListLoading": "SEF 的验证者列表尚未加载",
+      "sefListOmits": "SEF 的验证者列表不包含这些验证者",
+      "sefNone": "SEF 目前未公布 14 天数据",
+      "sefSome": "SEF 公布的 14 天数据（如 SEF 有公布）",
+      "source": "质押：{{stake}}。{{participation}}{{rule}}",
+      "stake": "质押",
+      "stakeWith": "质押给 {{name}}",
+      "subgraphWordsBeta_other": "{{beta}}：Gnosis 子图，{{count}} 个完整 UTC 日内出席的证明仪式",
+      "subgraphWords_other": "Gnosis 子图，截至 {{to}} 的 {{count}} 个完整 UTC 日内出席的证明仪式",
+      "title": "验证者",
+      "unlisted": "不在 SEF 列表中"
+    }
+  },
+  "programme": {
+    "betaEnded": "Beta 已于 {{betaEnd}} 结束。Aegis 数据自 {{aegisStart}} 开始。",
+    "betaEndedLabel": "Beta 已结束",
+    "participationRule": "如果某验证者在一个奖励周期内的参与率低于 {{threshold}}%，该验证者及其委托者在该周期内均无法获得奖励。",
+    "rateNotPublished": "未公布",
+    "withdrawnStatus": "已退出，Aegis 参与情况未确认"
+  },
+  "shell": {
+    "accessRestricted": {
+      "description": "SAFE Staking 及奖励在您所在的地区不可用。",
+      "title": "访问受限"
+    },
+    "byCoBuilders": "由 CoBuilders 提供",
+    "disconnected": {
+      "description": "请重新连接以继续。",
+      "title": "钱包已断开连接"
+    },
+    "error": {
+      "description": "加载此页面时发生意外错误。",
+      "retry": "重试",
+      "title": "出现问题"
+    },
+    "skipToContent": "跳到主要内容",
+    "walletRestricted": {
+      "description": "此钱包地址已被标记，无法使用 SAFE Staking。",
+      "title": "钱包受限"
+    }
+  }
+}

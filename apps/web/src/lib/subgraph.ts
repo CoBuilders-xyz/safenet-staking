@@ -1,5 +1,6 @@
 import { request, type RequestExtendedOptions, type Variables } from "graphql-request"
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core"
+import type { TFunction } from "i18next"
 import { SUBGRAPH_STALE_AFTER_SECONDS } from "@cobuilders/safenet-core"
 
 /** A query that has not answered in this time counts as failed, so the page can fall back. */
@@ -56,36 +57,47 @@ export function assessFreshness(f: Freshness): Degradation | undefined {
 
 /**
  * "42 s", "12 min", "15 min 1 s", "3 h", "2 d". Under an hour the seconds are kept whenever they
- * are not zero, so an age just past the 15 min limit never reads as "15 min".
+ * are not zero, so an age just past the 15 min limit never reads as "15 min". The units come
+ * from the catalogue; the numbers are never localised.
  */
-export function formatAge(seconds: number): string {
-  if (seconds < 120) return `${seconds} s`
+export function formatAge(seconds: number, t: TFunction): string {
+  if (seconds < 120) return t("overview.age.seconds", "{{n}} s", { n: seconds })
   if (seconds < 3600) {
     const m = Math.floor(seconds / 60)
     const s = seconds % 60
-    return s === 0 ? `${m} min` : `${m} min ${s} s`
+    return s === 0
+      ? t("overview.age.minutes", "{{n}} min", { n: m })
+      : t("overview.age.minutesSeconds", "{{m}} min {{s}} s", { m, s })
   }
-  if (seconds < 172_800) return `${Math.floor(seconds / 3600)} h`
-  return `${Math.floor(seconds / 86_400)} d`
+  if (seconds < 172_800) return t("overview.age.hours", "{{n}} h", { n: Math.floor(seconds / 3600) })
+  return t("overview.age.days", "{{n}} d", { n: Math.floor(seconds / 86_400) })
 }
 
 /** One plain sentence saying why subgraph figures are not shown. */
-export function describeDegradation(d: Degradation): string {
+export function describeDegradation(d: Degradation, t: TFunction): string {
   switch (d.kind) {
     case "unconfigured":
-      return "No subgraph endpoint is configured for this build."
+      return t("overview.degradation.unconfigured", "No subgraph endpoint is configured for this build.")
     case "failed":
-      return "The subgraph could not be queried."
+      return t("overview.degradation.failed", "The subgraph could not be queried.")
     case "indexing-error":
-      return "The subgraph reports an indexing error, so it has stopped advancing."
+      return t("overview.degradation.indexingError", "The subgraph reports an indexing error, so it has stopped advancing.")
     case "empty":
-      return "The subgraph has not indexed this data yet."
+      return t("overview.degradation.empty", "The subgraph has not indexed this data yet.")
     case "stale": {
       const { block, ageSeconds } = d.freshness
-      const limit = formatAge(SUBGRAPH_STALE_AFTER_SECONDS)
+      const values = { block: block.toLocaleString("en-US") }
       return ageSeconds === null
-        ? `The subgraph does not report when block ${block.toLocaleString("en-US")} was produced, so its age is unknown.`
-        : `The subgraph's last indexed block, ${block.toLocaleString("en-US")}, is ${formatAge(ageSeconds)} old, past the ${limit} limit.`
+        ? t(
+            "overview.degradation.staleUnknownAge",
+            "The subgraph does not report when block {{block}} was produced, so its age is unknown.",
+            values,
+          )
+        : t(
+            "overview.degradation.stale",
+            "The subgraph's last indexed block, {{block}}, is {{age}} old, past the {{limit}} limit.",
+            { ...values, age: formatAge(ageSeconds, t), limit: formatAge(SUBGRAPH_STALE_AFTER_SECONDS, t) },
+          )
     }
   }
 }

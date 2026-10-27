@@ -97,7 +97,7 @@ The release build reads none of this. It reads [`build.env`](build.env) only; se
 | `build` | `tsc -b`, then the production build into `dist/` |
 | `preview` | Serves `dist/` |
 | `lint` | ESLint |
-| `check` | `codegen:check`, ESLint, `tsc -b --noEmit`, and the e2e TypeScript project. Also run by the root `pnpm check` |
+| `check` | `codegen:check`, `i18n:check`, ESLint, `tsc -b --noEmit`, and the e2e TypeScript project. Also run by the root `pnpm check` |
 | `test` | Vitest, once: the tests under `src/` and `scripts/` |
 | `test:watch`, `test:coverage` | Vitest in watch mode, and with a coverage report |
 | `test:e2e` | Playwright against mocked RPC, `e2e/tests/` |
@@ -107,6 +107,8 @@ The release build reads none of this. It reads [`build.env`](build.env) only; se
 | `codegen` | Regenerates the typed GraphQL in `src/graphql/<chain>/generated.ts` from each subgraph package's `schema.graphql` |
 | `codegen:check` | Fails when the committed GraphQL types differ from a fresh `codegen` |
 | `codegen:live-check` | Validates the GraphQL documents against a running graph-node, the Studio deployments by default |
+| `i18n:extract` | Writes the English catalogue, `src/i18n/locales/en.json`, from the keys and English in `src/`; see [`docs/translations.md`](../../docs/translations.md) |
+| `i18n:check` | Writes nothing; fails when a catalogue misses a key, keeps an unused one, or changes a placeholder |
 | `generate:proofs` | Builds a reward Merkle tree and its files; see [Reward proofs](#reward-proofs) |
 | `release:build` | The reproducible production build from `build.env`, packed into `release/app.car` with its root CID in `release/CID`; see [Deployment](#deployment) |
 | `release:pin` | Pins `release/app.car` to Pinata and checks that the gateways serve it |
@@ -169,6 +171,7 @@ CI runs it nightly, not on pull requests, because every run reads from the archi
 - Radix UI primitives styled after shadcn/ui
 - graphql-request with GraphQL Code Generator
 - Recharts
+- i18next with react-i18next
 - Vitest and Playwright
 
 ## Layout
@@ -181,6 +184,7 @@ src/
 ├── config/       chain and transports, contract addresses, wagmi, QueryClient, subgraph endpoints
 ├── graphql/      GraphQL documents per chain and their generated types
 ├── hooks/        contract reads and writes, subgraph queries, rewards, compliance checks
+├── i18n/         languages, detection, and the catalogues in locales/
 ├── lib/          formatting, errors, figures, programme copy, Safe detection
 └── pages/        one component per route
 e2e/
@@ -193,7 +197,8 @@ scripts/
 ├── merkle-tree.ts, generate-merkle-tree.ts, merkle-config.json   reward proofs
 ├── fork-env/     the manual QA fork behind fork:up, fork:reset and fork:down
 ├── codegen-check.ts, codegen-live-check.ts, subgraph-api-schema.ts   GraphQL codegen
-└── release.ts, release-pin.ts, release-gateways.ts   the IPFS release
+├── release.ts, release-pin.ts, release-gateways.ts   the IPFS release
+└── i18n-extract.ts, i18n-catalogues.ts   the catalogue extraction and check
 public/           static files, including the Safe App manifest
 ```
 

@@ -6,19 +6,26 @@ import { config } from "@/config/wagmi"
 import { queryClient } from "@/config/queryClient"
 import { ToastProvider } from "@/hooks/ToastProvider"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { initI18n } from "@/i18n"
 import App from "./App"
 import "./index.css"
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <WagmiProvider config={config} reconnectOnMount={false}>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider delayDuration={100}>
-          <ToastProvider>
-            <App />
-          </ToastProvider>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
-  </StrictMode>,
-)
+function render() {
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <WagmiProvider config={config} reconnectOnMount={false}>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider delayDuration={100}>
+            <ToastProvider>
+              <App />
+            </ToastProvider>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </WagmiProvider>
+    </StrictMode>,
+  )
+}
+
+// The first render waits for the reader's catalogue, so it is already in their language. A
+// catalogue that fails to load leaves the page in English, never blank.
+void initI18n().catch(() => undefined).finally(render)

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { PageHero } from "@/components/PageHero"
 import { Button } from "@/components/ui/button"
@@ -16,34 +17,35 @@ import {
  * error boundary, so one failing source leaves the others on screen.
  */
 export function OverviewPage() {
+  const { t } = useTranslation()
   return (
     <div className="space-y-6">
       <PageHero
-        title="Network overview"
-        subtitle="The state of Safenet staking and consensus. No wallet needed."
+        title={t("overview.hero.title", "Network overview")}
+        subtitle={t("overview.hero.subtitle", "The state of Safenet staking and consensus. No wallet needed.")}
       >
         <Button asChild variant="outline" className="mt-6">
-          <Link to="/dashboard">Open the staking dashboard</Link>
+          <Link to="/dashboard">{t("overview.hero.openDashboard", "Open the staking dashboard")}</Link>
         </Button>
       </PageHero>
-      <SectionBoundary title="Data freshness">
+      <SectionBoundary title={t("overview.freshness.title", "Data freshness")}>
         <FreshnessPanel />
       </SectionBoundary>
-      <SectionBoundary title="Headline figures">
+      <SectionBoundary title={t("overview.headline.title", "Headline figures")}>
         <HeadlineStats />
       </SectionBoundary>
       <div className="grid gap-6 lg:grid-cols-2">
-        <SectionBoundary title="Stake distribution">
+        <SectionBoundary title={t("overview.distribution.title", "Stake distribution")}>
           <DistributionPanel />
         </SectionBoundary>
-        <SectionBoundary title="Rewards">
+        <SectionBoundary title={t("overview.rewards.title", "Rewards")}>
           <RewardsPanel />
         </SectionBoundary>
       </div>
-      <SectionBoundary title="Validators">
+      <SectionBoundary title={t("overview.validators.title", "Validators")}>
         <ValidatorsPanel />
       </SectionBoundary>
-      <SectionBoundary title="Recent activity">
+      <SectionBoundary title={t("overview.activity.boundaryTitle", "Recent activity")}>
         <ActivityPanel />
       </SectionBoundary>
     </div>

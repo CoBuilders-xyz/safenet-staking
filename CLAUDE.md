@@ -31,7 +31,7 @@ Every package implements the same five. Turborepo fans them out.
 | `pnpm dev` | Starts the web app's Vite dev server, type-watches `packages/core`, and regenerates the subgraph manifests and types. |
 | `pnpm build` | Builds all packages. |
 | `pnpm test` | Unit tests: Vitest in `apps/web`, matchstick in both subgraphs, node:test in `packages/core`, `packages/cli` and `packages/mcp`, and node:test for the root `tools/` through `test:tools`. The `packages/core` tests live under `src` and `scripts`, and its script fails when it finds no test file. `packages/cli` also has Mainnet smoke tests and fork tests that skip here, and `packages/mcp` Mainnet smoke tests; see `test:smoke` and `test:fork`. |
-| `pnpm check` | Lint, the browser-safety check, then each package's check. In `apps/web` that first fails if the committed GraphQL types differ from a fresh `pnpm codegen`, then lints and type-checks. Run it before every commit. |
+| `pnpm check` | Lint, the browser-safety check, then each package's check. In `apps/web` that first fails if the committed GraphQL types differ from a fresh `pnpm codegen` or if a translation catalogue misses a key, keeps an unused one or changes a placeholder, then lints and type-checks. Run it before every commit. |
 
 This file gives no test counts, because they change with every pull request. Run the suite for
 the current count.
@@ -98,7 +98,7 @@ packages/mcp                EXISTS   safenet-mcp: an MCP server over stdio, one 
                                      Calls the shared library, not the CLI binary. Writes are dry
                                      runs unless the operator allows them at start
 tools/                      EXISTS   edit hook, task guard, browser-safety check, metrics report
-docs/                       EXISTS   the manual QA fork guide
+docs/                       EXISTS   the manual QA fork guide and the translation guide
 scripts/setup.sh            EXISTS   what `pnpm bootstrap` runs
 docker-compose.yml          EXISTS   local graph-node, postgres and ipfs
 graph-node.toml             EXISTS   graph-node config for two chains at once

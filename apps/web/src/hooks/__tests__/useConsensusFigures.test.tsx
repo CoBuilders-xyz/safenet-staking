@@ -3,7 +3,8 @@ import { renderHook, waitFor } from "@testing-library/react"
 import { AEGIS_START_DAY, BETA_END_DAY, GNOSIS_SNAPSHOT, utcDayMs } from "@cobuilders/safenet-core"
 import { CONSENSUS_QUERY_DAYS } from "@/lib/consensus"
 import { STALE_AGE, answerOperations, meta, mockRequest, queryWrapper } from "@/__tests__/subgraph-mocks"
-import { CONSENSUS_MESSAGES, useConsensusFigures } from "../useConsensusFigures"
+import { consensusMessages, useConsensusFigures } from "../useConsensusFigures"
+import { i18n } from "@/i18n"
 
 vi.mock("graphql-request", () => ({ request: (o: unknown) => mockRequest(o) }))
 
@@ -94,7 +95,7 @@ describe("useConsensusFigures", () => {
 
     expect(result.current.attestations.state === "ready" && result.current.attestations.source).toBe("snapshot")
     expect(result.current.attestations.state === "ready" && result.current.attestations.value.mean).toBe(GNOSIS_SNAPSHOT.attestationsPerDay)
-    expect(result.current.snapshotReason).toBe(CONSENSUS_MESSAGES.noCompleteDay)
+    expect(result.current.snapshotReason).toBe(consensusMessages(i18n.t).noCompleteDay)
     expect(result.current.participation).toBeUndefined()
   })
 
@@ -105,7 +106,7 @@ describe("useConsensusFigures", () => {
     await waitFor(() => expect(result.current.latency.state).toBe("ready"))
     expect(result.current.attestations.state === "ready" && result.current.attestations.source).toBe("subgraph")
     expect(result.current.latency.state === "ready" && result.current.latency.source).toBe("snapshot")
-    expect(result.current.snapshotReason).toBe(CONSENSUS_MESSAGES.noLatencySample)
+    expect(result.current.snapshotReason).toBe(consensusMessages(i18n.t).noLatencySample)
   })
 
   it("shows the snapshot when the subgraph is stale", async () => {

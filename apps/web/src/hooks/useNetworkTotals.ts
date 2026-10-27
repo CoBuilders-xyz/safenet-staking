@@ -1,3 +1,5 @@
+import type { TFunction } from "i18next"
+import { useTranslation } from "react-i18next"
 import { NetworkTotalsDocument } from "@/graphql/mainnet/generated"
 import { useTotalStaked } from "@/hooks/useStakingReads"
 import { useValidators } from "@/hooks/useValidators"
@@ -5,10 +7,11 @@ import { describeDegradation } from "@/lib/subgraph"
 import { fromRead, loading, ready, unavailable, type Figure } from "@/lib/figure"
 import { selectLive, useSubgraphQuery } from "./useSubgraphQuery"
 
-export const NETWORK_MESSAGES = {
-  stakingReadFailed: "The staking contract could not be read from Ethereum.",
-  validatorListFailed: "SEF's validator list could not be loaded.",
-} as const
+/** Sentences more than one overview hook shows, in the current language. Written once here. */
+export const networkMessages = (t: TFunction) => ({
+  stakingReadFailed: t("overview.reason.stakingReadFailed", "The staking contract could not be read from Ethereum."),
+  validatorListFailed: t("overview.reason.validatorListFailed", "SEF's validator list could not be loaded."),
+})
 
 /** The query the network totals and the rewards figures share. One request serves both. */
 export function useNetworkQuery() {
@@ -32,6 +35,8 @@ export interface ValidatorCounts {
  * count every registered one.
  */
 export function useNetworkTotals() {
+  const { t } = useTranslation()
+  const messages = networkMessages(t)
   const subgraph = useNetworkQuery()
   const network = selectLive(subgraph, (d) => d.network)
   const degraded = network.status === "degraded"
@@ -41,7 +46,7 @@ export function useNetworkTotals() {
   let totalStaked: Figure<bigint> = loading()
   let stakers: Figure<number> = loading()
   const validatorCounts: Figure<ValidatorCounts> = validators.error
-    ? unavailable(NETWORK_MESSAGES.validatorListFailed)
+    ? unavailable(messages.validatorListFailed)
     : validators.data
       ? ready(
           {
@@ -56,8 +61,12 @@ export function useNetworkTotals() {
     totalStaked = ready(BigInt(network.value.totalStaked), "subgraph")
     stakers = ready(network.value.stakersCurrent, "subgraph")
   } else if (network.status === "degraded") {
-    totalStaked = fromRead(totalRead, "contract", NETWORK_MESSAGES.stakingReadFailed)
-    stakers = unavailable(`${describeDegradation(network.degradation)} No contract read gives this figure.`)
+    totalStaked = fromRead(totalRead, "contract", messages.stakingReadFailed)
+    stakers = unavailable(
+      t("overview.reason.stakersUnavailable", "{{why}} No contract read gives this figure.", {
+        why: describeDegradation(network.degradation, t),
+      }),
+    )
   }
 
   return { subgraph, totalStaked, validatorCounts, stakers }

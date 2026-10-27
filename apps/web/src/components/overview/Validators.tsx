@@ -1,8 +1,8 @@
+import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import type { Address } from "viem"
 import { ParticipationRate } from "@/components/validators/ParticipationRate"
 import { formatParticipation, formatTokenAmount, truncateAddress } from "@/lib/format"
-import { RATE_NOT_PUBLISHED, WITHDRAWN_STATUS } from "@/lib/programme"
 
 export interface ValidatorTableRow {
   address: Address
@@ -33,6 +33,7 @@ export interface ValidatorTableRow {
  * offers no way to stake with it. An active one links to staking with it.
  */
 export function Validators({ rows }: { rows: readonly ValidatorTableRow[] }) {
+  const { t } = useTranslation()
   const showStakers = rows.some((r) => r.stakers !== undefined)
   // Mark the source per row only when the rows mix sources; otherwise the caption says it.
   const mixed = new Set(rows.map((r) => r.participationSource).filter(Boolean)).size > 1
@@ -41,12 +42,12 @@ export function Validators({ rows }: { rows: readonly ValidatorTableRow[] }) {
       <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr className="border-b border-border text-xs uppercase tracking-[0.06em] text-faint">
-            <th scope="col" className="py-2.5 pr-3 text-left font-normal">Validator</th>
-            <th scope="col" className="px-3 py-2.5 text-right font-normal">Staked</th>
-            <th scope="col" className="px-3 py-2.5 text-right font-normal">Share</th>
-            {showStakers && <th scope="col" className="px-3 py-2.5 text-right font-normal">Stakers</th>}
-            <th scope="col" className="px-3 py-2.5 text-right font-normal">Participation</th>
-            <th scope="col" className="py-2.5 pl-3 text-right font-normal">Status</th>
+            <th scope="col" className="py-2.5 pr-3 text-left font-normal">{t("overview.validators.column.validator", "Validator")}</th>
+            <th scope="col" className="px-3 py-2.5 text-right font-normal">{t("overview.validators.column.staked", "Staked")}</th>
+            <th scope="col" className="px-3 py-2.5 text-right font-normal">{t("overview.validators.column.share", "Share")}</th>
+            {showStakers && <th scope="col" className="px-3 py-2.5 text-right font-normal">{t("overview.validators.column.stakers", "Stakers")}</th>}
+            <th scope="col" className="px-3 py-2.5 text-right font-normal">{t("overview.validators.column.participation", "Participation")}</th>
+            <th scope="col" className="py-2.5 pl-3 text-right font-normal">{t("overview.validators.column.status", "Status")}</th>
           </tr>
         </thead>
         <tbody>
@@ -70,34 +71,43 @@ export function Validators({ rows }: { rows: readonly ValidatorTableRow[] }) {
               <td className="px-3 py-3 text-right font-mono tabular-nums">
                 {v.participation === undefined ? (
                   <span className="text-muted-foreground">
-                    {v.participationSource === "sef" ? RATE_NOT_PUBLISHED : "Not available"}
+                    {v.participationSource === "sef"
+                      ? t("programme.rateNotPublished", "Not published")
+                      : t("overview.validators.notAvailable", "Not available")}
                   </span>
                 ) : (
                   <>
                     <ParticipationRate rate={v.participation} text={formatParticipation(v.participation, v.absences)} />
                     {v.absences !== undefined && (
-                      <div className="text-xs text-faint">{v.absences.toLocaleString("en-US")} missed</div>
+                      <div className="text-xs text-faint">
+                        {t("overview.validators.missed", "{{n}} missed", {
+                          count: Number(v.absences),
+                          n: v.absences.toLocaleString("en-US"),
+                        })}
+                      </div>
                     )}
-                    {mixed && v.participationSource === "sef" && <div className="text-xs text-faint">SEF file</div>}
+                    {mixed && v.participationSource === "sef" && <div className="text-xs text-faint">{t("overview.validators.sefFile", "SEF file")}</div>}
                   </>
                 )}
               </td>
               <td className="py-3 pl-3 text-right">
                 {v.status === "withdrawn" ? (
-                  <span className="text-xs text-warning">{WITHDRAWN_STATUS}</span>
+                  <span className="text-xs text-warning">
+                    {t("programme.withdrawnStatus", "Withdrawn, Aegis participation unconfirmed")}
+                  </span>
                 ) : v.status === "active" ? (
                   <span className="inline-flex items-center gap-3">
-                    <span className="text-xs text-success">Active</span>
+                    <span className="text-xs text-success">{t("overview.validators.active", "Active")}</span>
                     <Link
                       to={`/validators?delegate=${v.address}`}
-                      aria-label={`Stake with ${v.label ?? truncateAddress(v.address)}`}
+                      aria-label={t("overview.validators.stakeWith", "Stake with {{name}}", { name: v.label ?? truncateAddress(v.address) })}
                       className="text-xs font-medium text-primary underline-offset-2 hover:underline"
                     >
-                      Stake
+                      {t("overview.validators.stake", "Stake")}
                     </Link>
                   </span>
                 ) : v.status === "unlisted" ? (
-                  <span className="text-xs text-muted-foreground">Not in SEF&apos;s list</span>
+                  <span className="text-xs text-muted-foreground">{t("overview.validators.unlisted", "Not in SEF's list")}</span>
                 ) : (
                   <span className="text-xs text-muted-foreground">—</span>
                 )}

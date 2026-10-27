@@ -13,7 +13,6 @@ import { ChainFreshness } from "../overview/Freshness"
 import { SectionBoundary } from "../overview/OverviewSection"
 import { ParticipationRate } from "../validators/ParticipationRate"
 import { PARTICIPATION_RULE } from "@/lib/programme"
-import { HHI_DEFINITION } from "@/lib/distribution"
 
 const SAFE = 10n ** 18n
 const A = getAddress(TEST_ACCOUNTS.validator1)
@@ -49,7 +48,11 @@ describe("Distribution", () => {
   it("shows the index, its one-line definition, and every share", () => {
     render(<Distribution rows={rows} index={5200} />)
     expect(screen.getByText("HHI 5,200")).toBeInTheDocument()
-    expect(screen.getByText(HHI_DEFINITION)).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "The sum of each validator's squared percentage share: 10,000 if one validator held all stake, 10,000 ÷ n for n equal validators.",
+      ),
+    ).toBeInTheDocument()
     expect(screen.getByText("60.0%")).toBeInTheDocument()
     expect(screen.getByText("40.0%")).toBeInTheDocument()
   })

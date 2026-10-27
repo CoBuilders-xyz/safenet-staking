@@ -12,7 +12,11 @@ as `pnpm <script>` from `apps/web`.
 - **Dev server:** `dev`. Vite reads env from the repository root, not from this directory.
 - **Build:** `build` (`tsc -b && vite build`)
 - **Check:** `check`: `codegen:check`, which fails if `src/graphql/<chain>/generated.ts` is stale,
-  then ESLint, `tsc -b --noEmit` and the e2e TypeScript project. The root `pnpm check` runs it.
+  `i18n:check`, which fails if a catalogue in `src/i18n/locales/` misses a key, keeps an unused
+  one or changes a placeholder, then ESLint, `tsc -b --noEmit` and the e2e TypeScript project. The
+  root `pnpm check` runs it.
+- **Translations:** `i18n:extract` writes `src/i18n/locales/en.json` from the source;
+  `docs/translations.md` at the repository root is the guide
 - **Lint only:** `lint`
 - **Unit tests:** `test` (Vitest, `src/**` and `scripts/**`); `test:watch`; `test:coverage`
 - **E2E, mocked RPC:** `test:e2e` (Playwright, `e2e/tests/`); `test:e2e:ui`; `test:e2e:headed`.
@@ -59,8 +63,28 @@ TanStack Query, Radix UI, graphql-request and Recharts.
 
 ### Provider stack (`src/main.tsx`)
 
-`StrictMode` → `WagmiProvider` (`reconnectOnMount={false}`) → `QueryClientProvider` →
-`TooltipProvider` → `ToastProvider` → `App`
+`initI18n()` first; the first render waits for the reader's catalogue. Then `StrictMode` →
+`WagmiProvider` (`reconnectOnMount={false}`) → `QueryClientProvider` → `TooltipProvider` →
+`ToastProvider` → `App`
+
+### Languages (`src/i18n/`)
+
+i18next with react-i18next, one namespace. `languages.ts` lists the eight languages and detects
+the starting one: the choice stored under `localStorage` `language`, else the browser's
+preferred languages, else English. `index.ts` puts English in the main bundle and loads every
+other catalogue on demand through `import.meta.glob`; the document's `lang` follows
+`currentLanguage()`, which is English when a catalogue failed to load. `LanguageSwitcher` in the
+header stores a choice; a detected language is never stored.
+
+Each call carries its key and English: `t("overview.hero.title", "Network overview")`. Keys are
+string literals, or `i18n:check` fails; `scripts/i18n-catalogues.ts` has the rules. Plurals take
+`count`. Numbers and dates are formatted before they reach `t`, with the same formatters in every
+language. A function outside a component takes `t` as a parameter (`describeDegradation`,
+`formatAge`, the `*Messages(t)` helpers in the overview hooks).
+
+The catalogues cover the shell, the header, the footer and the Overview route. The other routes
+still use English literals, and `lib/programme.ts` keeps its English constants for them; a test
+in `src/i18n/__tests__/` holds those constants equal to the `programme.*` keys.
 
 ### Routing (`src/App.tsx`)
 
@@ -202,7 +226,8 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
 ### Libraries
 
 - `src/lib/format.ts`: token amounts, addresses, countdowns, participation rates, UTC dates.
-- `src/lib/programme.ts`: copy built on the programme calendar in core: `PARTICIPATION_RULE`,
+- `src/lib/programme.ts`: English copy built on the programme calendar in core, for the routes
+  not yet translated: `PARTICIPATION_RULE`,
   `RATE_NOT_PUBLISHED` for a rate SEF lists as null, `belowThreshold`, the dated Beta notice, the withdrawn status for a validator SEF lists as
   inactive.
 - `src/lib/errorFormat.ts`: `formatContractError`, `revertedErrorName`.
@@ -229,7 +254,8 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
 - `scripts/release.ts`, `scripts/release-pin.ts`, `scripts/release-gateways.ts`: the IPFS
   release behind `release:build` and `release:pin`. `build.env` is the release build's only env
   input; it is public and holds no secret.
-- `scripts/__tests__/`: Vitest tests for the tree and the generator.
+- `scripts/i18n-extract.ts`, `scripts/i18n-catalogues.ts`: `i18n:extract` and `i18n:check`.
+- `scripts/__tests__/`: Vitest tests for the tree, the generator and the catalogue check.
 
 To use generated proofs, serve the output and point `VITE_REWARDS_BASE_URL` at it, then set the
 MerkleDrop's root. This repository sets a root only on an Anvil fork.

@@ -1,11 +1,12 @@
 import { useMemo } from "react"
+import { useTranslation } from "react-i18next"
 import { getAddress, type Address } from "viem"
 import { ValidatorStakesDocument } from "@/graphql/mainnet/generated"
 import { useValidatorTotalStakes } from "@/hooks/useStakingReads"
 import { findValidator, useValidators } from "@/hooks/useValidators"
 import { withShares } from "@/lib/distribution"
 import { loading, ready, unavailable, type Figure } from "@/lib/figure"
-import { NETWORK_MESSAGES } from "./useNetworkTotals"
+import { networkMessages } from "./useNetworkTotals"
 import { selectLive, useSubgraphQuery } from "./useSubgraphQuery"
 
 export interface ValidatorStakeRow {
@@ -28,6 +29,8 @@ export interface ValidatorStakeRow {
  * single failed read makes the whole distribution unavailable rather than wrong.
  */
 export function useValidatorStakes() {
+  const { t } = useTranslation()
+  const messages = networkMessages(t)
   const subgraph = useSubgraphQuery("mainnet", "validators", ValidatorStakesDocument)
   const live = selectLive(subgraph, (d) => (d.validators.length > 0 ? d.validators : undefined))
   const degraded = live.status === "degraded"
@@ -53,20 +56,30 @@ export function useValidatorStakes() {
     )
   } else if (degraded) {
     if (sef.error) {
-      rows = unavailable(`${NETWORK_MESSAGES.validatorListFailed} Without it there is no list of validators to read stakes for.`)
+      rows = unavailable(
+        t("overview.reason.noValidatorList", "{{why}} Without it there is no list of validators to read stakes for.", {
+          why: messages.validatorListFailed,
+        }),
+      )
     } else if (!sef.data) {
       rows = loading()
     } else if (sefListed.length === 0) {
       rows = ready([], "contract")
     } else if (reads.error) {
-      rows = unavailable(NETWORK_MESSAGES.stakingReadFailed)
+      rows = unavailable(messages.stakingReadFailed)
     } else if (!reads.data) {
       rows = loading()
     } else {
       const failed = reads.data.filter((r) => r.status !== "success" || typeof r.result !== "bigint").length
       rows =
         failed > 0
-          ? unavailable(`${failed} of ${reads.data.length} validator stakes could not be read, so shares would be wrong.`)
+          ? unavailable(
+              t(
+                "overview.reason.stakesUnread",
+                "{{count}} of {{total}} validator stakes could not be read, so shares would be wrong.",
+                { count: failed, total: reads.data.length },
+              ),
+            )
           : ready(
               sortByStake(
                 withShares(

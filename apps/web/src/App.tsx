@@ -1,4 +1,5 @@
 import { lazy, useEffect, useRef, type ReactNode } from "react"
+import { useTranslation } from "react-i18next"
 import { HashRouter, Routes, Route } from "react-router-dom"
 import { useAccount } from "wagmi"
 import { Layout } from "@/components/layout/Layout"
@@ -49,6 +50,7 @@ function DisconnectWatcher() {
   const { isConnected } = useAccount()
   const wasConnected = useRef(false)
   const { toast } = useToast()
+  const { t } = useTranslation()
 
   useEffect(() => {
     if (isConnected) {
@@ -57,17 +59,18 @@ function DisconnectWatcher() {
       wasConnected.current = false
       toast({
         variant: "info",
-        title: "Wallet disconnected",
-        description: "Please reconnect to continue.",
+        title: t("shell.disconnected.title", "Wallet disconnected"),
+        description: t("shell.disconnected.description", "Please reconnect to continue."),
       })
     }
-  }, [isConnected, toast])
+  }, [isConnected, toast, t])
 
   return null
 }
 
 function WalletSanctionsGate({ children }: { children: ReactNode }) {
   const { allowed, isLoading } = useWalletSanctionsCheck()
+  const { t } = useTranslation()
 
   if (isLoading) {
     return (
@@ -78,13 +81,19 @@ function WalletSanctionsGate({ children }: { children: ReactNode }) {
   }
 
   if (!allowed) {
-    return <RestrictedScreen title="Wallet Restricted" description="This wallet address has been flagged and cannot use SAFE Staking." />
+    return (
+      <RestrictedScreen
+        title={t("shell.walletRestricted.title", "Wallet Restricted")}
+        description={t("shell.walletRestricted.description", "This wallet address has been flagged and cannot use SAFE Staking.")}
+      />
+    )
   }
 
   return <>{children}</>
 }
 
 function App() {
+  const { t } = useTranslation()
   useAutoConnect()
   const { allowed: sanctionsAllowed, isLoading: sanctionsLoading } = useSanctionsCheck()
   const { allowed: geoAllowed, isLoading: geoLoading } = useGeoblockCheck()
@@ -109,7 +118,12 @@ function App() {
   }
 
   if (!sanctionsAllowed || !geoAllowed) {
-    return <RestrictedScreen title="Access Restricted" description="SAFE Staking and Rewards are unavailable in your region." />
+    return (
+      <RestrictedScreen
+        title={t("shell.accessRestricted.title", "Access Restricted")}
+        description={t("shell.accessRestricted.description", "SAFE Staking and Rewards are unavailable in your region.")}
+      />
+    )
   }
 
   return (

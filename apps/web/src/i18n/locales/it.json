@@ -1,0 +1,219 @@
+{
+  "footer": {
+    "documentation": "Documentazione",
+    "faq": "FAQ",
+    "imprint": "Note legali",
+    "privacy": "Privacy",
+    "terms": "Termini"
+  },
+  "header": {
+    "closeMenu": "Chiudere il menu",
+    "darkMode": "Passare alla modalità scura",
+    "language": "Lingua",
+    "lightMode": "Passare alla modalità chiara",
+    "nav": {
+      "dashboard": "Dashboard",
+      "overview": "Panoramica",
+      "rewards": "Ricompense",
+      "validators": "Validatori",
+      "withdrawals": "Prelievi"
+    },
+    "openMenu": "Aprire il menu"
+  },
+  "overview": {
+    "activity": {
+      "boundaryTitle": "Attività recente",
+      "rewardsClaimed": "Ricompense riscattate",
+      "source": "Subgraph Mainnet, totali giornalieri dal {{since}}.",
+      "stakedIn": "Entrato in staking",
+      "stakersNow": "Staker attuali",
+      "stakes": "Operazioni di staking",
+      "title_many": "Ultimi {{count}} giorni",
+      "title_one": "Ultimo {{count}} giorno",
+      "title_other": "Ultimi {{count}} giorni",
+      "unavailable": "Non disponibile. {{reason}}",
+      "withdrawals": "Prelievi",
+      "withdrawn": "Prelevato"
+    },
+    "age": {
+      "days": "{{n}} g",
+      "hours": "{{n}} h",
+      "minutes": "{{n}} min",
+      "minutesSeconds": "{{m}} min {{s}} s",
+      "seconds": "{{n}} s"
+    },
+    "betaWindow": "Beta, dal {{from}} al {{to}}",
+    "degradation": {
+      "empty": "Il subgraph non ha ancora indicizzato questi dati.",
+      "failed": "Non è stato possibile interrogare il subgraph.",
+      "indexingError": "Il subgraph segnala un errore di indicizzazione e quindi non avanza più.",
+      "stale": "L'ultimo blocco indicizzato dal subgraph, {{block}}, risale a {{age}} fa, oltre il limite di {{limit}}.",
+      "staleUnknownAge": "Il subgraph non indica quando è stato prodotto il blocco {{block}}, quindi la sua età è sconosciuta.",
+      "unconfigured": "Per questa build non è configurato alcun endpoint del subgraph."
+    },
+    "distribution": {
+      "barLabel": "Quota di stake per validatore",
+      "definition": "La somma dei quadrati della quota percentuale di ciascun validatore: 10,000 se un solo validatore detenesse tutto lo stake, 10,000 ÷ n per n validatori uguali.",
+      "empty": "Nessun validatore detiene ancora stake.",
+      "index": "HHI {{index}}",
+      "title": "Distribuzione dello stake"
+    },
+    "figure": {
+      "loading": "Caricamento",
+      "loadingLabel": "Caricamento: {{label}}",
+      "unavailable": "Non disponibile"
+    },
+    "freshness": {
+      "chain": "Subgraph {{chain}}:",
+      "checking": "verifica in corso.",
+      "gnosisFallback": "I dati sulle attestazioni provengono da un'istantanea misurata il {{runAt}} e la partecipazione dal dato pubblicato dalla SEF, ove la SEF lo pubblichi.",
+      "live": "attivo. Ultimo blocco indicizzato <block>{{block}}</block>, vecchio di {{age}} al controllo del {{checkedAt}}.",
+      "mainnetFallback": "I dati di staking e ricompense vengono invece letti direttamente dai contratti su Ethereum.",
+      "notUsed": "non utilizzato. {{why}} {{fallback}}",
+      "title": "Aggiornamento dei dati"
+    },
+    "headline": {
+      "activeCount_many": "{{count}} attivi",
+      "activeCount_one": "{{count}} attivo",
+      "activeCount_other": "{{count}} attivi",
+      "activeValidators": "Validatori attivi",
+      "attestationsDetail_many": "Media su {{count}} giorni completi, intervallo da {{min}} a {{max}}",
+      "attestationsDetail_one": "Media su {{count}} giorno completo, intervallo da {{min}} a {{max}}",
+      "attestationsDetail_other": "Media su {{count}} giorni completi, intervallo da {{min}} a {{max}}",
+      "attestationsPerDay": "Attestazioni al giorno",
+      "gnosisSource": "Subgraph Gnosis, giorni UTC completi dal {{from}} al {{to}}",
+      "gnosisSourceBeta": "{{beta}}. Subgraph Gnosis, giorni UTC completi.",
+      "latency": "Latenza di attestazione",
+      "latencyDetail_many": "Mediana di {{count}} blocchi dalla proposta all'attestazione",
+      "latencyDetail_one": "Mediana di {{count}} blocco dalla proposta all'attestazione",
+      "latencyDetail_other": "Mediana di {{count}} blocchi dalla proposta all'attestazione",
+      "latencyValue": "~{{n}} s",
+      "snapshotSource": "Istantanea misurata il {{runAt}}.",
+      "snapshotSourceWithReason": "Istantanea misurata il {{runAt}}. {{reason}}",
+      "title": "Dati principali",
+      "totalStaked": "Totale SAFE in staking",
+      "withdrawnCount_many": "{{count}} ritirati",
+      "withdrawnCount_one": "{{count}} ritirato",
+      "withdrawnCount_other": "{{count}} ritirati",
+      "withdrawnDetail": "Ritirato: partecipazione ad Aegis non confermata."
+    },
+    "hero": {
+      "openDashboard": "Aprire la dashboard di staking",
+      "subtitle": "Lo stato dello staking e del consenso di Safenet. Nessun wallet necessario.",
+      "title": "Panoramica della rete"
+    },
+    "reason": {
+      "balanceExceedsAllocation": "Il contratto detiene più SAFE dell'allocazione pubblicata, quindi la differenza non misura i riscatti.",
+      "claimsExceedAllocation": "I riscatti superano l'allocazione pubblicata, quindi la differenza non misura ciò che resta da riscattare.",
+      "latestFileFailed": "Non è stato possibile caricare il file delle ricompense pubblicato dalla SEF.",
+      "merkleDropReadFailed": "Non è stato possibile leggere il contratto MerkleDrop su Ethereum.",
+      "negativeClaims": "Il subgraph riporta un totale riscattato negativo, il che non può essere corretto.",
+      "negativeDaily": "Il subgraph riporta un importo giornaliero negativo, il che non può essere corretto.",
+      "noCompleteDay": "Il subgraph Gnosis non ha ancora indicizzato un giorno UTC completo.",
+      "noDailyHistory": "{{why}} Nessuna lettura di contratto fornisce uno storico giornaliero.",
+      "noLatencySample": "Nessuna attestazione nella finestra del subgraph Gnosis è stata associata alla relativa proposta.",
+      "noValidatorList": "{{why}} Senza di essa non esiste un elenco di validatori di cui leggere lo stake.",
+      "rootDiffers": "La root on-chain differisce da quella pubblicata dalla SEF, quindi l'allocazione pubblicata non corrisponde a quanto paga il contratto.",
+      "stakersUnavailable": "{{why}} Nessuna lettura di contratto fornisce questo dato.",
+      "stakesUnread_many": "Non è stato possibile leggere {{count}} stake di validatori su {{total}}, quindi le quote sarebbero errate.",
+      "stakesUnread_one": "Non è stato possibile leggere {{count}} stake di validatore su {{total}}, quindi le quote sarebbero errate.",
+      "stakesUnread_other": "Non è stato possibile leggere {{count}} stake di validatori su {{total}}, quindi le quote sarebbero errate.",
+      "stakingReadFailed": "Non è stato possibile leggere il contratto di staking su Ethereum.",
+      "validatorListFailed": "Non è stato possibile caricare l'elenco dei validatori della SEF."
+    },
+    "rewards": {
+      "allocated": "Allocato finora",
+      "claimed": "Riscattato",
+      "percentClaimed": "{{percent}}% riscattato",
+      "percentUnclaimed": "{{percent}}% non riscattato",
+      "progressLabel": "Quota delle ricompense allocate già riscattata",
+      "rootCheck": "Merkle root on-chain confrontata con la root pubblicata dalla SEF",
+      "rootDiffers": "Diversa",
+      "rootMatch": "Corrispondente",
+      "rootNotCompared": "Non ancora confrontata",
+      "sourceAllocated": "Allocato: file delle ricompense pubblicato dalla SEF.",
+      "sourceClaimedContract": "Riscattato e non riscattato: l'allocato meno il saldo SAFE attuale del MerkleDrop.",
+      "sourceClaimedSubgraph": "Riscattato: la somma degli eventi Claimed secondo il subgraph Mainnet; il non riscattato è l'allocato meno tale somma.",
+      "title": "Ricompense",
+      "unclaimed": "Non riscattato"
+    },
+    "section": {
+      "failed": "Non è stato possibile mostrare questa sezione.",
+      "retry": "Riprovare"
+    },
+    "source": {
+      "contract": "Letto direttamente dai contratti su Ethereum",
+      "mainnetSubgraph": "Subgraph Mainnet",
+      "sef": "Elenco dei validatori pubblicato dalla SEF",
+      "snapshot": "Istantanea"
+    },
+    "sourceSentence": "{{source}}.",
+    "validators": {
+      "active": "Attivo",
+      "column": {
+        "participation": "Partecipazione",
+        "share": "Quota",
+        "staked": "In staking",
+        "stakers": "Staker",
+        "status": "Stato",
+        "validator": "Validatore"
+      },
+      "empty": "Nessun validatore è ancora registrato.",
+      "missed_many": "{{n}} mancate",
+      "missed_one": "{{n}} mancata",
+      "missed_other": "{{n}} mancate",
+      "notAvailable": "Non disponibile",
+      "participationMarked": "Partecipazione: {{subgraph}}; le righe contrassegnate con «{{marker}}» usano {{sef}}.",
+      "participationNone": "Partecipazione: nessun dato disponibile. Il subgraph Gnosis non ne ha per questi validatori e {{reason}}.",
+      "participationOtherRows": "Partecipazione: {{subgraph}}; per le altre righe, {{sef}}.",
+      "participationSef": "Partecipazione: {{sef}}.",
+      "participationSubgraph": "Partecipazione: {{subgraph}}.",
+      "sefAll": "il dato a 14 giorni pubblicato dalla SEF",
+      "sefFile": "file SEF",
+      "sefListFailed": "non è stato possibile leggere l'elenco dei validatori della SEF",
+      "sefListLoading": "l'elenco dei validatori della SEF non è stato caricato",
+      "sefListOmits": "l'elenco dei validatori della SEF non include questi validatori",
+      "sefNone": "la SEF al momento non pubblica alcun dato a 14 giorni",
+      "sefSome": "il dato a 14 giorni pubblicato dalla SEF, ove la SEF lo pubblichi",
+      "source": "Stake: {{stake}}. {{participation}} {{rule}}",
+      "stake": "Fare staking",
+      "stakeWith": "Fare staking con {{name}}",
+      "subgraphWordsBeta_many": "{{beta}}: il subgraph Gnosis, cerimonie di attestazione a cui ha partecipato in {{count}} giorni UTC completi",
+      "subgraphWordsBeta_one": "{{beta}}: il subgraph Gnosis, cerimonie di attestazione a cui ha partecipato in {{count}} giorno UTC completo",
+      "subgraphWordsBeta_other": "{{beta}}: il subgraph Gnosis, cerimonie di attestazione a cui ha partecipato in {{count}} giorni UTC completi",
+      "subgraphWords_many": "il subgraph Gnosis, cerimonie di attestazione a cui ha partecipato in {{count}} giorni UTC completi fino al {{to}}",
+      "subgraphWords_one": "il subgraph Gnosis, cerimonie di attestazione a cui ha partecipato in {{count}} giorno UTC completo fino al {{to}}",
+      "subgraphWords_other": "il subgraph Gnosis, cerimonie di attestazione a cui ha partecipato in {{count}} giorni UTC completi fino al {{to}}",
+      "title": "Validatori",
+      "unlisted": "Non presente nell'elenco della SEF"
+    }
+  },
+  "programme": {
+    "betaEnded": "Beta si è concluso il {{betaEnd}}. I dati di Aegis iniziano il {{aegisStart}}.",
+    "betaEndedLabel": "Beta concluso",
+    "participationRule": "Se la partecipazione di un validatore è inferiore al {{threshold}}% in un periodo di ricompense, né il validatore né i suoi deleganti ricevono ricompense per quel periodo.",
+    "rateNotPublished": "Non pubblicato",
+    "withdrawnStatus": "Ritirato, partecipazione ad Aegis non confermata"
+  },
+  "shell": {
+    "accessRestricted": {
+      "description": "SAFE Staking e le ricompense non sono disponibili nella Sua regione.",
+      "title": "Accesso limitato"
+    },
+    "byCoBuilders": "di CoBuilders",
+    "disconnected": {
+      "description": "Si prega di riconnettersi per continuare.",
+      "title": "Wallet disconnesso"
+    },
+    "error": {
+      "description": "Si è verificato un errore imprevisto durante il caricamento di questa pagina.",
+      "retry": "Riprovare",
+      "title": "Si è verificato un problema"
+    },
+    "skipToContent": "Vai al contenuto principale",
+    "walletRestricted": {
+      "description": "Questo indirizzo di wallet è stato segnalato e non può utilizzare SAFE Staking.",
+      "title": "Wallet limitato"
+    }
+  }
+}

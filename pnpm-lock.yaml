@@ -99,6 +99,9 @@ importers:
       graphql-request:
         specifier: 7.4.0
         version: 7.4.0(graphql@16.14.2)
+      i18next:
+        specifier: 26.4.7
+        version: 26.4.7(typescript@5.9.3)
       lucide-react:
         specifier: 0.563.0
         version: 0.563.0(react@19.2.4)
@@ -111,6 +114,9 @@ importers:
       react-dom:
         specifier: 19.2.4
         version: 19.2.4(react@19.2.4)
+      react-i18next:
+        specifier: 17.0.20
+        version: 17.0.20(i18next@26.4.7(typescript@5.9.3))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
       react-router-dom:
         specifier: 7.18.2
         version: 7.18.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -4335,6 +4341,9 @@ packages:
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
 
+  html-parse-stringify@4.0.1:
+    resolution: {integrity: sha512-0zHsZJrK7S3K2aucXWL6ycoYJ/iNtIcFHC/nYQgFklPtrv5LpJctIiSCroWZWeuoXvuyFdzp6KzjJQ+OT5MfFw==}
+
   http-call@5.3.0:
     resolution: {integrity: sha512-ahwimsC23ICE4kPl9xTBjKB4inbRaeLyZeRunC/1Jy/Z6X8tv22MEAjK+KBOMSVLaqXPTTmd8638waVIKLGx2w==}
     engines: {node: '>=8.0.0'}
@@ -4358,6 +4367,14 @@ packages:
   human-signals@2.1.0:
     resolution: {integrity: sha512-B4FFZ6q/T2jhhksgkbEW3HBvWIfDW85snkQgawt07S7J5QXTk6BkNV+0yAeZrM5QpMAdYlocGoljn0sJ/WQkFw==}
     engines: {node: '>=10.17.0'}
+
+  i18next@26.4.7:
+    resolution: {integrity: sha512-p/3hqy6EcuqRs6wNwBYwGGC1fzBJSMxV9zMuN814ab/7QjdZbXfjXwuPZdQbngX6KDOTxM01uUiZyqmMB8ghZg==}
+    peerDependencies:
+      typescript: ^5 || ^6 || ^7
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   iconv-lite@0.6.3:
     resolution: {integrity: sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==}
@@ -5585,6 +5602,22 @@ packages:
     peerDependencies:
       react: ^19.2.4
 
+  react-i18next@17.0.20:
+    resolution: {integrity: sha512-rzSSirf0NP9vfcUXHZAksIuyMWl7L/T/7nm8S+sSIFuIzku54qcyyVAOZXbawPNpUxGkDx/eosSv4DrpzcxuOQ==}
+    peerDependencies:
+      i18next: '>= 26.2.0'
+      react: '>= 16.8.0'
+      react-dom: '*'
+      react-native: '*'
+      typescript: ^5 || ^6 || ^7
+    peerDependenciesMeta:
+      react-dom:
+        optional: true
+      react-native:
+        optional: true
+      typescript:
+        optional: true
+
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
 
@@ -6347,6 +6380,11 @@ packages:
 
   use-sync-external-store@1.4.0:
     resolution: {integrity: sha512-9WXSPC5fMv61vaupRkCKCxsPxBocVnwakBEkMIHHpkTTg6icbJtg6jzgtLDm4bl3cSHAca52rYWih0k4K3PfHw==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  use-sync-external-store@1.7.0:
+    resolution: {integrity: sha512-6L+EeigHMQhdaIPNIFUKwfWJSwWFQ8gJbJ2DLOs5sDIegTwR9fRxvnM3uciHKjIZhFz+KAv2emhWMRvDmMcY8A==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
@@ -11833,6 +11871,8 @@ snapshots:
 
   html-escaper@2.0.2: {}
 
+  html-parse-stringify@4.0.1: {}
+
   http-call@5.3.0:
     dependencies:
       content-type: 1.0.5
@@ -11875,6 +11915,10 @@ snapshots:
       - supports-color
 
   human-signals@2.1.0: {}
+
+  i18next@26.4.7(typescript@5.9.3):
+    optionalDependencies:
+      typescript: 5.9.3
 
   iconv-lite@0.6.3:
     dependencies:
@@ -13085,6 +13129,17 @@ snapshots:
       react: 19.2.4
       scheduler: 0.27.0
 
+  react-i18next@17.0.20(i18next@26.4.7(typescript@5.9.3))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3):
+    dependencies:
+      '@babel/runtime': 7.29.7
+      html-parse-stringify: 4.0.1
+      i18next: 26.4.7(typescript@5.9.3)
+      react: 19.2.4
+      use-sync-external-store: 1.7.0(react@19.2.4)
+    optionalDependencies:
+      react-dom: 19.2.4(react@19.2.4)
+      typescript: 5.9.3
+
   react-is@17.0.2: {}
 
   react-native-fetch-api@3.0.0:
@@ -13814,6 +13869,10 @@ snapshots:
       '@types/react': 19.2.14
 
   use-sync-external-store@1.4.0(react@19.2.4):
+    dependencies:
+      react: 19.2.4
+
+  use-sync-external-store@1.7.0(react@19.2.4):
     dependencies:
       react: 19.2.4
 

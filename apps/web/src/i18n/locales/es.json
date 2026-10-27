@@ -1,0 +1,219 @@
+{
+  "footer": {
+    "documentation": "Documentación",
+    "faq": "Preguntas frecuentes",
+    "imprint": "Aviso legal",
+    "privacy": "Privacidad",
+    "terms": "Términos"
+  },
+  "header": {
+    "closeMenu": "Cerrar menú",
+    "darkMode": "Cambiar a modo oscuro",
+    "language": "Idioma",
+    "lightMode": "Cambiar a modo claro",
+    "nav": {
+      "dashboard": "Panel",
+      "overview": "Resumen",
+      "rewards": "Recompensas",
+      "validators": "Validadores",
+      "withdrawals": "Retiros"
+    },
+    "openMenu": "Abrir menú"
+  },
+  "overview": {
+    "activity": {
+      "boundaryTitle": "Actividad reciente",
+      "rewardsClaimed": "Recompensas reclamadas",
+      "source": "Subgrafo de Mainnet, totales diarios desde {{since}}.",
+      "stakedIn": "Ingresado en staking",
+      "stakersNow": "Stakers actuales",
+      "stakes": "Operaciones de staking",
+      "title_many": "Últimos {{count}} días",
+      "title_one": "Último {{count}} día",
+      "title_other": "Últimos {{count}} días",
+      "unavailable": "No disponible. {{reason}}",
+      "withdrawals": "Retiros",
+      "withdrawn": "Retirado"
+    },
+    "age": {
+      "days": "{{n}} d",
+      "hours": "{{n}} h",
+      "minutes": "{{n}} min",
+      "minutesSeconds": "{{m}} min {{s}} s",
+      "seconds": "{{n}} s"
+    },
+    "betaWindow": "Beta, de {{from}} a {{to}}",
+    "degradation": {
+      "empty": "El subgrafo aún no ha indexado estos datos.",
+      "failed": "No se pudo consultar el subgrafo.",
+      "indexingError": "El subgrafo informa de un error de indexación, por lo que ha dejado de avanzar.",
+      "stale": "El último bloque indexado por el subgrafo, {{block}}, tiene una antigüedad de {{age}}, por encima del límite de {{limit}}.",
+      "staleUnknownAge": "El subgrafo no informa cuándo se produjo el bloque {{block}}, por lo que se desconoce su antigüedad.",
+      "unconfigured": "Esta versión no tiene configurado ningún punto de acceso al subgrafo."
+    },
+    "distribution": {
+      "barLabel": "Participación en el stake por validador",
+      "definition": "La suma de los cuadrados de la participación porcentual de cada validador: 10,000 si un solo validador tuviera todo el stake, 10,000 ÷ n para n validadores iguales.",
+      "empty": "Ningún validador tiene stake todavía.",
+      "index": "IHH {{index}}",
+      "title": "Distribución del stake"
+    },
+    "figure": {
+      "loading": "Cargando",
+      "loadingLabel": "Cargando {{label}}",
+      "unavailable": "No disponible"
+    },
+    "freshness": {
+      "chain": "Subgrafo de {{chain}}:",
+      "checking": "comprobando.",
+      "gnosisFallback": "Las cifras de atestaciones proceden de una instantánea medida el {{runAt}}, y la participación, de la cifra publicada por SEF cuando SEF la publica.",
+      "live": "activo. Último bloque indexado <block>{{block}}</block>, con una antigüedad de {{age}} al comprobarlo el {{checkedAt}}.",
+      "mainnetFallback": "En su lugar, las cifras de staking y recompensas se leen directamente de los contratos en Ethereum.",
+      "notUsed": "no se usa. {{why}} {{fallback}}",
+      "title": "Actualidad de los datos"
+    },
+    "headline": {
+      "activeCount_many": "{{count}} activos",
+      "activeCount_one": "{{count}} activo",
+      "activeCount_other": "{{count}} activos",
+      "activeValidators": "Validadores activos",
+      "attestationsDetail_many": "Media de {{count}} días completos, rango de {{min}} a {{max}}",
+      "attestationsDetail_one": "Media de {{count}} día completo, rango de {{min}} a {{max}}",
+      "attestationsDetail_other": "Media de {{count}} días completos, rango de {{min}} a {{max}}",
+      "attestationsPerDay": "Atestaciones por día",
+      "gnosisSource": "Subgrafo de Gnosis, días UTC completos del {{from}} al {{to}}",
+      "gnosisSourceBeta": "{{beta}}. Subgrafo de Gnosis, días UTC completos.",
+      "latency": "Latencia de atestación",
+      "latencyDetail_many": "Mediana de {{count}} bloques desde la propuesta hasta la atestación",
+      "latencyDetail_one": "Mediana de {{count}} bloque desde la propuesta hasta la atestación",
+      "latencyDetail_other": "Mediana de {{count}} bloques desde la propuesta hasta la atestación",
+      "latencyValue": "~{{n}} s",
+      "snapshotSource": "Instantánea medida el {{runAt}}.",
+      "snapshotSourceWithReason": "Instantánea medida el {{runAt}}. {{reason}}",
+      "title": "Cifras principales",
+      "totalStaked": "Total de SAFE en staking",
+      "withdrawnCount_many": "{{count}} retirados",
+      "withdrawnCount_one": "{{count}} retirado",
+      "withdrawnCount_other": "{{count}} retirados",
+      "withdrawnDetail": "Retirado: participación en Aegis sin confirmar."
+    },
+    "hero": {
+      "openDashboard": "Abrir el panel de staking",
+      "subtitle": "El estado del staking y el consenso de Safenet. No se necesita una wallet.",
+      "title": "Resumen de la red"
+    },
+    "reason": {
+      "balanceExceedsAllocation": "El contrato contiene más SAFE que la asignación publicada, por lo que la diferencia no mide las reclamaciones.",
+      "claimsExceedAllocation": "Las reclamaciones superan la asignación publicada, por lo que la diferencia no mide lo que queda sin reclamar.",
+      "latestFileFailed": "No se pudo cargar el archivo de recompensas publicado por SEF.",
+      "merkleDropReadFailed": "No se pudo leer el contrato MerkleDrop en Ethereum.",
+      "negativeClaims": "El subgrafo informa de un total reclamado negativo, lo cual no puede ser correcto.",
+      "negativeDaily": "El subgrafo informa de un importe diario negativo, lo cual no puede ser correcto.",
+      "noCompleteDay": "El subgrafo de Gnosis aún no ha indexado un día UTC completo.",
+      "noDailyHistory": "{{why}} Ninguna lectura de contrato ofrece un historial diario.",
+      "noLatencySample": "Ninguna atestación de la ventana del subgrafo de Gnosis pudo asociarse a su propuesta.",
+      "noValidatorList": "{{why}} Sin ella no hay una lista de validadores cuyo stake leer.",
+      "rootDiffers": "La raíz en cadena difiere de la publicada por SEF, por lo que la asignación publicada no coincide con lo que paga el contrato.",
+      "stakersUnavailable": "{{why}} Ninguna lectura de contrato ofrece esta cifra.",
+      "stakesUnread_many": "No se pudieron leer {{count}} de {{total}} stakes de validadores, por lo que las participaciones serían incorrectas.",
+      "stakesUnread_one": "No se pudo leer {{count}} de {{total}} stakes de validadores, por lo que las participaciones serían incorrectas.",
+      "stakesUnread_other": "No se pudieron leer {{count}} de {{total}} stakes de validadores, por lo que las participaciones serían incorrectas.",
+      "stakingReadFailed": "No se pudo leer el contrato de staking en Ethereum.",
+      "validatorListFailed": "No se pudo cargar la lista de validadores de SEF."
+    },
+    "rewards": {
+      "allocated": "Asignado hasta la fecha",
+      "claimed": "Reclamado",
+      "percentClaimed": "{{percent}}% reclamado",
+      "percentUnclaimed": "{{percent}}% sin reclamar",
+      "progressLabel": "Proporción de las recompensas asignadas que se ha reclamado",
+      "rootCheck": "Raíz de Merkle en cadena frente a la raíz publicada por SEF",
+      "rootDiffers": "Difiere",
+      "rootMatch": "Coincide",
+      "rootNotCompared": "Aún no comparado",
+      "sourceAllocated": "Asignado: archivo de recompensas publicado por SEF.",
+      "sourceClaimedContract": "Reclamado y sin reclamar: lo asignado menos el saldo de SAFE actual del MerkleDrop.",
+      "sourceClaimedSubgraph": "Reclamado: la suma de los eventos Claimed según el subgrafo de Mainnet; lo no reclamado es lo asignado menos esa suma.",
+      "title": "Recompensas",
+      "unclaimed": "Sin reclamar"
+    },
+    "section": {
+      "failed": "No se pudo mostrar esta sección.",
+      "retry": "Reintentar"
+    },
+    "source": {
+      "contract": "Leído directamente de los contratos en Ethereum",
+      "mainnetSubgraph": "Subgrafo de Mainnet",
+      "sef": "Lista de validadores publicada por SEF",
+      "snapshot": "Instantánea"
+    },
+    "sourceSentence": "{{source}}.",
+    "validators": {
+      "active": "Activo",
+      "column": {
+        "participation": "Participación",
+        "share": "Proporción",
+        "staked": "En staking",
+        "stakers": "Stakers",
+        "status": "Estado",
+        "validator": "Validador"
+      },
+      "empty": "Todavía no hay ningún validador registrado.",
+      "missed_many": "{{n}} omitidas",
+      "missed_one": "{{n}} omitida",
+      "missed_other": "{{n}} omitidas",
+      "notAvailable": "No disponible",
+      "participationMarked": "Participación: {{subgraph}}; las filas marcadas con «{{marker}}» usan {{sef}}.",
+      "participationNone": "Participación: no hay ninguna cifra disponible. El subgrafo de Gnosis no tiene ninguna para estos validadores y {{reason}}.",
+      "participationOtherRows": "Participación: {{subgraph}}; para las demás filas, {{sef}}.",
+      "participationSef": "Participación: {{sef}}.",
+      "participationSubgraph": "Participación: {{subgraph}}.",
+      "sefAll": "la cifra de 14 días publicada por SEF",
+      "sefFile": "archivo de SEF",
+      "sefListFailed": "no se pudo leer la lista de validadores de SEF",
+      "sefListLoading": "la lista de validadores de SEF no se ha cargado",
+      "sefListOmits": "la lista de validadores de SEF no incluye estos validadores",
+      "sefNone": "SEF no publica actualmente ninguna cifra de 14 días",
+      "sefSome": "la cifra de 14 días publicada por SEF, cuando SEF la publica",
+      "source": "Stake: {{stake}}. {{participation}} {{rule}}",
+      "stake": "Hacer staking",
+      "stakeWith": "Hacer staking con {{name}}",
+      "subgraphWordsBeta_many": "{{beta}}: el subgrafo de Gnosis, ceremonias de atestación a las que asistió durante {{count}} días UTC completos",
+      "subgraphWordsBeta_one": "{{beta}}: el subgrafo de Gnosis, ceremonias de atestación a las que asistió durante {{count}} día UTC completo",
+      "subgraphWordsBeta_other": "{{beta}}: el subgrafo de Gnosis, ceremonias de atestación a las que asistió durante {{count}} días UTC completos",
+      "subgraphWords_many": "el subgrafo de Gnosis, ceremonias de atestación a las que asistió durante {{count}} días UTC completos hasta el {{to}}",
+      "subgraphWords_one": "el subgrafo de Gnosis, ceremonias de atestación a las que asistió durante {{count}} día UTC completo hasta el {{to}}",
+      "subgraphWords_other": "el subgrafo de Gnosis, ceremonias de atestación a las que asistió durante {{count}} días UTC completos hasta el {{to}}",
+      "title": "Validadores",
+      "unlisted": "No figura en la lista de SEF"
+    }
+  },
+  "programme": {
+    "betaEnded": "Beta finalizó el {{betaEnd}}. Los datos de Aegis comienzan el {{aegisStart}}.",
+    "betaEndedLabel": "Beta finalizado",
+    "participationRule": "Si la participación de un validador es inferior al {{threshold}}% en un periodo de recompensas, ni el validador ni sus delegadores obtienen recompensas por ese periodo.",
+    "rateNotPublished": "No publicado",
+    "withdrawnStatus": "Retirado, participación en Aegis sin confirmar"
+  },
+  "shell": {
+    "accessRestricted": {
+      "description": "SAFE Staking y las recompensas no están disponibles en su región.",
+      "title": "Acceso restringido"
+    },
+    "byCoBuilders": "por CoBuilders",
+    "disconnected": {
+      "description": "Vuelva a conectarse para continuar.",
+      "title": "Wallet desconectada"
+    },
+    "error": {
+      "description": "Se produjo un error inesperado al cargar esta página.",
+      "retry": "Intentar de nuevo",
+      "title": "Algo salió mal"
+    },
+    "skipToContent": "Ir al contenido principal",
+    "walletRestricted": {
+      "description": "Esta dirección de wallet ha sido marcada y no puede usar SAFE Staking.",
+      "title": "Wallet restringida"
+    }
+  }
+}
