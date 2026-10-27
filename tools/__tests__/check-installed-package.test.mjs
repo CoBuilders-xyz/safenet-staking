@@ -16,6 +16,11 @@ const mode = process.env.FAKE_MODE
 if (args === "--version") console.log("1.2.3")
 else if (args === "--help") console.log("Usage: safenet [options] [command]")
 else if (args === "status --json") {
+  // An empty variable would be an endpoint of "". The check must leave it out instead.
+  if (process.env.MAINNET_RPC_URL === "") {
+    console.error("error: MAINNET_RPC_URL is set but empty")
+    process.exit(1)
+  }
   if (mode === "fail") {
     console.error("error: the read failed at https://rpc.invalid/secret-key")
     process.exit(1)
@@ -53,7 +58,7 @@ function check(kind, { mode = "ok", rpc = "https://rpc.invalid/secret-key", exec
     const summary = join(dir, "summary.md")
     const { MAINNET_RPC_URL: _, ...env } = process.env
     const run = spawnSync(process.execPath, [SCRIPT, kind, dir], {
-      env: { ...env, FAKE_MODE: mode, GITHUB_STEP_SUMMARY: summary, CHECK_TIMEOUT_MS: "10000", ...(rpc ? { MAINNET_RPC_URL: rpc } : {}) },
+      env: { ...env, FAKE_MODE: mode, GITHUB_STEP_SUMMARY: summary, CHECK_TIMEOUT_MS: "10000", MAINNET_RPC_URL: rpc },
       encoding: "utf8",
     })
     return { status: run.status, output: run.stdout + run.stderr, summary: readFileSync(summary, "utf8") }
@@ -83,10 +88,12 @@ test("a status that prints something other than JSON fails", () => {
   assert.match(output, /stdout is not one JSON document/)
 })
 
-test("an empty MAINNET_RPC_URL fails before anything runs", () => {
-  const { status, output } = check("cli", { rpc: "" })
-  assert.equal(status, 1)
-  assert.match(output, /FAIL {2}MAINNET_RPC_URL: empty/)
+test("an empty MAINNET_RPC_URL leaves the package its own public endpoints, and says so", () => {
+  const { status, output, summary } = check("cli", { rpc: "" })
+  assert.equal(status, 0, output)
+  assert.match(output, /note {2}reads Mainnet through the package's public endpoints, because MAINNET_RPC_URL is empty/)
+  assert.match(output, /pass {2}safenet status --json/)
+  assert.match(summary, /\| endpoint \| note \| the package's public endpoints/)
 })
 
 test("an installed MCP server that initializes, lists its tools and answers status passes", () => {

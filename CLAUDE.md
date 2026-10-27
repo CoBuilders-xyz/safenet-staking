@@ -175,7 +175,8 @@ GitHub Release. On a pull request that changes the build, and by hand, it stops 
 `publish.yml` publishes `packages/cli` on a tag `cli-v<version>` and `packages/mcp` on a tag
 `mcp-v<version>`, or one of them by hand. Its `pack` job receives no secret: it runs the package's
 unit tests, builds and packs it. Its `check` job installs the tarball outside the monorepo and runs
-`tools/check-installed-package.mjs` against Mainnet with `MAINNET_RPC_URL`. Its `publish` job sends
+`tools/check-installed-package.mjs` against Mainnet with `MAINNET_RPC_URL`, or, when the secret is
+empty, as on a pull request from a fork, through the package's own public endpoints. Its `publish` job sends
 that same tarball with `pnpm publish --provenance --access public` and `NPM_TOKEN`, and fails
 when the token is empty. It refuses version 0.0.0, a tag whose version differs from the package's,
 a dispatch that publishes from a branch other than `main`, and a private repository, from which

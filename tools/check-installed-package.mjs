@@ -10,7 +10,8 @@
 //   node tools/check-installed-package.mjs <cli|mcp> <directory the tarball was installed into>
 //
 // Each binary is run through node_modules/.bin, so the package's `bin` entry and its shebang are
-// part of the check. Reads MAINNET_RPC_URL. One line per check on stdout, and a table in
+// part of the check. Reads Mainnet through MAINNET_RPC_URL, or without it through the public
+// endpoints the package carries. One line per check on stdout, and a table in
 // $GITHUB_STEP_SUMMARY when it is set. No line carries a URL: an RPC URL can hold a key.
 import { appendFileSync, readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -170,17 +171,22 @@ try {
   process.exit(1)
 }
 
-if (!process.env.MAINNET_RPC_URL) {
-  record("MAINNET_RPC_URL", false, "empty: the status check reads Mainnet and needs the endpoint")
-} else {
-  // The server's own settings are cleared, so it runs as the README configures it: reads through
-  // MAINNET_RPC_URL, writes off.
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("SAFENET_MCP_")))
-  await (kind === "cli" ? checkCli(env) : checkMcp(env))
+// The server's own settings are cleared, so it runs as the README configures it: reads through
+// MAINNET_RPC_URL, writes off. Without MAINNET_RPC_URL, as on a pull request from a fork, which
+// gets no secret, the package reads through the public endpoints it carries from core, as a user's
+// install without the variable does. No endpoint is typed here.
+const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("SAFENET_MCP_")))
+let endpoint = "MAINNET_RPC_URL"
+if (!env.MAINNET_RPC_URL) {
+  delete env.MAINNET_RPC_URL
+  endpoint = "the package's public endpoints, because MAINNET_RPC_URL is empty"
 }
+console.log(`note  reads Mainnet through ${endpoint}`)
+await (kind === "cli" ? checkCli(env) : checkMcp(env))
 
 if (process.env.GITHUB_STEP_SUMMARY) {
   const rows = results.map((r) => `| ${r.check} | ${r.ok ? "pass" : "**fail**"} | ${r.detail.replaceAll("|", "\\|")} |`)
+  rows.push(`| endpoint | note | ${endpoint} |`)
   appendFileSync(process.env.GITHUB_STEP_SUMMARY,
     [`### ${pkg.name} ${installedVersion}, installed from its tarball`, "", "| Check | Result | Detail |", "|---|---|---|", ...rows, ""].join("\n") + "\n")
 }
