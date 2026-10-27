@@ -47,7 +47,7 @@ export function FreshnessPanel() {
       <ChainFreshness
         chain="Gnosis"
         result={gnosis}
-        fallback={`Attestation figures come from a snapshot measured ${formatUtcDateTime(snapshot.runAt)}, and participation from SEF's published figure.`}
+        fallback={`Attestation figures come from a snapshot measured ${formatUtcDateTime(snapshot.runAt)}, and participation from SEF's published figure where SEF publishes one.`}
       />
     </section>
   )
@@ -198,7 +198,9 @@ export function ValidatorsPanel() {
       const published = findValidator(sef.data, r.address)
       return {
         ...r,
-        participation: ours ? ours.rate : published ? published.participationRate / 100 : undefined,
+        participation: ours
+          ? ours.rate
+          : published?.participationRate != null ? published.participationRate / 100 : undefined,
         participationSource: ours ? "subgraph" : published ? "sef" : undefined,
         absences: ours?.absences,
         status: !sef.data ? undefined : !published ? "unlisted" : published.isActive ? "active" : "withdrawn",
@@ -208,18 +210,40 @@ export function ValidatorsPanel() {
   // The caption names the sources the rows actually use. A validator with no ValidatorDay row in
   // the window falls back to SEF's figure even while the subgraph is live; such rows are marked.
   const fromSubgraph = participation && window && rows.state === "ready" && rows.value.some((r) => participation.has(r.address.toLowerCase()))
-  const fromSef = rows.state === "ready" && rows.value.some((r) => !participation?.has(r.address.toLowerCase()))
+  // The rows that fall back to SEF's file are the ones it lists. A validator SEF does not list has
+  // no SEF figure and says nothing about SEF's rates. SEF's file can also list every validator with
+  // a null rate; then no row carries SEF's figure.
+  const sefRows = rows.state === "ready" ? rows.value.filter((r) => !participation?.has(r.address.toLowerCase())) : []
+  const sefListed = sefRows.map((r) => findValidator(sef.data, r.address)).filter((v) => v !== null)
+  const fromSef = sefListed.length > 0
+  const sefPublishesNone = fromSef && sefListed.every((v) => v.participationRate === null)
+  const sefPublishesSome = !sefPublishesNone && sefListed.some((v) => v.participationRate === null)
   const subgraphWords = !window
     ? ""
     : betaOnly
       ? `${betaWindow(window)}: the Gnosis subgraph, attestation ceremonies attended over ${window.days} complete UTC days`
       : `the Gnosis subgraph, attestation ceremonies attended over ${window.days} complete UTC days to ${dayOf(window.to)}`
-  const participationSource =
-    fromSubgraph && fromSef
-      ? `Participation: ${subgraphWords}; rows marked "SEF file" use SEF's published 14-day figure.`
+  const sefWords = sefPublishesNone
+    ? "SEF publishes no 14-day figure at present"
+    : sefPublishesSome
+      ? "SEF's published 14-day figure, where SEF publishes one"
+      : "SEF's published 14-day figure"
+  // Neither source gives any row a figure: name neither as the source, say why there is none.
+  const noSefRate =
+    sef.data === undefined
+      ? sef.error ? "SEF's validator list could not be read" : "SEF's validator list has not loaded"
+      : !fromSef ? "SEF's validator list does not include these validators" : "SEF publishes no 14-day figure at present"
+  const noFigure =
+    rows.state === "ready" && rows.value.length > 0 && !fromSubgraph && sefListed.every((v) => v.participationRate === null)
+  const participationSource = noFigure
+    ? `Participation: no figure is available. The Gnosis subgraph has none for these validators, and ${noSefRate}.`
+    : fromSubgraph && fromSef
+      ? sefPublishesNone
+        ? `Participation: ${subgraphWords}; for the other rows, ${sefWords}.`
+        : `Participation: ${subgraphWords}; rows marked "SEF file" use ${sefWords}.`
       : fromSubgraph
         ? `Participation: ${subgraphWords}.`
-        : "Participation: SEF's published 14-day figure."
+        : `Participation: ${sefWords}.`
 
   return (
     <OverviewSection

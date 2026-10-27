@@ -2,7 +2,7 @@ import { Link } from "react-router-dom"
 import type { Address } from "viem"
 import { ParticipationRate } from "@/components/validators/ParticipationRate"
 import { formatParticipation, formatTokenAmount, truncateAddress } from "@/lib/format"
-import { WITHDRAWN_STATUS } from "@/lib/programme"
+import { RATE_NOT_PUBLISHED, WITHDRAWN_STATUS } from "@/lib/programme"
 
 export interface ValidatorTableRow {
   address: Address
@@ -11,9 +11,12 @@ export interface ValidatorTableRow {
   share: number
   /** Addresses staking with this validator now. Undefined when the source does not have it. */
   stakers: number | undefined
-  /** Fraction of attestation ceremonies attended. Undefined when no source has it. */
+  /**
+   * Fraction of attestation ceremonies attended. Undefined when no source has it, including a
+   * row from SEF's file that lists the validator with a null rate.
+   */
   participation: number | undefined
-  /** Where this row's participation comes from. */
+  /** Where this row's participation comes from, or would: "sef" with no rate is SEF's null. */
   participationSource?: "subgraph" | "sef"
   /** Ceremonies missed in the same window. Only the subgraph counts them. */
   absences: bigint | undefined
@@ -66,7 +69,9 @@ export function Validators({ rows }: { rows: readonly ValidatorTableRow[] }) {
               )}
               <td className="px-3 py-3 text-right font-mono tabular-nums">
                 {v.participation === undefined ? (
-                  <span className="text-muted-foreground">Not available</span>
+                  <span className="text-muted-foreground">
+                    {v.participationSource === "sef" ? RATE_NOT_PUBLISHED : "Not available"}
+                  </span>
                 ) : (
                   <>
                     <ParticipationRate rate={v.participation} text={formatParticipation(v.participation, v.absences)} />

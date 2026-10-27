@@ -221,7 +221,12 @@ test("a gateway 404, a gateway error and a repository 404 are no file, not an er
   assert.deepEqual(read.tried.map((a) => a.outcome), ["not found", "error", "not found"])
 })
 
-test("a timed-out gateway and a repository 404 are no file", async () => {
+test("a timed-out gateway and a repository 404 are no file", async (t) => {
+  // Date.now() is frozen; setTimeout stays real. On a loaded runner the first gateway's timer can
+  // fire late enough to spend the shared budget, and b then reads "skipped": that path has its own
+  // test below. Here each gateway must time out.
+  mock.timers.enable({ apis: ["Date"], now: 1_800_000_000_000 })
+  t.after(() => mock.timers.reset())
   const { attempt } = answers({ "a.example": "hang", "b.example": "hang" })
   const read = await readRewardsFile({ bases: BASES, path: "proofs/x.json", attempt, timeoutMs: 30 })
   assert.equal(read.value, null)

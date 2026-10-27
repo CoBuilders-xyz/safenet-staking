@@ -78,7 +78,6 @@ export function ProgrammeSection({ programme }: { programme: ReturnType<typeof u
               measure claims.
             </SectionNote>
           )}
-          <p className="text-xs text-muted-foreground">File updated {formatUtcDateTime(latest.data.updatedAt)}.</p>
         </>
       )}
     </RewardsSection>

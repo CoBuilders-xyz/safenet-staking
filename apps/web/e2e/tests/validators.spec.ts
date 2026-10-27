@@ -35,6 +35,20 @@ test.describe("Validators Page", () => {
     await expect(unstakeButtons.first()).toBeVisible()
   })
 
+  test("a rate SEF publishes as null reads Not published, never 0.00%", async ({ disconnectedPage: page, mockChainState }) => {
+    // validator-info.json as SEF published it from cce3fc2, 2026-10-20 09:01 UTC, until 88bf9d9, 2026-10-22 14:33 UTC: every rate null.
+    mockChainState.sefValidators = mockChainState.sefValidators.map((v) => ({ ...v, participation_rate_14d: null }))
+    const validators = new ValidatorsPage(page)
+    await validators.goto()
+
+    await expect(page.getByRole("link", { name: "Validator A" })).toBeVisible({ timeout: 15_000 })
+    // One per card: A and B, and C, which SEF lists as withdrawn.
+    await expect(page.getByText("Not published")).toHaveCount(3)
+    await expect(page.getByText("If a validator's participation is below 75% in a reward period", { exact: false })).toBeVisible()
+    await expect(page.getByText(/^0(\.00)?%$/)).toHaveCount(0)
+    await expect(page.getByRole("button", { name: /reward threshold/ })).toHaveCount(0)
+  })
+
   test("validator card links to detail page", async ({ disconnectedPage: page }) => {
     const validators = new ValidatorsPage(page)
     await validators.goto()

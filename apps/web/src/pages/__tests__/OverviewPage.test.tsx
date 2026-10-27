@@ -176,6 +176,63 @@ describe("OverviewPage", () => {
     expect(screen.getByRole("region", { name: "Validators" })).toHaveTextContent("Participation: SEF's published 14-day figure.")
   })
 
+  it("says SEF publishes no rate, and shows no 0.00%, when SEF's file lists every rate as null", () => {
+    mocks.validators.mockReturnValue({ data: MOCK_VALIDATORS.map((v) => ({ ...v, participationRate: null })), error: null })
+    renderPage()
+    const validators = screen.getByRole("region", { name: "Validators" })
+    // Gnosis keeps the subgraph's rate; Greenfield falls back to SEF's file, which has none.
+    expect(within(validators).getByText("99.50%")).toBeInTheDocument()
+    expect(within(validators).getByText("Not published")).toBeInTheDocument()
+    expect(validators).not.toHaveTextContent("0.00%")
+    expect(validators).toHaveTextContent("for the other rows, SEF publishes no 14-day figure at present.")
+
+    mocks.consensus.mockReturnValue({ ...mocks.consensus(), participation: undefined, window: undefined })
+    renderPage()
+    expect(screen.getAllByRole("region", { name: "Validators" })[1]).toHaveTextContent(
+      "Participation: no figure is available. The Gnosis subgraph has none for these validators, " +
+        "and SEF publishes no 14-day figure at present.",
+    )
+  })
+
+  it("says SEF publishes a figure only where it does, when some of SEF's rates are null", () => {
+    mocks.consensus.mockReturnValue({ ...mocks.consensus(), participation: undefined, window: undefined })
+    mocks.validators.mockReturnValue({ data: [MOCK_VALIDATORS[0], { ...MOCK_VALIDATORS[1], participationRate: null }], error: null })
+    renderPage()
+    const validators = screen.getByRole("region", { name: "Validators" })
+    expect(validators).toHaveTextContent("Participation: SEF's published 14-day figure, where SEF publishes one.")
+    expect(within(validators).getByText("Not published")).toBeInTheDocument()
+  })
+
+  it("names no source when neither the Gnosis subgraph nor SEF gives a validator a figure", () => {
+    const noSubgraph = { ...mocks.consensus(), participation: undefined, window: undefined }
+    for (const [sef, why] of [
+      [{ data: [], error: null }, "SEF's validator list does not include these validators"],
+      [{ data: undefined, error: new Error("HTTP 502") }, "SEF's validator list could not be read"],
+      [{ data: undefined, error: null }, "SEF's validator list has not loaded"],
+    ] as const) {
+      mocks.consensus.mockReturnValue(noSubgraph)
+      mocks.validators.mockReturnValue(sef)
+      const { unmount } = renderPage()
+      const validators = screen.getByRole("region", { name: "Validators" })
+      expect(validators).toHaveTextContent(
+        `Participation: no figure is available. The Gnosis subgraph has none for these validators, and ${why}.`,
+      )
+      expect(validators).not.toHaveTextContent("SEF's published 14-day figure")
+      unmount()
+    }
+  })
+
+  it("does not read a validator SEF does not list as SEF publishing no rate", () => {
+    // Gnosis is listed with a null rate but read from the subgraph; Greenfield is not listed.
+    mocks.validators.mockReturnValue({ data: [{ ...MOCK_VALIDATORS[0], participationRate: null }], error: null })
+    renderPage()
+    const validators = screen.getByRole("region", { name: "Validators" })
+    expect(validators).not.toHaveTextContent("SEF publishes no 14-day figure")
+    // No row carries SEF's figure, so the caption points at no "SEF file" rows.
+    expect(validators).not.toHaveTextContent("SEF file")
+    expect(within(validators).getByText("Not available")).toBeInTheDocument()
+  })
+
   it("shows no APY and no SAFE price", () => {
     renderPage()
     expect(screen.queryByText(/APY|APR|price/i)).not.toBeInTheDocument()

@@ -37,9 +37,10 @@ export interface FakeOptions {
   readonly logsRefused?: boolean
   /** The message eth_getLogs rejects with when `logsRefused` is set. */
   readonly rpcErrorText?: string
-  /** Replaces SEF's rewards/latest.json or network-info.json, to test a changed shape. */
+  /** Replaces SEF's rewards/latest.json, network-info.json or validator-info.json, to test a changed shape. */
   readonly rewardsLatest?: object
   readonly networkInfo?: object
+  readonly validatorInfo?: readonly object[]
   /** A second staker opens a withdrawal with the id the first staker already claimed. */
   readonly sharedWithdrawalId?: boolean
   /** eth_call of this function reverts with this custom error from the call's ABI. */
@@ -227,8 +228,27 @@ export const PUBLISHED_AT = "2026-10-04T21:12:45Z"
 
 const latestFile = (epoch: number) => ({
   epoch, merkleRoot: ROOT, rewardsUntil: "2026-09-22T00:00:00.000Z",
-  tokenTotal: String(50n * SAFE), unpaidAmount: "0", updatedAt: "2026-09-22T08:55:44.268Z",
+  tokenTotal: String(50n * SAFE), unpaidAmount: "0",
 })
+
+/**
+ * SEF's validator-info.json as published at cce3fc2, 2026-10-20 09:01 UTC, and live until 88bf9d9,
+ * 2026-10-22 14:33 UTC: every rate null. Labels, flags and commissions copied from the file; the
+ * addresses are this file's fixtures, in the same places.
+ */
+export const SEF_VALIDATORS_AT_CCE3FC2 = [
+  { address: VALIDATOR_A, commission: 0.05, is_active: true, label: "Gnosis", participation_rate_14d: null },
+  { address: VALIDATOR_B, commission: 0.05, is_active: false, label: "RockawayX", participation_rate_14d: null },
+]
+
+/**
+ * SEF's rewards/latest.json as live on 2026-10-22, after 276526f removed `updatedAt`: the five
+ * fields, values copied from the file, except the root, which is the fake chain's.
+ */
+export const SEF_LATEST_2026_10_22 = {
+  epoch: 0, merkleRoot: ROOT, rewardsUntil: "2026-10-06T00:00:00.000Z",
+  tokenTotal: "4499987774807670271201970", unpaidAmount: "12225192329728798030",
+}
 
 /** SEF's IPFS dataset through a gateway: the repository's layout under the dataset root. */
 function fakeDataset(o: FakeOptions, url: URL): Response {
@@ -254,7 +274,7 @@ function fakeFetch(o: FakeOptions): typeof fetch {
       if (o.githubStatus && o.githubStatus !== 200) return json({ message: "rate limited" }, o.githubStatus)
       return json([{ sha: "abcdef0123456789", commit: { committer: { date: PUBLISHED_AT } } }])
     }
-    if (url === SEF_DATA.validatorInfo || url.endsWith("/validator-info.json")) return json(SEF_VALIDATORS)
+    if (url === SEF_DATA.validatorInfo || url.endsWith("/validator-info.json")) return json(o.validatorInfo ?? SEF_VALIDATORS)
     if (url === SEF_DATA.networkInfo && o.networkInfo) return json(o.networkInfo)
     if (url === SEF_DATA.rewardsLatest && o.rewardsLatest) return json(o.rewardsLatest)
     if (url === SEF_DATA.networkInfo) return json({ total_staked_amount: "300", total_transactions_checked: 1 })

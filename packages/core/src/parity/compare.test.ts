@@ -1,10 +1,10 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import type { SefValidator } from "../sef.js"
+import { AEGIS_START_DAY, BETA_END_DAY, participationWindow, utcDayMs, type SefValidator } from "../sef.js"
 import {
   EXIT_CODE, agrees, compareAmount, compareParticipation, compareStakedTotal, formatAge, freshness,
-  NEEDS_HOURLY_BUCKETS, lacksHourlyBuckets, notComparable, overall, parseLastCommit, participationFromHours,
-  renderMarkdown, renderText, sefRunSpan, staleOutcome, totalsBetween,
+  NEEDS_HOURLY_BUCKETS, SEF_PUBLISHES_NO_RATE, lacksHourlyBuckets, notComparable, overall, parseLastCommit,
+  participationFromHours, renderMarkdown, renderText, sefRunSpan, staleOutcome, totalsBetween, windowOutsideProgramme,
 } from "./compare.js"
 
 // Made-up validators. The addresses are test fixtures, not contracts.
@@ -75,6 +75,83 @@ test("a signer SEF does not list fails, and a validator with no attendance reads
 test("a window with no ceremonies fails rather than dividing by zero", () => {
   const rows = compareParticipation({ sef: SEF, attended: attended(0n, 0n), ceremonies: 0n })
   assert.equal(overall(rows), "FAIL")
+})
+
+// validator-info.json as SEF published it at cce3fc2, 2026-10-20 09:01 UTC, and live until
+// 88bf9d9, 2026-10-22 14:33 UTC: every rate null. Addresses, labels and flags copied from the file.
+const SEF_AT_CCE3FC2: SefValidator[] = [
+  { address: "0x3D58a5475c1336b0A755c3aBd298CeB9b7BB9CDe", commission: 0.05, is_active: true, label: "Gnosis", participation_rate_14d: null },
+  { address: "0x7B0A8EFA45dE81F11F2846EC28259B62155a2b37", commission: 0.05, is_active: true, label: "Greenfield", participation_rate_14d: null },
+  { address: "0xb0E735D4a3b70195420E0ae933689A55750CFcd2", commission: 0.05, is_active: false, label: "RockawayX", participation_rate_14d: null },
+  { address: "0xCc00DE0eA14c08669b26DcBFE365dBD9890B04D9", commission: 0.05, is_active: true, label: "Core Contributors", participation_rate_14d: null },
+  { address: "0xD8997c2a94052C4FB79B53b3e255c1F07c99305B", commission: 0.05, is_active: false, label: "Blockchain Capital", participation_rate_14d: null },
+  { address: "0xF6EA21D702983c443f58A267265912FE03D2FF0b", commission: 0.05, is_active: true, label: "Safe Labs", participation_rate_14d: null },
+]
+
+test("a null SEF rate is NOT COMPARABLE, says why, and exits 0, even over a window with no ceremonies", () => {
+  for (const ceremonies of [0n, CEREMONIES]) {
+    const rows = compareParticipation({ sef: SEF_AT_CCE3FC2, attended: new Map(), ceremonies })
+    assert.equal(rows.length, 6)
+    assert.ok(rows.every((r) => r.verdict === "NOT COMPARABLE" && r.note === SEF_PUBLISHES_NO_RATE))
+    assert.equal(rows[2]!.figure, "RockawayX participation_rate_14d")
+    const state = overall(rows)
+    assert.equal(state, "NOT COMPARABLE")
+    assert.equal(EXIT_CODE[state], 0)
+  }
+})
+
+test("a null rate beside a published one still compares the published one", () => {
+  const mixed = [validator(A, "Alpha", 30_412 / 31_153), { ...validator(B, "Bravo", 0), participation_rate_14d: null }]
+  const pass = compareParticipation({ sef: mixed, attended: attended(30_412n, 31_152n), ceremonies: CEREMONIES })
+  assert.deepEqual(pass.map((r) => r.verdict), ["PASS", "NOT COMPARABLE"])
+  const fail = compareParticipation({ sef: mixed, attended: attended(30_413n, 31_152n), ceremonies: CEREMONIES })
+  assert.equal(overall(fail), "FAIL")
+  // With a rate published, a window the subgraph counts no ceremony in still fails.
+  assert.equal(overall(compareParticipation({ sef: mixed, attended: new Map(), ceremonies: 0n })), "FAIL")
+})
+
+// ------------------------------------------------------------------ the programme calendar
+
+const HOUR_MS = 3_600_000
+const DAY_MS = 24 * HOUR_MS
+/** The first instant after Beta's last day, from core's calendar. */
+const AFTER_BETA = utcDayMs(BETA_END_DAY) + DAY_MS
+/** A publish instant, a few minutes past the hour as SEF's commits are, whose window starts at `start`. */
+const publishedFor = (start: number) => new Date(start + 14 * DAY_MS + 7 * 60_000)
+
+test("a window that starts the first hour after Beta's last day is NOT COMPARABLE, and says why", () => {
+  const window = participationWindow(publishedFor(AFTER_BETA))
+  assert.equal(window.start.getTime(), AFTER_BETA)
+  const reason = windowOutsideProgramme(window, "beta")
+  assert.equal(reason, `SEF's window holds no day of Beta, the programme this deployment indexes; Beta ended on ${BETA_END_DAY}`)
+  const rows = [notComparable("participation_rate_14d", reason!)]
+  assert.equal(overall(rows), "NOT COMPARABLE")
+  assert.equal(EXIT_CODE[overall(rows)], 0)
+})
+
+test("a window that still holds the last hour of Beta is compared as before", () => {
+  const window = participationWindow(publishedFor(AFTER_BETA - HOUR_MS))
+  assert.equal(window.start.getTime(), AFTER_BETA - HOUR_MS)
+  assert.equal(windowOutsideProgramme(window, "beta"), undefined)
+})
+
+test("SEF's publish of 2026-10-23 19:58 UTC lies after Beta; a deployment indexing Aegis is never refused", () => {
+  // b79b1be in safe-fndn/safenet-data, which published Aegis rates for every validator.
+  const window = participationWindow(new Date("2026-10-23T19:58:46Z"))
+  assert.ok(windowOutsideProgramme(window, "beta"))
+  assert.equal(windowOutsideProgramme(window, "aegis"), undefined)
+  assert.equal(windowOutsideProgramme(participationWindow(new Date(utcDayMs(AEGIS_START_DAY) + 400 * DAY_MS)), "aegis"), undefined)
+})
+
+test("a FAIL from another cause still wins over a window outside the indexed programme", () => {
+  const reason = windowOutsideProgramme(participationWindow(publishedFor(AFTER_BETA)), "beta")!
+  const lagging = {
+    figure: "subgraph covers the window", ours: "", sef: "", precision: "", verdict: "FAIL" as const,
+    note: "the subgraph has indexed to block 1, before the window's last block 2",
+  }
+  const state = overall([lagging, notComparable("participation_rate_14d", reason)])
+  assert.equal(state, "FAIL")
+  assert.equal(EXIT_CODE[state], 1)
 })
 
 test("amounts compare to the wei", () => {

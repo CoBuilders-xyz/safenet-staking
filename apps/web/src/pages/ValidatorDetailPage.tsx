@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/useToast"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Info } from "lucide-react"
 import { useWrongNetwork } from "@/hooks/useWrongNetwork"
-import { ParticipationRate } from "@/components/validators/ParticipationRate"
+import { PublishedParticipationRate } from "@/components/validators/ParticipationRate"
 import { PARTICIPATION_RULE, WITHDRAWN, WITHDRAWN_STATUS } from "@/lib/programme"
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left"
 import Copy from "lucide-react/dist/esm/icons/copy"
@@ -146,11 +146,7 @@ export function ValidatorDetailPage() {
             </div>
             <div>
               <span className="text-muted-foreground">Participation (14d): </span>
-              <ParticipationRate
-                className="font-medium"
-                rate={validatorInfo.participationRate / 100}
-                text={`${validatorInfo.participationRate}%`}
-              />
+              <PublishedParticipationRate className="font-medium" percent={validatorInfo.participationRate} />
             </div>
           </div>
           <p className="text-xs text-muted-foreground">{PARTICIPATION_RULE}</p>

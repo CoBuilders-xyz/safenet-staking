@@ -101,6 +101,19 @@ describe("ValidatorDetailPage", () => {
     expect(screen.getByRole("button", { name: "Stake" })).toBeDisabled()
   })
 
+  it("says Not published when SEF publishes no rate, and still states the rule", () => {
+    vi.mocked(useValidators).mockReturnValue({
+      data: [{ ...MOCK_VALIDATORS[0], participationRate: null }],
+      isLoading: false,
+    } as unknown as ReturnType<typeof useValidators>)
+    renderWithRoute(TEST_ACCOUNTS.validator1)
+
+    expect(screen.getByText("Not published")).toBeInTheDocument()
+    expect(screen.queryByText("0%")).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /reward threshold/ })).not.toBeInTheDocument()
+    expect(screen.getByText(PARTICIPATION_RULE)).toBeInTheDocument()
+  })
+
   it("shows stake and unstake buttons when connected", () => {
     renderWithRoute(TEST_ACCOUNTS.validator1)
 

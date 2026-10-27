@@ -18,13 +18,21 @@
  * deployment keeps. Studio keeps about 1,000 blocks. A deployment built before the hourly
  * buckets has no rows to sum, and the run reports it as NOT COMPARABLE.
  *
+ * This deployment indexes the programme GNOSIS_INDEXED_PROGRAMME in packages/core names, and SEF
+ * computes its rates over the programme running when it publishes. A window that starts after
+ * the indexed programme's last day holds no ceremony this deployment counts, so the run reports
+ * NOT COMPARABLE with the reason, not a FAIL per validator: windowOutsideProgramme in
+ * packages/core. A validator SEF lists with a null rate is NOT COMPARABLE too.
+ *
  * The states, from ParityState in packages/core:
  *   PASS            every rate is SEF's double                                     exit 0
  *   FAIL            a rate differs, a validator is missing or extra, the subgraph
  *                   reports indexing errors or is behind the window, SEF's file is
  *                   over 24 hours old, or the run hit an error                     exit 1
  *   STALE           SEF's file is over 9 hours old; nothing is compared            exit 0
- *   NOT COMPARABLE  the deployment has no hourly buckets, or starts after the window  exit 0
+ *   NOT COMPARABLE  the deployment has no hourly buckets or starts after the window,
+ *                   SEF's window lies after the programme it indexes, or SEF
+ *                   publishes a null rate                                          exit 0
  *
  *   pnpm --filter @cobuilders/safenet-subgraph-gnosis test:parity
  *   SUBGRAPH_URL_GNOSIS=<query URL> pnpm --filter @cobuilders/safenet-subgraph-gnosis test:parity
@@ -33,12 +41,12 @@
  * of this subgraph: subgraphEndpoint in packages/core resolves it, the same way for both chains.
  */
 import {
-  SEF_DATA, SHARE_LOOKBACK_BLOCKS, participationWindow, type SefNetworkInfo, type SefValidator,
+  GNOSIS_INDEXED_PROGRAMME, SEF_DATA, SHARE_LOOKBACK_BLOCKS, participationWindow, type SefNetworkInfo, type SefValidator,
 } from "@cobuilders/safenet-core"
 import {
   EXIT_CODE, NEEDS_HOURLY_BUCKETS, appendSummary, chainReader, compareParticipation, formatAge, freshness,
   githubToken, lacksHourlyBuckets, lastSefCommit, notComparable, overall, participationFromHours, querySubgraph,
-  recordState, redact, renderMarkdown, renderText, sefAsset, staleOutcome, subgraphEndpoint,
+  recordState, redact, renderMarkdown, renderText, sefAsset, staleOutcome, subgraphEndpoint, windowOutsideProgramme,
   type ConsensusHourRow, type ParityRow, type ValidatorHourRow,
 } from "@cobuilders/safenet-core/parity"
 
@@ -160,10 +168,16 @@ async function main(): Promise<number> {
       `it does not cover SEF's window with ${SHARE_LOOKBACK_BLOCKS} blocks of look-back, so it started too late to compare it`
     : undefined
 
+  // SEF's window after the programme this deployment indexes: nothing to count, so nothing to
+  // compare. A refusal above is still a FAIL and still wins.
+  const outside = windowOutsideProgramme(window, GNOSIS_INDEXED_PROGRAMME)
+
   let rows: ParityRow[] = refusals.map((note) => ({
     figure: "subgraph covers the window", ours: "", sef: "", precision: "", verdict: "FAIL", note,
   }))
-  if (refusals.length === 0 && coverage) {
+  if (refusals.length === 0 && outside) {
+    rows = [notComparable("participation_rate_14d", outside)]
+  } else if (refusals.length === 0 && coverage) {
     rows = [notComparable("participation_rate_14d", coverage)]
   } else if (refusals.length === 0) {
     const counted = await windowCounts(endpoint, indexed, window)
@@ -176,12 +190,13 @@ async function main(): Promise<number> {
     }
   }
 
-  // network-info.json's other figure counts Gnosis activity from the deploy. Say why it is not
-  // compared rather than leave it out of the table.
+  // network-info.json's other figure is a count SEF keeps per programme, from its start: Aegis
+  // Sentinel verdicts since SEF's data job moved to Aegis. Say why it is not compared rather than
+  // leave it out of the table.
   rows.push({
     figure: "total_transactions_checked", ours: "", sef: String(network.total_transactions_checked),
     precision: "", verdict: "NOT COMPARED",
-    note: "a count from the contract's deploy; this deployment indexes from a later block",
+    note: "a count SEF keeps per programme, from the programme's start; this deployment does not hold it",
   })
 
   const result = overall(rows)
@@ -201,7 +216,7 @@ async function main(): Promise<number> {
     `Gnosis blocks ${first} to ${last}. Subgraph deployment \`${meta._meta.deployment}\`, indexed to block ${indexed}.`, "",
     "Rates are compared exactly: SEF publishes the double, and ours is the same division of the same integers, " +
     "summed from the hourly buckets.", "",
-    renderMarkdown(rows), "", `**${result}**`, "",
+    renderMarkdown(rows), "", `**${result}: ${reason}**`, "",
   ].join("\n"))
   return EXIT_CODE[result]
 }

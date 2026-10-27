@@ -7,6 +7,9 @@ export const PARTICIPATION_RULE = `If a validator's participation is below ${REW
 /** The short form of the threshold, for a marker beside a rate. */
 export const THRESHOLD_LABEL = `${REWARD_PARTICIPATION_THRESHOLD * 100}%`
 
+/** Shown where SEF's file lists a validator with a null rate, in place of a percentage. */
+export const RATE_NOT_PUBLISHED = "Not published"
+
 /** True when a participation rate, as a fraction, is below the reward threshold. */
 export function belowThreshold(rate: number): boolean {
   return rate < REWARD_PARTICIPATION_THRESHOLD

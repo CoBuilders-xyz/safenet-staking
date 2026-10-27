@@ -41,8 +41,8 @@ export interface SefValidator {
   commission: number
   is_active: boolean
   label: string
-  /** A double. */
-  participation_rate_14d: number
+  /** A double. Null when SEF publishes no rate. */
+  participation_rate_14d: number | null
 }
 
 /** The window a published participation rate covers. Every rate is shown with one. */
@@ -215,7 +215,7 @@ function assertValidators(data: unknown): asserts data is SefValidator[] {
         typeof v.label === "string" &&
         typeof v.is_active === "boolean" &&
         typeof v.commission === "number" &&
-        typeof v.participation_rate_14d === "number",
+        (typeof v.participation_rate_14d === "number" || v.participation_rate_14d === null),
     )
   if (!ok) throw new SafenetError("SEF's validator-info.json no longer has the shape this tool reads")
 }
@@ -312,8 +312,7 @@ function isRewardsLatest(data: unknown): data is SefRewardsLatest {
     typeof data.merkleRoot === "string" && /^0x[0-9a-fA-F]{64}$/.test(data.merkleRoot) &&
     typeof data.rewardsUntil === "string" && !Number.isNaN(Date.parse(data.rewardsUntil)) &&
     typeof data.tokenTotal === "string" &&
-    typeof data.unpaidAmount === "string" &&
-    typeof data.updatedAt === "string"
+    typeof data.unpaidAmount === "string"
   )
 }
 

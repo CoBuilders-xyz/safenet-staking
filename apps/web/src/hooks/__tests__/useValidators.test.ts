@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { renderHook } from "@testing-library/react"
 import { SEF_DATA } from "@cobuilders/safenet-core"
+import { TEST_ACCOUNTS } from "@/__tests__/test-data"
 import { findValidator } from "../useValidators"
 
 const mockFetch = vi.fn()
@@ -149,7 +150,26 @@ describe("useValidators", () => {
     expect(result).toHaveLength(2)
   })
 
-  it("queryFn defaults missing commission and participation to 0", async () => {
+  it("queryFn keeps a null rate null, as SEF published it from 2026-10-20 to 2026-10-22, never 0", async () => {
+    // validator-info.json as SEF published it from cce3fc2, 2026-10-20 09:01 UTC, until 88bf9d9, 2026-10-22 14:33 UTC: labels, flags,
+    // commissions and the null rates
+    // copied from the file; two of its six entries, at the shared fixture addresses.
+    const live = [
+      { address: TEST_ACCOUNTS.validator1, commission: 0.05, is_active: true, label: "Gnosis", participation_rate_14d: null },
+      { address: TEST_ACCOUNTS.validator2, commission: 0.05, is_active: false, label: "RockawayX", participation_rate_14d: null },
+    ]
+    mockFetch.mockResolvedValue({ ok: true, text: () => Promise.resolve(JSON.stringify(live)) })
+
+    renderHook(() => useValidators())
+    const result = (await capturedQueryFn!()) as Array<{ label: string; isActive: boolean; participationRate: number | null }>
+
+    expect(result.map((v) => [v.label, v.isActive, v.participationRate])).toEqual([
+      ["Gnosis", true, null],
+      ["RockawayX", false, null],
+    ])
+  })
+
+  it("queryFn defaults missing commission to 0 and a missing rate to null", async () => {
     const rawData = [
       {
         address: "0x1111111111111111111111111111111111111111",
@@ -164,12 +184,12 @@ describe("useValidators", () => {
     renderHook(() => useValidators())
     const result = (await capturedQueryFn!()) as Array<{
       commission: number
-      participationRate: number
+      participationRate: number | null
       isActive: boolean
     }>
 
     expect(result[0].commission).toBe(0)
-    expect(result[0].participationRate).toBe(0)
+    expect(result[0].participationRate).toBeNull()
     expect(result[0].isActive).toBe(true)
   })
 })

@@ -165,6 +165,12 @@ describe("Validators", () => {
     expect(screen.getByText("2 missed")).toBeInTheDocument()
   })
 
+  it("says Not published for a row SEF lists with no rate, not Not available", () => {
+    render(withRouter(<Validators rows={[{ ...row, participation: undefined, participationSource: "sef", absences: undefined }]} />))
+    expect(screen.getByText("Not published")).toBeInTheDocument()
+    expect(screen.queryByText("Not available")).not.toBeInTheDocument()
+  })
+
   it("drops the stakers column when no row has it, and says when participation is missing", () => {
     render(withRouter(<Validators rows={[{ ...row, stakers: undefined, participation: undefined, absences: undefined }]} />))
     expect(screen.queryByRole("columnheader", { name: "Stakers" })).not.toBeInTheDocument()

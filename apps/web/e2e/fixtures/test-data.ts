@@ -1,4 +1,4 @@
-import { DEPLOYMENTS } from "@cobuilders/safenet-core"
+import { DEPLOYMENTS, type SefValidator } from "@cobuilders/safenet-core"
 
 /** Mainnet addresses, from core, so no address is written twice. */
 export const STAKING_CONTRACT = DEPLOYMENTS[1].staking.toLowerCase()
@@ -18,6 +18,36 @@ export const VALIDATORS = {
   validatorB: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
   validatorC: "0xc0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0",
 } as const
+
+/**
+ * SEF's validator-info.json as the mock serves it by default: the live file's fields, with a rate
+ * per validator. SEF published a null rate for every validator from cce3fc2, 2026-10-20 09:01 UTC, until 88bf9d9, 2026-10-22 14:33 UTC;
+ * a test sets one to null through `mockChainState.sefValidators`.
+ */
+export const SEF_VALIDATOR_INFO: readonly SefValidator[] = [
+  {
+    address: VALIDATORS.validatorA,
+    is_active: true,
+    label: "Validator A",
+    commission: 0.05,
+    participation_rate_14d: 0.999,
+  },
+  {
+    address: VALIDATORS.validatorB,
+    is_active: true,
+    label: "Validator B",
+    commission: 0.03,
+    participation_rate_14d: 0.985,
+  },
+  {
+    address: VALIDATORS.validatorC,
+    is_active: false,
+    label: "Validator C",
+    commission: 0.05,
+    // Differs from the Gnosis subgraph mock's 980 of 1,000, so a test can tell the two sources apart.
+    participation_rate_14d: 0.975,
+  },
+]
 
 /** Mainnet. The RPC is fully mocked, so this is the identity the app expects. */
 export const CHAIN_ID = 1
@@ -77,7 +107,6 @@ export const REWARDS_LATEST = {
   rewardsUntil: "2026-09-22T00:00:00.000Z",
   tokenTotal: (1000n * 10n ** 18n).toString(),
   unpaidAmount: "0",
-  updatedAt: "2026-09-22T08:55:44.268Z",
 }
 
 /** Sample reward proofs (matching public/rewards/proofs/{address}.json format) for rewards.spec.ts */

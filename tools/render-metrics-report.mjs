@@ -8,7 +8,8 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs"
 import { resolve } from "node:path"
 
-const ROOT = resolve(import.meta.dirname, "..")
+// METRICS_ROOT points the renderer at another tree. Only its regression test sets it.
+const ROOT = process.env.METRICS_ROOT ? resolve(process.env.METRICS_ROOT) : resolve(import.meta.dirname, "..")
 
 const OUT_DIR = resolve(ROOT, "packages/core/.metrics")
 const RUN = resolve(OUT_DIR, "metrics-poc-run.json")
@@ -78,8 +79,11 @@ md += `| Validator | Ours | SEF published | Match | Absences |\n|---|---|---|---
 for (const p of [...j.participation].sort((a, b) => b.ours - a.ours)) {
   // Show the raw doubles and say plainly whether they are the same value. A rounded
   // "0.000 pp" cannot distinguish exact from 0.0004 pp off, and exactness is the whole claim.
-  const same = p.ours === p.sef
-  md += `| ${p.label} | \`${p.ours}\` | \`${p.sef}\` | ${same ? "**identical**" : `off by ${((p.ours - p.sef) * 100).toExponential(2)} pp`} | ${n(p.absences)} |\n`
+  // SEF can publish a null rate: then there is nothing to compare, and no gap to report.
+  const match = p.sef === null
+    ? "not compared"
+    : p.ours === p.sef ? "**identical**" : `off by ${((p.ours - p.sef) * 100).toExponential(2)} pp`
+  md += `| ${p.label} | \`${p.ours}\` | ${p.sef === null ? "not published" : `\`${p.sef}\``} | ${match} | ${n(p.absences)} |\n`
 }
 const spread = (Math.max(...j.participation.map((p) => p.ours)) - Math.min(...j.participation.map((p) => p.ours))) * 100
 const worst = j.participation.reduce((a, b) => (a.absences > b.absences ? a : b))
