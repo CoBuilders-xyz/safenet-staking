@@ -161,15 +161,15 @@ test("IPFS_GATEWAY is tried before the public gateways", async () => {
 test("one context resolves the ENS name once", async () => {
   const ctx = fakeContext({ ensContenthash: CONTENTHASH })
   let lookups = 0
-  const readContract = ctx.client.readContract.bind(ctx.client)
+  const request = ctx.client.request.bind(ctx.client)
   const counted = {
     ...ctx,
     client: {
       ...ctx.client,
-      readContract: ((p: { functionName: string }) => {
-        if (p.functionName === "findResolver") lookups++
-        return readContract(p as never)
-      }) as typeof ctx.client.readContract,
+      request: ((p: { method: string }) => {
+        if (p.method === "eth_call") lookups++
+        return request(p as never)
+      }) as typeof ctx.client.request,
     },
   }
   await getStatus(counted)
@@ -183,15 +183,15 @@ test("a failed ENS read is retried after a minute, a successful one is kept for 
   t.after(() => mock.timers.reset())
   const ctx = fakeContext({ ensContenthash: CONTENTHASH })
   let lookups = 0
-  const readContract = ctx.client.readContract.bind(ctx.client)
+  const request = ctx.client.request.bind(ctx.client)
   const flaky = {
     ...ctx,
     client: {
       ...ctx.client,
-      readContract: ((p: { functionName: string }) => {
-        if (p.functionName === "findResolver" && ++lookups === 1) return Promise.reject(new Error("RPC blip"))
-        return readContract(p as never)
-      }) as typeof ctx.client.readContract,
+      request: ((p: { method: string }) => {
+        if (p.method === "eth_call" && ++lookups === 1) return Promise.reject(new Error("RPC blip"))
+        return request(p as never)
+      }) as typeof ctx.client.request,
     },
   }
   assert.equal((await rewardsSource(flaky)).ens.status, "unreadable")

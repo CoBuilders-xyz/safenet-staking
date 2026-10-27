@@ -227,11 +227,23 @@ export const safeTokenEventsAbi = parseAbi([signatureOf("safeToken", "Transfer")
 
 /**
  * ENS, read only to find SEF's canonical reward dataset. Standard interfaces, not Safenet's:
- * the Universal Resolver's `findResolver`, which viem's own `getEnsResolver` calls, and a
- * resolver's `contenthash` from ENSIP-7. `src/rewards-source.ts` reads them.
+ * the Universal Resolver's `resolve`, which follows ENSIP-10 for wildcard and non-wildcard names
+ * alike, and a resolver's `contenthash` from ENSIP-7, the call `resolve` carries.
+ * `src/rewards-source.ts` reads them.
+ *
+ * The Universal Resolver is a proxy whose implementation forwards again, so its selectors are not
+ * in the bytecode it shows; each entry was proven by `eth_call` on Mainnet at block 26,287,089,
+ * with CCIP-read off. `resolve` returned `(bytes, address)` for rewards.safenet-gov.eth, and the
+ * bytes decode to the contenthash the registry's own resolver for the name returns.
+ * `ResolverNotFound` came back for a name with no resolver, `ResolverError` for a call the
+ * name's resolver reverts on, and `OffchainLookup`, with the Universal Resolver as sender, for
+ * two cb.id names, which resolve offchain.
  */
 export const ensUniversalResolverAbi = parseAbi([
-  "function findResolver(bytes name) view returns (address, bytes32, uint256)",
+  "function resolve(bytes name, bytes data) view returns (bytes, address)",
+  "error ResolverNotFound(bytes name)",
+  "error ResolverError(bytes errorData)",
+  "error OffchainLookup(address sender, string[] urls, bytes callData, bytes4 callbackFunction, bytes extraData)",
 ])
 
 export const ensResolverAbi = parseAbi([

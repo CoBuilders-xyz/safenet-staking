@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { QueryClient } from "@tanstack/react-query"
-import { numberToHex, pad, type Hex } from "viem"
+import { encodeFunctionResult, numberToHex, pad, type Hex } from "viem"
 import {
-  REPOSITORY_REWARDS_BASE, REWARDS_LATEST_PATH, REWARDS_SOURCE_RETRY_MS, REWARDS_SOURCE_STALE_MS, SEF_DATA, type EnsReadClient,
+  REPOSITORY_REWARDS_BASE, REWARDS_LATEST_PATH, REWARDS_SOURCE_RETRY_MS, REWARDS_SOURCE_STALE_MS, SEF_DATA, ensResolverAbi,
+  ensUniversalResolverAbi, type EnsReadClient,
 } from "@cobuilders/safenet-core"
 import { readRewardsFileThrough, resolveWebRewardsSource } from "../useRewardsSource"
 
@@ -11,12 +12,16 @@ const CONTENTHASH: Hex = "0xe3010170122029f2d17be6139079dc48696d1f582a8530eb9805
 const CID = "bafybeibj6lixxzqtsb45ysdjnupvqkufgdvzqbnvmhw2kf7cfkesy7r7d4"
 const RESOLVER = pad(numberToHex(0xe75), { size: 20 })
 
-/** A Mainnet client whose ENS name holds `contenthash`, counting each lookup. */
+/**
+ * A Mainnet client whose ENS name holds `contenthash`, counting each lookup: the one eth_call to
+ * the Universal Resolver's `resolve` that resolution makes.
+ */
 function ensClient(contenthash: Hex) {
-  const readContract = vi.fn(async (p: { functionName: string }) =>
-    p.functionName === "findResolver" ? [RESOLVER, `0x${"00".repeat(32)}`, 0n] : contenthash,
+  const answer = encodeFunctionResult({ abi: ensResolverAbi, functionName: "contenthash", result: contenthash })
+  const request = vi.fn<(p: { method: string }) => Promise<Hex>>(async () =>
+    encodeFunctionResult({ abi: ensUniversalResolverAbi, functionName: "resolve", result: [answer, RESOLVER] }),
   )
-  return { client: { readContract } as unknown as EnsReadClient, readContract }
+  return { client: { request } as unknown as EnsReadClient, request }
 }
 
 /** A fetch that answers per host: a body, a status, or a network failure. */
@@ -40,10 +45,10 @@ async function attempt(url: string, signal: AbortSignal) {
 
 describe("resolveWebRewardsSource", () => {
   it("lets the configured URL replace every source, and reads no ENS name", async () => {
-    const { client, readContract } = ensClient(CONTENTHASH)
+    const { client, request } = ensClient(CONTENTHASH)
     const source = await resolveWebRewardsSource(client, "https://mock-rewards.test/")
     expect(source).toEqual({ ens: null, bases: [{ url: "https://mock-rewards.test", kind: "override" }] })
-    expect(readContract).not.toHaveBeenCalled()
+    expect(request).not.toHaveBeenCalled()
   })
 
   it("puts SEF's IPFS dataset first, gateway by gateway, then the repository", async () => {
@@ -106,10 +111,10 @@ describe("readRewardsFileThrough", () => {
 
   it("resolves the ENS name once per session, not once per file", async () => {
     vi.stubGlobal("fetch", serve({ "ipfs.orbitor.dev": { epoch: 1 } }))
-    const { client, readContract } = ensClient(CONTENTHASH)
+    const { client, request } = ensClient(CONTENTHASH)
     await readRewardsFileThrough(queryClient, client, REWARDS_LATEST_PATH, attempt, signal)
     await readRewardsFileThrough(queryClient, client, "proofs/x.json", attempt, signal)
-    expect(readContract.mock.calls.filter(([p]) => p.functionName === "findResolver")).toHaveLength(1)
+    expect(request.mock.calls.filter(([p]) => p.method === "eth_call")).toHaveLength(1)
   })
 
   it("reads no proof, not an error, when a gateway fails and the repository answers 404", async () => {
@@ -131,9 +136,9 @@ describe("readRewardsFileThrough", () => {
     vi.useFakeTimers({ toFake: ["Date"], now: 1_800_000_000_000 })
     try {
       vi.stubGlobal("fetch", serve({ "ipfs.orbitor.dev": { epoch: 1 }, "raw.githubusercontent.com": { epoch: 0 } }))
-      const { client, readContract } = ensClient(CONTENTHASH)
-      readContract.mockRejectedValueOnce(new Error("RPC blip"))
-      const lookups = () => readContract.mock.calls.filter(([p]) => p.functionName === "findResolver").length
+      const { client, request } = ensClient(CONTENTHASH)
+      request.mockRejectedValueOnce(new Error("RPC blip"))
+      const lookups = () => request.mock.calls.filter(([p]) => p.method === "eth_call").length
       const read = () => readRewardsFileThrough(queryClient, client, REWARDS_LATEST_PATH, attempt, signal)
 
       expect((await read()).ens?.status).toBe("unreadable")

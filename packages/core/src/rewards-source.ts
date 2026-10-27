@@ -18,7 +18,9 @@
  * The browser app imports this module, so it reads no environment. A caller passes in its own
  * configured gateway, and reads the chain through the client it passes in.
  */
-import { hexToBytes, isHex, toHex, zeroAddress, type Hex, type PublicClient } from "viem"
+import {
+  decodeErrorResult, decodeFunctionResult, encodeFunctionData, hexToBytes, isHex, toHex, type Hex, type PublicClient,
+} from "viem"
 import { mainnet } from "viem/chains"
 import { namehash, packetToBytes } from "viem/ens"
 import { ensResolverAbi, ensUniversalResolverAbi } from "./abis.js"
@@ -81,11 +83,11 @@ export type RewardsEnsState =
   | { readonly status: "empty" }
   /**
    * A contenthash this code cannot turn into a gateway path, such as Swarm or malformed bytes,
-   * or a name served by a parent's wildcard resolver, which this code does not query. `raw` is
-   * null when no contenthash was read.
+   * or a name whose resolver answers only offchain, through CCIP-read, which this code does not
+   * follow, or reverts. `raw` is null when no contenthash was read.
    */
   | { readonly status: "unsupported"; readonly raw: Hex | null; readonly reason: string }
-  /** The chain did not answer. */
+  /** The chain did not answer, or answered with a revert this code does not know. */
   | { readonly status: "unreadable"; readonly reason: string }
 
 /** One place reward files are read from. `latest.json` and `proofs/` sit directly under `url`. */
@@ -108,7 +110,7 @@ export interface RewardsSource {
 export const REPOSITORY_REWARDS_BASE: RewardsDataBase = { url: SEF_DATA.rewardsProofBase, kind: "repository" }
 
 /** The one client method resolution needs, so a test can pass a stub. */
-export type EnsReadClient = Pick<PublicClient, "readContract">
+export type EnsReadClient = Pick<PublicClient, "request">
 
 // ENSIP-7 protocol codes, and the multiformats codes a CID carries.
 const IPFS_NS = 0xe3
@@ -276,32 +278,81 @@ async function within<T>(ms: number, outer: AbortSignal | undefined, run: (signa
   }
 }
 
+/** The contenthash bytes the name holds, `0x` when it has none, or why there are none to read. */
+type ContenthashAnswer = { readonly raw: Hex } | { readonly unsupported: string }
+
 /**
- * The contenthash bytes of the ENS name: `0x` when it has no resolver, null when its resolver
- * is a parent's wildcard resolver.
+ * The contenthash of the ENS name, read through the Universal Resolver's `resolve`, which follows
+ * ENSIP-10: it finds the resolver on the name or, for a wildcard resolver, on a parent, and asks
+ * it for the name. So the name's own resolver and a parent's wildcard resolver read the same way.
  *
- * This asks the name's own resolver directly, as viem's getEnsContentHash did before the
- * Universal Resolver. It does not follow ENSIP-10 wildcard resolution or CCIP-read. A non-zero
- * `offset` from `findResolver` means the resolver was found on a parent name, which only a
- * wildcard resolver answers for; that is reported, not guessed at. On 2026-10-08 the name had
- * its own resolver, offset 0.
+ * Until this read, the code asked `findResolver` for the resolver and refused any found on a
+ * parent, by its offset. On 2026-10-08 the name's offset was 0. On 2026-10-27, at block
+ * 26,287,089, `findResolver` named one bridge resolver on the second-level name for every name,
+ * at offset 8 for this one, while the registry still held the name's own resolver and `resolve`
+ * returned its contenthash unchanged. Our inference: ENS moved names behind that resolver
+ * between the two dates.
+ *
+ * The call is a plain `eth_call`, not viem's `readContract`: viem follows an `OffchainLookup`
+ * revert by itself whenever the client allows CCIP-read, and neither the CLI's client nor the
+ * interface's disables it. Here a revert is only decoded. `OffchainLookup` and `ResolverError`
+ * become `unsupported` with the reason; `ResolverNotFound` means the name has no resolver.
  */
-async function readContenthash(client: EnsReadClient): Promise<Hex | null> {
-  // The same call viem's getEnsResolver makes, through `readContract`, so a stub can answer it.
-  const [resolver, , offset] = await client.readContract({
-    address: mainnet.contracts.ensUniversalResolver.address,
-    abi: ensUniversalResolverAbi,
-    functionName: "findResolver",
-    args: [toHex(packetToBytes(SEF_REWARDS_ENS_NAME))],
-  })
-  if (resolver.toLowerCase() === zeroAddress) return "0x"
-  if (offset !== 0n) return null
-  return client.readContract({
-    address: resolver,
+async function readContenthash(client: EnsReadClient): Promise<ContenthashAnswer> {
+  const lookup = encodeFunctionData({
     abi: ensResolverAbi,
     functionName: "contenthash",
     args: [namehash(SEF_REWARDS_ENS_NAME)],
   })
+  const data = encodeFunctionData({
+    abi: ensUniversalResolverAbi,
+    functionName: "resolve",
+    args: [toHex(packetToBytes(SEF_REWARDS_ENS_NAME)), lookup],
+  })
+  let result: Hex
+  try {
+    result = await client.request({
+      method: "eth_call",
+      params: [{ to: mainnet.contracts.ensUniversalResolver.address, data }, "latest"],
+    })
+  } catch (error) {
+    const reverted = universalResolverRevert(error)
+    if (reverted) return reverted
+    throw error
+  }
+  const [answer] = decodeFunctionResult({ abi: ensUniversalResolverAbi, functionName: "resolve", data: result })
+  return { raw: decodeFunctionResult({ abi: ensResolverAbi, functionName: "contenthash", data: answer }) }
+}
+
+/** A Universal Resolver revert this code knows, read off the RPC error; undefined for anything else. */
+function universalResolverRevert(error: unknown): ContenthashAnswer | undefined {
+  const data = revertData(error)
+  if (!data) return undefined
+  let errorName: string
+  try {
+    errorName = decodeErrorResult({ abi: ensUniversalResolverAbi, data }).errorName
+  } catch {
+    return undefined
+  }
+  switch (errorName) {
+    case "ResolverNotFound": return { raw: "0x" }
+    case "OffchainLookup": return { unsupported: "the name's resolver answers only offchain, through CCIP-read, which this code does not follow" }
+    case "ResolverError": return { unsupported: "the name's resolver reverted when asked for the contenthash" }
+    default: return undefined
+  }
+}
+
+/**
+ * The revert bytes an RPC error carries. A node answers a reverted `eth_call` with the bytes in
+ * the error's `data`, sometimes nested one level, and viem keeps them on the error or its cause.
+ */
+function revertData(error: unknown): Hex | undefined {
+  for (let e: unknown = error, depth = 0; e && typeof e === "object" && depth < 8; e = (e as { cause?: unknown }).cause, depth++) {
+    const data = (e as { data?: unknown }).data
+    const hex = typeof data === "object" && data !== null ? (data as { data?: unknown }).data : data
+    if (typeof hex === "string" && isHex(hex) && hex.length >= 10) return hex
+  }
+  return undefined
 }
 
 /** What the ENS name holds on Mainnet. Never throws: a failed read is the `unreadable` state. */
@@ -309,15 +360,14 @@ export async function readRewardsEnsState(
   client: EnsReadClient,
   options: { readonly timeoutMs?: number } = {},
 ): Promise<RewardsEnsState> {
-  let raw: Hex | null
+  let answer: ContenthashAnswer
   try {
-    raw = await within(options.timeoutMs ?? REWARDS_FETCH_TIMEOUT_MS, undefined, () => readContenthash(client))
+    answer = await within(options.timeoutMs ?? REWARDS_FETCH_TIMEOUT_MS, undefined, () => readContenthash(client))
   } catch (error) {
     return { status: "unreadable", reason: failureReason(error) }
   }
-  if (raw === null) {
-    return { status: "unsupported", raw: null, reason: "the name is served by a parent's wildcard resolver" }
-  }
+  if ("unsupported" in answer) return { status: "unsupported", raw: null, reason: answer.unsupported }
+  const { raw } = answer
   try {
     const contenthash = decodeContenthash(raw)
     return contenthash ? { status: "set", contenthash, raw } : { status: "empty" }
