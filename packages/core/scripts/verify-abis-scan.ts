@@ -1,9 +1,12 @@
 /**
- * The per-event log scans behind verify:abis, taking the client as an argument so the unit
- * tests can hand them a mocked getLogs. No network here, and no constant from the registry.
+ * The per-event log scans behind verify:abis, and the anchor of a closed programme, taking the
+ * client as an argument so the unit tests can hand them a mocked getLogs and getBlock. No network
+ * here, and no constant from the registry: the programme calendar is an argument too.
  */
 import type { AbiEvent, Address } from "viem"
 import type { ChainKey } from "../src/chains.js"
+import type { ContractRef } from "../src/contracts.js"
+import { utcDayMs, type Programme, type UtcDay } from "../src/sef.js"
 import { blockAtTimestamp } from "../src/parity/blocks.js"
 
 /**
@@ -151,26 +154,74 @@ export async function scanRecent(
   return { status: any.logs.length > 0 ? "NO MATCH" : "NO ACTIVITY", logs: 0, depth: found.depth }
 }
 
+/** Where a contract's closed programme ends, and the block to search for that end from. */
+export interface Close {
+  programme: Programme
+  /** Midnight UTC of the day the programme is closed from. */
+  closedAt: Date
+  /** A block before the close: the deploy block, else the scan floor. */
+  floor: bigint
+}
+
+/**
+ * Whether verify:abis scans a contract back from its programme's end instead of the head: only
+ * when the contract names a programme and `closedFrom`, the calendar of PROGRAMME_CLOSED_FROM in
+ * sef.ts, closes it. Throws when such a contract gives no block to search the end from.
+ */
+export function closeOf(
+  ref: ContractRef,
+  closedFrom: Readonly<Partial<Record<Programme, UtcDay>>>,
+): Close | undefined {
+  if (ref.programme === undefined) return undefined
+  const day = closedFrom[ref.programme]
+  if (day === undefined) return undefined
+  const floor = ref.deployBlock ?? ref.startBlock
+  if (floor === undefined) {
+    throw new Error(
+      `${ref.address} belongs to the closed ${ref.programme} programme, and contracts.ts gives no ` +
+      `block to search its end from.`,
+    )
+  }
+  return { programme: ref.programme, closedAt: new Date(utcDayMs(day)), floor }
+}
+
 /**
  * The last block before `closedAt`, the instant a programme closed: the newest block a closed
  * programme's contracts can hold a log of it in. A binary search on block timestamps, from
- * `floor`, a block known to be earlier such as the deploy block, up to the head. Found at run
- * time, so no block number is written down for it.
+ * `floor`, a block known to be earlier such as the deploy block, up to `margin` blocks below the
+ * head. Found at run time, so no block number is written down for it.
+ *
+ * Not up to the head itself: a public RPC pool spreads requests over backends, and one a block
+ * behind answers null for a block another just reported as the head, which viem throws as
+ * BlockNotFoundError. A block `margin` behind is settled on every backend, and the close of a
+ * programme that has ended lies far further back. A close within `margin` of the head is
+ * refused, not clamped.
  */
 export async function lastBlockBefore(
   client: BlocksClient,
   closedAt: Date,
   floor: bigint,
   latest: bigint,
+  margin: bigint,
 ): Promise<bigint> {
-  return blockAtTimestamp({
-    timestampOf: async (blockNumber) => (await client.getBlock({ blockNumber })).timestamp,
-    lo: floor,
-    hi: latest,
-    // The last block stamped strictly before the instant. Timestamps are whole seconds.
-    target: BigInt(Math.ceil(closedAt.getTime() / 1000)) - 1n,
-    side: "last",
-  })
+  const hi = latest - margin
+  try {
+    return await blockAtTimestamp({
+      timestampOf: async (blockNumber) => (await client.getBlock({ blockNumber })).timestamp,
+      lo: floor,
+      hi,
+      // The last block stamped strictly before the instant. Timestamps are whole seconds.
+      target: BigInt(Math.ceil(closedAt.getTime() / 1000)) - 1n,
+      side: "last",
+    })
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    throw new Error(
+      `the last block before ${closedAt.toISOString()} is not between blocks ${floor} and ${hi}, ` +
+      `${margin} below the head: ${reason}`,
+      { cause: err },
+    )
+  }
 }
 
 /**
