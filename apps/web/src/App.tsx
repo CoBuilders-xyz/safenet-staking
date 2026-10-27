@@ -6,7 +6,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { Toaster } from "@/components/ui/toaster"
 import { RestrictedScreen } from "@/components/RestrictedScreen"
 import { Button } from "@/components/ui/button"
-import type { Restriction } from "@/lib/restriction"
+import { chooseRestriction, type Restriction } from "@/lib/restriction"
 import { Analytics } from "@/components/Analytics"
 import { useAutoConnect } from "@/hooks/useAutoConnect"
 import { useSanctionsCheck } from "@/hooks/useSanctionsCheck"
@@ -123,13 +123,12 @@ function App() {
     )
   }
 
-  if (!sanctions.allowed || !geo.allowed) {
-    // When both gates refuse, the sanctions screening is named: it is checked first. Blocked
-    // without a reason is still blocked: fail closed, and call it a failed check.
-    const restriction: Restriction =
-      (!sanctions.allowed && sanctions.restriction) ||
-      (!geo.allowed && geo.restriction) ||
-      (!sanctions.allowed ? { gate: "sanctionsApi", reason: "unavailable" } : { gate: "geoblock", reason: "unavailable" })
+  // Sanctions screening is checked first. A refusal is named before a failed check.
+  const restriction = chooseRestriction([
+    { gate: "sanctionsApi", ...sanctions },
+    { gate: "geoblock", ...geo },
+  ])
+  if (restriction) {
     return (
       <RestrictedScreen
         restriction={restriction}

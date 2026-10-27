@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { countryName, restrictionCopy, type Restriction } from "../restriction"
+import { chooseRestriction, countryName, restrictionCopy, type Restriction } from "../restriction"
 
 const ALL: Restriction[] = [
   { gate: "sanctionsApi", reason: "refused" },
@@ -44,5 +44,47 @@ describe("restrictionCopy", () => {
 describe("countryName", () => {
   it("falls back to the code when it is not a region", () => {
     expect(countryName("not-a-code")).toBe("not-a-code")
+  })
+})
+
+describe("chooseRestriction", () => {
+  const open = { allowed: true }
+
+  it("is undefined while every gate is open", () => {
+    expect(chooseRestriction([{ gate: "sanctionsApi", ...open }, { gate: "geoblock", ...open }])).toBeUndefined()
+  })
+
+  it("names the first gate when both refuse", () => {
+    expect(
+      chooseRestriction([
+        { gate: "sanctionsApi", allowed: false, restriction: { gate: "sanctionsApi", reason: "refused" } },
+        { gate: "geoblock", allowed: false, restriction: { gate: "geoblock", reason: "region", country: "CU" } },
+      ]),
+    ).toEqual({ gate: "sanctionsApi", reason: "refused" })
+  })
+
+  it("names a refusal before a check that could not answer, whatever the order", () => {
+    expect(
+      chooseRestriction([
+        { gate: "sanctionsApi", allowed: false, restriction: { gate: "sanctionsApi", reason: "unavailable" } },
+        { gate: "geoblock", allowed: false, restriction: { gate: "geoblock", reason: "region", country: "CU" } },
+      ]),
+    ).toEqual({ gate: "geoblock", reason: "region", country: "CU" })
+  })
+
+  it("names the first failed check when no gate refused", () => {
+    expect(
+      chooseRestriction([
+        { gate: "sanctionsApi", allowed: false, restriction: { gate: "sanctionsApi", reason: "unavailable" } },
+        { gate: "geoblock", allowed: false, restriction: { gate: "geoblock", reason: "unavailable" } },
+      ]),
+    ).toEqual({ gate: "sanctionsApi", reason: "unavailable" })
+  })
+
+  it("treats a closed gate without a reason as a failed check of that gate", () => {
+    expect(chooseRestriction([{ gate: "sanctionsApi", ...open }, { gate: "geoblock", allowed: false }])).toEqual({
+      gate: "geoblock",
+      reason: "unavailable",
+    })
   })
 })

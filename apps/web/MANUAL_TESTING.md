@@ -158,7 +158,7 @@ repeated in each table so a table can be checked alone.
 | Loading | A spinner, while the sanctions endpoint, the location lookup and, with a wallet, the sanctions oracle answer |
 | Restricted, refused | "Access Restricted" for Sanctions screening or Location check, the latter naming the country; "Wallet Restricted" for Wallet screening, with Disconnect wallet |
 | Restricted, check failed | "Access Check Failed" with Reload, or "Wallet Check Failed" with Try again and Disconnect wallet |
-| Both gates refuse | Sanctions screening is named; it is checked first |
+| Two gates closed | A refusal is named before a failed check; between two of a kind, Sanctions screening, which is checked first |
 | Route loading | A spinner in the page area |
 | A page throws | "Something went wrong", "An unexpected error occurred while loading this page." and Try Again; the header and footer stay |
 

@@ -11,6 +11,28 @@ export type Restriction =
   | { gate: "geoblock"; reason: "unavailable" }
   | { gate: "walletSanctions"; reason: "flagged" | "unavailable" }
 
+/** What one gate reported. A closed gate without a reason is still closed. */
+export interface GateResult {
+  allowed: boolean
+  restriction?: Restriction
+}
+
+/**
+ * The restriction to show when gates are closed, given in the order they are checked; undefined
+ * when every gate is open. A refusal is named before a check that could not answer, because a
+ * retry cannot lift a refusal and the screen must not offer one as the way in. Among refusals,
+ * and among failed checks, the first gate wins. A closed gate with no reason is a failed check
+ * of that gate.
+ */
+export function chooseRestriction(
+  gates: readonly (GateResult & { gate: Restriction["gate"] })[],
+): Restriction | undefined {
+  const closed = gates
+    .filter((g) => !g.allowed)
+    .map((g): Restriction => g.restriction ?? ({ gate: g.gate, reason: "unavailable" } as Restriction))
+  return closed.find((r) => r.reason !== "unavailable") ?? closed[0]
+}
+
 export interface RestrictionCopy {
   title: string
   /** The gate, as the visitor sees it named. */

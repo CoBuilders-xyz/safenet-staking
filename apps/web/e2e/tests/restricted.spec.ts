@@ -60,6 +60,18 @@ test.describe("Restricted screen", () => {
     await expect(page.getByRole("button", { name: "Reload" })).toBeVisible()
   })
 
+  test("a refusal is named before a failed check, so the screen offers no Reload", async ({ disconnectedPage: page, mockChainState }) => {
+    mockChainState.sanctionsApi = "fail"
+    await page.route("**/api.country.is**", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ country: "CU" }) }),
+    )
+    await page.goto("/")
+
+    await expect(page.getByRole("heading", { name: "Access Restricted" })).toBeVisible({ timeout: 10_000 })
+    await expect(restricted(page)).toContainText("Closed by: Location check")
+    await expect(page.getByRole("button", { name: "Reload" })).toHaveCount(0)
+  })
+
   test("wallet screening: a listed wallet is refused, and disconnecting it reopens the public pages", async ({ connectedPage: page, mockChainState }) => {
     mockChainState.walletSanctioned = true
     await page.goto("/")

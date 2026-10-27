@@ -87,7 +87,8 @@ Pages are lazy-loaded with `React.lazy()` and preloaded after first paint throug
 App-level gates, each rendering `RestrictedScreen` with a `Restriction` (`src/lib/restriction.ts`):
 the gate, and whether it refused or could not answer. Each hook returns `allowed`, `isLoading` and
 `restriction`; `App.tsx` blocks on `!allowed` alone, so a block without a reason still blocks, as
-a failed check. When both app-level gates refuse, the sanctions screening is named.
+a failed check. `chooseRestriction` picks the one to name: a refusal before a failed check, then
+the sanctions screening before the location check.
 
 - `useGeoblockCheck` looks up the country (country.is, then ipapi.co) and blocks the countries
   listed in the hook, naming the country. It fails closed: a failed lookup is "unavailable". The
