@@ -113,9 +113,8 @@ Do not infer that a planned package exists because this file names it. Check.
 
 `packages/core`, `packages/cli`, `packages/mcp`, `apps/web` and both subgraph packages each own a
 `CLAUDE.md`.
-Read the one for the package you are in, not all of them. `apps/web/CLAUDE.md` came with the fork
-and names `yarn`. This repository uses pnpm, so run its scripts as
-`pnpm --filter @cobuilders/safenet-web <script>`.
+Read the one for the package you are in, not all of them. Run a package's scripts from the root
+as `pnpm --filter <name> <script>`.
 
 ## Subgraphs
 

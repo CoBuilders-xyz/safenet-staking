@@ -1,10 +1,30 @@
 # safenet-staking
 
+The tools CoBuilders builds for staking on Safenet: the web interface for staking SAFE to Safenet
+validators, two subgraphs that index the Safenet contracts on Ethereum Mainnet and Gnosis Chain,
+the `safenet` command-line interface, and an MCP server that gives an AI client the same reads.
+They share one package of constants, so every address, start block and ABI is written once.
+
 [![Parity with SEF](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml/badge.svg)](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml)
 
 Each day, the Studio deployments named in `packages/core/src/subgraphs.ts` are compared with
 SEF's published figures at their publish instant: the Mainnet staked total to the wei, and each
 validator's Gnosis participation rate as the identical double.
+
+## Layout
+
+- [`apps/web`](apps/web): the staking interface, a React app that also runs as a Safe App. Its
+  [README](apps/web/README.md) goes from a fresh clone to a running app and its tests.
+- [`packages/core`](packages/core): the addresses, start blocks, ABIs and other constants every
+  other package reads.
+- [`packages/cli`](packages/cli): `safenet`, the command-line interface, with read commands and
+  write commands that support `--dry-run`.
+- [`packages/mcp`](packages/mcp): `safenet-mcp`, the MCP server.
+- [`packages/subgraph-mainnet`](packages/subgraph-mainnet): staking, withdrawals and rewards on
+  Ethereum Mainnet.
+- [`packages/subgraph-gnosis`](packages/subgraph-gnosis): consensus and signing on Gnosis Chain.
+- [`tools`](tools): repository scripts: the edit hook, the task guard, the browser-safety check,
+  the metrics report, the Studio deploy, and the runner for their tests.
 
 ## Setup
 
