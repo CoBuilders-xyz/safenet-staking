@@ -34,7 +34,10 @@ Events are tagged `high` or `rare`. High-frequency events are proven by a recent
 on every pull request. When an event has no log in that window, the scan widens back in doubling
 steps up to a ceiling per chain, so a quiet weekend does not fail every pull request. Rare events
 need `--deep`, which scans from the deploy block and runs nightly, because even the ceiling
-legitimately contains none of them.
+legitimately contains none of them. Since 2026-10-23, a contract whose `programme` in
+`src/contracts.ts` is closed by `PROGRAMME_CLOSED_FROM` in `src/sef.ts`, today the Gnosis Beta
+contracts, is scanned back from the last block before the close, found by timestamp at run time,
+because it will never log that programme's events again and a scan from the head only finds silence.
 
 ## Files
 
@@ -76,8 +79,9 @@ legitimately contains none of them.
 - `src/gnosis-snapshot.ts` — one dated `pnpm metrics` run of the Gnosis figures, kept here because
   it carries validator addresses. Shown only when the Gnosis subgraph is not live.
 - `scripts/verify-abis.ts` — the check itself.
-- `scripts/verify-abis-scan.ts` — the per-event scans, the window and the ceiling, taking the
-  client as an argument so `verify-abis-scan.test.ts` runs them against a mocked `getLogs`.
+- `scripts/verify-abis-scan.ts` — the per-event scans, the window, the ceiling and the anchor of a
+  closed programme, taking the client as an argument so `verify-abis-scan.test.ts` runs them
+  against a mocked `getLogs` and `getBlock`.
 
 ## Adding a contract or an event
 

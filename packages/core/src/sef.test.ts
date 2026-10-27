@@ -6,6 +6,7 @@ import {
   BETA_END_DAY,
   GNOSIS_INDEXED_PROGRAMME,
   PARTICIPATION_WINDOW_DAYS,
+  PROGRAMME_CLOSED_FROM,
   REWARDS_LATEST_PATH,
   REWARD_PARTICIPATION_THRESHOLD,
   REWARD_PERIOD_DAYS,
@@ -107,6 +108,14 @@ test("the calendar's days are the ones SEF's transition note gives", () => {
 
 test("the Gnosis subgraph indexes the Beta contracts until a change indexes Aegis's", () => {
   assert.equal(GNOSIS_INDEXED_PROGRAMME, "beta")
+})
+
+test("Beta is closed from the Aegis start, so its stray ceremony in the gap stays inside it", () => {
+  assert.equal(PROGRAMME_CLOSED_FROM.beta, AEGIS_START_DAY)
+  assert.equal(programmePhase(new Date("2026-10-06T12:00:00Z")), "gap")
+  assert.ok(utcDayMs(PROGRAMME_CLOSED_FROM.beta) > utcDayMs("2026-10-06"))
+  // Aegis is running: its contracts are scanned back from the head.
+  assert.equal(PROGRAMME_CLOSED_FROM.aegis, undefined)
 })
 
 test("utcDayMs and programmePhase refuse what is not a day", () => {
