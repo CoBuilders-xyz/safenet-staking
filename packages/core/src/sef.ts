@@ -37,6 +37,11 @@ export interface SefNetworkInfo {
    * is exact to the wei. Parse it with `parseSefAmount`: `Number()` rounds it.
    */
   total_staked_amount: string
+  /**
+   * Per programme, from its deployment. On Beta, the TransactionProposed logs of the consensus
+   * contract. On Aegis, per SEF's README at 1c18bdc, the SentinelOracle requests with at least one
+   * `Revealed`, each counted once. SEF keeps Beta's final value under the git tag `beta-final`.
+   */
   total_transactions_checked: number
 }
 

@@ -44,7 +44,10 @@ because it will never log that programme's events again and a scan from the head
 - `src/chains.ts` — chain config and RPC fallback order. Several endpoints per chain on purpose:
   the reference interface reads the chain through one hardcoded URL and goes blank when it fails.
 - `src/contracts.ts` — addresses, deploy blocks, and where SEF publishes the data our numbers must
-  match.
+  match. The Gnosis contracts of both programmes sit side by side: Beta's keep their original
+  keys, `consensus` and `frostCoordinator`, and Aegis's are prefixed `aegis`. `GNOSIS_CONTRACTS`
+  names which entry plays which role in each programme; pick Gnosis contracts through it, not by
+  key. Aegis changed the two transaction events, so a Beta handler does not read an Aegis log.
 - `src/abis.ts` — the indexed event registry, `indexedEvent()` to look one up by name, the
   decoded error registry, and the ABIs built from them; also `ensUniversalResolverAbi` and
   `ensResolverAbi`, the two standard ENS reads `src/rewards-source.ts` makes.

@@ -5,7 +5,8 @@
  * Never type a hex address anywhere else in this repository.
  *
  * Source: safe-fndn/safenet-data/config/beta.env, cross-checked against
- * the Security page of SEF's documentation. Verified 2026-08-26.
+ * the Security page of SEF's documentation. Verified 2026-08-26. The Aegis entries name
+ * their own sources.
  */
 import type { Address } from "viem"
 import type { ChainKey } from "./chains.js"
@@ -82,9 +83,64 @@ export const CONTRACTS = {
     deployBlock: 45_210_395n,
     programme: "beta",
   },
+  // Aegis, on Gnosis since October 2026. Addresses from SEF's README at safe-fndn/safenet-data
+  // 1c18bdc (consensus and SentinelOracle) and the Contracts and Audits page of SEF's Aegis
+  // documentation (all three), which agreed on 2026-10-27. Deploy blocks found that day by binary
+  // search over eth_getCode; neither source publishes one.
+  aegisConsensus: {
+    address: "0xc855761D619f6002923507cE68B84d7689C2aa96",
+    chain: "gnosis",
+    // Verified 2026-10-27: no code at 48,635,842, 8,049 bytes at 48,635,843.
+    startBlock: 48_635_843n,
+    deployBlock: 48_635_843n,
+    programme: "aegis",
+  },
+  aegisFrostCoordinator: {
+    // The README does not name it. The docs page does, and the chain agrees: getCoordinator() on
+    // aegisConsensus returned this address on 2026-10-27. Unlike Beta's, it deployed well BEFORE
+    // its consensus contract, 18,022 blocks or about 25 hours, and signed its first ceremonies
+    // before the consensus contract existed.
+    address: "0xC6B34dA4c99C043A093214D58423a8bE39585B78",
+    chain: "gnosis",
+    // Verified 2026-10-27: no code at 48,617,820, 14,345 bytes at 48,617,821.
+    startBlock: 48_617_821n,
+    deployBlock: 48_617_821n,
+    programme: "aegis",
+  },
+  aegisSentinelOracle: {
+    // The oracle every Aegis transaction proposal names: each TransactionProposed and
+    // TransactionAttested on aegisConsensus to 2026-10-27 carried this address as `oracle`.
+    address: "0x4F61B8832978e83b80D69551AEf07557DBE41d03",
+    chain: "gnosis",
+    // Verified 2026-10-27: no code at 48,635,849, 16,812 bytes at 48,635,850.
+    startBlock: 48_635_850n,
+    deployBlock: 48_635_850n,
+    programme: "aegis",
+  },
 } as const satisfies Record<string, ContractRef>
 
 export type ContractName = keyof typeof CONTRACTS
+
+/** The Gnosis contracts of one programme, by the role each plays. */
+export interface GnosisProgrammeContracts {
+  readonly consensus: ContractName
+  readonly frostCoordinator: ContractName
+  /** Aegis only. Beta checked transactions without an oracle. */
+  readonly sentinelOracle?: ContractName
+}
+
+/**
+ * Which entry of CONTRACTS plays which role in each programme. Beta's keys predate Aegis and keep
+ * their names, so code written for Beta still reads Beta.
+ */
+export const GNOSIS_CONTRACTS: Readonly<Record<Programme, GnosisProgrammeContracts>> = {
+  beta: { consensus: "consensus", frostCoordinator: "frostCoordinator" },
+  aegis: {
+    consensus: "aegisConsensus",
+    frostCoordinator: "aegisFrostCoordinator",
+    sentinelOracle: "aegisSentinelOracle",
+  },
+}
 
 /**
  * The GitHub repository where SEF publishes its data. It was `safenet-beta-data` until SEF
