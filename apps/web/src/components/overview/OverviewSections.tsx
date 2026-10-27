@@ -228,8 +228,16 @@ export function ValidatorsPanel() {
     : sefPublishesSome
       ? "SEF's published 14-day figure, where SEF publishes one"
       : "SEF's published 14-day figure"
-  const participationSource =
-    fromSubgraph && fromSef
+  // Neither source gives any row a figure: name neither as the source, say why there is none.
+  const noSefRate =
+    sef.data === undefined
+      ? sef.error ? "SEF's validator list could not be read" : "SEF's validator list has not loaded"
+      : !fromSef ? "SEF's validator list does not include these validators" : "SEF publishes no 14-day figure at present"
+  const noFigure =
+    rows.state === "ready" && rows.value.length > 0 && !fromSubgraph && sefListed.every((v) => v.participationRate === null)
+  const participationSource = noFigure
+    ? `Participation: no figure is available. The Gnosis subgraph has none for these validators, and ${noSefRate}.`
+    : fromSubgraph && fromSef
       ? sefPublishesNone
         ? `Participation: ${subgraphWords}; for the other rows, ${sefWords}.`
         : `Participation: ${subgraphWords}; rows marked "SEF file" use ${sefWords}.`

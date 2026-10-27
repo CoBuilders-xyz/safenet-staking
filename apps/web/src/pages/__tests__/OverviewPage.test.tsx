@@ -189,7 +189,8 @@ describe("OverviewPage", () => {
     mocks.consensus.mockReturnValue({ ...mocks.consensus(), participation: undefined, window: undefined })
     renderPage()
     expect(screen.getAllByRole("region", { name: "Validators" })[1]).toHaveTextContent(
-      "Participation: SEF publishes no 14-day figure at present.",
+      "Participation: no figure is available. The Gnosis subgraph has none for these validators, " +
+        "and SEF publishes no 14-day figure at present.",
     )
   })
 
@@ -200,6 +201,25 @@ describe("OverviewPage", () => {
     const validators = screen.getByRole("region", { name: "Validators" })
     expect(validators).toHaveTextContent("Participation: SEF's published 14-day figure, where SEF publishes one.")
     expect(within(validators).getByText("Not published")).toBeInTheDocument()
+  })
+
+  it("names no source when neither the Gnosis subgraph nor SEF gives a validator a figure", () => {
+    const noSubgraph = { ...mocks.consensus(), participation: undefined, window: undefined }
+    for (const [sef, why] of [
+      [{ data: [], error: null }, "SEF's validator list does not include these validators"],
+      [{ data: undefined, error: new Error("HTTP 502") }, "SEF's validator list could not be read"],
+      [{ data: undefined, error: null }, "SEF's validator list has not loaded"],
+    ] as const) {
+      mocks.consensus.mockReturnValue(noSubgraph)
+      mocks.validators.mockReturnValue(sef)
+      const { unmount } = renderPage()
+      const validators = screen.getByRole("region", { name: "Validators" })
+      expect(validators).toHaveTextContent(
+        `Participation: no figure is available. The Gnosis subgraph has none for these validators, and ${why}.`,
+      )
+      expect(validators).not.toHaveTextContent("SEF's published 14-day figure")
+      unmount()
+    }
   })
 
   it("does not read a validator SEF does not list as SEF publishing no rate", () => {
