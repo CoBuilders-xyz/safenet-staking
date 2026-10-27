@@ -48,6 +48,32 @@ unless the operator allows writes when the server starts.
   and how to add the server to Claude Desktop and Cursor.
 - [packages/mcp/CLAUDE.md](packages/mcp/CLAUDE.md): how it is built and tested.
 
+## Release
+
+Production is IPFS. Vercel serves previews only.
+
+A release is a tag `v*`, or a manual run of the `Release` workflow. The workflow builds the
+interface from the committed public values in `apps/web/build.env`, packs it into a CAR and
+pins that CAR to Pinata. Then it checks that the dedicated Pinata gateway and each public
+gateway in `packages/core` serve it.
+
+A manual run has a boolean input `pin`, on by default. With `pin` off, the workflow builds,
+records the CID and uploads the CAR as an artifact, and pins nothing. The pin job also refuses
+any ref other than `main` or a `v*` tag, so a manual run from another branch never pins.
+
+The build job receives no secret, so none can reach the bundle. That is the guarantee in CI.
+The browser-safety check also runs there, but its bundle half compares the build with
+`.env.local`, which the runner does not have, so it finds nothing to compare. On a developer
+machine with `.env.local`, it fails the release build when a secret reaches the bundle.
+
+The CID depends only on the source, the lockfile and `build.env`, so anyone can rebuild it
+and compare. [`VERIFY.md`](VERIFY.md) has the exact commands.
+
+```sh
+pnpm --filter @cobuilders/safenet-web release:build   # writes apps/web/release/CID and app.car
+pnpm --filter @cobuilders/safenet-web release:pin     # needs PINATA_JWT and PINATA_GATEWAY
+```
+
 ## License
 
 This repository is released under the MIT License, see [LICENSE](LICENSE). `apps/web` derives
