@@ -94,7 +94,8 @@
     },
     "hero": {
       "openDashboard": "Staking-Dashboard öffnen",
-      "subtitle": "Der Stand von Staking und Konsens bei Safenet. Keine Wallet erforderlich."
+      "subtitle": "Der Stand von Staking und Konsens bei Safenet. Keine Wallet erforderlich.",
+      "title": "Netzwerkübersicht"
     },
     "reason": {
       "balanceExceedsAllocation": "Der Vertrag hält mehr SAFE als die veröffentlichte Zuteilung, daher misst die Differenz nicht die beanspruchten Beträge.",
