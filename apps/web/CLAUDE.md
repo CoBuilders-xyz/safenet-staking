@@ -120,7 +120,8 @@ wallet's chain is not Mainnet; `ConnectButton` then shows "Switch to Ethereum".
   `refetchOnWindowFocus: false`.
 - **Validators** (`src/hooks/useValidators.ts`): fetches `VITE_VALIDATOR_INFO_URL` or SEF's
   `validator-info.json` (`SEF_DATA.validatorInfo` in core), cached five minutes. `findValidator()`
-  looks one up by address; an unknown address shows truncated.
+  looks one up by address; an unknown address shows truncated. `participationRate` is null when
+  SEF publishes no rate, never 0.
 - **Withdrawals** (`src/hooks/useWithdrawals.ts`): the connected user's queue, polled every
   15 seconds, and `useNextClaimable` for the banner.
 - **Gas** (`src/hooks/useGasEstimate.ts`): `estimateGas` and `getGasPrice`, debounced 500 ms.
@@ -153,9 +154,7 @@ when the dataset did not answer, Your rewards says the absence rests on the mirr
 `latestSource`, which Verifiability shows as the source of `latest.json`.
 
 SEF's `latest.json` carries exactly `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal` and
-`unpaidAmount`. In this tree, `parseRewardsLatest` (`src/hooks/useProgrammeRewards.ts`) also
-requires an ISO `updatedAt`, so a file without one is read as the wrong shape, and
-`scripts/generate-merkle-tree.ts` and `scripts/fork-env/rewards.ts` still write one.
+`unpaidAmount`.
 
 `useRewards` disables Claim when the proof's root differs from the MerkleDrop's root.
 
@@ -192,7 +191,10 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
   claim, it opens as "Stake your balance".
 - `src/components/validators/`: `ValidatorList`, `ValidatorCard`, and `ParticipationRate`, which
   marks SEF's 75% reward threshold. Screens that show a rate also state the rule as text, because
-  a tooltip does not open on touch.
+  a tooltip does not open on touch. `PublishedParticipationRate`, in the same file, takes SEF's
+  rate in percent: a null reads "Not published", with no marker, never 0.00%. The validator
+  cards, the detail page and the dashboard positions use it; the Overview table says "Not
+  published" for a row SEF lists with a null rate.
 - `src/components/staking/`: `AmountInput`, `DelegateDialog`, `StakeForm`, `ValidatorSelect`,
   `UndelegateDialog`.
 - `src/components/withdrawals/`: `WithdrawalQueue`, `WithdrawalCard`.
@@ -201,7 +203,7 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
 
 - `src/lib/format.ts`: token amounts, addresses, countdowns, participation rates, UTC dates.
 - `src/lib/programme.ts`: copy built on the programme calendar in core: `PARTICIPATION_RULE`,
-  `belowThreshold`, the dated Beta notice, the withdrawn status for a validator SEF lists as
+  `RATE_NOT_PUBLISHED` for a rate SEF lists as null, `belowThreshold`, the dated Beta notice, the withdrawn status for a validator SEF lists as
   inactive.
 - `src/lib/errorFormat.ts`: `formatContractError`, `revertedErrorName`.
 - `src/lib/clipboard.ts`: `copyToClipboard()`.

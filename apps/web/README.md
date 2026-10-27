@@ -250,8 +250,7 @@ address has no proof while the dataset did not answer, Your rewards adds that th
 mirror.
 
 SEF's `latest.json` carries exactly `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal` and
-`unpaidAmount`. In this tree, `parseRewardsLatest` in `src/hooks/useProgrammeRewards.ts` also
-requires an `updatedAt` date, so it treats a file without one as the wrong shape.
+`unpaidAmount`.
 
 ## Reward proofs
 
@@ -273,8 +272,8 @@ requires an `updatedAt` date, so it treats a file without one as the wrong shape
 2. Run `pnpm --filter @cobuilders/safenet-web generate:proofs`. It writes to `apps/web/.rewards/`,
    which git ignores; `--out <dir>` names another directory.
 3. The output is `proofs/<radix>/<lowercase address>.json` for each address and `latest.json`
-   with `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal`, `unpaidAmount` and an `updatedAt`
-   set to the time of the run.
+   with `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal` and `unpaidAmount`, the five fields
+   SEF publishes.
 4. Serve the directory and point `VITE_REWARDS_BASE_URL` at it.
 5. Then set the MerkleDrop's root to the generated one. In the other order the app serves the old
    proofs against the new root, and Claim stays disabled because the roots differ. This

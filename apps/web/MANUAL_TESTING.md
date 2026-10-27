@@ -44,7 +44,8 @@ Note the transaction hash of everything you send, for debugging later.
       and age.
 - [ ] Dashboard (`/dashboard`) shows the total delegated; quick actions are hidden.
 - [ ] Validators (`/validators`) lists the validator cards with name, participation rate and
-      total stake, and states SEF's 75% participation rule as text.
+      total stake, and states SEF's 75% participation rule as text. A rate SEF does not publish
+      reads Not published, never 0.00%.
 - [ ] A validator's detail page (`/validators/<address>`) shows its figures; an unknown address
       shows not found.
 - [ ] Withdrawals (`/withdrawals`) asks to connect.
