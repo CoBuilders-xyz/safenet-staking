@@ -1,236 +1,245 @@
-# CLAUDE.md
+# CLAUDE.md — apps/web
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for agents working in `@cobuilders/safenet-web`, the Safenet staking interface. Read the
+root `CLAUDE.md` first: its rules on constants and secrets apply here. `README.md` in this
+directory covers setup, the environment variables and the test suites for a human reader.
 
 ## Commands
 
-- **Build:** `yarn build` (runs `tsc -b && vite build`)
-- **Dev server:** `yarn dev`
-- **Lint:** `yarn lint`
-- **Type check only:** `npx tsc --noEmit`
-- **Preview production build:** `yarn preview`
-- **Run unit/integration tests:** `yarn test` (vitest run)
-- **Check:** `pnpm check` (`codegen:check`, which fails if `src/graphql/<chain>/generated.ts` is stale, then eslint and `tsc -b --noEmit`; also run in CI)
-- **GraphQL types:** `pnpm codegen` regenerates them; `pnpm codegen:live-check` validates the documents against a running graph-node
-- **Watch mode:** `yarn test:watch`
-- **Coverage:** `yarn test:coverage`
-- **E2E tests:** `yarn test:e2e` (Playwright)
-- **Generate Merkle proofs:** `pnpm generate:proofs [--out <dir>]` (reads `scripts/merkle-config.json`, writes to the git-ignored `.rewards/` by default)
-- **Manual QA fork:** `pnpm fork:up`, `pnpm fork:reset`, `pnpm fork:down`, from the repository root or here. The tool is `scripts/fork-env/`; the guide is `docs/manual-qa-fork.md` at the repository root
+Run every script as `pnpm --filter @cobuilders/safenet-web <script>` from the repository root, or
+as `pnpm <script>` from `apps/web`.
 
-## Pre-push Checklist
+- **Dev server:** `dev`. Vite reads env from the repository root, not from this directory.
+- **Build:** `build` (`tsc -b && vite build`)
+- **Check:** `check`: `codegen:check`, which fails if `src/graphql/<chain>/generated.ts` is stale,
+  then ESLint, `tsc -b --noEmit` and the e2e TypeScript project. The root `pnpm check` runs it.
+- **Lint only:** `lint`
+- **Unit tests:** `test` (Vitest, `src/**` and `scripts/**`); `test:watch`; `test:coverage`
+- **E2E, mocked RPC:** `test:e2e` (Playwright, `e2e/tests/`); `test:e2e:ui`; `test:e2e:headed`.
+  Needs Chromium once: `pnpm --filter @cobuilders/safenet-web exec playwright install chromium`,
+  which `pnpm bootstrap` also runs.
+- **E2E, Anvil fork:** `test:fork` (Playwright, `e2e/fork/`). Needs `anvil` and the archive
+  `MAINNET_RPC_URL`.
+- **GraphQL types:** `codegen` regenerates them; `codegen:live-check` validates the documents
+  against a running graph-node
+- **Reward proofs:** `generate:proofs [--out <dir>]` reads `scripts/merkle-config.json` and writes
+  to the git-ignored `.rewards/` by default
+- **Manual QA fork:** `fork:up`, `fork:reset`, `fork:down`, also from the repository root as
+  `pnpm fork:up` and so on. The tool is `scripts/fork-env/`; the guide is
+  `docs/manual-qa-fork.md` at the repository root
+- **IPFS release:** `release:build` builds from `build.env` alone and writes
+  `release/app.car` and `release/CID`; `release:pin` pins the CAR to Pinata and checks the
+  gateways, with `PINATA_JWT` and `PINATA_GATEWAY`. `VERIFY.md` at the root rebuilds a release;
+  `.github/workflows/release.yml` runs both on a `v*` tag or by hand
 
-Before pushing code to the remote, always run these checks in order and fix any failures:
+Before every commit, run `pnpm check` from the root. Before a pull request, also `test`,
+`test:e2e` and `build` here.
 
-1. `yarn lint` — ESLint must pass with zero errors
-2. `yarn test` — All unit/integration tests must pass
-3. `yarn build` — Production build must succeed (includes `tsc -b`)
+## Constants
+
+Every address, chain id, start block, RPC list, subgraph endpoint and SEF data URL comes from
+`@cobuilders/safenet-core`. Do not write one in this package. Environment variables may override
+some of them, and the e2e suite relies on that to point the app at mocks.
+
+- `src/config/chains.ts`: the wagmi chain is Mainnet, the only chain core configures. RPC
+  endpoints are `VITE_RPC_URL` and its two fallbacks when set, which replace core's list,
+  otherwise core's list. `VITE_CHAIN_ID` selects only the default RPC list and the scan floor.
+- `src/config/contracts.ts`: `getContractAddresses()` returns core's Mainnet addresses for the
+  staking contract, the SAFE token, the MerkleDrop (`VITE_MERKLE_DROP_ADDRESS` overrides it) and
+  the sanctions oracle. `deployBlock` is `VITE_STAKING_DEPLOY_BLOCK` or core's scan floor.
+- `src/config/subgraphs.ts`: `VITE_SUBGRAPH_URL_MAINNET` and `VITE_SUBGRAPH_URL_GNOSIS` when set,
+  otherwise the defaults in `packages/core/src/subgraphs.ts`, which are Studio deployments.
+
+Every `VITE_` value is public in the bundle. Never give a secret a `VITE_` name.
 
 ## Architecture
 
-Safenet Staking UI is a React 19 + TypeScript dApp for delegating SAFE tokens to validators on Ethereum. It uses Vite 7, Tailwind CSS 4 (via `@tailwindcss/vite`), wagmi 3 / viem for wallet and contract interactions, and recharts for data visualization.
+React 19 and TypeScript, Vite 7, Tailwind CSS 4 (through `@tailwindcss/vite`), wagmi 3 and viem,
+TanStack Query, Radix UI, graphql-request and Recharts.
 
-### Provider Stack (src/main.tsx)
+### Provider stack (`src/main.tsx`)
 
-`StrictMode` → `WagmiProvider` → `QueryClientProvider` → `TooltipProvider` → `ToastProvider` → `App`
+`StrictMode` → `WagmiProvider` (`reconnectOnMount={false}`) → `QueryClientProvider` →
+`TooltipProvider` → `ToastProvider` → `App`
 
-All wagmi hooks, React Query, Radix tooltip context, and toast context are available throughout the app.
+### Routing (`src/App.tsx`)
 
-### Routing (src/App.tsx)
+`HashRouter`. Seven routes under a shared `Layout` (header, footer, `<Outlet />`), each page
+wrapped in `ErrorBoundary`:
 
-Seven routes under a shared `Layout` (header + footer + `<Outlet />`), wrapped in `ErrorBoundary`:
-- `/` → `OverviewPage` (Network Overview, no wallet needed: headline figures, stake distribution with HHI, rewards with the root check, validator table, last 30 days, and a freshness line per subgraph)
-- `/dashboard` → `DashboardPage` (stats, claimable banner, quick actions, rewards, staking section, stake distribution chart)
-- `/validators` → `ValidatorsPage` (validator cards with delegate/undelegate; supports `?delegate=0x...` deep-link to auto-open delegate dialog)
-- `/validators/:address` → `ValidatorDetailPage` (full validator info, delegate/undelegate buttons)
-- `/withdrawals` → `WithdrawalsPage` (pending withdrawal queue with FIFO tooltip, cooldown progress bars, claim)
-- `/rewards` → `RewardsPage` (your rewards, Claim & Stake, claim, programme totals, and the on-chain root checked against SEF's published one)
-- `*` → `NotFoundPage` (404 catch-all)
+- `/` → `OverviewPage`: Network Overview, no wallet needed. Headline figures, stake distribution,
+  rewards with the root check, the validator table, the last 30 days, and a freshness line per
+  subgraph
+- `/dashboard` → `DashboardPage`: stats, claimable banners, quick actions, the staking section,
+  the stake distribution chart
+- `/validators` → `ValidatorsPage`: validator cards with Delegate and Undelegate.
+  `?delegate=<address>` opens the delegate dialog
+- `/validators/:address` → `ValidatorDetailPage`
+- `/withdrawals` → `WithdrawalsPage`: the queue, oldest first, cooldowns, Claim, and Claim All in
+  a batching wallet
+- `/rewards` → `RewardsPage`: Your rewards, Claim, Claim & Stake, Programme, and Verifiability,
+  the on-chain root checked against SEF's published one
+- `*` → `NotFoundPage`
 
-All pages are lazy-loaded with `React.lazy()` and preloaded via `requestIdleCallback` in a `useEffect` with cleanup.
+Pages are lazy-loaded with `React.lazy()` and preloaded after first paint through
+`requestIdleCallback`.
 
-App-level guards: `useSanctionsCheck` blocks the entire app if `VITE_SANCTIONS_API_URL` returns 403. `useGeoblockCheck` blocks access from OFAC/ITAR-restricted countries via `api.country.is` (fails open). `WalletSanctionsGate` blocks individual wallet addresses flagged by the sanctions API. `DisconnectWatcher` shows a toast on wallet disconnect.
+App-level gates, each rendering `RestrictedScreen`:
 
-### Contract Integration
+- `useGeoblockCheck` looks up the country (country.is, then ipapi.co) and blocks the countries
+  listed in the hook. It fails closed. The result is cached in `localStorage` for
+  `VITE_GEOBLOCK_CACHE_DAYS` days, 7 by default.
+- `useSanctionsCheck` fetches `VITE_SANCTIONS_API_URL` when set; a 403 or an error blocks.
+- `WalletSanctionsGate` uses `useWalletSanctionsCheck`, which reads `isSanctioned` on the
+  sanctions oracle from core for the connected address. It allows only an explicit `false`.
 
-- **Config layer:** `src/config/chains.ts` resolves chain from `VITE_CHAIN_ID`, `src/config/contracts.ts` maps chain IDs to staking/token/merkleDrop contract addresses.
-- **ABIs:** `src/abi/stakingAbi.ts` (staking contract) and `src/abi/erc20Abi.ts` (SAFE token). ABIs use viem's `parseAbi` with human-readable signatures. `src/abi/merkleDropAbi.ts` re-exports the MerkleDrop ABI from `@cobuilders/safenet-core`, whose events and errors `verify:abis` proves against the chain.
-- **Read hooks** (`src/hooks/useStakingReads.ts`): Thin wrappers around wagmi's `useReadContract`/`useReadContracts`. Per-user hooks guard with `query: { enabled: !!address }`. All hooks poll every 15 seconds via `refetchInterval: 15_000`.
-- **Write hooks** (`src/hooks/useStakingWrites.ts`): Each write hook (`useStake`, `useInitiateWithdrawal`, `useClaimWithdrawal`) combines `useWriteContract` + `useWaitForTransactionReceipt` and returns a unified `{ action, isPending, isSuccess, error, reset, txHash }` interface. Cache invalidation uses targeted `predicate`-based queries via `useInvalidateOnSuccess`.
-- **QueryClient** (`src/config/queryClient.ts`): Shared singleton with `staleTime: 30_000` and `refetchOnWindowFocus: false` defaults.
-- **Safe detection** (`src/lib/safe.ts`): Shared `isSafeApp` constant used by `useAutoConnect`, `useTokenAllowance`, `useStakingWrites`, `useDarkMode`.
-- **Validator discovery** (`src/hooks/useValidators.ts`): Fetches validator data from `VITE_VALIDATOR_INFO_URL` or, by default, SEF's published `validator-info.json` (`SEF_DATA.validatorInfo` in `@cobuilders/safenet-core`). Returns `ValidatorInfo[]` with `{ address, isActive, label, commission, participationRate }`. Cached with React Query (5 min staleTime). Also exports `findValidator()` helper for synchronous address lookup.
-- **Withdrawals** (`src/hooks/useWithdrawals.ts`): Fetches pending withdrawals for the connected user. Includes `useNextClaimable` for the claimable banner.
-- **Gas estimation** (`src/hooks/useGasEstimate.ts`): Uses `estimateGas` + `getGasPrice` from viem to show estimated gas cost in delegate/undelegate dialogs. Debounced 500ms on amount change.
-- **Rewards** (`src/hooks/useRewards.ts`, `src/hooks/useRewardProof.ts`, `src/hooks/useClaimRewards.ts`, `src/hooks/useProgrammeRewards.ts`): Rewards reading, Merkle proof fetching, claim transaction hooks, and the programme-wide figures (SEF's `latest.json`, the MerkleDrop's root and SAFE balance). Both files are read through `src/hooks/useRewardsSource.ts`: `VITE_REWARDS_BASE_URL` when set, which replaces every source; otherwise SEF's IPFS dataset behind the ENS name `rewards.safenet-gov.eth`, through each gateway, when its contenthash is set, and then the repository mirror. The order, the gateways and the paths come from `src/rewards-source.ts` and `src/sef.ts` in `@cobuilders/safenet-core`. The ENS resolution is one TanStack query, `["rewardsSource"]`, reused and kept in the cache for an hour (`gcTime`, because nothing observes it). A proof is absent only when the repository, or the override, answers 404; when the dataset did not answer, Your rewards says the absence rests on the mirror (`proofAbsenceCaveat` in `src/lib/rewardsSource.ts`, fed by `useRewardProofSource`). The Verifiability section says why the repository was read: the name is empty, set in a form the page cannot read, or could not be read; or the dataset did not answer, or has no latest.json at the expected path. `useProgrammeRewards` returns `latestSource`, with every source tried, which the Verifiability section shows as "Source of latest.json".
-- **Subgraphs** (`src/config/subgraphs.ts`, `src/lib/subgraph.ts`, `src/hooks/useSubgraphQuery.ts`): Typed GraphQL through `graphql-request` and codegen. Documents live in `src/graphql/<chain>/*.graphql`; `pnpm codegen` writes `src/graphql/<chain>/generated.ts` from each subgraph package's `schema.graphql`, and `pnpm check` fails when the committed output is stale. Every query selects `_meta`, so each answer carries its last indexed block and age; an answer older than `SUBGRAPH_STALE_AFTER_SECONDS` (from core) is not shown as current. The overview hooks (`useNetworkTotals`, `useValidatorStakes`, `useRewardsOverview`, `useRecentDays`, `useConsensusFigures`) read the subgraph first and fall back to the contract reads, SEF's files, or the Gnosis snapshot in core. Each figure is a `Figure` (`src/lib/figure.ts`): loading, ready with its source, or unavailable with a reason.
-- **Approval flow** (`src/hooks/useApprovalFlow.ts`): Wraps `useTokenAllowance` with approval type tracking (exact vs unlimited), toast notifications, and a unified API for DelegateDialog.
-- **Stake form** (`src/hooks/useStakeForm.ts`): Amount, approval, stake and the approve-and-stake batch behind `StakeForm`. DelegateDialog and Claim & Stake both run on it. Batching is detected by `useAtomicBatchSupport` (`useStakingWrites.ts`), which accepts EIP-5792's `atomic.status: "supported"` and the earlier draft's `atomicBatch.supported`.
-- **Claim step** (`src/hooks/useClaimStep.ts`): The claim inside Claim & Stake. Simulates first, sends through `wallet_sendCalls` in a wallet that batches, and reads the claimed amount from the SAFE `Transfer` in the receipt (`src/lib/claimReceipt.ts`).
-- **Transaction toasts** (`src/hooks/useTxToast.ts`): Shared hook for success/error/Safe-queued toast notifications, used by DelegateDialog, UndelegateDialog, and other tx dialogs.
+`DisconnectWatcher` shows a toast when the wallet disconnects.
+
+### Wallets (`src/config/wagmi.ts`)
+
+Connectors in order: `safe()`, `injected()` as "Browser Wallet" on `window.ethereum`, and
+`walletConnect()` when `VITE_WALLETCONNECT_PROJECT_ID` is set. `src/lib/safe.ts` exports
+`isSafeApp`, true inside an iframe. `useAutoConnect` connects the Safe connector when
+`isSafeApp`, and calls wagmi's `reconnect()` otherwise. `useWrongNetwork` is true when the
+wallet's chain is not Mainnet; `ConnectButton` then shows "Switch to Ethereum".
+
+### Contract integration
+
+- **ABIs:** `src/abi/`. Staking, ERC-20 and sanctions oracle use viem's `parseAbi`.
+  `merkleDropAbi.ts` re-exports the MerkleDrop ABI from core, whose events and errors
+  `verify:abis` proves against the chain.
+- **Reads** (`src/hooks/useStakingReads.ts`): wrappers around `useReadContract` and
+  `useReadContracts`, polling every 30 seconds. Per-user hooks are enabled only with an address.
+- **Writes** (`src/hooks/useStakingWrites.ts`): `useStake`, `useInitiateWithdrawal`,
+  `useClaimWithdrawal` and the batch hooks combine `useWriteContract` with
+  `useWaitForTransactionReceipt` and return `isSigningTx`, `isConfirmingTx`, `isSuccess`,
+  `isSafeQueued`, `error`, `reset` and `txHash` next to the action. `useInvalidateOnSuccess`
+  invalidates the affected queries. `useAtomicBatchSupport` accepts EIP-5792's
+  `atomic.status: "supported"` and the earlier draft's `atomicBatch.supported`.
+- **QueryClient** (`src/config/queryClient.ts`): `staleTime: 30_000`,
+  `refetchOnWindowFocus: false`.
+- **Validators** (`src/hooks/useValidators.ts`): fetches `VITE_VALIDATOR_INFO_URL` or SEF's
+  `validator-info.json` (`SEF_DATA.validatorInfo` in core), cached five minutes. `findValidator()`
+  looks one up by address; an unknown address shows truncated.
+- **Withdrawals** (`src/hooks/useWithdrawals.ts`): the connected user's queue, polled every
+  15 seconds, and `useNextClaimable` for the banner.
+- **Gas** (`src/hooks/useGasEstimate.ts`): `estimateGas` and `getGasPrice`, debounced 500 ms.
+- **Approval** (`src/hooks/useApprovalFlow.ts`): wraps `useTokenAllowance` with the exact or
+  unlimited approval type and its toasts.
+- **Stake form** (`src/hooks/useStakeForm.ts`): amount, approval, stake and the approve-and-stake
+  batch behind `StakeForm`. `DelegateDialog` and Claim & Stake both run on it.
+- **Claim step** (`src/hooks/useClaimStep.ts`): the claim inside Claim & Stake. Simulates first,
+  sends through `wallet_sendCalls` in a batching wallet, and reads the claimed amount from the
+  SAFE `Transfer` in the receipt (`src/lib/claimReceipt.ts`).
+- **Toasts** (`src/hooks/useTxToast.ts`): success, error and Safe-queued toasts for the
+  transaction dialogs.
+
+### Rewards
+
+`useRewards`, `useRewardProof`, `useClaimRewards` and `useProgrammeRewards` read the reward state,
+fetch the proof, claim, and read the programme-wide figures (SEF's `latest.json`, the
+MerkleDrop's root and SAFE balance). Both files are read through `src/hooks/useRewardsSource.ts`:
+
+1. `VITE_REWARDS_BASE_URL` when set, which replaces every other source.
+2. SEF's IPFS dataset behind the ENS name in core, through each gateway, when its contenthash is
+   set: `VITE_IPFS_GATEWAY` first, then core's list.
+3. The repository mirror.
+
+The order, the gateways, the timeouts and the paths come from `src/rewards-source.ts` and
+`src/sef.ts` in core. The ENS resolution is one TanStack query, `["rewardsSource"]`, kept for an
+hour through `gcTime`. A proof is absent only when the repository, or the override, answers 404;
+when the dataset did not answer, Your rewards says the absence rests on the mirror
+(`proofAbsenceCaveat` in `src/lib/rewardsSource.ts`). `useProgrammeRewards` returns
+`latestSource`, which Verifiability shows as the source of `latest.json`.
+
+SEF's `latest.json` carries exactly `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal` and
+`unpaidAmount`. In this tree, `parseRewardsLatest` (`src/hooks/useProgrammeRewards.ts`) also
+requires an ISO `updatedAt`, so a file without one is read as the wrong shape, and
+`scripts/generate-merkle-tree.ts` and `scripts/fork-env/rewards.ts` still write one.
+
+`useRewards` disables Claim when the proof's root differs from the MerkleDrop's root.
+
+### Subgraphs
+
+`src/config/subgraphs.ts`, `src/lib/subgraph.ts`, `src/hooks/useSubgraphQuery.ts`. Typed GraphQL
+through `graphql-request` and codegen. Documents live in `src/graphql/<chain>/*.graphql`;
+`codegen` writes `src/graphql/<chain>/generated.ts` from each subgraph package's
+`schema.graphql`, through the served schema `scripts/subgraph-api-schema.ts` derives. Every query
+selects `_meta`, so each answer carries its last indexed block and age; an answer older than
+`SUBGRAPH_STALE_AFTER_SECONDS` from core is not shown as current. The overview hooks
+(`useNetworkTotals`, `useValidatorStakes`, `useRewardsOverview`, `useRecentDays`,
+`useConsensusFigures`) read the subgraph first and fall back to contract reads, SEF's files, or
+the Gnosis snapshot in core. Each figure is a `Figure` (`src/lib/figure.ts`): loading, ready
+with its source, or unavailable with a reason.
 
 ### Terminology
 
-The UI uses "delegation" terminology externally (Delegate/Undelegate) but the smart contract uses "stake" terminology. Hook and contract function names reflect the contract (`useStake`, `stake()`), while component labels say "Delegate"/"Undelegate".
+The interface says Delegate and Undelegate. The contract says stake, and so do the hooks
+(`useStake`, `stake()`, `initiateWithdrawal()`, `claimWithdrawal()`).
 
-### Validator Metadata
+### Components
 
-Validator metadata (label, commission, participation rate) is fetched from the remote endpoint alongside address and active status — all fields live in the `ValidatorInfo` type returned by `useValidators()`. Components use `findValidator(validators, address)` for single-validator lookups. Unknown validators fall back to truncated address display.
+- `src/components/ui/`: Radix primitives wrapped with CVA and tailwind-merge (`cn()` in
+  `src/lib/utils.ts`), after shadcn/ui. `TxButton` shows the signing and confirming phases;
+  `stepper.tsx` drives Claim → Stake → Done.
+- `src/components/overview/`: the Network Overview sections.
+- `src/components/dashboard/`: `StatsOverview`, `QuickActions`, `StakingSection`,
+  `StakeDistribution`, `ClaimRewardsDialog`.
+- `src/components/rewards/`: the Rewards page sections and `ClaimAndStakeDialog`, which stakes
+  exactly what the claim paid. The user picks a validator and may lower the amount. A
+  `MerkleRootWasUpdated` revert offers to reload the proof and retry. Once nothing is left to
+  claim, it opens as "Stake your balance".
+- `src/components/validators/`: `ValidatorList`, `ValidatorCard`, and `ParticipationRate`, which
+  marks SEF's 75% reward threshold. Screens that show a rate also state the rule as text, because
+  a tooltip does not open on touch.
+- `src/components/staking/`: `AmountInput`, `DelegateDialog`, `StakeForm`, `ValidatorSelect`,
+  `UndelegateDialog`.
+- `src/components/withdrawals/`: `WithdrawalQueue`, `WithdrawalCard`.
 
-### Compliance
+### Libraries
 
-- **IP-level sanctions** (`src/hooks/useSanctionsCheck.ts`): Fetches `VITE_SANCTIONS_API_URL` on mount; no-op if env var is unset.
-- **Geo-blocking** (`src/hooks/useGeoblockCheck.ts`): Checks user's country via `api.country.is` against an OFAC/ITAR blocked country list. Result is cached in `localStorage` (key: `geoblock_check`) for `VITE_GEOBLOCK_CACHE_DAYS` days (default 7). Fails closed on lookup errors.
-- **Wallet sanctions** (`src/hooks/useWalletSanctionsCheck.ts`): Checks connected wallet address against the sanctions API. Blocks the UI if flagged.
+- `src/lib/format.ts`: token amounts, addresses, countdowns, participation rates, UTC dates.
+- `src/lib/programme.ts`: copy built on the programme calendar in core: `PARTICIPATION_RULE`,
+  `belowThreshold`, the dated Beta notice, the withdrawn status for a validator SEF lists as
+  inactive.
+- `src/lib/errorFormat.ts`: `formatContractError`, `revertedErrorName`.
+- `src/lib/clipboard.ts`: `copyToClipboard()`.
 
-### UI Components
+### Path alias
 
-Radix UI primitives (`dialog`, `tabs`, `tooltip`, `slot`) wrapped in `src/components/ui/` using CVA + tailwind-merge (`cn()` from `src/lib/utils.ts`). These follow shadcn/ui conventions.
+`@/*` maps to `./src/*`, in `vite.config.ts` and `tsconfig.app.json`.
 
-Key UI components:
-- `button.tsx` — CVA button with variants (default, destructive, outline, secondary, ghost, link) and sizes
-- `TxButton.tsx` — Transaction button with spinner and contextual labels during signing/confirming phases
-- `card.tsx` — Compound card components (Card, CardHeader, CardTitle, CardContent)
-- `dialog.tsx` — Radix Dialog with overlay animations
-- `tabs.tsx` — Radix Tabs (used in staking section)
-- `tooltip.tsx` — Radix Tooltip (used for FIFO queue info, etc.)
-- `progress.tsx` — Progress bar with size (default, sm, lg) and variant (default, success, warning) props
-- `stepper.tsx` — Horizontal step indicator with circles + connecting lines (used in ClaimAndStakeDialog for Claim → Stake → Done)
-- `SafeTokenBadge.tsx` — SAFE token icon badge
-- `ErrorBoundary.tsx` — React error boundary wrapping route elements
-- `badge.tsx`, `input.tsx`, `skeleton.tsx` — Standard primitives
+## Scripts directory
 
-### Utility Libraries
+- `scripts/merkle-tree.ts`: Merkle tree logic, no I/O. `encodeLeaf`, `buildMerkleTree`,
+  `verifyProof`, sorted-pair hashing (OpenZeppelin convention).
+- `scripts/generate-merkle-tree.ts`: `generate:proofs`. Reads `scripts/merkle-config.json`
+  (`epoch`, `entries` of address to cumulative wei, optional `rewardsUntil` and `unpaidAmount`)
+  and writes `proofs/<radix>/<lowercase address>.json` (`{ cumulativeAmount, merkleRoot, proof }`)
+  and `latest.json`.
+- `scripts/fork-env/`: the manual QA fork. Anvil on a pinned Mainnet fork, a rewards tree of every
+  real claimer plus a test account, the new root set as the MerkleDrop's owner
+  (`chain.ts`), and a proxy that serves the app, the proofs and the RPC on one origin. Uses
+  `merkle-tree.ts`.
+- `scripts/codegen-check.ts`, `scripts/codegen-live-check.ts`, `scripts/subgraph-api-schema.ts`:
+  GraphQL codegen and its checks.
+- `scripts/release.ts`, `scripts/release-pin.ts`, `scripts/release-gateways.ts`: the IPFS
+  release behind `release:build` and `release:pin`. `build.env` is the release build's only env
+  input; it is public and holds no secret.
+- `scripts/__tests__/`: Vitest tests for the tree and the generator.
 
-- `src/lib/utils.ts` — `cn()` for class merging (clsx + tailwind-merge)
-- `src/lib/format.ts` — `formatTokenAmount`, `truncateAddress`, `formatCountdown`, `formatParticipation`, `formatUtcDateTime` ("Tue 22 Sep 2026, 00:00 UTC") and `formatUtcDayLong` ("5 October 2026")
-- `src/lib/programme.ts` — the copy built on the programme calendar in `@cobuilders/safenet-core`: SEF's 75% reward rule (`PARTICIPATION_RULE`), `belowThreshold`, the dated notice shown while the Gnosis figures describe Beta, and the withdrawn status for a validator SEF lists with `is_active: false`
-- `src/lib/errorFormat.ts` — `formatContractError` for user-friendly contract error messages, `revertedErrorName` for the custom error a revert carries
-- `src/lib/clipboard.ts` — `copyToClipboard()` with navigator.clipboard API + textarea fallback
+To use generated proofs, serve the output and point `VITE_REWARDS_BASE_URL` at it, then set the
+MerkleDrop's root. This repository sets a root only on an Anvil fork.
 
-### Dashboard Components
+## Tests
 
-- `StatsOverview` — Grid of stat cards (total delegated, user delegation, active validators, unstaking count, pending withdrawal total)
-- `ClaimableBanner` — Dismissible banner when a withdrawal is ready to claim (uses `useNextClaimable`)
-- `QuickActions` — Delegate/Undelegate/Claim navigation buttons (visible when connected)
-- `ClaimRewardsDialog` — Dialog for claiming Merkle drop rewards (uses `TxButton`)
-- `StakingSection` — Combined staking overview and calculator
-- `StakeDistribution` — Recharts donut chart showing delegation distribution (only renders with 2+ validators)
+- `src/**/__tests__/`: Vitest with jsdom. `src/__tests__/` holds the wagmi mock, the setup and
+  shared test data.
+- `e2e/tests/`: Playwright against a mocked RPC, mocked subgraphs, mocked SEF files and mocked
+  gateways (`e2e/mocks/`, `e2e/fixtures/`). Page objects in `e2e/pages/`. The Safe App and
+  WalletConnect are only smoke-tested.
+- `e2e/fork/`: Playwright against Anvil. `e2e/playwright.config.ts` switches suites on
+  `E2E_SUITE=fork`, which `test:fork` sets.
 
-### Validator Components
-
-- `ValidatorList` — Grid of ValidatorCards. Accepts optional `autoOpenDelegate` prop for deep-linking. Batches `useReadContracts` for user stakes and passes data as props to cards. States SEF's reward rule as text under the grid.
-- `ValidatorCard` — Per-validator card with metadata, stakes, delegate/undelegate buttons, copy address, and link to detail page. Receives `userStake`/`loadingUserStake` props; dialogs render conditionally only when open. A validator SEF lists as inactive reads "Withdrawn".
-- `ParticipationRate` — A participation rate with the 75% reward threshold marker ("≥75%" or "<75%") and SEF's rule in its tooltip. Every screen that shows a rate uses it; the screens also state the rule as text, because a tooltip does not open on touch.
-
-### Staking Components
-
-- `AmountInput` — Input with 25%/50%/75%/MAX percentage shortcut buttons
-- `DelegateDialog` — Stake dialog for one validator: `useStakeForm` rendered by `StakeForm`
-- `StakeForm` — Amount, gas estimate, unstaking period, and the approve/stake buttons (batched in a wallet that supports it)
-- `ValidatorSelect` — Picker over the active validators; chooses nothing for the user
-- `UndelegateDialog` — Withdrawal initiation dialog with gas estimation, uses `useTxToast` and `TxButton`
-
-### Rewards Components
-
-- `ClaimAndStakeDialog` — Claim → Stake → Done. Stakes exactly what the claim paid; the user picks a validator and may lower the amount. A `MerkleRootWasUpdated` revert offers to reload the proof and retry. Closing after a claim says the SAFE is in the wallet, unstaked. Opened as "Stake your balance" once there is nothing left to claim.
-
-### Withdrawal Components
-
-- `WithdrawalQueue` — List of pending withdrawals with FIFO tooltip explanation
-- `WithdrawalCard` — Per-withdrawal card with inline countdown timer, cooldown progress bar, and claim button
-
-### Wallet Connection
-
-Wagmi config (`src/config/wagmi.ts`) uses `safe()` (auto-detects Safe Wallet iframe), `injected()`, and optionally `walletConnect()` (if `VITE_WALLETCONNECT_PROJECT_ID` is set). Token approval flow is handled by `useApprovalFlow` hook (wraps `useTokenAllowance` with approval type tracking and toast notifications). ConnectButton supports copy-to-clipboard for the connected address.
-
-### Path Alias
-
-`@/*` maps to `./src/*` (configured in both `vite.config.ts` and `tsconfig.app.json`).
-
-## Environment Variables
-
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `VITE_CHAIN_ID` | Yes | Target chain (1 = mainnet, 11155111 = sepolia) |
-| `VITE_RPC_URL` | Yes | JSON-RPC endpoint |
-| `VITE_STAKING_DEPLOY_BLOCK` | Yes | Block number to start scanning withdrawal events from |
-| `VITE_VALIDATOR_INFO_URL` | No | Validator info JSON endpoint (defaults to SEF's published file, `SEF_DATA.validatorInfo` in `@cobuilders/safenet-core`) |
-| `VITE_WALLETCONNECT_PROJECT_ID` | No | Enables WalletConnect connector |
-| `VITE_MERKLE_DROP_ADDRESS` | No | Merkle drop contract address for rewards claiming |
-| `VITE_SANCTIONS_API_URL` | No | Sanctions check endpoint (403 = blocked) |
-| `VITE_REWARDS_BASE_URL` | No | Base URL for `latest.json` and the reward proofs. Replaces every source when set; unset, SEF's IPFS dataset through ENS, then the repository |
-| `VITE_IPFS_GATEWAY` | No | An IPFS gateway tried before the public ones for SEF's reward dataset; only its origin is used |
-| `VITE_GEOBLOCK_CACHE_DAYS` | No | Geo-block cache duration in days (defaults to 7) |
-| `VITE_DOCS_URL` | No | Footer documentation link (defaults to Safe docs) |
-| `VITE_TERMS_URL` | No | Footer terms link (hidden if unset) |
-| `VITE_PRIVACY_URL` | No | Footer privacy link (hidden if unset) |
-| `VITE_IMPRINT_URL` | No | Footer imprint link (hidden if unset) |
-| `VITE_SUBGRAPH_URL_MAINNET` | No | Mainnet subgraph query URL. Public in the bundle; never a URL with a key. Defaults to the Studio deployment named in `packages/core/src/subgraphs.ts`, in development and production builds alike. That is Studio's development URL, rate-limited to about 3,000 queries a day per subgraph, and not the production read path. Set it to the local graph-node's URL to read `pnpm graph:up` |
-| `VITE_SUBGRAPH_URL_GNOSIS` | No | Gnosis subgraph query URL. Same rules |
-| `VITE_APP_URL` | No | Canonical app URL for social preview meta tags (`og:image`, `twitter:image`); absolute URLs are required for social crawlers |
-
-## Adding a New Chain
-
-1. Add chain object to `chainMap` in `src/config/chains.ts`
-2. Add contract addresses for the chain ID in `src/config/contracts.ts`
-3. Update `.env` with the new `VITE_CHAIN_ID` and `VITE_RPC_URL`
-
-## Merkle Proof Generation
-
-Off-chain tooling for generating Merkle proofs compatible with the MerkleDrop contract.
-
-### Scripts
-
-- `scripts/merkle-tree.ts` — Pure Merkle tree logic (no I/O). Exports `encodeLeaf`, `buildMerkleTree`, `verifyProof`. Uses sorted-pair hashing (OpenZeppelin convention).
-- `scripts/generate-merkle-tree.ts` — CLI entry point. Reads config, builds tree, writes output files.
-- `scripts/merkle-config.json` — Input config with epoch number and address → cumulative amount mapping, plus optional `rewardsUntil` and `unpaidAmount`.
-- `scripts/__tests__/merkle-tree.test.ts` — Unit tests for encoding, tree construction, and proof verification.
-- `scripts/__tests__/generate-merkle-tree.test.ts` — Parses the generated `latest.json` with the app's own `parseRewardsLatest`.
-
-### Workflow
-
-1. Edit `scripts/merkle-config.json` with wallet addresses and cumulative amounts (in wei)
-2. Run `pnpm generate:proofs`. It writes to `.rewards/`, which git ignores, or to the directory `--out <dir>` names
-3. Output files, in the shape SEF publishes:
-   - `proofs/<radix>/{lowercase_address}.json` — per-address proof file (`{ cumulativeAmount, merkleRoot, proof }`)
-   - `latest.json` — `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal`, `unpaidAmount`, `updatedAt`
-4. Serve the output directory and point `VITE_REWARDS_BASE_URL` at it. `useRewardProof` fetches each proof from `${VITE_REWARDS_BASE_URL}/proofs/<radix>/{lowercase_address}.json`, and `useProgrammeRewards` reads `${VITE_REWARDS_BASE_URL}/latest.json`.
-5. Only then set the Merkle root on-chain via the admin panel (see below). In the other order the app still serves the old proofs against the new root, and `useRewards` disables Claim because the roots differ.
-
-### Config Format
-
-```json
-{
-  "epoch": 1,
-  "entries": {
-    "0xAddress1": "1000000000000000000000",
-    "0xAddress2": "500000000000000000000"
-  },
-  "rewardsUntil": "2026-09-22T00:00:00.000Z",
-  "unpaidAmount": "0"
-}
-```
-
-## Admin Panel
-
-The `admin/` directory contains a separate Vite app for contract administration (proposing validators, recovering tokens, executing timelocked operations, and setting Merkle roots). It has its own `package.json` and runs independently.
-
-### Admin Sections
-
-- **Withdraw Delay** — Propose and execute withdraw delay changes (timelocked)
-- **Validator Management** — Propose and execute validator registration/deregistration (timelocked)
-- **Token Operations** — Mint test tokens, recover tokens from staking contract
-- **Merkle Drop** — Set Merkle root on the MerkleDrop contract (only shown when `VITE_MERKLE_DROP_ADDRESS` is set)
-- **Event Log** — View contract events
-
-### Admin Contract Config
-
-Admin contract addresses are in `admin/src/config/contracts.ts`. The `merkleDrop` field is optional and read from `VITE_MERKLE_DROP_ADDRESS`.
-
-## Known Pre-existing Lint Errors
-
-The following lint errors exist in the codebase and are not from recent changes:
-- `admin/src/components/ProposeValidators.tsx` and `admin/src/components/RecoverTokens.tsx` — `react-hooks/set-state-in-effect` (setState in useEffect)
-- `admin/src/components/ui/badge.tsx`, `admin/src/components/ui/button.tsx`, `admin/src/hooks/useToast.tsx` — `react-refresh/only-export-components`
-- `src/components/ui/badge.tsx`, `src/components/ui/button.tsx`, `src/hooks/useToast.tsx` — `react-refresh/only-export-components`
+Ports come from `.env.ports` at the repository root: `E2E_PORT`, `FORK_PORT`, `ANVIL_PORT`
+(`e2e/ports.ts`). Without the file, 5174, 5178 and 8545.
