@@ -84,7 +84,15 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   and broadcasts through the selected RPC. Session storage is memory only. Command cleanup closes the signer.
   Cancellation, account/chain changes, disconnect, expiry, and timeouts prevent further signatures and broadcasts.
   `src/fork/signers.test.ts` proves effects using an emulated transport; it does not prove physical hardware.
-  Compliance gates remain owned by the compliance integration branch.
+- Every write passes the compliance gates first, dry runs included, before any other read:
+  `checkCompliance()` in `src/lib/compliance.ts`, over core's `src/compliance.ts`. The sanctions
+  oracle on chain is always read for the signer's address, or `--from`; only an explicit false
+  passes. `--sanctions-endpoint <url>` adds a GET that refuses on 403 or any failure, and
+  `--geo-check` adds core's country lookups against its blocked countries: the web's
+  `useWalletSanctionsCheck`, `useSanctionsCheck` and `useGeoblockCheck`. Each gate fails closed.
+  A refusal throws `ComplianceRefusal`: one sentence naming each refused gate, exit 1, and with
+  `--json` the report `{ refused, compliance }` on stdout. A write that passes carries the report
+  as `compliance`. The endpoint's URL is never printed.
 - A live write first checks that the endpoint is on chain 1. Each transaction's hash goes to
   stderr the moment it is sent, and its receipt when it confirms, so `--json` stays one document
   on stdout. A hash whose receipt cannot be read is reported as sent, with the hash, and is not
@@ -138,7 +146,8 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
 `src/test-support.ts`. No network. `src/writes.test.ts` runs every write with `--dry-run` and a
 signer whose `signTransaction` throws, and fails if it is reached. `src/reward-periods.test.ts`
 checks the periods against a fake subgraph, the chain read at each period's last block, a
-subgraph that differs, one that is down, and the override. `src/fork/redaction.test.ts`
+subgraph that differs, one that is down, and the override. `src/compliance.test.ts` runs each gate’s pass, refusal and failure, and checks refusal before signing.
+`src/fork/redaction.test.ts`
 also runs here: it makes the fork suite's archive read fail and checks that its error carries no
 part of the URL.
 

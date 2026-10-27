@@ -28,6 +28,7 @@ import {
 } from "viem"
 import type { Context } from "./context.js"
 import { SafenetError } from "./errors.js"
+import type { ComplianceOptions, ComplianceReport } from "./compliance.js"
 import { figure, type Figure } from "./figure.js"
 import type { Signer } from "./signer.js"
 
@@ -98,6 +99,8 @@ export type WriteMode =
 
 export interface WriteOptions {
   readonly onProgress?: (event: Progress) => void
+  /** The opt-in gates. The sanctions oracle is read whatever this says. */
+  readonly compliance?: ComplianceOptions
 }
 
 /** What every write operation returns, around its own figures. */
@@ -106,6 +109,8 @@ export interface WriteResultBase {
   readonly from: Address
   /** The block the reads before the first transaction were made at. */
   readonly block: bigint
+  /** Every compliance gate, run before anything else. A write that returns passed them all. */
+  readonly compliance: ComplianceReport
   readonly steps: readonly Step[]
 }
 

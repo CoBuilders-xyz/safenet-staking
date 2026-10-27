@@ -17,7 +17,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js"
 import type { z } from "zod"
 import {
-  errorSentence, scrubSecrets,
+  ComplianceRefusal, errorSentence, scrubSecrets,
   type Context, type Progress, type Signer, type WriteMode, type WriteResultBase,
 } from "@cobuilders/safenet-cli/lib"
 import { readFileSync } from "node:fs"
@@ -210,12 +210,16 @@ export function createServer(config: ServerConfig, deps: Dependencies): Server {
       dryMode = { dryRun: true, from: request.from }
     }
 
-    const dryRun: WriteResultBase = await tool.run(deps.lib, context(), dryMode, args, {})
+    // The gates run in both: a refusal stops the dry run, and a live run reads them again.
+    const dryRun: WriteResultBase = await tool.run(deps.lib, context(), dryMode, args, { compliance: request.compliance })
     let execution: WriteResultBase | null = null
     if (signer) {
       const live: WriteMode = { dryRun: false, signer }
       execution = await exclusive(() =>
-        tool.run(deps.lib, context(), live, args, { onProgress: (e) => deps.log(progressLine(tool.name, e)) }),
+        tool.run(deps.lib, context(), live, args, {
+          onProgress: (e) => deps.log(progressLine(tool.name, e)),
+          compliance: request.compliance,
+        }),
       )
     }
 
@@ -242,6 +246,10 @@ export function createServer(config: ServerConfig, deps: Dependencies): Server {
       return tool.kind === "read" ? await callRead(tool, args) : await callWrite(tool, args)
     } catch (err) {
       if (err instanceof ToolInputError) return failure(err.message)
+      // A refused gate is an answer: the sentence, and the report as structured content.
+      if (err instanceof ComplianceRefusal) {
+        return { ...failure(errorSentence(err, ARCHIVE_ADVICE)), structuredContent: { refused: true, compliance: toStructured(err.report) } }
+      }
       return failure(errorSentence(err, ARCHIVE_ADVICE))
     }
   })

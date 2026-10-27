@@ -113,7 +113,7 @@ export function registerWithdrawals(program: Command, rt: CommandRuntime): void 
     const mode = await rt.writeMode(request, ctx)
     rt.emit(
       globals,
-      await claimWithdrawals(ctx, mode, requested, { onProgress: rt.progress(renderProgress) }),
+      await claimWithdrawals(ctx, mode, requested, { onProgress: rt.progress(renderProgress), compliance: request.compliance }),
       renderClaimWithdrawals,
     )
   })

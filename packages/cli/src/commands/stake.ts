@@ -64,7 +64,7 @@ export function registerStake(program: Command, rt: CommandRuntime): void {
     }
     const ctx = rt.context(globals)
     const mode = await rt.writeMode(request, ctx)
-    rt.emit(globals, await stake(ctx, mode, input, { onProgress: rt.progress(renderProgress) }), renderStake)
+    rt.emit(globals, await stake(ctx, mode, input, { onProgress: rt.progress(renderProgress), compliance: request.compliance }), renderStake)
   })
 
   addWriteOptions(
@@ -82,6 +82,6 @@ export function registerStake(program: Command, rt: CommandRuntime): void {
     }
     const ctx = rt.context(globals)
     const mode = await rt.writeMode(request, ctx)
-    rt.emit(globals, await unstake(ctx, mode, input, { onProgress: rt.progress(renderProgress) }), renderUnstake)
+    rt.emit(globals, await unstake(ctx, mode, input, { onProgress: rt.progress(renderProgress), compliance: request.compliance }), renderUnstake)
   })
 }

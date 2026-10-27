@@ -31,6 +31,10 @@ export { readRewardPeriods, subgraphUrl, type RewardPeriod, type RewardPeriods }
 export { localSigner, type Signer, type TransactionToSend } from "./signer.js"
 export { decryptKeystore } from "./keystore.js"
 export {
+  checkCompliance, ComplianceRefusal,
+  type ComplianceOptions, type ComplianceReport, type GateName, type GateResult,
+} from "./compliance.js"
+export {
   amount, createRunner, revertError, WriteError,
   type Amount, type Progress, type SentTransaction, type Step, type WriteMode, type WriteOptions, type WriteResultBase,
 } from "./transactions.js"

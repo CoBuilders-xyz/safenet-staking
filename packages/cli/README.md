@@ -194,6 +194,23 @@ An unsupported method is an acceptance blocker; record the device, firmware, app
 
 Keep pairing URIs, keys, passwords, seed words, RPC credentials, and terminal recordings out of acceptance evidence.
 
+## Compliance gates
+
+Every write checks these before it signs anything, dry runs included. They are the gates of the
+web interface.
+
+| Gate | When | Refuses when |
+|---|---|---|
+| Sanctions oracle | Always | The oracle on chain lists the address that would sign, or `--from`. It also refuses when the oracle cannot be read |
+| `--sanctions-endpoint <url>` | When given | A GET to the URL answers 403, any other error, or nothing. The endpoint judges the client making the request, so no address is sent |
+| `--geo-check` | When given | This machine's IP address is in a country the web interface blocks, or no lookup names a country |
+
+Each gate fails closed: an answer that is not a clear yes refuses. A refusal exits 1 with one
+sentence that names each gate that refused and why. With `--json`, stdout also holds the report,
+`{ "refused": true, "compliance": { ... } }`. A write that passes prints the gates it passed, and
+its `--json` result carries the same report as `compliance`. The endpoint's URL is never printed:
+it may carry a key.
+
 ## Settings
 
 | Variable | What it sets |

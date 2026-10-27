@@ -8,7 +8,7 @@
 import { Command, CommanderError } from "commander"
 import pkg from "../package.json" with { type: "json" }
 import {
-  createContext, errorSentence as librarySentence, redactUrls, rpcEndpoints, rpcHosts, scrubSecrets, ScanError, SafenetError,
+  ComplianceRefusal, createContext, errorSentence as librarySentence, redactUrls, rpcEndpoints, rpcHosts, scrubSecrets, ScanError, SafenetError,
   type Context, type ContextOptions, type Progress, type Signer, type WriteMode,
 } from "./lib/index.js"
 import { ARCHIVE_ADVICE, toJson } from "./commands/format.js"
@@ -160,6 +160,11 @@ export async function run(argv: readonly string[], runtime: Runtime): Promise<nu
     if (err instanceof UsageError) {
       runtime.io.err(`error: ${scrubUsage(err.message)}\n`)
       return 2
+    }
+    // A refused gate is an answer, not a breakdown: with --json the report is the document on
+    // stdout, so a script can read which gate refused and why. The sentence goes to stderr as usual.
+    if (err instanceof ComplianceRefusal && argv.includes("--json")) {
+      runtime.io.out(`${toJson({ refused: true, compliance: err.report })}\n`)
     }
     runtime.io.err(`error: ${errorSentence(err)}\n`)
     if ((argv.includes("--verbose") || argv.includes("-v")) && err instanceof Error && err.stack) {

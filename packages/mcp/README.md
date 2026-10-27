@@ -35,6 +35,12 @@ structured content the tool returns.
 - `dryRun` defaults to `true`, and is forced to `true` unless writes are allowed (see below).
 - `from` is the address a dry run simulates from. It is required while writes are off. While
   they are on, the signer's address is used, and a different `from` is refused.
+- Every write tool also takes `sanctionsEndpoint` (an http or https URL) and `geoCheck`
+  (boolean), the compliance gates of `safenet`'s `--sanctions-endpoint` and `--geo-check`. The
+  sanctions oracle on chain is read for every write whatever they say. A refused gate stops the
+  call before anything is signed, dry runs included: the result is a tool error with one sentence,
+  and the report as structured content, `{ refused: true, compliance }`. The safenet-cli README's
+  "Compliance gates" section describes each gate.
 - `validators_show` (its delegators count), `withdrawals_list` without `address`, and
   `rewards_history` scan the chain's history and need an archive RPC endpoint.
 

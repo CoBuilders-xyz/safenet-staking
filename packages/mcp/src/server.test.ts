@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { parseUnits } from "viem"
-import { DEFAULT_HISTORY_LIMIT, ScanError, type WriteMode } from "@cobuilders/safenet-cli/lib"
+import { ComplianceRefusal, DEFAULT_HISTORY_LIMIT, ScanError, type WriteMode } from "@cobuilders/safenet-cli/lib"
 import { readConfig } from "./config.js"
 import {
   BLOCK, connect, fakeLibrary, KEY_LIKE_VALUE, PASSWORD_VALUE, SIGNER_ADDRESS, STAKER, textOf, tripwire, VALIDATOR,
@@ -112,9 +112,9 @@ test("each write tool calls its library function with the parsed input", async (
     assert.equal(libCalls[0]!.fn, fn, name)
     assert.equal(ctx, fake.context)
     assert.deepEqual(mode, { dryRun: true, from: STAKER }, name)
-    // The write options come last: none for a dry run.
+    // The write options come last: for a dry run, the gates only, none of them asked for.
     assert.deepEqual(rest.slice(0, -1), expected, `${name} ${JSON.stringify(args)}`)
-    assert.deepEqual(rest.at(-1), {}, name)
+    assert.deepEqual(rest.at(-1), { compliance: { sanctionsEndpoint: null, geoCheck: false } }, name)
     await s.close()
   }
 })
@@ -333,4 +333,58 @@ test("the rewards_history summary says how many periods the subgraph gave, and w
   assert.match(textOf(await d.call("rewards_history", { address: STAKER })),
     / No periods: the subgraph could not give the periods \(the subgraph answered HTTP 502\)\.$/m)
   await d.close()
+})
+
+// --- compliance gates --------------------------------------------------------------------
+
+test("sanctionsEndpoint and geoCheck reach the library's write options, for the dry run and the live run", async () => {
+  const gates = { sanctionsEndpoint: "https://sanctions.invalid/check", geoCheck: true }
+  for (const [name, args] of WRITES) {
+    const fake = fakeLibrary()
+    const trip = tripwire()
+    const s = await connect(WRITES_ON, { fake, trip })
+    // The tripwire signer refuses the live send, after the library was called with its options.
+    const r = await s.call(name, { ...args, ...gates, dryRun: false })
+    assert.equal(textOf(r), "the signer was reached.", name)
+    const writes = fake.calls.filter((c) => c.fn !== "createContext")
+    assert.equal(writes.length, 2, name)
+    for (const call of writes) {
+      const options = call.args.at(-1) as { compliance: unknown }
+      assert.deepEqual(options.compliance, gates, name)
+    }
+    await s.close()
+  }
+})
+
+test("a refused gate is a tool error: one sentence, and the report as structured content, with no URL", async () => {
+  const report = {
+    address: STAKER, block: BLOCK, allowed: false,
+    gates: [{ gate: "sanctions oracle", checked: true, allowed: false, reason: "the address is on the sanctions list", source: "chain: SanctionsList.isSanctioned(address)" }],
+  } as const
+  const refuse = async () => {
+    throw new ComplianceRefusal(report as never)
+  }
+  for (const [name, args] of WRITES) {
+    const fake = fakeLibrary({ stake: refuse, unstake: refuse, claimWithdrawals: refuse, claimRewards: refuse, claimAndStake: refuse })
+    const s = await connect(WRITES_OFF, { fake })
+    const r = await s.call(name, { ...args, from: STAKER, sanctionsEndpoint: "https://user:key@sanctions.invalid/check" })
+    assert.equal(r.isError, true, name)
+    assert.equal(textOf(r),
+      `A compliance gate refused ${STAKER}, so nothing was signed or sent: sanctions oracle: the address is on the sanctions list.`)
+    const structured = r.structuredContent as { refused: boolean; compliance: { block: string; allowed: boolean } }
+    assert.equal(structured.refused, true)
+    assert.equal(structured.compliance.allowed, false)
+    assert.equal(structured.compliance.block, String(BLOCK))
+    assert.doesNotMatch(JSON.stringify(r), /sanctions\.invalid|user:key/)
+    await s.close()
+  }
+})
+
+test("sanctionsEndpoint takes an http or https URL, and a wrong value is not repeated", async () => {
+  const s = await connect(WRITES_OFF)
+  const r = await s.call("stake", { validator: VALIDATOR, amount: "1", from: STAKER, sanctionsEndpoint: "Hunter2_not_a_url" })
+  assert.equal(r.isError, true)
+  assert.match(textOf(r), /sanctionsEndpoint must be an http or https URL/)
+  assert.doesNotMatch(textOf(r), /Hunter2/)
+  await s.close()
 })

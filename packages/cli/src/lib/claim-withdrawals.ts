@@ -8,6 +8,7 @@
  */
 import { parseEventLogs, type Address } from "viem"
 import { CONTRACTS, indexedEvent, stakingAbi } from "@cobuilders/safenet-core"
+import { checkCompliance } from "./compliance.js"
 import type { Context } from "./context.js"
 import { SafenetError } from "./errors.js"
 import { figure, type Figure } from "./figure.js"
@@ -121,6 +122,8 @@ export async function claimWithdrawals(
   options: WriteOptions = {},
 ): Promise<ClaimWithdrawalsResult> {
   const from = actor(mode)
+  // Before anything else is read, so a refused address learns nothing more and signs nothing.
+  const compliance = await checkCompliance(ctx, from, options.compliance)
   const block = await ctx.client.getBlock()
   const queue = await readQueue(ctx, from, block)
   const chosen = select(from, queue, requested)
@@ -142,6 +145,7 @@ export async function claimWithdrawals(
     operation: "withdrawals claim",
     dryRun: mode.dryRun,
     from,
+    compliance,
     block: block.number,
     blockTime: new Date(Number(block.timestamp) * 1000),
     requested,
