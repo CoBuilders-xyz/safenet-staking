@@ -61,7 +61,8 @@ test.describe("Wallet Connection", () => {
   test("prompts to switch network when connected to the wrong chain", async ({ wrongNetworkPage: page }) => {
     await page.goto("/")
 
-    await expect(page.getByRole("button", { name: "Switch to Ethereum" })).toBeVisible({ timeout: 10_000 })
+    // The header's own prompt. The Wrong network notice on the page offers the same switch.
+    await expect(page.locator("header").getByRole("button", { name: "Switch to Ethereum" })).toBeVisible({ timeout: 10_000 })
     // Balance/actions are hidden until the user switches back to the right network
     await expect(page.locator("header").getByText("1,000", { exact: true })).not.toBeVisible()
   })

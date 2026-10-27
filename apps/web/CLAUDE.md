@@ -84,14 +84,19 @@ wrapped in `ErrorBoundary`:
 Pages are lazy-loaded with `React.lazy()` and preloaded after first paint through
 `requestIdleCallback`.
 
-App-level gates, each rendering `RestrictedScreen`:
+App-level gates, each rendering `RestrictedScreen` with a `Restriction` (`src/lib/restriction.ts`):
+the gate, and whether it refused or could not answer. Each hook returns `allowed`, `isLoading` and
+`restriction`; `App.tsx` blocks on `!allowed` alone, so a block without a reason still blocks, as
+a failed check. When both app-level gates refuse, the sanctions screening is named.
 
 - `useGeoblockCheck` looks up the country (country.is, then ipapi.co) and blocks the countries
-  listed in the hook. It fails closed. The result is cached in `localStorage` for
-  `VITE_GEOBLOCK_CACHE_DAYS` days, 7 by default.
-- `useSanctionsCheck` fetches `VITE_SANCTIONS_API_URL` when set; a 403 or an error blocks.
+  listed in the hook, naming the country. It fails closed: a failed lookup is "unavailable". The
+  result is cached in `localStorage` for `VITE_GEOBLOCK_CACHE_DAYS` days, 7 by default.
+- `useSanctionsCheck` fetches `VITE_SANCTIONS_API_URL` when set; a 403 refuses, an error is
+  "unavailable".
 - `WalletSanctionsGate` uses `useWalletSanctionsCheck`, which reads `isSanctioned` on the
-  sanctions oracle from core for the connected address. It allows only an explicit `false`.
+  sanctions oracle from core for the connected address. It allows only an explicit `false`; `true`
+  refuses and anything else is "unavailable", with `refetch` behind Try again.
 
 `DisconnectWatcher` shows a toast when the wallet disconnects.
 
@@ -101,13 +106,18 @@ Connectors in order: `safe()`, `injected()` as "Browser Wallet" on `window.ether
 `walletConnect()` when `VITE_WALLETCONNECT_PROJECT_ID` is set. `src/lib/safe.ts` exports
 `isSafeApp`, true inside an iframe. `useAutoConnect` connects the Safe connector when
 `isSafeApp`, and calls wagmi's `reconnect()` otherwise. `useWrongNetwork` is true when the
-wallet's chain is not Mainnet; `ConnectButton` then shows "Switch to Ethereum".
+wallet's chain is not Mainnet. `useNetworkSwitch` adds whether the connector can switch (the Safe
+connector cannot) and the switch itself. `WrongNetworkNotice`, in `Layout`, then shows on every
+page, and `ConnectButton` shows "Switch to Ethereum", or "Wrong network" when the wallet cannot
+switch. Reads do not go through the wallet, so figures stay correct; `TxButton` disables every
+transaction.
 
 ### Contract integration
 
-- **ABIs:** `src/abi/`. Staking, ERC-20 and sanctions oracle use viem's `parseAbi`.
-  `merkleDropAbi.ts` re-exports the MerkleDrop ABI from core, whose events and errors
-  `verify:abis` proves against the chain.
+- **ABIs:** every ABI is imported from `@cobuilders/safenet-core` (`stakingAbi`, `erc20Abi`,
+  `sanctionsOracleAbi`, `merkleDropAbi`, `safeTokenEventsAbi`), and events through
+  `indexedEvent()`. `verify:abis` proves each function, event and error against the chain. No
+  ABI or signature is written in this package; a function the interface needs is added to core.
 - **Reads** (`src/hooks/useStakingReads.ts`): wrappers around `useReadContract` and
   `useReadContracts`, polling every 30 seconds. Per-user hooks are enabled only with an address.
 - **Writes** (`src/hooks/useStakingWrites.ts`): `useStake`, `useInitiateWithdrawal`,
@@ -128,7 +138,10 @@ wallet's chain is not Mainnet; `ConnectButton` then shows "Switch to Ethereum".
 - **Approval** (`src/hooks/useApprovalFlow.ts`): wraps `useTokenAllowance` with the exact or
   unlimited approval type and its toasts.
 - **Stake form** (`src/hooks/useStakeForm.ts`): amount, approval, stake and the approve-and-stake
-  batch behind `StakeForm`. `DelegateDialog` and Claim & Stake both run on it.
+  batch behind `StakeForm`. `DelegateDialog` and Claim & Stake both run on it. An amount the
+  interface fills in, the claimed amount or a MAX or percentage shortcut, is a `PresetAmount`
+  (`src/lib/format.ts`): shown rounded down to four decimals and sent exact while its text is
+  unchanged.
 - **Claim step** (`src/hooks/useClaimStep.ts`): the claim inside Claim & Stake. Simulates first,
   sends through `wallet_sendCalls` in a batching wallet, and reads the claimed amount from the
   SAFE `Transfer` in the receipt (`src/lib/claimReceipt.ts`).
@@ -201,7 +214,9 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
 
 ### Libraries
 
-- `src/lib/format.ts`: token amounts, addresses, countdowns, participation rates, UTC dates.
+- `src/lib/format.ts`: token amounts, preset amounts, addresses, countdowns, participation rates,
+  UTC dates.
+- `src/lib/restriction.ts`: the gates' `Restriction` and the restricted screen's copy.
 - `src/lib/programme.ts`: copy built on the programme calendar in core: `PARTICIPATION_RULE`,
   `RATE_NOT_PUBLISHED` for a rate SEF lists as null, `belowThreshold`, the dated Beta notice, the withdrawn status for a validator SEF lists as
   inactive.
