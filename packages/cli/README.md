@@ -86,7 +86,7 @@ and what it printed against Mainnet, in the human format and with `--json`.
 | `safenet validators show <address>` | One validator, with its delegators count. A rate SEF does not publish prints as "not published", and as `null` with `--json` | read |
 | `safenet withdrawals list` | Pending withdrawals: the network figure and count, or one staker's queue with `--address <address>` | read |
 | `safenet rewards check <address>` | Claimable, earned, claimed and held amounts, and whether the proof is current | read |
-| `safenet rewards history <address>` | The address's reward claims, newest first. The newest 20, or every claim with `--all` | read |
+| `safenet rewards history <address>` | The address's reward claims, newest first, the newest 20 or every claim with `--all`; then each distribution period from the Mainnet subgraph, with the address's claims in it and its cumulative claimed checked against the chain at the period's last block | read |
 | `safenet stake <validator> <amount>` | Stake SAFE on a validator, approving the staking contract first when the allowance is short. `--approve exact` (the default) or `--approve unlimited` | write |
 | `safenet unstake <validator> <amount>` | Start a withdrawal of SAFE staked on a validator. It becomes claimable after the delay | write |
 | `safenet withdrawals claim [id]` | Claim withdrawals past their delay, up to and including `id`, or every one with `--all`. The contract pays the oldest first | write |
@@ -202,6 +202,7 @@ Keep pairing URIs, keys, passwords, seed words, RPC credentials, and terminal re
 | `MAINNET_RPC_URL` | The Mainnet RPC endpoint, tried before the public endpoints. `--rpc-url` overrides it |
 | `GITHUB_TOKEN` or `GH_TOKEN` | Raises the GitHub API limit for the lookup that dates SEF's participation window. Optional |
 | `IPFS_GATEWAY` | An IPFS gateway, tried before the public gateways for SEF's reward dataset. Only its origin is used: a path such as `/ipfs/` is dropped. Optional |
+| `SUBGRAPH_URL_MAINNET` | The Mainnet subgraph `rewards history` reads its periods from, instead of the Studio deployment in `packages/core`. Never printed. Optional |
 
 An RPC URL can carry a key. It is never printed: `--verbose` shows the host only, and error
 messages have URLs removed.

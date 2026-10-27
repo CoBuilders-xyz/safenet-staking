@@ -90,6 +90,7 @@ function commandRuntime(runtime: Runtime): CommandRuntime {
         rpcUrl: globals.rpcUrl,
         githubToken: runtime.env.GITHUB_TOKEN || runtime.env.GH_TOKEN || undefined,
         ipfsGateway: runtime.env.IPFS_GATEWAY || undefined,
+        subgraphUrl: runtime.env.SUBGRAPH_URL_MAINNET || undefined,
       })
     },
     emit(globals, data, render) {

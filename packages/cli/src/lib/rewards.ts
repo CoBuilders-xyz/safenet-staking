@@ -1,6 +1,7 @@
 /** `safenet rewards check` and `safenet rewards history`. */
 import type { Address, Hash, Hex } from "viem"
 import { CONTRACTS, indexedEvent, merkleDropAbi } from "@cobuilders/safenet-core"
+import { periodsFailure, readRewardPeriods, type RewardPeriods } from "./reward-periods.js"
 import type { Context } from "./context.js"
 import { figure, sameHex, type Figure } from "./figure.js"
 import { scanLogs } from "./scan.js"
@@ -101,6 +102,10 @@ export interface RewardsHistory {
   readonly cumulativeClaimed: Figure<bigint>
   /** The claims sum to cumulativeClaimed on chain. False means a claim was missed. */
   readonly sumMatchesChain: boolean
+  /** Per distribution period, from the subgraph, each checked against the chain at its last block. */
+  readonly periods: RewardPeriods | null
+  /** Why `periods` is null: the subgraph could not answer. The claims above are still the chain's. */
+  readonly periodsReason: string | null
 }
 
 export const DEFAULT_HISTORY_LIMIT = 20
@@ -115,11 +120,15 @@ export async function rewardsHistory(
   const from = CONTRACTS.merkleDrop.deployBlock
   const event = indexedEvent("merkleDrop", "Claimed")
   const block = await client.getBlockNumber()
-  const [logs, cumulativeClaimed] = await Promise.all([
+  const [logs, cumulativeClaimed, periods] = await Promise.all([
     scanLogs(ctx, { address: merkleDrop, event, args: { account: address }, fromBlock: from, toBlock: block }),
     client.readContract({
       address: merkleDrop, abi: merkleDropAbi, functionName: "cumulativeClaimed", args: [address], blockNumber: block,
     }),
+    readRewardPeriods(ctx, address).then(
+      (value) => ({ value, reason: null }),
+      (err: unknown) => ({ value: null, reason: periodsFailure(err) }),
+    ),
   ])
   const newestFirst = [...logs].sort((a, b) =>
     a.blockNumber === b.blockNumber ? (b.logIndex ?? 0) - (a.logIndex ?? 0) : b.blockNumber! > a.blockNumber! ? 1 : -1)
@@ -151,5 +160,7 @@ export async function rewardsHistory(
     totalClaimed,
     cumulativeClaimed: figure(cumulativeClaimed, "chain: MerkleDrop.cumulativeClaimed(address)"),
     sumMatchesChain: totalClaimed === cumulativeClaimed,
+    periods: periods.value,
+    periodsReason: periods.reason,
   }
 }

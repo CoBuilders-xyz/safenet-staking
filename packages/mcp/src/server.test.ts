@@ -74,13 +74,14 @@ test("the context is made once, from the server's RPC setting", async () => {
   const fake = fakeLibrary()
   const config = readConfig({
     SAFENET_MCP_RPC_URL: "https://rpc.invalid/key", GITHUB_TOKEN: "token", IPFS_GATEWAY: "https://gw.invalid",
+    SUBGRAPH_URL_MAINNET: "https://subgraph.invalid/query",
   })
   const s = await connect(config, { fake })
   await s.call("status")
   await s.call("status")
   const made = fake.calls.filter((c) => c.fn === "createContext")
   assert.deepEqual(made.map((c) => c.args), [[
-    { rpcUrl: "https://rpc.invalid/key", githubToken: "token", ipfsGateway: "https://gw.invalid" },
+    { rpcUrl: "https://rpc.invalid/key", githubToken: "token", ipfsGateway: "https://gw.invalid", subgraphUrl: "https://subgraph.invalid/query" },
   ]])
   await s.close()
 })
@@ -312,4 +313,23 @@ test("a live write reports each transaction on the log as it lands", async () =>
   assert.ok(!r.isError, textOf(r))
   assert.deepEqual(s.logs, [`stake: sent Staking.stake: 0x${"cd".repeat(32)}, waiting for its receipt`])
   await s.close()
+})
+
+test("the rewards_history summary says how many periods the subgraph gave, and whether each matches the chain", async () => {
+  const s = await connect(WRITES_OFF)
+  const r = await s.call("rewards_history", { address: STAKER })
+  assert.match(textOf(r),
+    new RegExp(`2 distribution periods from the subgraph at block ${BLOCK}; each matches cumulativeClaimed on chain at its last block\\.$`, "m"))
+  await s.close()
+
+  const down = fakeLibrary({
+    rewardsHistory: (async () => ({
+      block: BLOCK, address: STAKER, count: 0, claims: [], limited: false, totalClaimed: 0n, sumMatchesChain: true,
+      periods: null, periodsReason: "the subgraph could not give the periods (the subgraph answered HTTP 502)",
+    })) as never,
+  })
+  const d = await connect(WRITES_OFF, { fake: down })
+  assert.match(textOf(await d.call("rewards_history", { address: STAKER })),
+    / No periods: the subgraph could not give the periods \(the subgraph answered HTTP 502\)\.$/m)
+  await d.close()
 })

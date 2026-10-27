@@ -134,8 +134,17 @@ test("safenet rewards check", { skip, timeout: TIMEOUT }, async () => {
 })
 
 test("safenet rewards history", { skip, timeout: TIMEOUT }, async () => {
-  const h = await json<{ count: number; sumMatchesChain: boolean }>("rewards", "history", claimant, "--all")
+  const h = await json<{
+    count: number; sumMatchesChain: boolean; periodsReason: string | null
+    periods: { allMatch: boolean; periods: { claims: number; cumulativeAtEnd: { match: boolean } }[] } | null
+  }>("rewards", "history", claimant, "--all")
   assert.ok(h.count > 0)
   // The claim amounts are increments, so they must sum to cumulativeClaimed on chain.
   assert.equal(h.sumMatchesChain, true)
+  // The Mainnet subgraph's periods, each checked against the chain at its last block. A
+  // subgraph that cannot answer leaves the reason, and fails here.
+  assert.ok(h.periods, h.periodsReason ?? "no periods")
+  assert.ok(h.periods.periods.length > 0)
+  assert.equal(h.periods.periods.reduce((a, p) => a + p.claims, 0), h.count)
+  assert.equal(h.periods.allMatch, true)
 })

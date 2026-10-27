@@ -92,6 +92,12 @@ export function fakeLibrary(overrides: Partial<Library> = {}) {
     })),
     rewardsHistory: record("rewardsHistory", async () => ({
       block: BLOCK, address: STAKER, count: 0, claims: [], limited: false, totalClaimed: 0n, sumMatchesChain: true,
+      periods: {
+        subgraph: { block: BLOCK, time: new Date(0), stale: false, source: "fake" },
+        periods: [{ period: 1 }, { period: 2 }],
+        allMatch: true,
+      },
+      periodsReason: null,
     })),
     stake: record("stake", (_ctx: Context, mode: WriteMode) => writeResult(mode, { operation: "stake" })),
     unstake: record("unstake", (_ctx: Context, mode: WriteMode) => writeResult(mode, { operation: "unstake" })),

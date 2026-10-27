@@ -24,6 +24,8 @@ export interface ServerConfig {
   readonly githubToken: string | undefined
   /** IPFS_GATEWAY: a gateway tried before the public ones for SEF's reward dataset. */
   readonly ipfsGateway: string | undefined
+  /** SUBGRAPH_URL_MAINNET: the Mainnet subgraph rewards_history reads, instead of core's default. */
+  readonly subgraphUrl: string | undefined
   readonly writes: Writes
   /** Lines for stderr at start: settings that have no effect, said once. */
   readonly notices: readonly string[]
@@ -99,6 +101,7 @@ export function readConfig(env: Env): ServerConfig {
     rpcUrl,
     githubToken: set(env.GITHUB_TOKEN) ? env.GITHUB_TOKEN : set(env.GH_TOKEN) ? env.GH_TOKEN : undefined,
     ipfsGateway: set(env.IPFS_GATEWAY) ? env.IPFS_GATEWAY : undefined,
+    subgraphUrl: set(env.SUBGRAPH_URL_MAINNET) ? env.SUBGRAPH_URL_MAINNET : undefined,
     writes,
     notices,
   }

@@ -10,7 +10,7 @@ import {
 } from "viem"
 import { mainnet } from "viem/chains"
 import {
-  ANVIL_TEST_MNEMONIC, CONTRACTS, REWARDS_LATEST_PATH, SEF_DATA, ensResolverAbi, ensUniversalResolverAbi, rewardProofPath,
+  ANVIL_TEST_MNEMONIC, CONTRACTS, REWARDS_LATEST_PATH, SUBGRAPH_ENDPOINTS, SEF_DATA, ensResolverAbi, ensUniversalResolverAbi, rewardProofPath,
   rewardProofUrl, safeTokenEventsAbi,
 } from "@cobuilders/safenet-core"
 import type { Context, Signer } from "./lib/index.js"
@@ -70,6 +70,8 @@ export interface FakeOptions {
   readonly datasetMissing?: boolean
   /** The status the repository answers for its reward files, when not 200. */
   readonly repositoryStatus?: number
+  /** The Mainnet subgraph: answers, is down, or reports a cumulative that differs from the chain. */
+  readonly subgraph?: "down" | "differs"
 }
 
 /** A made-up ENS resolver. */
@@ -103,7 +105,7 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
   const fail = () => {
     if (o.rpcError) throw o.rpcError
   }
-  const reads: Record<string, (args: readonly unknown[]) => unknown> = {
+  const reads: Record<string, (args: readonly unknown[], blockNumber?: bigint) => unknown> = {
     totalStakedAmount: () => 300n * SAFE,
     totalPendingWithdrawals: () => (o.sharedWithdrawalId ? 11n : 7n) * SAFE,
     merkleRoot: () => o.chainRoot ?? ROOT,
@@ -111,7 +113,8 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
     isValidator: ([a]) => [VALIDATOR_A, VALIDATOR_B].includes(String(a).toLowerCase() as Hex),
     totalValidatorStakes: ([a]) => (a === VALIDATOR_A ? 200n * SAFE : 100n * SAFE),
     stakes: () => 1n * SAFE,
-    cumulativeClaimed: () => 10n * SAFE,
+    // The two Claimed logs below: 6 SAFE at BLOCK - 5, then 4 SAFE at BLOCK - 4.
+    cumulativeClaimed: (_, b) => (b === undefined || b >= BLOCK - 4n ? 10n * SAFE : b >= BLOCK - 5n ? 6n * SAFE : 0n),
     getPendingWithdrawals: () => [
       { amount: 5n * SAFE, claimableAt: BLOCK_TIME - 60n },
       { amount: 2n * SAFE, claimableAt: BLOCK_TIME + 90_000n },
@@ -199,11 +202,11 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
       const answer = encodeFunctionResult({ abi: ensResolverAbi, functionName: "contenthash", result: o.ensContenthash ?? "0x" })
       return encodeFunctionResult({ abi: ensUniversalResolverAbi, functionName: "resolve", result: [answer, ENS_RESOLVER] })
     },
-    readContract: async (p: { functionName: string; args?: readonly unknown[] }) => {
+    readContract: async (p: { functionName: string; args?: readonly unknown[]; blockNumber?: bigint }) => {
       fail()
       const read = reads[p.functionName]
       if (!read) throw new Error(`fake chain: no ${p.functionName}`)
-      return read(p.args ?? [])
+      return read(p.args ?? [], p.blockNumber)
     },
     getLogs: async (p: { event: { name: string }; fromBlock: bigint }) => {
       fail()
@@ -275,10 +278,33 @@ function fakeDataset(o: FakeOptions, url: URL): Response {
   return new Response("not found", { status: 404 })
 }
 
+/**
+ * The Mainnet subgraph, consistent with the fake chain: two periods, the second current, and the
+ * two claims of the Claimed logs, one in each.
+ */
+function fakeSubgraph(o: FakeOptions, body: string): Response {
+  if (o.subgraph === "down") return new Response("bad gateway", { status: 502 })
+  if (body.includes("_meta")) return json({ data: { _meta: { block: { number: Number(BLOCK), timestamp: null } } } })
+  const period = (n: number, block: bigint) => ({
+    period: n, root: fakeRoot(0x200 + n), blockNumber: String(block), timestamp: String(BLOCK_TIME - (BLOCK - block) * 12n),
+    transactionHash: fakeRoot(0x300 + n),
+  })
+  return json({
+    data: {
+      rewardPeriods: [period(1, BLOCK - 10n), period(2, BLOCK - 4n)],
+      rewardClaims: [
+        { blockNumber: String(BLOCK - 5n), amount: String(6n * SAFE), cumulativeAmount: String(6n * SAFE) },
+        { blockNumber: String(BLOCK - 4n), amount: String(4n * SAFE), cumulativeAmount: String((o.subgraph === "differs" ? 9n : 10n) * SAFE) },
+      ],
+    },
+  })
+}
+
 function fakeFetch(o: FakeOptions): typeof fetch {
-  return (async (input: string | URL | Request) => {
+  return (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input)
     const parsed = new URL(url)
+    if (url === SUBGRAPH_ENDPOINTS.mainnet) return fakeSubgraph(o, String(init?.body ?? ""))
     if (/^\/ip[fn]s\//.test(parsed.pathname)) return fakeDataset(o, parsed)
     if (o.repositoryStatus && url.startsWith(SEF_DATA.rewardsProofBase)) {
       return new Response("repository unavailable", { status: o.repositoryStatus })
@@ -316,7 +342,7 @@ export function fakeRuntime(
   return {
     io,
     env,
-    createContext: (options) => ({ ...fakeContext(o, sends), ipfsGateway: options.ipfsGateway }),
+    createContext: (options) => ({ ...fakeContext(o, sends), ipfsGateway: options.ipfsGateway, subgraphUrl: options.subgraphUrl }),
     loadSigner: o.loadSigner ?? ((request, ctx) => loadSigner(request, ctx, { env, askPassword: undefined })),
     stdout: () => out,
     stderr: () => err,

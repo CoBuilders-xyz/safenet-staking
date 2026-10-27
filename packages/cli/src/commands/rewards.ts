@@ -103,10 +103,44 @@ export function renderRewardsCheck(r: RewardsCheck): string {
   ].join("\n")
 }
 
+/** The periods section: one row per distribution, newest first, each checked at its last block. */
+export function renderPeriods(h: RewardsHistory): string {
+  if (!h.periods) return `Periods: not shown, because ${h.periodsReason ?? "the subgraph gave none"}.`
+  const p = h.periods
+  const head = `Periods, from the subgraph at block ${formatCount(p.subgraph.block)} (${formatTime(p.subgraph.time)})` +
+    `${p.subgraph.stale ? ", which trails the chain by more than its staleness limit" : ""}:`
+  const table = renderTable(
+    [
+      { header: "PERIOD", align: "right" }, { header: "ROOT SET" }, { header: "LAST BLOCK", align: "right" },
+      { header: "CLAIMS", align: "right" }, { header: "CLAIMED", align: "right" },
+      { header: "CUMULATIVE, SUBGRAPH", align: "right" }, { header: "CUMULATIVE, CHAIN", align: "right" }, { header: "CHECK" },
+    ],
+    [...p.periods].reverse().map((r) => [
+      String(r.period),
+      formatTime(r.setAt.time),
+      `${formatCount(r.endBlock)}${r.current ? " (current)" : ""}`,
+      String(r.claims),
+      formatSafe(r.claimed),
+      formatSafe(r.cumulativeAtEnd.subgraph),
+      formatSafe(r.cumulativeAtEnd.chain),
+      r.cumulativeAtEnd.match ? "match" : "DIFFERS",
+    ]),
+  )
+  const verdict = p.allMatch
+    ? `Every period: the subgraph's cumulative claimed equals MerkleDrop.cumulativeClaimed(address) on chain at the period's last block.`
+    : `Check failed for period ${p.periods.filter((r) => !r.cumulativeAtEnd.match).map((r) => r.period).join(", ")}: ` +
+      "the subgraph and the chain differ at the same block."
+  return [
+    head, "", table, "", verdict,
+    "A period's CLAIMED is what this address claimed while that root was current. What a period paid out is in SEF's files, not on chain.",
+    `Source: ${p.subgraph.source}.`,
+  ].join("\n")
+}
+
 export function renderRewardsHistory(h: RewardsHistory): string {
   const head = `Reward claims by ${h.address}, Ethereum Mainnet block ${formatCount(h.block)}`
   const source = `Source: ${h.source}.`
-  if (h.count === 0) return [head, "", "None.", source].join("\n")
+  if (h.count === 0) return [head, "", "None.", source, "", renderPeriods(h)].join("\n")
   const table = renderTable(
     [{ header: "TIME" }, { header: "BLOCK", align: "right" }, { header: "AMOUNT", align: "right" }, { header: "TRANSACTION" }],
     h.claims.map((c) => [c.time ? formatTime(c.time) : "", formatCount(c.block), formatSafe(c.amount), c.transaction]),
@@ -118,7 +152,7 @@ export function renderRewardsHistory(h: RewardsHistory): string {
     ? `Claimed in total: ${formatSafe(h.totalClaimed)}, equal to ${h.cumulativeClaimed.source}.`
     : `Check failed: the claims sum to ${formatSafe(h.totalClaimed)}, but ${h.cumulativeClaimed.source} ` +
       `reports ${formatSafe(h.cumulativeClaimed.value)}.`
-  return [head, "", table, "", shown, check, source].join("\n")
+  return [head, "", table, "", shown, check, source, "", renderPeriods(h)].join("\n")
 }
 
 export function registerRewards(program: Command, rt: CommandRuntime): void {

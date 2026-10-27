@@ -59,7 +59,13 @@ export function rewardsCheckSummary(r: RewardsCheck): string {
 export function rewardsHistorySummary(h: RewardsHistory): string {
   return `${plural(h.count, "reward claim")} by ${h.address}, ${safe(h.totalClaimed)} in total` +
     `${h.limited ? `, the newest ${h.claims.length} shown` : ""}, at block ${h.block}.` +
-    (h.sumMatchesChain ? "" : " The claims do not sum to cumulativeClaimed on chain.")
+    (h.sumMatchesChain ? "" : " The claims do not sum to cumulativeClaimed on chain.") +
+    (h.periods
+      ? ` ${plural(h.periods.periods.length, "distribution period")} from the subgraph at block ${h.periods.subgraph.block}; ` +
+        (h.periods.allMatch
+          ? "each matches cumulativeClaimed on chain at its last block."
+          : "at least one differs from cumulativeClaimed on chain at its last block.")
+      : ` No periods: ${h.periodsReason ?? "the subgraph gave none"}.`)
 }
 
 /** The transactions of one run of a write, sent or simulated. */
