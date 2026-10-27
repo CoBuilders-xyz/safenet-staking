@@ -104,8 +104,10 @@ App-level gates, each rendering `RestrictedScreen`:
 
 Connectors in order: `safe()`, `injected()` as "Browser Wallet" on `window.ethereum`, and
 `walletConnect()` when `VITE_WALLETCONNECT_PROJECT_ID` is set. `src/lib/safe.ts` exports
-`isSafeApp`, true inside an iframe. `useAutoConnect` connects the Safe connector when
-`isSafeApp`, and calls wagmi's `reconnect()` otherwise. `useWrongNetwork` is true when the
+`isSafeApp`, true inside an iframe, and `SAFE_INFO_TIMEOUT_MS`, how long the Safe connector waits
+for Safe{Wallet}'s `getSafeInfo` answer: two seconds, not wagmi's 10 ms, for the reason in its
+comment. `useAutoConnect` connects the Safe connector when `isSafeApp`, and calls wagmi's
+`reconnect()` otherwise. `useWrongNetwork` is true when the
 wallet's chain is not Mainnet; `ConnectButton` then shows "Switch to Ethereum".
 
 ### Contract integration
@@ -248,9 +250,9 @@ MerkleDrop's root. This repository sets a root only on an Anvil fork.
   shared test data.
 - `e2e/tests/`: Playwright against a mocked RPC, mocked subgraphs, mocked SEF files and mocked
   gateways (`e2e/mocks/`, `e2e/fixtures/`). Page objects in `e2e/pages/`. WalletConnect is
-  only smoke-tested. `safe-app.spec.ts` frames the app from another origin and checks that the
-  Connect control is hidden and the Safe connector asks the parent for `getSafeInfo`; no real Safe
-  is involved, and the connection itself is not asserted.
+  only smoke-tested. `safe-app.spec.ts` frames the app from another origin: the Connect control is
+  hidden and the Safe connector asks the parent for `getSafeInfo`, and with the parent answering
+  15 ms late, the connection completes. No real Safe is involved.
 - `e2e/fork/`: Playwright against Anvil. `e2e/smoke/`: Playwright against production.
   `e2e/playwright.config.ts` switches suites on `E2E_SUITE`, `fork` or `smoke`, which `test:fork`
   and `test:smoke:web` set.

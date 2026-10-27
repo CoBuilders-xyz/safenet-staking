@@ -1,11 +1,12 @@
 import { createConfig } from "wagmi"
 import { injected, walletConnect, safe } from "wagmi/connectors"
 import { activeChain, transports } from "./chains"
+import { SAFE_INFO_TIMEOUT_MS } from "@/lib/safe"
 
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID
 
 const connectors = [
-  safe({ debug: false }),
+  safe({ debug: false, unstable_getInfoTimeout: SAFE_INFO_TIMEOUT_MS }),
   injected({
     target: {
       id: "browserWallet",

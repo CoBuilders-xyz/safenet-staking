@@ -127,11 +127,11 @@ See [`MANUAL_TESTING.md`](./MANUAL_TESTING.md) for the pre-release manual checkl
   listening there. An injected test wallet answers from a mocked RPC, and the subgraphs, SEF's
   files and the gateways are mocked too, so the suite needs no network and no secret. It proves
   the interface behaves, not that a transaction works. WalletConnect is only smoke-tested there.
-  For the Safe App, one test frames the app from another origin and checks that it takes the Safe
-  connector path: the Connect control is hidden, and the app asks its parent for the Safe's
-  details with the Safe Apps SDK's `getSafeInfo`. It proves the app's side, not that Safe{Wallet}
-  answers, and no transaction goes through a Safe. It does not assert that the connection
-  completes: wagmi's Safe connector waits 10 ms for the answer, which a loaded runner can miss.
+  For the Safe App, two tests frame the app from another origin. One checks that it takes the
+  Safe connector path: the Connect control is hidden, and the app asks its parent for the Safe's
+  details with the Safe Apps SDK's `getSafeInfo`. The other has the parent answer 15 ms late and
+  checks that the Safe it names becomes the connected account. They prove the app's side, not that
+  Safe{Wallet} answers, and no transaction goes through a Safe.
 - **Fork**: below.
 - **Production smoke**: below.
 
@@ -232,7 +232,9 @@ public/           static files, including the Safe App manifest
 `src/config/wagmi.ts` configures one chain, Mainnet, and these connectors:
 
 1. **Safe**, `safe()`. Inside a Safe{Wallet} iframe, `useAutoConnect` connects it on load, so a
-   Safe App always uses the Safe, not the last wallet used.
+   Safe App always uses the Safe, not the last wallet used. The connector waits
+   `SAFE_INFO_TIMEOUT_MS` (`src/lib/safe.ts`), two seconds, for Safe{Wallet}'s first answer, not
+   wagmi's default of 10 ms, which a loading or slow Safe{Wallet} misses.
 2. **Browser Wallet**, `injected()` on `window.ethereum`: MetaMask, Rabby and other extensions.
 3. **WalletConnect**, only when `VITE_WALLETCONNECT_PROJECT_ID` is set.
 
