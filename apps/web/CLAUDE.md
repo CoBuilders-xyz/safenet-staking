@@ -27,8 +27,12 @@ as `pnpm <script>` from `apps/web`.
 - **Manual QA fork:** `fork:up`, `fork:reset`, `fork:down`, also from the repository root as
   `pnpm fork:up` and so on. The tool is `scripts/fork-env/`; the guide is
   `docs/manual-qa-fork.md` at the repository root
-- **IPFS release:** `release:build` builds from `build.env` alone and writes
-  `release/app.car` and `release/CID`; `release:pin` pins the CAR to Pinata and checks the
+- **Performance budget:** `budget:bundle` checks a built `dist/` against the bundle limits in
+  `performance-budget.json`, and `release:build` runs it; `budget:lighthouse` serves `dist/` on
+  loopback and checks Lighthouse mobile, the median of three runs per route, against the rest.
+  `PERFORMANCE.md` explains each limit. Raise one only with the measurement that justifies it.
+- **IPFS release:** `release:build` builds from `build.env` alone, checks the bundle budget, and
+  writes `release/app.car` and `release/CID`; `release:pin` pins the CAR to Pinata and checks the
   gateways, with `PINATA_JWT` and `PINATA_GATEWAY`. `VERIFY.md` at the root rebuilds a release;
   `.github/workflows/release.yml` runs both on a `v*` tag or by hand
 
@@ -81,8 +85,9 @@ wrapped in `ErrorBoundary`:
   the on-chain root checked against SEF's published one
 - `*` → `NotFoundPage`
 
-Pages are lazy-loaded with `React.lazy()` and preloaded after first paint through
-`requestIdleCallback`.
+Pages are lazy-loaded with `React.lazy()` from `src/routes.ts`. The page of the URL opened starts
+loading at once, alongside the gates (`routeImportFor`); the others preload after the `load`
+event, when the browser is idle.
 
 App-level gates, each rendering `RestrictedScreen` with a `Restriction` (`src/lib/restriction.ts`):
 the gate, and whether it refused or could not answer. Each hook returns `allowed`, `isLoading` and
@@ -104,7 +109,9 @@ the sanctions screening before the location check.
 ### Wallets (`src/config/wagmi.ts`)
 
 Connectors in order: `safe()`, `injected()` as "Browser Wallet" on `window.ethereum`, and
-`walletConnect()` when `VITE_WALLETCONNECT_PROJECT_ID` is set. `src/lib/safe.ts` exports
+WalletConnect when `VITE_WALLETCONNECT_PROJECT_ID` is set, through `deferredWalletConnect`
+(`src/config/walletConnect.ts`): wagmi's connector, loaded only once the user picks it or it was
+the last connector used. Created plainly, it loaded about 300 KB on every first paint. `src/lib/safe.ts` exports
 `isSafeApp`, true inside an iframe. `useAutoConnect` connects the Safe connector when
 `isSafeApp`, and calls wagmi's `reconnect()` otherwise. `useWrongNetwork` is true when the
 wallet's chain is not Mainnet. `useNetworkSwitch` adds whether the connector can switch (the Safe
@@ -139,7 +146,8 @@ transaction.
 - **Approval** (`src/hooks/useApprovalFlow.ts`): wraps `useTokenAllowance` with the exact or
   unlimited approval type and its toasts.
 - **Stake form** (`src/hooks/useStakeForm.ts`): amount, approval, stake and the approve-and-stake
-  batch behind `StakeForm`. `DelegateDialog` and Claim & Stake both run on it. An amount the
+  batch behind `StakeForm`. `DelegateDialog` and Claim & Stake both run on it. Stake opens the
+  "what happens if" step, `StakeReview`; only its Confirm stake sends the stake or the batch. An amount the
   interface fills in, the claimed amount or a MAX or percentage shortcut, is a `PresetAmount`
   (`src/lib/format.ts`): shown rounded down to four decimals and sent exact while its text is
   unchanged.
@@ -193,7 +201,8 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
 ### Components
 
 - `src/components/ui/`: Radix primitives wrapped with CVA and tailwind-merge (`cn()` in
-  `src/lib/utils.ts`), after shadcn/ui. `TxButton` shows the signing and confirming phases;
+  `src/lib/utils.ts`), after shadcn/ui. `Term` explains a term where it appears, from
+  `src/lib/glossary.ts`: a button that opens on hover, focus or a tap, and closes on Escape. `TxButton` shows the signing and confirming phases;
   `stepper.tsx` drives Claim → Stake → Done.
 - `src/components/overview/`: the Network Overview sections.
 - `src/components/dashboard/`: `StatsOverview`, `QuickActions`, `StakingSection`,
@@ -209,8 +218,8 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
   rate in percent: a null reads "Not published", with no marker, never 0.00%. The validator
   cards, the detail page and the dashboard positions use it; the Overview table says "Not
   published" for a row SEF lists with a null rate.
-- `src/components/staking/`: `AmountInput`, `DelegateDialog`, `StakeForm`, `ValidatorSelect`,
-  `UndelegateDialog`.
+- `src/components/staking/`: `AmountInput`, `DelegateDialog`, `StakeForm`, `StakeReview`,
+  `ValidatorSelect`, `UndelegateDialog`.
 - `src/components/withdrawals/`: `WithdrawalQueue`, `WithdrawalCard`.
 
 ### Libraries
@@ -218,6 +227,8 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
 - `src/lib/format.ts`: token amounts, preset amounts, addresses, countdowns, participation rates,
   UTC dates.
 - `src/lib/restriction.ts`: the gates' `Restriction` and the restricted screen's copy.
+- `src/lib/glossary.ts`: what each term means, restating SEF's staking documentation. Figures come
+  from core or the staking contract, never from the text.
 - `src/lib/programme.ts`: copy built on the programme calendar in core: `PARTICIPATION_RULE`,
   `RATE_NOT_PUBLISHED` for a rate SEF lists as null, `belowThreshold`, the dated Beta notice, the withdrawn status for a validator SEF lists as
   inactive.
@@ -254,6 +265,8 @@ MerkleDrop's root. This repository sets a root only on an Anvil fork.
 
 - `src/**/__tests__/`: Vitest with jsdom. `src/__tests__/` holds the wagmi mock, the setup and
   shared test data.
+- `e2e/tests/accessibility.spec.ts`: axe, WCAG 2.2 A and AA, on every route and state; a serious
+  or critical violation fails it. `ACCESSIBILITY.md` says what it covers and what a person checks.
 - `e2e/tests/`: Playwright against a mocked RPC, mocked subgraphs, mocked SEF files and mocked
   gateways (`e2e/mocks/`, `e2e/fixtures/`). Page objects in `e2e/pages/`. The Safe App and
   WalletConnect are only smoke-tested.

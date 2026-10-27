@@ -16,8 +16,9 @@ import Info from "lucide-react/dist/esm/icons/info"
 import { PublishedParticipationRate } from "@/components/validators/ParticipationRate"
 import { AEGIS_UNCONFIRMED, PARTICIPATION_RULE, WITHDRAWN } from "@/lib/programme"
 import type { Address } from "viem"
+import { SEF_DOCS } from "@cobuilders/safenet-core"
 
-const rewardsDocsUrl = "https://docs.safefoundation.org/safenet/staking/rewards"
+const rewardsDocsUrl = SEF_DOCS.rewards
 
 interface Position {
   validator: Address

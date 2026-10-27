@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useAccount } from "wagmi"
 import { PageHero } from "@/components/PageHero"
+import { Term } from "@/components/ui/term"
 import { ClaimRewardsDialog } from "@/components/dashboard/ClaimRewardsDialog"
 import { ClaimAndStakeDialog, type ClaimAndStakeMode } from "@/components/rewards/ClaimAndStakeDialog"
 import { YourRewardsSection } from "@/components/rewards/YourRewardsSection"
@@ -28,7 +29,11 @@ export function RewardsPage() {
     <div className="space-y-6">
       <PageHero
         title="Rewards"
-        subtitle="Claim your Safenet rewards and check them against the chain"
+        subtitle={
+          <>
+            Claim your Safenet <Term term="rewards">rewards</Term> and check them against the chain
+          </>
+        }
       />
       <div className="grid gap-6 md:grid-cols-2">
         <YourRewardsSection isConnected={isConnected} rewards={rewards} />

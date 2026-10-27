@@ -129,6 +129,12 @@ function renderDialog({
 const rootUpdated = () =>
   new Error(`Execution reverted: custom error ${encodeErrorResult({ abi: merkleDropAbi, errorName: "MerkleRootWasUpdated" })}`)
 
+/** Stake, then confirm on the "what happens if" step: only the confirmation sends. */
+async function stakeAndConfirm() {
+  await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+  await userEvent.click(screen.getByRole("button", { name: "Confirm stake" }))
+}
+
 /** The claim has confirmed and paid `amount`. */
 function claimed(amount: bigint | undefined) {
   m.claimState = { isSuccess: true, claimedAmount: amount, txHash: `0x${"c1".repeat(32)}` }
@@ -228,7 +234,7 @@ describe("ClaimAndStakeDialog", () => {
       expect(screen.getByRole("button", { name: "Stake" })).toBeDisabled()
 
       await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
-      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+      await stakeAndConfirm()
 
       expect(m.stake).toHaveBeenCalledWith(TEST_ACCOUNTS.validator1, 60n * SAFE)
     })
@@ -242,7 +248,7 @@ describe("ClaimAndStakeDialog", () => {
       expect(screen.getByText(/Shown rounded down to four decimals/)).toBeInTheDocument()
 
       await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
-      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+      await stakeAndConfirm()
 
       expect(m.stake).toHaveBeenCalledWith(TEST_ACCOUNTS.validator1, paid)
     })
@@ -257,12 +263,13 @@ describe("ClaimAndStakeDialog", () => {
       expect(amount).toHaveValue("12.34567")
       expect(screen.queryByText(/Shown rounded down/)).not.toBeInTheDocument()
       await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
-      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+      await stakeAndConfirm()
       expect(m.stake).toHaveBeenLastCalledWith(TEST_ACCOUNTS.validator1, 12_345_670_000_000_000_000n)
 
+      await userEvent.click(screen.getByRole("button", { name: "Back" }))
       await userEvent.click(screen.getByRole("button", { name: "MAX" }))
-      expect(amount).toHaveValue("12.3456")
-      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+      expect(screen.getByLabelText("Amount")).toHaveValue("12.3456")
+      await stakeAndConfirm()
       expect(m.stake).toHaveBeenLastCalledWith(TEST_ACCOUNTS.validator1, paid)
     })
 
@@ -290,7 +297,7 @@ describe("ClaimAndStakeDialog", () => {
 
       await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
       expect(screen.queryByRole("button", { name: /Approve/ })).not.toBeInTheDocument()
-      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+      await stakeAndConfirm()
 
       expect(m.batchApproveAndStake).toHaveBeenCalledWith(TEST_ACCOUNTS.validator1, 60n * SAFE)
     })
@@ -346,7 +353,7 @@ describe("ClaimAndStakeDialog", () => {
       await userEvent.clear(amount)
       await userEvent.type(amount, "50")
       await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
-      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+      await stakeAndConfirm()
       // Edited while the stake confirms: the result still reports what was sent.
       await userEvent.type(amount, "5")
 
@@ -415,7 +422,7 @@ describe("ClaimAndStakeDialog", () => {
       await userEvent.clear(amount)
       await userEvent.type(amount, "50")
       await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
-      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+      await stakeAndConfirm()
 
       // Closed while the stake confirms: the dialog drops its validator and amount.
       m.stakeState = { isSuccess: false, isConfirmingTx: true, txHash: undefined } as typeof m.stakeState
@@ -450,7 +457,7 @@ describe("ClaimAndStakeDialog", () => {
     expect(screen.getByLabelText("Amount")).toHaveValue("1000")
 
     await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
-    await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+    await stakeAndConfirm()
     expect(m.stake).toHaveBeenCalledWith(TEST_ACCOUNTS.validator1, AMOUNTS.userBalance)
   })
 

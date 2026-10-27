@@ -61,6 +61,9 @@ test.describe("Mainnet fork", () => {
     const stakeButton = dialog.getByRole("button", { name: "Stake", exact: true })
     await expect(stakeButton).toBeEnabled()
     await stakeButton.click()
+    // The "what happens if" step, then the confirmation that sends.
+    await expect(dialog.getByText("…I want my SAFE back?")).toBeVisible()
+    await dialog.getByRole("button", { name: "Confirm stake" }).click()
     await expect(page.getByText("Delegation successful")).toBeVisible()
 
     expect(await stakeOf(user, validator)).toBe(stakeBefore + amount)
@@ -210,6 +213,9 @@ test.describe("Mainnet fork", () => {
       const stakeButton = dialog.getByRole("button", { name: "Stake", exact: true })
       await expect(stakeButton).toBeEnabled()
       await stakeButton.click()
+    // The "what happens if" step, then the confirmation that sends.
+    await expect(dialog.getByText("…I want my SAFE back?")).toBeVisible()
+    await dialog.getByRole("button", { name: "Confirm stake" }).click()
       await expect(dialog.getByRole("status")).toContainText("Staked")
 
       // Every wei of the claim is staked, though the input showed it rounded.

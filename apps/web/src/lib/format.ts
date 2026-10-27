@@ -90,6 +90,21 @@ export function formatCountdown(seconds: number): string {
   return `${s}s`
 }
 
+/** A duration in words, largest units first, zero parts left out: 172800 reads "2 days". */
+export function formatDuration(seconds: number): string {
+  if (seconds <= 0) return "no time"
+  const parts: [number, string][] = [
+    [Math.floor(seconds / 86400), "day"],
+    [Math.floor((seconds % 86400) / 3600), "hour"],
+    [Math.floor((seconds % 3600) / 60), "minute"],
+    [seconds % 60, "second"],
+  ]
+  return parts
+    .filter(([n]) => n > 0)
+    .map(([n, unit]) => `${n} ${unit}${n === 1 ? "" : "s"}`)
+    .join(" ")
+}
+
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const LONG_MONTHS = [

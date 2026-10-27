@@ -12,10 +12,9 @@ import { AmountInput } from "./AmountInput"
 import { useUserStakeOnValidator, useWithdrawDelay } from "@/hooks/useStakingReads"
 import { useInitiateWithdrawal } from "@/hooks/useStakingWrites"
 import { useTxToast } from "@/hooks/useTxToast"
-import { truncateAddress, formatCountdown, safeParseEther } from "@/lib/format"
+import { truncateAddress, formatDuration, safeParseEther } from "@/lib/format"
 import { useGasEstimate } from "@/hooks/useGasEstimate"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import Info from "lucide-react/dist/esm/icons/info"
+import { Term } from "@/components/ui/term"
 import Fuel from "lucide-react/dist/esm/icons/fuel"
 
 interface UndelegateDialogProps {
@@ -91,18 +90,9 @@ export function UndelegateDialog({ validator, open, onOpenChange }: UndelegateDi
 
         {withdrawDelay !== undefined && (
           <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button type="button" className="shrink-0" aria-label="Unstaking period info">
-                  <Info className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs text-xs">
-                <p>During the unstaking period, your tokens are locked and do not earn rewards.</p>
-                <p className="mt-1">After the period ends, you must manually claim them from the Withdrawals page.</p>
-              </TooltipContent>
-            </Tooltip>
-            <span>Unstaking period: {formatCountdown(Number(withdrawDelay))}. Tokens will be claimable after this period.</span>
+            <span>
+              <Term term="unstakingPeriod" unstakingPeriod={withdrawDelay}>Unstaking period</Term>: {formatDuration(Number(withdrawDelay))}. Tokens will be claimable after this period.
+            </span>
           </div>
         )}
 

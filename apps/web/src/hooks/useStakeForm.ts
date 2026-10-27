@@ -62,6 +62,10 @@ export function useStakeForm({
     const p = presetAmount(value)
     setEntry({ text: p.text, preset: p })
   }, [])
+  // The "what happens if" step between pressing Stake and the wallet's confirmation.
+  const [reviewing, setReviewing] = useState(false)
+  const startReview = useCallback(() => setReviewing(true), [])
+  const cancelReview = useCallback(() => setReviewing(false), [])
   const { data: balance } = useTokenBalance({ refetchInterval: pollBalance && active ? 4_000 : undefined })
 
   const parsedAmount = parseAmount(amount, preset)
@@ -203,6 +207,7 @@ export function useStakeForm({
   useEffect(() => {
     if (!active && !isBusy) {
       setEntry(null)
+      setReviewing(false)
       resetApprovalFlow()
       resetStake()
       resetBatch()
@@ -214,6 +219,10 @@ export function useStakeForm({
     amount,
     setAmount: setTypedAmount,
     setPresetAmount,
+    /** True on the review step, after Stake and before the wallet asks to confirm. */
+    reviewing,
+    startReview,
+    cancelReview,
     /** The preset behind the amount shown, while the user has not edited it. */
     preset: preset !== undefined && amount === preset.text ? preset : undefined,
     parsedAmount,

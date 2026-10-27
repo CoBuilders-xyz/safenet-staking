@@ -3,6 +3,7 @@ import { QuickActions } from "@/components/dashboard/QuickActions"
 import { StakingSection } from "@/components/dashboard/StakingSection"
 import { StakeDistribution } from "@/components/dashboard/StakeDistribution"
 import { PageHero } from "@/components/PageHero"
+import { Term } from "@/components/ui/term"
 
 const termsUrl = import.meta.env.VITE_TERMS_URL as string | undefined
 
@@ -11,7 +12,11 @@ export function DashboardPage() {
     <div className="space-y-6">
       <PageHero
         title="Stake your SAFE"
-        subtitle="Earn rewards for helping secure Safenet"
+        subtitle={
+          <>
+            Earn <Term term="rewards">rewards</Term> for helping secure <Term term="safenet">Safenet</Term>
+          </>
+        }
       >
         <p className="mt-4 text-xs text-muted-foreground">
           Rewards are not guaranteed and may vary.{" "}

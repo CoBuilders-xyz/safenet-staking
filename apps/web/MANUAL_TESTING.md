@@ -99,7 +99,9 @@ Notes and transaction hashes:
 
 - [ ] `?delegate=<address>` on `/validators` opens the delegate dialog for that validator.
 - [ ] The 25%, 50%, 75% and MAX shortcuts fill the amount; Delegate stays disabled without one.
-- [ ] The dialog shows a gas estimate and the unstaking period.
+- [ ] The dialog shows a gas estimate and the unstaking period, in words, read from the contract.
+- [ ] Stake opens "Before you stake … with …" and its five "What happens if" answers. Back returns
+      to the form with the amount kept; only Confirm stake opens the wallet.
 - [ ] With an allowance below the amount, both Approve exact amount and Approve unlimited unlock
       Stake, each on a separate run.
 - [ ] Rejecting the wallet prompt shows an error and leaves the dialog usable.
@@ -107,6 +109,16 @@ Notes and transaction hashes:
       with.
 - [ ] With two or more pending withdrawals, only the oldest has Claim; claiming it reveals the
       next.
+
+## Terms explained where they appear
+
+- [ ] Each dotted-underlined term opens its explanation on hover, on keyboard focus and on a
+      tap, and closes on Escape or a second tap: Safenet and staking on the Overview, rewards and
+      Safenet on the Dashboard, validator, stake and Commission on Validators, Commission on a
+      validator's page, withdrawals on Withdrawals, rewards on Rewards, Unstaking period in both
+      dialogs, and the unstaking period, slashing and rewards in "What happens if".
+- [ ] The unstaking period reads the same in every place, and matches the contract's
+      `withdrawDelay`.
 
 ## Claim & Stake
 
@@ -235,6 +247,21 @@ repeated in each table so a table can be checked alone.
 | Any | "404", "Page not found" and Back to Overview; it reads nothing and has no error boundary |
 | Restricted | The restricted screen, as above |
 | Wrong network | The Wrong network notice, from the layout |
+
+## Accessibility
+
+`e2e/tests/accessibility.spec.ts` runs axe on every route and state; `ACCESSIBILITY.md` says
+what it covers. These need a person:
+
+- [ ] Keyboard alone, from the address bar: reach and use every link and button, open and close
+      every dialog, delegate, undelegate and claim. Focus is always visible and never lost.
+- [ ] VoiceOver on macOS or NVDA on Windows: each page's heading and sections are announced, a
+      term's explanation is read with its button, loading is announced, and an error is read
+      when it appears.
+- [ ] At 200% browser zoom, and at 320 px wide, nothing is cut off and nothing needs scrolling
+      sideways.
+- [ ] On a phone: every button can be hit with a thumb, terms open on a tap, dialogs fit.
+- [ ] With reduced motion set in the operating system, nothing animates.
 
 ## Safe App
 

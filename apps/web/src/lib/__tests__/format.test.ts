@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { formatParticipation, formatTokenAmount, isRounded, parseAmount, presetAmount, truncateAddress, formatCountdown, formatUtcDateTime, formatUtcDayLong } from "../format"
+import { formatDuration, formatParticipation, formatTokenAmount, isRounded, parseAmount, presetAmount, truncateAddress, formatCountdown, formatUtcDateTime, formatUtcDayLong } from "../format"
 
 describe("formatTokenAmount", () => {
   it("formats zero", () => {
@@ -164,5 +164,16 @@ describe("presetAmount and parseAmount", () => {
     expect(preset.text).toBe("0.000000000000001234")
     expect(parseAmount(preset.text, preset)).toBe(1234n)
     expect(isRounded(preset)).toBe(false)
+  })
+})
+
+describe("formatDuration", () => {
+  it("reads a duration in words, largest units first, zero parts left out", () => {
+    expect(formatDuration(172_800)).toBe("2 days")
+    expect(formatDuration(604_800)).toBe("7 days")
+    expect(formatDuration(86_400 + 3_600)).toBe("1 day 1 hour")
+    expect(formatDuration(90 * 60 + 5)).toBe("1 hour 30 minutes 5 seconds")
+    expect(formatDuration(1)).toBe("1 second")
+    expect(formatDuration(0)).toBe("no time")
   })
 })

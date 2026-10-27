@@ -1,10 +1,10 @@
 import type { ReactNode } from "react"
 import { TxButton } from "@/components/ui/TxButton"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { Term } from "@/components/ui/term"
 import { AmountInput } from "./AmountInput"
+import { StakeReview } from "./StakeReview"
 import type { StakeFormState } from "@/hooks/useStakeForm"
-import { formatCountdown, isRounded } from "@/lib/format"
-import Info from "lucide-react/dist/esm/icons/info"
+import { formatDuration, isRounded } from "@/lib/format"
 import Fuel from "lucide-react/dist/esm/icons/fuel"
 
 interface StakeFormProps {
@@ -38,6 +38,8 @@ export function StakeForm({ form, maxLabel, aboveMaxMessage, notes }: StakeFormP
     approval,
     stake,
     batch,
+    reviewing,
+    startReview,
   } = form
   const {
     needsApproval,
@@ -51,6 +53,9 @@ export function StakeForm({ form, maxLabel, aboveMaxMessage, notes }: StakeFormP
 
   const ceiling =
     maxAmount !== undefined && balanceValue !== undefined && balanceValue < maxAmount ? balanceValue : (maxAmount ?? balanceValue)
+
+  // Stake opens the "what happens if" step; only its Confirm sends the transaction.
+  if (reviewing) return <StakeReview form={form} />
 
   return (
     <>
@@ -96,18 +101,9 @@ export function StakeForm({ form, maxLabel, aboveMaxMessage, notes }: StakeFormP
 
       {withdrawDelay !== undefined && (
         <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button type="button" className="shrink-0" aria-label="Unstaking period info">
-                <Info className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs text-xs">
-              <p>If you undelegate, your tokens will be locked during the unstaking period and will not earn rewards.</p>
-              <p className="mt-1">After the period ends, you must manually claim them from the Withdrawals page.</p>
-            </TooltipContent>
-          </Tooltip>
-          <span>Unstaking period: {formatCountdown(Number(withdrawDelay))}</span>
+          <span>
+            <Term term="unstakingPeriod" unstakingPeriod={withdrawDelay}>Unstaking period</Term>: {formatDuration(Number(withdrawDelay))}
+          </span>
         </div>
       )}
 
@@ -117,7 +113,7 @@ export function StakeForm({ form, maxLabel, aboveMaxMessage, notes }: StakeFormP
             isSigningTx={batch.isSigningTx}
             isConfirmingTx={batch.isConfirmingTx}
             signingLabel="Confirm in Safe…"
-            onClick={() => validator && batch.batchApproveAndStake(validator, parsedAmount)}
+            onClick={startReview}
             disabled={!validator || parsedAmount === 0n || insufficientBalance || aboveMax}
           >
             Stake
@@ -154,7 +150,7 @@ export function StakeForm({ form, maxLabel, aboveMaxMessage, notes }: StakeFormP
           <TxButton
             isSigningTx={stake.isSigningTx}
             isConfirmingTx={stake.isConfirmingTx}
-            onClick={() => validator && stake.stake(validator, parsedAmount)}
+            onClick={startReview}
             disabled={!canDelegate}
           >
             Stake

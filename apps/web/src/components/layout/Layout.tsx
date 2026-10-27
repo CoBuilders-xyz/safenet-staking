@@ -38,7 +38,16 @@ export function Layout() {
         </div>
         <main id="main-content" className="container mx-auto max-w-5xl px-4 py-8">
           <WrongNetworkNotice />
-          <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+          {/* A full screen tall, so the footer stays below the fold until the page arrives and
+              is not pushed down by it: on a phone that push was the largest layout shift. */}
+          <Suspense
+            fallback={
+              <div className="flex min-h-dvh items-start justify-center py-20" role="status">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden="true" />
+                <span className="sr-only">Loading the page…</span>
+              </div>
+            }
+          >
             <Outlet />
           </Suspense>
         </main>

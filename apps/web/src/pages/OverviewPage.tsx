@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import { PageHero } from "@/components/PageHero"
+import { Term } from "@/components/ui/term"
 import { Button } from "@/components/ui/button"
 import { SectionBoundary } from "@/components/overview/OverviewSection"
 import {
@@ -20,7 +21,12 @@ export function OverviewPage() {
     <div className="space-y-6">
       <PageHero
         title="Network overview"
-        subtitle="The state of Safenet staking and consensus. No wallet needed."
+        subtitle={
+          <>
+            The state of <Term term="safenet">Safenet</Term> <Term term="staking">staking</Term> and consensus. No
+            wallet needed.
+          </>
+        }
       >
         <Button asChild variant="outline" className="mt-6">
           <Link to="/dashboard">Open the staking dashboard</Link>

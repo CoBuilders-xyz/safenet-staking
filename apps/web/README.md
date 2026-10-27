@@ -21,6 +21,11 @@ Safe Foundation's safenet-staking-ui; see [License](#license).
 | `/rewards` | `RewardsPage` | Your rewards, Claim, Claim & Stake, the programme totals, and the root on chain checked against SEF's published one |
 | `*` | `NotFoundPage` | 404 |
 
+Terms are explained where they appear: a dotted-underlined word opens its explanation on hover,
+focus or a tap (`Term`, from `src/lib/glossary.ts`). Before a stake goes to the wallet, "What
+happens if" answers five questions: getting the SAFE back, switching validators, a drop in
+participation, something going wrong, and lower rewards.
+
 The router is `HashRouter` (`src/App.tsx`), so every path is served from one `index.html`
 under `#/`, which a static host and an IPFS gateway can both serve.
 
@@ -110,6 +115,8 @@ The release build reads none of this. It reads [`build.env`](build.env) only; se
 | `generate:proofs` | Builds a reward Merkle tree and its files; see [Reward proofs](#reward-proofs) |
 | `release:build` | The reproducible production build from `build.env`, packed into `release/app.car` with its root CID in `release/CID`; see [Deployment](#deployment) |
 | `release:pin` | Pins `release/app.car` to Pinata and checks that the gateways serve it |
+| `budget:bundle` | Checks a built `dist/` against the bundle limits in `performance-budget.json`; `release:build` runs it |
+| `budget:lighthouse` | Lighthouse mobile on a built `dist/`, three runs per route, checked against the rest of the budget; see [`PERFORMANCE.md`](./PERFORMANCE.md) |
 
 The root also has `pnpm test:e2e`, `pnpm test:fork`, `pnpm fork:up`, `pnpm fork:reset` and
 `pnpm fork:down`, which run the same scripts.
@@ -125,7 +132,8 @@ See [`MANUAL_TESTING.md`](./MANUAL_TESTING.md) for the pre-release manual checkl
   listening there. An injected test wallet answers from a mocked RPC, and the subgraphs, SEF's
   files and the gateways are mocked too, so the suite needs no network and no secret. It proves
   the interface behaves, not that a transaction works. The Safe App and WalletConnect are only
-  smoke-tested there.
+  smoke-tested there. `e2e/tests/accessibility.spec.ts`, in the same suite, runs axe against
+  WCAG 2.2 AA on every route; see [`ACCESSIBILITY.md`](./ACCESSIBILITY.md).
 - **Fork**: below.
 
 ### Fork suite

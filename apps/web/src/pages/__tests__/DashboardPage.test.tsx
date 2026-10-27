@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { DashboardPage } from "../DashboardPage"
 
+// The terms render as their words here; Term has its own tests.
+vi.mock("@/components/ui/term", () => ({ Term: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
+
 // Mock all child components to isolate page-level rendering
 vi.mock("@/components/dashboard/StatsOverview", () => ({
   StatsOverview: () => <div data-testid="stats-overview">StatsOverview</div>,
@@ -23,7 +26,7 @@ vi.mock("@/components/PageHero", () => ({
   PageHero: (props: Record<string, unknown>) => (
     <div data-testid="page-hero">
       <h1>{String(props.title)}</h1>
-      <p>{String(props.subtitle)}</p>
+      <p>{props.subtitle as React.ReactNode}</p>
     </div>
   ),
 }))

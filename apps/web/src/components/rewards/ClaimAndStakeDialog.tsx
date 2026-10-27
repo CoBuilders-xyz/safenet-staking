@@ -271,7 +271,8 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
                   : "Your rewards are claimed and in your wallet. Their amount could not be read from the transaction receipt, so enter the amount to stake."}
               </p>
             )}
-            <ValidatorSelect value={validator} onChange={setValidator} disabled={form.isBusy} />
+            {/* The review names the validator; it is chosen before it. */}
+            {!form.reviewing && <ValidatorSelect value={validator} onChange={setValidator} disabled={form.isBusy} />}
             <StakeForm
               form={form}
               maxLabel="Claimed"
