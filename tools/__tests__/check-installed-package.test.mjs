@@ -40,7 +40,7 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
 `
 
 /** Installs the fake package of `kind` into a fresh directory and runs the check there. */
-function check(kind, { mode = "ok", rpc = "https://rpc.invalid/secret-key" } = {}) {
+function check(kind, { mode = "ok", rpc = "https://rpc.invalid/secret-key", executable = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "check-installed-"))
   try {
     const name = kind === "cli" ? "safenet-cli" : "safenet-mcp"
@@ -49,7 +49,7 @@ function check(kind, { mode = "ok", rpc = "https://rpc.invalid/secret-key" } = {
     mkdirSync(join(dir, "node_modules/.bin"), { recursive: true })
     writeFileSync(join(dir, "node_modules/@cobuilders", name, "package.json"), JSON.stringify({ version: "1.2.3" }))
     writeFileSync(join(dir, "node_modules/.bin", bin), kind === "cli" ? FAKE_CLI : FAKE_MCP)
-    chmodSync(join(dir, "node_modules/.bin", bin), 0o755)
+    chmodSync(join(dir, "node_modules/.bin", bin), executable ? 0o755 : 0o644)
     const summary = join(dir, "summary.md")
     const { MAINNET_RPC_URL: _, ...env } = process.env
     const run = spawnSync(process.execPath, [SCRIPT, kind, dir], {
@@ -107,4 +107,14 @@ test("a server that exits at start fails the check with its first line on stderr
   const { status, output } = check("mcp", { mode: "exit" })
   assert.equal(status, 1)
   assert.match(output, /FAIL {2}initialize: the server exited 2: not started: a setting is wrong\./)
+})
+
+test("a binary that cannot start fails each tool with a FAIL line and a summary, not a crash", () => {
+  for (const kind of ["cli", "mcp"]) {
+    const { status, output, summary } = check(kind, { executable: false })
+    assert.equal(status, 1, output)
+    assert.match(output, kind === "cli" ? /FAIL {2}safenet --help: exit null: .*EACCES/ : /FAIL {2}initialize: the server exited null: .*EACCES/)
+    assert.doesNotMatch(output, /at .*check-installed-package\.mjs/)
+    assert.match(summary, /\*\*fail\*\*/)
+  }
 })

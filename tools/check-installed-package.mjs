@@ -110,7 +110,16 @@ async function checkMcp(env) {
       waiting.get(msg.id)?.(msg)
     }
   })
-  const exited = new Promise((resolve) => child.on("close", (code) => resolve(code)))
+  // A binary that cannot start, such as a broken `bin` link, emits `error` and never `close`. A
+  // write to a server that has exited fails on stdin. Either becomes a failed check, not a crash.
+  const exited = new Promise((resolve) => {
+    child.on("close", (code) => resolve(code))
+    child.on("error", (err) => {
+      stderr += err.message
+      resolve(null)
+    })
+  })
+  child.stdin.on("error", () => {})
   const send = (msg) => child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...msg })}\n`)
   const request = (id, method, params) =>
     Promise.race([
