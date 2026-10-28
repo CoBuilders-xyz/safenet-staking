@@ -64,7 +64,8 @@ export function rewardsHistorySummary(h: RewardsHistory): string {
       ? ` ${plural(h.periods.periods.length, "distribution period")} from the subgraph at block ${h.periods.subgraph.block}; ` +
         (h.periods.allMatch
           ? "each matches cumulativeClaimed on chain at its last block."
-          : "at least one differs from cumulativeClaimed on chain at its last block.")
+          : "at least one differs from cumulativeClaimed on chain at its last block.") +
+        " Claim attribution uses approximate block windows; all update-block claims enter the new window, including earlier claims."
       : ` No periods: ${h.periodsReason ?? "the subgraph gave none"}.`)
 }
 

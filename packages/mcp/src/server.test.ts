@@ -319,7 +319,8 @@ test("the rewards_history summary says how many periods the subgraph gave, and w
   const s = await connect(WRITES_OFF)
   const r = await s.call("rewards_history", { address: STAKER })
   assert.match(textOf(r),
-    new RegExp(`2 distribution periods from the subgraph at block ${BLOCK}; each matches cumulativeClaimed on chain at its last block\\.$`, "m"))
+    new RegExp(`2 distribution periods from the subgraph at block ${BLOCK}; each matches cumulativeClaimed on chain at its last block\\.`, "m"))
+  assert.match(textOf(r), /Claim attribution uses approximate block windows; all update-block claims enter the new window, including earlier claims\./)
   await s.close()
 
   const down = fakeLibrary({

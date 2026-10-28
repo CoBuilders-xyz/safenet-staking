@@ -15,7 +15,7 @@ async function history(options: FakeOptions = {}, ...extra: string[]) {
 }
 
 interface Periods {
-  subgraph: { block: string; stale: boolean }
+  subgraph: { block: string; stale: boolean; source: string }
   allMatch: boolean
   periods: {
     period: number; endBlock: string; current: boolean; claims: number; claimed: string
@@ -30,6 +30,7 @@ test("each period gives this address's claims in it, and its cumulative claimed 
   assert.equal(h.periodsReason, null)
   assert.equal(h.periods.subgraph.block, String(BLOCK))
   assert.equal(h.periods.allMatch, true)
+  assert.match(h.periods.subgraph.source, /approximate block-window claim attribution/)
   assert.deepEqual(h.periods.periods.map((p) => ({ ...p, root: undefined, setAt: undefined })), [
     {
       period: 1, root: undefined, setAt: undefined, endBlock: String(BLOCK - 5n), current: false, claims: 1, claimed: String(6n * SAFE),
@@ -49,6 +50,21 @@ test("the chain is read at each period's last block, not at the head", async () 
   assert.equal(first.cumulativeAtEnd.chain, String(6n * SAFE))
 })
 
+test("reversed same-block claims use the final cumulative amount regardless of query tie order", async () => {
+  // Both claims surround a root update in one block. Block ordering may return 10 before 6.
+  const r = await history({ subgraph: "same-block-reversed" }, "--json")
+  assert.equal(r.code, 0, r.err)
+  const h = JSON.parse(r.out) as { periods: Periods; sumMatchesChain: boolean }
+  assert.equal(h.sumMatchesChain, true)
+  assert.equal(h.periods.allMatch, true)
+  assert.deepEqual(h.periods.periods.map((p) => p.cumulativeAtEnd), [
+    { subgraph: "0", chain: "0", match: true },
+    { subgraph: String(10n * SAFE), chain: String(10n * SAFE), match: true },
+  ])
+  // Block windows place both claims in the new period, without resolving event order.
+  assert.deepEqual(h.periods.periods.map((p) => [p.claims, p.claimed]), [[0, "0"], [2, String(10n * SAFE)]])
+})
+
 test("the text shows a row per period, newest first, and says every period matched", async () => {
   const r = await history()
   assert.equal(r.code, 0, r.err)
@@ -58,6 +74,7 @@ test("the text shows a row per period, newest first, and says every period match
   assert.match(rows[0]!, /^ +2 .*26,000,000 \(current\) +1 +4 SAFE +10 SAFE +10 SAFE +match$/)
   assert.match(rows[1]!, /^ +1 .*25,999,995 +1 +6 SAFE +6 SAFE +6 SAFE +match$/)
   assert.match(r.out, /Every period: the subgraph's cumulative claimed equals MerkleDrop\.cumulativeClaimed\(address\) on chain at the period's last block\./)
+  assert.match(r.out, /CLAIMS and CLAIMED use approximate block windows\./)
 })
 
 test("a subgraph that differs from the chain at the same block is flagged, in the period and overall", async () => {

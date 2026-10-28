@@ -2,8 +2,10 @@
  * An address's rewards per distribution period, from the Mainnet subgraph, each period checked
  * against the chain at the same block.
  *
- * A period is the time one Merkle root was current: from the block of its MerkelRootUpdated event
- * to the block before the next one, or to the subgraph's head for the current root. For each, the
+ * A period row approximates root lifetime with whole blocks: from its MerkelRootUpdated block
+ * to the block before the next update, or to the subgraph's head for the current root.
+ * The schema has no root-update log index, so claims before an update in its block also enter
+ * the new period's window. These are block windows, not exact event-order attribution. For each, the
  * subgraph gives this address's claims in it, and its cumulative claimed at the period's last
  * block, the running total of its RewardClaim entities. The chain gives
  * `cumulativeClaimed(address)` at that same block. The two must be equal.
@@ -23,10 +25,10 @@ export interface RewardPeriod {
   readonly root: Hex
   /** The distribution: the block, time and transaction of the root update. */
   readonly setAt: { readonly block: bigint; readonly time: Date; readonly transaction: Hash }
-  /** The last block this root was current, or the subgraph's head for the current root. */
+  /** Last block of this window; the next update block minus one, or the indexed head. */
   readonly endBlock: bigint
   readonly current: boolean
-  /** This address's claims while the root was current. */
+  /** This address's claims in the whole-block window; update-block event order is unresolved. */
   readonly claims: number
   readonly claimed: bigint
   /** This address's cumulative claimed at endBlock, by the subgraph and by the chain. */
@@ -123,7 +125,9 @@ export async function readRewardPeriods(ctx: Context, address: Address): Promise
       current: !next,
       claims: inPeriod.length,
       claimed: inPeriod.reduce((a, c) => a + c.amount, 0n),
-      subgraph: before.at(-1)?.cumulative ?? 0n,
+      // handleClaimed adds each uint256 payment to the account's running total. It never
+      // decreases, so the maximum is the end-block value even when block-number ties reverse.
+      subgraph: before.reduce((max, c) => c.cumulative > max ? c.cumulative : max, 0n),
     }
   })
 
@@ -146,7 +150,7 @@ export async function readRewardPeriods(ctx: Context, address: Address): Promise
       block: head,
       time: headTime,
       stale,
-      source: "subgraph: safenet-mainnet RewardPeriod and RewardClaim; chain: MerkleDrop.cumulativeClaimed(address) at each period's last block",
+      source: "subgraph: safenet-mainnet RewardPeriod and RewardClaim, with approximate block-window claim attribution; chain: MerkleDrop.cumulativeClaimed(address) at each period's last block",
     },
     periods,
     allMatch: periods.every((p) => p.cumulativeAtEnd.match),

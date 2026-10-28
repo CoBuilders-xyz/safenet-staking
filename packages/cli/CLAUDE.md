@@ -110,8 +110,11 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
 - `rewards history`'s periods come from the Mainnet subgraph, `src/lib/reward-periods.ts`: every
   query pinned to the block `_meta` gives, and for each period the subgraph's cumulative claimed
   for the address at the period's last block against `cumulativeClaimed()` on chain at that same
-  block. A period's claimed figure is what the address claimed while that root was current; what
-  it paid out is in SEF's files, not on chain. When the subgraph cannot answer, `periods` is null
+  block. Claim attribution uses approximate whole-block windows: root-update block through the
+  block before the next update, or the indexed head. Update-block claims enter the new window,
+  including claims before the update. The schema has no root-update log index. Cumulative
+  comparisons stay exact at each window's last block. Period earnings come from SEF's files.
+  When the subgraph cannot answer, `periods` is null
   with `periodsReason`, and the claims, read from the chain, still print. The endpoint is
   `SUBGRAPH_URL_MAINNET` when set, else core's `SUBGRAPH_ENDPOINTS.mainnet`, and is never printed.
 - Amounts print exactly, to the last wei. `--json` gives the same fields, with amounts as wei in

@@ -132,7 +132,8 @@ export function renderPeriods(h: RewardsHistory): string {
       "the subgraph and the chain differ at the same block."
   return [
     head, "", table, "", verdict,
-    "A period's CLAIMED is what this address claimed while that root was current. What a period paid out is in SEF's files, not on chain.",
+    "CLAIMS and CLAIMED use approximate block windows. All claims in a root-update block enter the new window, including earlier claims.",
+    "Cumulative comparisons are exact at each window's last block. Period earnings come from SEF's files.",
     `Source: ${p.subgraph.source}.`,
   ].join("\n")
 }

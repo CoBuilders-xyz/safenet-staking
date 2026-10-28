@@ -70,8 +70,8 @@ export interface FakeOptions {
   readonly datasetMissing?: boolean
   /** The status the repository answers for its reward files, when not 200. */
   readonly repositoryStatus?: number
-  /** The Mainnet subgraph: answers, is down, or reports a cumulative that differs from the chain. */
-  readonly subgraph?: "down" | "differs"
+  /** Subgraph failure, mismatch, or two claims tied by block number in reversed event order. */
+  readonly subgraph?: "down" | "differs" | "same-block-reversed"
 }
 
 /** A made-up ENS resolver. */
@@ -114,7 +114,7 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
     totalValidatorStakes: ([a]) => (a === VALIDATOR_A ? 200n * SAFE : 100n * SAFE),
     stakes: () => 1n * SAFE,
     // The two Claimed logs below: 6 SAFE at BLOCK - 5, then 4 SAFE at BLOCK - 4.
-    cumulativeClaimed: (_, b) => (b === undefined || b >= BLOCK - 4n ? 10n * SAFE : b >= BLOCK - 5n ? 6n * SAFE : 0n),
+    cumulativeClaimed: (_, b) => (b === undefined || b >= BLOCK - 4n ? 10n * SAFE : b >= BLOCK - 5n && o.subgraph !== "same-block-reversed" ? 6n * SAFE : 0n),
     getPendingWithdrawals: () => [
       { amount: 5n * SAFE, claimableAt: BLOCK_TIME - 60n },
       { amount: 2n * SAFE, claimableAt: BLOCK_TIME + 90_000n },
@@ -224,7 +224,12 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
             : []),
         ]
         case "WithdrawalClaimed": return [log({ staker: STAKER, withdrawalId: 2n, amount: 3n * SAFE }, 3)]
-        case "Claimed": return [log({ account: STAKER, amount: 4n * SAFE }, 4), log({ account: STAKER, amount: 6n * SAFE }, 5)]
+        case "Claimed": return [
+          { ...log({ account: STAKER, amount: 4n * SAFE }, 4),
+            ...(o.subgraph === "same-block-reversed" ? { logIndex: 2 } : {}) },
+          { ...log({ account: STAKER, amount: 6n * SAFE }, 5),
+            ...(o.subgraph === "same-block-reversed" ? { blockNumber: BLOCK - 4n } : {}) },
+        ]
         default: return []
       }
     },
@@ -289,13 +294,14 @@ function fakeSubgraph(o: FakeOptions, body: string): Response {
     period: n, root: fakeRoot(0x200 + n), blockNumber: String(block), timestamp: String(BLOCK_TIME - (BLOCK - block) * 12n),
     transactionHash: fakeRoot(0x300 + n),
   })
+  const claims = [
+    { blockNumber: String(o.subgraph === "same-block-reversed" ? BLOCK - 4n : BLOCK - 5n), amount: String(6n * SAFE), cumulativeAmount: String(6n * SAFE) },
+    { blockNumber: String(BLOCK - 4n), amount: String(4n * SAFE), cumulativeAmount: String((o.subgraph === "differs" ? 9n : 10n) * SAFE) },
+  ]
   return json({
     data: {
       rewardPeriods: [period(1, BLOCK - 10n), period(2, BLOCK - 4n)],
-      rewardClaims: [
-        { blockNumber: String(BLOCK - 5n), amount: String(6n * SAFE), cumulativeAmount: String(6n * SAFE) },
-        { blockNumber: String(BLOCK - 4n), amount: String(4n * SAFE), cumulativeAmount: String((o.subgraph === "differs" ? 9n : 10n) * SAFE) },
-      ],
+      rewardClaims: o.subgraph === "same-block-reversed" ? claims.reverse() : claims,
     },
   })
 }
