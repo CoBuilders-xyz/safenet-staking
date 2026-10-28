@@ -1,3 +1,6 @@
+/** Preloaded beside the first page so its tooltip provider adds no later network round trip. */
+export const routeContentImport = () => import("@/components/layout/RouteContent")
+
 /** Each route's page, loaded on demand. */
 export const pageImports = {
   Overview: () => import("@/pages/OverviewPage")

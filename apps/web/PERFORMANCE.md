@@ -58,9 +58,26 @@ Initial JavaScript has 16.3 KB of headroom.
 
 Rollup explicitly splits the React runtime. It leaves other dependencies with their importers,
 so shared UI code does not eagerly load Radix dialogs and tabs through a manual UI chunk.
-The tooltip provider loads with route content after access checks. The header uses no tooltip,
+The tooltip provider preloads beside the first page while access checks run, then renders with
+route content. This avoids an extra network round trip after the gates pass. The header uses no tooltip,
 so its positioning code is not needed while the app starts. All route explanations share the
 same provider, preserving hover timing and keyboard/touch behavior.
+The document preconnects to the location service used by the access gate. Its connection can
+start before JavaScript executes; Lighthouse identified about 95 ms of potential savings.
+
+## Integrated Lighthouse measurements — 2026-10-28
+
+Release build, three mobile runs per route, median of each metric. All unchanged limits pass.
+The checks use live services, so latency varies between runs. Overview LCP is very close to
+the 4.5 s ceiling; repeat the audit before publication and keep this margin visible in review.
+
+| Route | Performance | Accessibility | Best practices | SEO | FCP | LCP | TBT | CLS |
+|---|---|---|---|---|---|---|---|---|
+| `/` | 82 | 100 | 100 | 100 | 1.97 s | 4.497 s | 77 ms | 0.000 |
+| `/#/dashboard` | 89 | 100 | 100 | 100 | 1.97 s | 3.540 s | 43 ms | 0.036 |
+| `/#/validators` | 89 | 100 | 100 | 100 | 1.82 s | 3.627 s | 74 ms | 0.000 |
+| `/#/withdrawals` | 91 | 100 | 100 | 100 | 1.82 s | 3.414 s | 56 ms | 0.029 |
+| `/#/rewards` | 89 | 100 | 100 | 100 | 1.97 s | 3.477 s | 89 ms | 0.000 |
 
 ## Earlier onboarding measurements
 

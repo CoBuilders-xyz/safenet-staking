@@ -15,12 +15,13 @@ import { useSanctionsCheck } from "@/hooks/useSanctionsCheck"
 import { useGeoblockCheck } from "@/hooks/useGeoblockCheck"
 import { useWalletSanctionsCheck } from "@/hooks/useWalletSanctionsCheck"
 import { useToast } from "@/hooks/useToast"
-import { pageImports, routeImportFor } from "@/routes"
+import { pageImports, routeImportFor, routeContentImport } from "@/routes"
 import Loader2 from "lucide-react/dist/esm/icons/loader-2"
 
 // The first page's code loads while the gates are still answering, rather than after them.
 // Only code: nothing renders until every gate is open.
 void routeImportFor(window.location.hash)()
+void routeContentImport()
 
 const OverviewPage = lazy(pageImports.Overview)
 const DashboardPage = lazy(pageImports.Dashboard)

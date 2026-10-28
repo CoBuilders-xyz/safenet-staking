@@ -4,9 +4,10 @@ import { Header } from "./Header"
 import { Footer } from "./Footer"
 import { WrongNetworkNotice } from "@/components/WrongNetworkNotice"
 import Loader2 from "lucide-react/dist/esm/icons/loader-2"
+import { routeContentImport } from "@/routes"
 
 // Explanations belong to route content. Keep their positioning code out of startup.
-const RouteContent = lazy(() => import("./RouteContent"))
+const RouteContent = lazy(routeContentImport)
 
 const tickStyle = {
   background: `repeating-linear-gradient(

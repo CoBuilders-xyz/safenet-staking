@@ -66,7 +66,7 @@ TanStack Query, Radix UI, graphql-request and Recharts.
 `initI18n()` loads the selected catalogue before rendering. Then `StrictMode` → `WagmiProvider` (`reconnectOnMount={false}`) → `QueryClientProvider` →
 `ToastProvider` → `App`
 
-`Layout` loads `RouteContent` on demand after access checks. It wraps the route outlet in
+`RouteContent` preloads alongside the first page while access checks run; `Layout` renders it after they pass. It wraps the route outlet in
 `TooltipProvider`, keeping tooltip positioning code out of the initial entry bundle.
 
 ### Languages (`src/i18n/`)
