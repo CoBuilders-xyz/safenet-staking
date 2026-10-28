@@ -29,6 +29,7 @@ function day(offset: number, attestations: number, ceremonies: number, buckets: 
 function query(overrides: Partial<ConsensusWindowQuery> = {}): ConsensusWindowQuery {
   return {
     _meta: { block: { number: 1, timestamp: TODAY }, hasIndexingErrors: false },
+    programmeConsensus: [{ validatorCount: 2, validators: [{ id: A }, { id: B }] }],
     firstDay: [{ date: TODAY - 3 * DAY }],
     consensusDays: [
       day(-3, 100, 10), // the first indexed day: partial, dropped
@@ -100,6 +101,28 @@ describe("deriveConsensusWindow", () => {
     expect(p.get(B)?.rate).toBeCloseTo(1 / 3, 9)
   })
 
+  it("retains a programme validator with no daily attendance rows", () => {
+    const w = deriveConsensusWindow(query({
+      validatorDays: query().validatorDays.filter((v) => v.validator.id === A),
+    }), NOON)!
+    expect(w.participation?.get(B)).toEqual({ rate: 0, attended: 0n, absences: 900n })
+  })
+
+  it("does not invent zero attendance when programme membership is incomplete", () => {
+    expect(deriveConsensusWindow(query({ programmeConsensus: [] }), NOON)!.participation).toBeUndefined()
+    expect(deriveConsensusWindow(query({
+      programmeConsensus: [{ validatorCount: 3, validators: [{ id: A }, { id: B }] }],
+    }), NOON)!.participation).toBeUndefined()
+  })
+
+  it("averages one active day and thirteen silent days over fourteen calendar days", () => {
+    const w = deriveConsensusWindow(query({
+      firstDay: [{ date: TODAY - 15 * DAY }], consensusDays: [day(-1, 100, 100)], validatorDays: [],
+    }), NOON)!
+    expect(w.days).toBe(14)
+    expect(w.attestationsPerDay).toEqual({ mean: 7, min: 0, max: 100 })
+  })
+
   it("keeps at most the window's number of days", () => {
     const many = Array.from({ length: 20 }, (_, i) => day(-20 + i, 1000 + i, 100))
     const w = deriveConsensusWindow(query({ firstDay: [{ date: TODAY - 30 * DAY }], consensusDays: many }), NOON)!
@@ -127,7 +150,7 @@ describe("deriveConsensusWindow", () => {
     ]
     const p = deriveConsensusWindow(query({ validatorDays: rows }), NOON)!.participation!
     expect(p.get(A)?.attended).toBe(900n)
-    expect(p.has(B)).toBe(false)
+    expect(p.get(B)).toEqual({ rate: 0, attended: 0n, absences: 900n })
   })
 
   it("ends at the last day the subgraph holds, so a network that stopped keeps its figures", () => {
@@ -184,13 +207,14 @@ describe("the window at the end of Beta", () => {
     expect(describesBeta(w.lastCeremonyDay, "beta")).toBe(true)
   })
 
-  it("counts only consecutive calendar days: a day with no row inside them is not counted", () => {
+  it("counts silent calendar days inside the indexed window as zero", () => {
     // Rows a week apart: the 14 calendar days ending on the newest row hold only two of them.
     const sparse = [34, 27, 20, 13, 6].map((n) => row(END - n * DAY, 3000))
     const w = deriveConsensusWindow(query({ firstDay: [{ date: END - 60 * DAY }], validatorDays: [], consensusDays: sparse }), checked)!
-    expect(w.from).toBe(END - 13 * DAY)
+    expect(w.from).toBe(END - 19 * DAY)
     expect(w.to).toBe(END - 6 * DAY)
-    expect(w.days).toBe(2)
+    expect(w.days).toBe(14)
+    expect(w.attestationsPerDay).toEqual({ mean: 429, min: 0, max: 3000 })
   })
 
   it("keeps Aegis days once the subgraph indexes the Aegis contracts", () => {

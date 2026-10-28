@@ -229,11 +229,12 @@ export const NEEDS_PROGRAMMES = "rows filed under their programme are needed to 
 /**
  * Whether a subgraph error says a `programme` filter is not in the schema: a Gnosis deployment
  * built before it indexed two programmes. Its rows mix nothing, but nothing says which programme
- * they are, so they are not summed. graph-node words it "Invalid value provided for argument
- * `where`" and quotes the filter, as version edc2588 answered on 2026-10-27.
+ * they are, so they are not summed. Only the programme-only probe is unambiguous: a mixed
+ * filter can be invalid because of its hour or id fields. Match the exact graph-node error
+ * from that probe, as version edc2588 answered on 2026-10-27. Other errors must fail.
  */
 export function lacksProgrammes(message: string): boolean {
-  return /Invalid value provided for argument `where`: .*"programme"/.test(message)
+  return /^(?:the gnosis subgraph: )?Invalid value provided for argument `where`: Object\(\{"programme": String\("(?:beta|aegis)"\)\}\)$/.test(message)
 }
 
 /** One ConsensusHour row, as the Gnosis subgraph returns it. See its schema. */

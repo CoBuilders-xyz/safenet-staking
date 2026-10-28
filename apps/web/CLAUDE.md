@@ -171,6 +171,13 @@ selects `_meta`, so each answer carries its last indexed block and age; an answe
 the Gnosis snapshot in core. Each figure is a `Figure` (`src/lib/figure.ts`): loading, ready
 with its source, or unavailable with a reason.
 
+The Gnosis Overview reads only Aegis rows and programme membership. A known member with no
+attendance rows has zero attendance and all window ceremonies as absences. Complete calendar
+days without a bucket count as zero in the daily average. The window ends at the latest stored
+complete day and spans at most 14 days, excluding the first indexed day. Missing or incomplete
+membership never invents a participation rate. When the subgraph fails, the dated Beta snapshot
+remains visibly labelled as historical data.
+
 ### Terminology
 
 The interface says Delegate and Undelegate. The contract says stake, and so do the hooks

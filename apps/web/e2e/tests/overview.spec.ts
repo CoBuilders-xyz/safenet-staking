@@ -119,6 +119,15 @@ test.describe("Network Overview", () => {
     await expect(page.getByRole("note", { name: "Beta ended" })).toHaveCount(0)
   })
 
+  test("shows indexed zero attendance and absences without falling back to SEF", async ({ disconnectedPage: page, mockSubgraph }) => {
+    mockSubgraph.gnosisZeroAttendance = true
+    await page.goto("/")
+    const row = page.getByRole("region", { name: "Validators" }).getByRole("row").filter({ hasText: "Validator B" })
+    await expect(row).toContainText("0.00%")
+    await expect(row).toContainText("14,000")
+    await expect(row).not.toContainText("SEF file")
+  })
+
   test("shows Beta's dated figures, with the Beta notice, while the index holds no Aegis day", async ({ disconnectedPage: page, mockSubgraph }) => {
     mockSubgraph.gnosisAegis = false
     await page.goto("/")

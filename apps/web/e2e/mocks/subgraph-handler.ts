@@ -18,10 +18,11 @@ export interface MockSubgraphState {
   gnosis: SubgraphMode
   /** Whether the Gnosis subgraph holds Aegis days. False: it answers an Aegis query with no row. */
   gnosisAegis: boolean
+  gnosisZeroAttendance: boolean
 }
 
 export function createMockSubgraphState(): MockSubgraphState {
-  return { mainnet: "ok", gnosis: "ok", gnosisAegis: true }
+  return { mainnet: "ok", gnosis: "ok", gnosisAegis: true, gnosisZeroAttendance: false }
 }
 
 const SAFE = 10n ** 18n
@@ -96,10 +97,10 @@ function mainnet(operation: string, mode: SubgraphMode): unknown {
  *
  * Both carry the same daily figures, so a test reads the same numbers from either.
  */
-function gnosis(operation: string, mode: SubgraphMode, programme: unknown, aegis: boolean): unknown {
+function gnosis(operation: string, mode: SubgraphMode, programme: unknown, aegis: boolean, zeroAttendance: boolean): unknown {
   if (operation !== "ConsensusWindow") throw new Error(`no mock for gnosis ${operation}`)
   const _meta = meta(SUBGRAPH_FIGURES.gnosisBlock, mode)
-  if (programme === "aegis" && !aegis) return { _meta, firstDay: [], consensusDays: [], validatorDays: [] }
+  if (programme === "aegis" && !aegis) return { _meta, firstDay: [], programmeConsensus: [], consensusDays: [], validatorDays: [] }
   if (programme !== "aegis" && programme !== "beta") throw new Error(`no mock for the programme ${String(programme)}`)
   const today = Math.floor(Date.now() / 1000 / DAY) * DAY
   const last = programme === "aegis" ? today : utcDayMs(BETA_END_DAY) / 1000
@@ -108,6 +109,7 @@ function gnosis(operation: string, mode: SubgraphMode, programme: unknown, aegis
   const buckets = Array.from({ length: 65 }, (_, i) => (i === SUBGRAPH_FIGURES.latencyMedianBlocks ? "100" : "0"))
   return {
     _meta,
+    programmeConsensus: [{ validatorCount: 3, validators: Object.values(VALIDATORS).map((id) => ({ id })) }],
     firstDay: [{ date: dates[0] }],
     // Newest first, as the query orders them.
     consensusDays: [
@@ -123,7 +125,7 @@ function gnosis(operation: string, mode: SubgraphMode, programme: unknown, aegis
       ...strays.map((date) => ({ date, attended: "1", validator: { id: VALIDATORS.validatorA } })),
       ...[...dates].reverse().flatMap((date) => [
         { date, attended: "1000", validator: { id: VALIDATORS.validatorA } },
-        { date, attended: "990", validator: { id: VALIDATORS.validatorB } },
+        ...(zeroAttendance ? [] : [{ date, attended: "990", validator: { id: VALIDATORS.validatorB } }]),
         { date, attended: "980", validator: { id: VALIDATORS.validatorC } },
       ]),
     ],
@@ -140,7 +142,7 @@ export function createSubgraphHandler(state: MockSubgraphState) {
     }
     const { operationName, variables } = route.request().postDataJSON() as { operationName?: string; variables?: Record<string, unknown> }
     const data = chain === "gnosis"
-      ? gnosis(operationName ?? "", mode, variables?.programme, state.gnosisAegis)
+      ? gnosis(operationName ?? "", mode, variables?.programme, state.gnosisAegis, state.gnosisZeroAttendance)
       : mainnet(operationName ?? "", mode)
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data }) })
   }

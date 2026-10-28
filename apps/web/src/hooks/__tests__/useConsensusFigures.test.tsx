@@ -41,6 +41,7 @@ function window() {
   })
   return {
     _meta: meta(10, 48_600_000),
+    programmeConsensus: [{ validatorCount: 1, validators: [{ id: V }] }],
     firstDay: [{ date: today - 3 * DAY }],
     consensusDays: [day(-3, 1), day(-2, 4000), day(-1, 5000), day(0, 9)],
     validatorDays: [

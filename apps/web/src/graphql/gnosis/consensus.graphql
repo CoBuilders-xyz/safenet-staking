@@ -17,6 +17,10 @@ query ConsensusWindow($days: Int!, $until: Int!, $programme: String!) {
   _meta {
     ...GnosisFreshness
   }
+  programmeConsensus: consensuses(first: 1, where: { programme: $programme }) {
+    validatorCount
+    validators(first: 1000) { id }
+  }
   # The first day the subgraph indexed. It started during that day, so the day is partial.
   firstDay: consensusDays(first: 1, where: { programme: $programme }, orderBy: date, orderDirection: asc) {
     date

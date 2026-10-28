@@ -70,6 +70,19 @@ const PAGE = 1000
 async function windowCounts(
   endpoint: string, indexed: bigint, window: { start: Date; end: Date },
 ): Promise<{ attended: Map<string, bigint>; ceremonies: bigint } | string> {
+  // A mixed filter error cannot identify which field the schema rejected. Probe only
+  // programme first, at the same snapshot, before deciding this deployment is unsupported.
+  try {
+    await querySubgraph("gnosis", endpoint, `{
+      consensusHours(first: 1, block: { number: ${indexed} },
+        where: { programme: "${GNOSIS_INDEXED_PROGRAMME}" }) { id }
+    }`)
+  } catch (e) {
+    const message = e instanceof Error ? e.message : ""
+    if (lacksHourlyBuckets(message)) return `this deployment has no hourly buckets; ${NEEDS_HOURLY_BUCKETS}`
+    if (lacksProgrammes(message)) return `this deployment files no programme on its rows; ${NEEDS_PROGRAMMES}`
+    throw e
+  }
   const from = window.start.getTime() / 1000
   const to = window.end.getTime() / 1000
   const where = (after: string) =>
@@ -88,17 +101,12 @@ async function windowCounts(
       after = got[got.length - 1]!.id
     }
   }
-  let consensus: (ConsensusHourRow & { id: string })[]
-  let validators: (Omit<ValidatorHourRow, "validator"> & { id: string; validator: { id: string } })[]
-  try {
-    consensus = await page("consensusHours", "hour attestationCeremonies attestationCeremoniesOnTheHour")
-    validators = await page("validatorHours", "validator { id } hour attended attendedOnTheHour")
-  } catch (e) {
-    const message = e instanceof Error ? e.message : ""
-    if (lacksHourlyBuckets(message)) return `this deployment has no hourly buckets; ${NEEDS_HOURLY_BUCKETS}`
-    if (lacksProgrammes(message)) return `this deployment files no programme on its rows; ${NEEDS_PROGRAMMES}`
-    throw e
-  }
+  const consensus = await page<ConsensusHourRow & { id: string }>(
+    "consensusHours", "hour attestationCeremonies attestationCeremoniesOnTheHour",
+  )
+  const validators = await page<Omit<ValidatorHourRow, "validator"> & { id: string; validator: { id: string } }>(
+    "validatorHours", "validator { id } hour attended attendedOnTheHour",
+  )
   return participationFromHours({
     window,
     consensus,

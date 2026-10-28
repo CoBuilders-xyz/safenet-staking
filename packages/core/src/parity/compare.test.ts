@@ -265,6 +265,18 @@ test("a deployment without programmes is recognised, and other errors are not", 
   assert.equal(lacksHourlyBuckets(NO_PROGRAMMES), false)
 })
 
+test("invalid mixed filters cannot be mistaken for a missing programme field", () => {
+  for (const filter of [
+    'Object({"programme": String("aegis"), "hour_gte": String("invalid")})',
+    'Object({"hour_gte": Int(1), "id_gt": Int(2), "programme": String("aegis")})',
+  ]) {
+    const message = `the gnosis subgraph: Invalid value provided for argument \`where\`: ${filter}`
+    assert.equal(lacksProgrammes(message), false, message)
+  }
+  // A second query error also prevents an unsupported-schema classification.
+  assert.equal(lacksProgrammes(`the gnosis subgraph: ${NO_PROGRAMMES}; another query failed`), false)
+})
+
 test("another subgraph error is not mistaken for missing buckets", () => {
   assert.equal(lacksHourlyBuckets("the gnosis subgraph answered HTTP 502; check SUBGRAPH_URL_GNOSIS"), false)
   assert.equal(lacksHourlyBuckets("Type `Query` has no field `validatorHourz`"), false)

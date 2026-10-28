@@ -48,6 +48,7 @@ describe("HeadlineStats at the end of Beta", () => {
         firstDay: [{ date: END - 3 * DAY }],
         consensusDays: [day(STRAY, 1), day(END, 1210), day(END - DAY, 3367), day(END - 2 * DAY, 3284)],
         validatorDays: [],
+        programmeConsensus: [],
       },
     })
     render(<HeadlineStats />, { wrapper: queryWrapper() })
