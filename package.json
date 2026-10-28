@@ -24,6 +24,7 @@
     "check:browser": "node tools/check-browser-safety.mjs",
     "metrics": "pnpm --filter @cobuilders/safenet-core metrics",
     "test:smoke": "pnpm --filter @cobuilders/safenet-cli --filter @cobuilders/safenet-mcp test:smoke",
+    "test:smoke:web": "node tools/require-task.mjs test:smoke:web \"apps/web\" && turbo run test:smoke:web",
     "lint": "eslint . && turbo run lint",
     "graph:up": "docker compose --profile graph --env-file .env.ports --env-file .env.local up -d",
     "graph:down": "docker compose --profile graph --env-file .env.ports --env-file .env.local down -v",

@@ -37,6 +37,8 @@
     "src/i18n/languages.ts",
     "scripts/budget.ts",
     "scripts/check-budget.ts",
-    "scripts/lighthouse.ts"
+    "scripts/lighthouse.ts",
+    "scripts/availability.ts",
+    "scripts/availability-checks.ts"
   ]
 }

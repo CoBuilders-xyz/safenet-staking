@@ -60,6 +60,13 @@
         "GITHUB_TOKEN"
       ]
     },
+    "test:smoke:web": {
+      "cache": false,
+      "passThroughEnv": [
+        "PRODUCTION_URL",
+        "CI"
+      ]
+    },
     "test:parity": {
       "cache": false,
       "passThroughEnv": [

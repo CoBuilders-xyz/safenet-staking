@@ -50,6 +50,8 @@ Specific commands, only where they apply:
 | `pnpm metrics` | `packages/core` | The 24 metrics, computed against live chains and compared with SEF's published JSON. Writes `packages/core/.metrics/`, which is git-ignored | needs an archive node. With public RPC only, it stopped on a failed Mainnet log range when this file was written |
 | `pnpm check:browser` | root | `apps/web/src` reads no `process.env`, and a built bundle contains no value from `.env.local` other than the public `VITE_` ones | works, part of `check` |
 | `pnpm test:smoke` | root, `packages/cli`, `packages/mcp` | Each of the six read commands runs against Mainnet through the real entry point; the MCP server, started over stdio, answers `status` and `validators_list` | needs the archive `MAINNET_RPC_URL`; runs nightly. Skipped, with the reason, everywhere else |
+| `pnpm test:smoke:web` | root, `apps/web` | The production deployment at `PRODUCTION_URL`, in Playwright, with no wallet and no mocks: the index answers with the title, the Overview shows a total staked figure that is not "Unavailable", the validators list shows a validator, the Rewards page shows the Programme section without its load error, and `manifest.json` carries `name`, `description` and an `iconPath` that answers as an image. Fails with a message when `PRODUCTION_URL` is unset | needs `PRODUCTION_URL`; nightly in `nightly.yml`, and alone by a dispatch with `suite: web-smoke`. On 2026-10-27, 3 of 5 passed against production: the Rewards page showed its load error, and the deployed manifest had no `iconPath` yet |
+| `availability` | `apps/web`, through `pnpm --filter` | The production deployment at `PRODUCTION_URL` answers with the title of `apps/web/index.html` and serves the entry script its index names. When `deployments.json` at the root records a release, each gateway in `IPFS_GATEWAYS` serves `index.html` of the latest one with the same title. Writes a table to the job summary | needs `PRODUCTION_URL`; every six hours in `availability.yml`, and on a pull request that changes the check or `deployments.json`. The record holds the first release, pinned on 2026-10-27, and both gateways served it then |
 | `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. Playwright. Includes axe against WCAG 2.2 AA on every route; a serious or critical violation fails it (`apps/web/ACCESSIBILITY.md`) | runs; one navigation test is intermittently flaky |
 | `pnpm test:fork` | `apps/web`, `packages/cli` | Against the real contracts on an Anvil Mainnet fork at a pinned block, each effect checked by reading the chain. `apps/web`: the staking flows in the interface, in Playwright, about 1.5 minutes. `packages/cli`: the five write commands sent for real, then each with `--dry-run`, which must change nothing, in node:test; one of those tests needs no Anvil and also runs under `pnpm test`; about 20 seconds | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
 | `pnpm fork:up`, `pnpm fork:reset`, `pnpm fork:down` | root | The manual QA fork for Claim & Stake: Anvil on a fork of Mainnet at a pinned block, a test account with SAFE in its wallet and a reward to claim under a root built from every real claimer's proof at the SEF data commit core pins, and the interface, the proofs and the RPC served on one loopback origin for a browser and MetaMask. `up` is idempotent, `reset` reverts to the baseline snapshot, `down` stops only what `up` started. The guide is `docs/manual-qa-fork.md` | works; needs `anvil` and the archive `MAINNET_RPC_URL` |
@@ -61,8 +63,8 @@ Specific commands, only where they apply:
 
 `turbo run <task>` with no package implementing the task reports a success while running nothing.
 A green tick over a suite that does not exist is worse than a red one: a failure gets fixed, a
-false pass gets believed. So `test:e2e` first runs `tools/require-task.mjs`, which fails unless
-some package implements the task; it passes because `apps/web` implements it. Put the same guard
+false pass gets believed. So `test:e2e` and `test:smoke:web` first run `tools/require-task.mjs`,
+which fails unless some package implements the task; both pass because `apps/web` implements them. Put the same guard
 in front of any new root task before its first suite lands, and remove it only once the real
 suite exists, as `test:parity` did when both subgraph packages implemented it.
 
@@ -139,7 +141,9 @@ workflow `.github/workflows/subgraphs-deploy.yml`. Its `CLAUDE.md` has the slug 
 `.github/workflows/ci.yml` runs four jobs on every pull request and on every push to `main`:
 `check`, `test`, `e2e` and `verify-abis`. `nightly.yml` runs the deep ABI scan, the unit tests,
 both fork suites and the CLI and MCP smoke tests daily; all but the unit tests need the `MAINNET_RPC_URL`
-secret, and fail without it. The fork suites stay out of per-PR CI because every run reads from
+secret, and fail without it. Its `web-smoke` job runs `pnpm test:smoke:web` against the
+repository variable `PRODUCTION_URL`, and fails without it; a dispatch with `suite: web-smoke` runs
+that job alone. The fork suites stay out of per-PR CI because every run reads from
 the archive node. `security.yml` runs a
 dependency review on pull requests, skipped until the repository is public, and `pnpm audit`
 weekly. `subgraphs-deploy.yml` runs only by hand: it deploys one or both subgraphs to
@@ -150,6 +154,17 @@ because its result depends on SEF's data and the deployed subgraphs, not on the 
 `release.yml` runs on a tag `v*` or by hand: its `build` job receives no secret, builds from
 `apps/web/build.env`, packs `apps/web/release/app.car` and prints the CID; its `pin` job runs only
 from `main` or a `v*` tag, needs `PINATA_JWT` and `PINATA_GATEWAY`, and fails when they are empty.
+`availability.yml` runs the `availability` script of `apps/web` every six hours, on demand, and
+on a pull request that changes the check or `deployments.json`; it writes the table to the job summary and drives the
+second badge in `README.md`. `deployments.json` at the repository root, documented in `README.md`,
+names the releases it checks on the gateways.
+
+A red run must reach a person. When a job of `nightly.yml`, `parity.yml` or `availability.yml`
+fails, a last job `page` calls `page-on-red.yml`, which runs `tools/page-on-red.mjs` with
+`issues: write`: it opens one issue per workflow, titled "<workflow> is red" and labelled
+`ci-red`, with the run link and the failed jobs, or comments on the open one. It never closes an
+issue; a person closes it once the cause is fixed. A red availability run on a pull request does
+not page.
 
 ## What happens when you edit
 
