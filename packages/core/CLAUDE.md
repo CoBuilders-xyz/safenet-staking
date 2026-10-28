@@ -98,3 +98,8 @@ because it will never log that programme's events again and a scan from the head
    the same comparison, and it imports nothing from them; and `src/rewards-source.ts`, because
    the interface and the CLI must try SEF's reward sources in the same order. It reads the chain
    and fetches only through what its caller passes in.
+
+The metrics oracle accepts `--beta-window --days 14` for the historical Beta window ending
+at the end of `BETA_END_DAY`. Its JSON records the programme and exact timestamp/block bounds.
+Only the Gnosis participation scan moves back; Mainnet reads retain their existing publication
+comparison. Historical Beta participation is not compared with current SEF Aegis rates.

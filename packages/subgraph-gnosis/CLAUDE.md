@@ -50,20 +50,28 @@ version. A deploy retires older version labels of the slug, so the same change m
 chain's default query URL in `packages/core/src/subgraphs.ts`; the web app and the parity run
 read it from there.
 
-`metrics-poc.ts` scans Beta's contracts, so the differential compares the Beta rows, or the
-programme in `PROGRAMME`. Aegis is compared with SEF's published rates by `test:parity`. To
-compare a deployed version with the oracle, generate the oracle over the same window and point
-the differential at the query URL:
+`metrics-poc.ts` scans Beta's contracts. Use its explicit historical window for the
+Beta differential. Today's SEF participation rates describe Aegis and cannot validate Beta.
+The oracle's `--beta-window` ends at the end of `BETA_END_DAY`, from core. Generate 14 days
+against the deployment's 16 days, leaving two days for ceremonies already in progress:
 
-```
-cd packages/core && node --env-file-if-exists=../../.env.local --import tsx \
-  scripts/metrics-poc.ts --days 16 --json /tmp/oracle-16d.json
-ORACLE=/tmp/oracle-16d.json ORACLE_DAYS=16 SUBGRAPH_URL=<studio query URL> \
+```sh
+(cd packages/core && node --env-file-if-exists=../../.env.local --import tsx \
+  scripts/metrics-poc.ts --beta-window --days 14 --json /tmp/oracle-beta.json)
+ORACLE=/tmp/oracle-beta.json ORACLE_DAYS=14 SUBGRAPH_URL=<studio-query-url> \
   pnpm --filter @cobuilders/safenet-subgraph-gnosis differential
 ```
 
-The comparison only holds shortly after a deploy. Once the deployment has indexed past its
-16 days, its counts cover more than the oracle's window.
+The oracle records both timestamp and block boundaries. Its other metrics still read current
+Mainnet state; historical Beta rates are explicitly not compared with current SEF rates.
+The differential requires those boundaries and reads every hourly page at one indexed block.
+It compares exact attendance and ceremony counts inside that window, including the block at its
+end. Later Beta activity does not enter the comparison. Programme membership keeps a validator
+with zero attendance in the result. Missing history, indexing errors and incomplete membership
+fail the check. This comparison remains valid after the deployment catches up to today's head.
+
+`pnpm test:scripts` runs the offline differential regressions; `pnpm test` includes them.
+Aegis is compared with SEF's published rates by `test:parity` after its endpoint switch.
 
 ## The buckets
 
