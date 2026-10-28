@@ -11,6 +11,7 @@ import {
   readFreshness,
   type Freshness,
 } from "../subgraph"
+import { i18n } from "@/i18n"
 
 vi.mock("graphql-request", () => ({ request: (o: unknown) => mockRequest(o) }))
 
@@ -59,25 +60,25 @@ describe("formatAge", () => {
     [3 * 3600, "3 h"],
     [5 * 86_400, "5 d"],
   ])("%i seconds reads %s", (s, text) => {
-    expect(formatAge(s)).toBe(text)
+    expect(formatAge(s, i18n.t)).toBe(text)
   })
 })
 
 describe("describeDegradation", () => {
   it("gives the block and the age for a stale subgraph", () => {
-    expect(describeDegradation({ kind: "stale", freshness: { ...freshness(7200), block: 25_700_259 } })).toBe(
+    expect(describeDegradation({ kind: "stale", freshness: { ...freshness(7200), block: 25_700_259 } }, i18n.t)).toBe(
       "The subgraph's last indexed block, 25,700,259, is 2 h old, past the 15 min limit.",
     )
   })
 
   it("never says an age just past the limit equals the limit", () => {
-    expect(describeDegradation({ kind: "stale", freshness: { ...freshness(901), block: 1 } })).toBe(
+    expect(describeDegradation({ kind: "stale", freshness: { ...freshness(901), block: 1 } }, i18n.t)).toBe(
       "The subgraph's last indexed block, 1, is 15 min 1 s old, past the 15 min limit.",
     )
   })
 
   it("says when no endpoint is configured", () => {
-    expect(describeDegradation({ kind: "unconfigured" })).toBe("No subgraph endpoint is configured for this build.")
+    expect(describeDegradation({ kind: "unconfigured" }, i18n.t)).toBe("No subgraph endpoint is configured for this build.")
   })
 })
 

@@ -49,6 +49,7 @@ describe("useGeoblockCheck", () => {
 
       expect(result.current.isLoading).toBe(false)
       expect(result.current.allowed).toBe(true)
+      expect(result.current.restriction).toBeUndefined()
     })
 
     it("returns allowed=false for blocked country (Iran)", () => {
@@ -61,6 +62,7 @@ describe("useGeoblockCheck", () => {
       const { result } = renderHook(() => useGeoblockCheck())
 
       expect(result.current.allowed).toBe(false)
+      expect(result.current.restriction).toEqual({ gate: "geoblock", reason: "region", country: "IR" })
     })
 
     it("returns allowed=false for blocked country (Russia)", () => {
@@ -85,6 +87,7 @@ describe("useGeoblockCheck", () => {
       const { result } = renderHook(() => useGeoblockCheck())
 
       expect(result.current.allowed).toBe(false)
+      expect(result.current.restriction).toEqual({ gate: "geoblock", reason: "unavailable" })
     })
   })
 

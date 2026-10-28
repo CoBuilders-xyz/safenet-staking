@@ -31,6 +31,34 @@ export function safeParseEther(amount: string): bigint {
 }
 
 /**
+ * An amount the interface fills in rather than the user types: what a claim paid, or a MAX or
+ * percentage shortcut. Its text is rounded down to `maxDecimals`, so a claim of
+ * 12.345678901234567891 SAFE reads 12.3456, and while the text is unchanged `parseAmount` returns
+ * the exact value, so the transaction sends every wei. An amount the rounding would show as 0
+ * keeps all its decimals.
+ */
+export interface PresetAmount {
+  text: string
+  value: bigint
+}
+
+export function presetAmount(value: bigint, maxDecimals = 4): PresetAmount {
+  const rounded = formatTokenAmountRaw(value, 18, maxDecimals)
+  const text = value > 0n && safeParseEther(rounded) === 0n ? formatTokenAmountRaw(value, 18, 18) : rounded
+  return { text, value }
+}
+
+/** The amount in wei: the preset's exact value while the text is still its text, else the text parsed. */
+export function parseAmount(text: string, preset?: PresetAmount): bigint {
+  return preset !== undefined && text === preset.text ? preset.value : safeParseEther(text)
+}
+
+/** True when the preset's text hides decimals of its value. */
+export function isRounded(preset: PresetAmount): boolean {
+  return safeParseEther(preset.text) !== preset.value
+}
+
+/**
  * A participation rate for display: a percentage with two decimals.
  *
  * Rounded, like any figure, unless the validator missed a ceremony. Then the value is floored,
@@ -60,6 +88,21 @@ export function formatCountdown(seconds: number): string {
   if (h > 0) return `${h}h ${m}m ${s}s`
   if (m > 0) return `${m}m ${s}s`
   return `${s}s`
+}
+
+/** A duration in words, largest units first, zero parts left out: 172800 reads "2 days". */
+export function formatDuration(seconds: number, locale = "en"): string {
+  if (seconds <= 0) return "no time"
+  const parts: [number, string][] = [
+    [Math.floor(seconds / 86400), "day"],
+    [Math.floor((seconds % 86400) / 3600), "hour"],
+    [Math.floor((seconds % 3600) / 60), "minute"],
+    [seconds % 60, "second"],
+  ]
+  return parts
+    .filter(([n]) => n > 0)
+    .map(([n, unit]) => new Intl.NumberFormat(locale, { style: "unit", unit, unitDisplay: "long" }).format(n))
+    .join(" ")
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]

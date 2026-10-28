@@ -5,6 +5,11 @@ import { answerOperations, meta, mockRequest, queryWrapper } from "@/__tests__/s
 import { HeadlineStats } from "../overview/OverviewSections"
 
 vi.mock("graphql-request", () => ({ request: (o: unknown) => mockRequest(o) }))
+// The state these tests describe: the Gnosis figures come from Beta's rows. Core names Aegis.
+vi.mock("@cobuilders/safenet-core", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@cobuilders/safenet-core")>()),
+  GNOSIS_INDEXED_PROGRAMME: "beta",
+}))
 vi.mock("@/hooks/useNetworkTotals", () => ({
   useNetworkTotals: () => ({ totalStaked: { state: "loading" }, validatorCounts: { state: "loading" } }),
 }))
@@ -43,6 +48,7 @@ describe("HeadlineStats at the end of Beta", () => {
         firstDay: [{ date: END - 3 * DAY }],
         consensusDays: [day(STRAY, 1), day(END, 1210), day(END - DAY, 3367), day(END - 2 * DAY, 3284)],
         validatorDays: [],
+        programmeConsensus: [],
       },
     })
     render(<HeadlineStats />, { wrapper: queryWrapper() })

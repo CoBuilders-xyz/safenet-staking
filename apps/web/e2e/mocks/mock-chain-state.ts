@@ -79,6 +79,10 @@ export interface MockChainState {
   failingGateways: string[]
   /** When true, every request to SEF's repository fails, as if it were blocked. */
   repositoryDown: boolean
+  /** What the sanctions oracle's isSanctioned answers for the test user. "error" fails the call. */
+  walletSanctioned: boolean | "error"
+  /** The sanctions endpoint (VITE_SANCTIONS_API_URL): 200, 403, or a failed request. */
+  sanctionsApi: "allow" | "refuse" | "fail"
 }
 
 export interface MockChainStateOverrides {
@@ -123,6 +127,8 @@ export function createMockChainState(overrides: MockChainStateOverrides = {}): M
     ensContenthash: "0x",
     failingGateways: [],
     repositoryDown: false,
+    walletSanctioned: false,
+    sanctionsApi: "allow",
   }
 }
 

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { useTranslation } from "react-i18next"
 import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { Figure, FigureSource } from "@/lib/figure"
@@ -20,13 +21,14 @@ interface StatProps<T> {
  * reader could take for a value.
  */
 export function Stat<T>({ label, figure, format, detail, source, tone = "default" }: StatProps<T>) {
+  const { t } = useTranslation()
   return (
     <Card role="group" aria-label={label} className="flex min-h-[132px] flex-col gap-2 p-5">
       <div className="text-xs uppercase tracking-[0.06em] text-faint">{label}</div>
-      {figure.state === "loading" && <Skeleton className="h-9 w-32" aria-label={`Loading ${label}`} />}
+      {figure.state === "loading" && <Skeleton className="h-9 w-32" aria-label={t("overview.figure.loadingLabel", "Loading {{label}}", { label })} />}
       {figure.state === "unavailable" && (
         <>
-          <div className="font-mono text-2xl tracking-tight">Unavailable</div>
+          <div className="font-mono text-2xl tracking-tight">{t("overview.figure.unavailable", "Unavailable")}</div>
           <div className="text-xs leading-snug text-muted-foreground">{figure.reason}</div>
         </>
       )}

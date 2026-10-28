@@ -37,6 +37,11 @@ export interface SefNetworkInfo {
    * is exact to the wei. Parse it with `parseSefAmount`: `Number()` rounds it.
    */
   total_staked_amount: string
+  /**
+   * Per programme, from its deployment. On Beta, the TransactionProposed logs of the consensus
+   * contract. On Aegis, per SEF's README at 1c18bdc, the SentinelOracle requests with at least one
+   * `Revealed`, each counted once. SEF keeps Beta's final value under the git tag `beta-final`.
+   */
   total_transactions_checked: number
 }
 
@@ -175,12 +180,12 @@ export type ProgrammePhase = "beta" | "gap" | "aegis"
 export type Programme = Exclude<ProgrammePhase, "gap">
 
 /**
- * The programme whose contracts packages/subgraph-gnosis indexes. Every ConsensusDay and
- * ValidatorDay row comes from these contracts, so a row dated outside the programme is a stray
- * on a closed contract, not a day of the network. The change that indexes the Aegis contracts
- * moves this.
+ * The programme the Gnosis figures describe. packages/subgraph-gnosis indexes both programmes and
+ * files every row under one, and the interface and the parity run read this programme's rows.
+ * It moves together with the default Gnosis endpoint in subgraphs.ts: a deployment that does not
+ * file its rows by programme indexes Beta only.
  */
-export const GNOSIS_INDEXED_PROGRAMME: Programme = "beta"
+export const GNOSIS_INDEXED_PROGRAMME: Programme = "aegis"
 
 /**
  * The UTC day from which a programme is closed, for each programme that has ended. A programme
@@ -213,3 +218,14 @@ export function programmePhase(at: Date): ProgrammePhase {
   if (day >= utcDayMs(AEGIS_START_DAY)) return "aegis"
   return "gap"
 }
+
+/**
+ * SEF's documentation pages the interface links to. Checked on 2026-10-27: each answers 200. The
+ * FAQ and the rewards page moved under the Aegis section; their former addresses under /safenet/
+ * answer 404.
+ */
+export const SEF_DOCS = {
+  home: "https://docs.safefoundation.org/safenet/",
+  faq: "https://docs.safefoundation.org/safenet-aegis/resources/faqs",
+  rewards: "https://docs.safefoundation.org/safenet-aegis/staking/rewards",
+} as const

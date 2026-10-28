@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { usePublicClient, useAccount } from "wagmi"
 import { formatEther, type Address, encodeFunctionData } from "viem"
-import { stakingAbi } from "@/abi/stakingAbi"
+import { stakingAbi } from "@cobuilders/safenet-core"
 import { getContractAddresses } from "@/config/contracts"
 import { activeChain } from "@/config/chains"
 

@@ -12,7 +12,3 @@ export function withShares<T extends { stake: bigint }>(rows: readonly T[]): (T 
 export function hhi(rows: readonly { share: number }[]): number {
   return Math.round(rows.reduce((sum, r) => sum + (r.share * 100) ** 2, 0))
 }
-
-/** The one-line definition shown next to the index. Kept here so the screen and its tests agree. */
-export const HHI_DEFINITION =
-  "The sum of each validator's squared percentage share: 10,000 if one validator held all stake, 10,000 ÷ n for n equal validators."

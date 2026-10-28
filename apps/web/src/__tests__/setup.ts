@@ -1,6 +1,17 @@
 import "@testing-library/jest-dom/vitest"
 import { afterEach, vi } from "vitest"
 import { cleanup } from "@testing-library/react"
+import { i18n, initI18n } from "@/i18n"
+import { LANGUAGE_STORAGE_KEY } from "@/i18n/languages"
+
+// Every test starts in English, the catalogue in the bundle. jsdom's navigator says en-US, so
+// detection picks English; a test that switches language is put back here.
+if (typeof document !== "undefined") await initI18n()
+afterEach(async () => {
+  if (typeof localStorage === "undefined") return
+  localStorage.removeItem(LANGUAGE_STORAGE_KEY)
+  if (i18n.language !== "en") await i18n.changeLanguage("en")
+})
 
 // Auto-cleanup rendered components after each test.
 // Required because globals:false means @testing-library can't find afterEach automatically.

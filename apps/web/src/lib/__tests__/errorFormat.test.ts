@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { ContractFunctionExecutionError, ContractFunctionRevertedError, encodeErrorResult } from "viem"
-import { merkleDropAbi } from "@/abi/merkleDropAbi"
+import { merkleDropAbi } from "@cobuilders/safenet-core"
 import { TEST_ACCOUNTS } from "@/__tests__/test-data"
 import { formatContractError, revertedErrorName } from "../errorFormat"
 

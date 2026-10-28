@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useEffect, useState } from "react"
 import type { Address } from "viem"
 import { useAccount } from "wagmi"
@@ -13,7 +14,7 @@ import { TxButton } from "@/components/ui/TxButton"
 import { Stepper } from "@/components/ui/stepper"
 import { StakeForm } from "@/components/staking/StakeForm"
 import { ValidatorSelect } from "@/components/staking/ValidatorSelect"
-import { merkleDropAbi } from "@/abi/merkleDropAbi"
+import { merkleDropAbi } from "@cobuilders/safenet-core"
 import { useClaimStep } from "@/hooks/useClaimStep"
 import { useStakeForm, type Staked } from "@/hooks/useStakeForm"
 import { useTokenBalance } from "@/hooks/useTokenBalance"
@@ -35,10 +36,6 @@ interface ClaimAndStakeDialogProps {
   rewards: ReturnType<typeof useRewards>
 }
 
-const ROOT_UPDATED =
-  "The rewards root changed on chain after your proof was loaded, so the contract refused the claim. " +
-  "Reload the proof to claim against the new root."
-
 /**
  * Claim & Stake: claim the MerkleDrop rewards, then stake exactly what arrived, in two
  * transactions. MerkleDrop rewards do not compound, so without this they sit in the wallet.
@@ -48,6 +45,7 @@ const ROOT_UPDATED =
  * already covers the amount.
  */
 export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: ClaimAndStakeDialogProps) {
+  const { t } = useTranslation()
   const { isConnected } = useAccount()
   const wrongNetwork = useWrongNetwork()
   const { toast } = useToast()
@@ -85,14 +83,14 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
     if (!claim.isSuccess) return
     toast({
       variant: "success",
-      title: "Rewards claimed",
+      title: t("dashboard.rewardsClaimed", "Rewards claimed"),
       description:
         claimedAmount !== undefined
-          ? `${formatTokenAmount(claimedAmount)} SAFE is in your wallet. It earns nothing until you stake it.`
-          : "Your rewards are in your wallet. They earn nothing until you stake them.",
+          ? t("rewards.claimedInWallet", "{{amount}} SAFE is in your wallet. It earns nothing until you stake it.", { amount: formatTokenAmount(claimedAmount) })
+          : t("rewards.yourRewardsAreInYourWalletTheyEarn", "Your rewards are in your wallet. They earn nothing until you stake them."),
       txHash: claim.txHash,
     })
-  }, [claim.isSuccess, claimedAmount, claim.txHash, toast])
+  }, [claim.isSuccess, claimedAmount, claim.txHash, toast, t])
 
   // A claim that confirms after the dialog closed has been reported by the toast above. Clear it,
   // so the next opening follows the button pressed, not the old claim.
@@ -140,16 +138,16 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
     try {
       const { proof, root, error } = await rewards.reload()
       if (error) {
-        setReloadNote("The proof or the on-chain root could not be loaded again. Try again.")
+        setReloadNote(t("rewards.theProofOrTheOnChainRootCould", "The proof or the on-chain root could not be loaded again. Try again."))
         return
       }
       if (!proof?.proof) {
-        setReloadNote("SEF's reward file for this address could not be loaded again. Try again later.")
+        setReloadNote(t("rewards.sefSRewardFileForThisAddressCould", "SEF's reward file for this address could not be loaded again. Try again later."))
         return
       }
       if (sameRoot(root, proof.merkleRoot) === false) {
         setReloadNote(
-          "SEF has not published proofs for the new root yet. Claiming opens when they match. Try again later.",
+          t("rewards.sefHasNotPublishedProofsForTheNew", "SEF has not published proofs for the new root yet. Claiming opens when they match. Try again later."),
         )
         return
       }
@@ -164,8 +162,10 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
     }
   }
 
-  const steps = restaking ? ["Claim", "Stake", "Done"] : ["Stake", "Done"]
-  const current = steps.indexOf(stage === "claim" ? "Claim" : stage === "stake" ? "Stake" : "Done")
+  const steps = restaking
+    ? [t("rewards.claim2", "Claim"), t("validators.stake", "Stake"), t("rewards.done2", "Done")]
+    : [t("validators.stake", "Stake"), t("rewards.done2", "Done")]
+  const current = stage === "claim" ? 0 : stage === "stake" ? (restaking ? 1 : 0) : steps.length - 1
 
   const rest =
     restaking && claimedAmount !== undefined && form.parsedAmount > 0n && form.parsedAmount < claimedAmount
@@ -181,25 +181,25 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{restaking ? "Claim & Stake" : "Stake your balance"}</DialogTitle>
+          <DialogTitle>{restaking ? t("rewards.claimStake", "Claim & Stake") : t("rewards.stakeYourBalance", "Stake your balance")}</DialogTitle>
           <DialogDescription>
             {restaking
-              ? "Claim your rewards, then stake them with a validator. A wallet that cannot batch also asks to approve before staking."
-              : "Stake SAFE that is already in your wallet."}
+              ? t("rewards.claimYourRewardsThenStakeThemWithA", "Claim your rewards, then stake them with a validator. A wallet that cannot batch also asks to approve before staking.")
+              : t("rewards.stakeSafeThatIsAlreadyInYourWallet", "Stake SAFE that is already in your wallet.")}
           </DialogDescription>
         </DialogHeader>
 
         <Stepper steps={steps} current={current} />
 
-        {!isConnected && <p className="text-sm text-destructive">Connect a wallet to continue.</p>}
+        {!isConnected && <p className="text-sm text-destructive">{t("rewards.connectAWalletToContinue", "Connect a wallet to continue.")}</p>}
         {isConnected && wrongNetwork && (
-          <p className="text-sm text-destructive">Your wallet is on another network. Switch to Ethereum to continue.</p>
+          <p className="text-sm text-destructive">{t("rewards.yourWalletIsOnAnotherNetworkSwitchTo", "Your wallet is on another network. Switch to Ethereum to continue.")}</p>
         )}
 
         {stage === "claim" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between rounded-lg border p-4">
-              <span className="text-sm text-muted-foreground">Claimable SAFE</span>
+              <span className="text-sm text-muted-foreground">{t("dashboard.claimableSafe", "Claimable SAFE")}</span>
               <span className="font-mono text-lg font-medium tabular-nums">
                 {formatTokenAmount(rewards.data.claimable)}
               </span>
@@ -207,7 +207,7 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
 
             {claimError && (
               <p role="alert" className="rounded-md border border-destructive/50 p-3 text-sm">
-                {rootUpdated ? ROOT_UPDATED : formatContractError(claimError)}
+                {rootUpdated ? t("rewards.rootUpdated", "The rewards root changed on chain after your proof was loaded, so the contract refused the claim. Reload the proof to claim against the new root.") : formatContractError(claimError)}
               </p>
             )}
             {reloadNote && (
@@ -216,9 +216,7 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
               </p>
             )}
             {claim.isSafeQueued && (
-              <p role="status" className="text-sm text-muted-foreground">
-                The claim is queued in your Safe. Once it executes, come back and use Stake your balance.
-              </p>
+              <p role="status" className="text-sm text-muted-foreground">{t("rewards.theClaimIsQueuedInYourSafeOnce", "The claim is queued in your Safe. Once it executes, come back and use Stake your balance.")}</p>
             )}
 
             {rootUpdated ? (
@@ -226,22 +224,18 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
                 className="w-full"
                 isSigningTx={reloading}
                 isConfirmingTx={false}
-                signingLabel="Reloading proof…"
+                signingLabel={t("rewards.reloadingProof", "Reloading proof…")}
                 onClick={() => void reloadAndRetry()}
-              >
-                Reload proof and retry
-              </TxButton>
+              >{t("rewards.reloadProofAndRetry", "Reload proof and retry")}</TxButton>
             ) : (
               <TxButton
                 className="w-full"
                 isSigningTx={reloading || claim.isSigningTx}
                 isConfirmingTx={claim.isConfirmingTx}
-                confirmingLabel={claim.isAwaitingExecution ? "Waiting for the Safe to execute…" : undefined}
+                confirmingLabel={claim.isAwaitingExecution ? t("rewards.waitingForTheSafeToExecute", "Waiting for the Safe to execute…") : undefined}
                 onClick={submitClaim}
                 disabled={!rewards.data.canClaim || !rewards.proof?.proof}
-              >
-                Claim {formatTokenAmount(rewards.data.claimable)} SAFE
-              </TxButton>
+              >{t("rewards.claimSafe", "Claim {{amount}} SAFE", { amount: formatTokenAmount(rewards.data.claimable) })}</TxButton>
             )}
           </div>
         )}
@@ -249,15 +243,14 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
         {stage === "stake" && leaving && (
           <div role="alert" className="space-y-3 rounded-md border border-warning/60 p-3 text-sm">
             <p>
-              {claimedAmount !== undefined ? `Your ${formatTokenAmount(claimedAmount)} SAFE` : "Your claimed SAFE"} is
-              in your wallet and is not staked. It earns no rewards until you stake it.
+              {claimedAmount !== undefined
+                ? t("rewards.unstakedAmount", "Your {{amount}} SAFE is in your wallet and is not staked. It earns no rewards until you stake it.", { amount: formatTokenAmount(claimedAmount) })
+                : t("rewards.unstakedClaim", "Your claimed SAFE is in your wallet and is not staked. It earns no rewards until you stake it.")}
             </p>
-            <p>To stake it later, come back to this page and use Stake your balance.</p>
+            <p>{t("rewards.toStakeItLaterComeBackToThis", "To stake it later, come back to this page and use Stake your balance.")}</p>
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setLeaving(false)}>Stake now</Button>
-              <Button variant="outline" onClick={close}>
-                Close anyway
-              </Button>
+              <Button onClick={() => setLeaving(false)}>{t("rewards.stakeNow", "Stake now")}</Button>
+              <Button variant="outline" onClick={close}>{t("rewards.closeAnyway", "Close anyway")}</Button>
             </div>
           </div>
         )}
@@ -267,24 +260,23 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
             {restaking && (
               <p className="text-sm text-muted-foreground">
                 {claimedAmount !== undefined
-                  ? `Claimed ${formatTokenAmount(claimedAmount)} SAFE. It is in your wallet now. Choose a validator to stake it with.`
-                  : "Your rewards are claimed and in your wallet. Their amount could not be read from the transaction receipt, so enter the amount to stake."}
+                  ? t("rewards.claimedChooseValidator", "Claimed {{amount}} SAFE. It is in your wallet now. Choose a validator to stake it with.", { amount: formatTokenAmount(claimedAmount) })
+                  : t("rewards.yourRewardsAreClaimedAndInYourWallet", "Your rewards are claimed and in your wallet. Their amount could not be read from the transaction receipt, so enter the amount to stake.")}
               </p>
             )}
-            <ValidatorSelect value={validator} onChange={setValidator} disabled={form.isBusy} />
+            {/* The review names the validator; it is chosen before it. */}
+            {!form.reviewing && <ValidatorSelect value={validator} onChange={setValidator} disabled={form.isBusy} />}
             <StakeForm
               form={form}
-              maxLabel="Claimed"
+              maxLabel={t("rewards.claimed", "Claimed")}
               aboveMaxMessage={
                 claimedAmount !== undefined
-                  ? `Claim & Stake stakes up to the ${formatTokenAmount(claimedAmount)} SAFE you claimed.`
+                  ? t("rewards.claimedCeiling", "Claim & Stake stakes up to the {{amount}} SAFE you claimed.", { amount: formatTokenAmount(claimedAmount) })
                   : undefined
               }
               notes={
                 rest > 0n && (
-                  <p className="text-sm text-muted-foreground">
-                    {formatTokenAmount(rest)} SAFE stays in your wallet, not staked.
-                  </p>
+                  <p className="text-sm text-muted-foreground">{t("rewards.safeStaysInYourWalletNotStaked", "{{amount}} SAFE stays in your wallet, not staked.", { amount: formatTokenAmount(rest) })}</p>
                 )
               }
             />
@@ -294,12 +286,10 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
         {stage === "done" && staked && (
           <div className="space-y-4">
             <p role="status" className="text-sm">
-              Staked {formatTokenAmount(staked.amount)} SAFE with {stakedWith}.
-              {stakedRest > 0n && ` ${formatTokenAmount(stakedRest)} SAFE stays in your wallet.`}
+              {t("rewards.stakedWith", "Staked {{amount}} SAFE with {{validator}}.", { amount: formatTokenAmount(staked.amount), validator: stakedWith })}
+              {stakedRest > 0n && t("rewards.remainingInWallet", " {{amount}} SAFE stays in your wallet.", { amount: formatTokenAmount(stakedRest) })}
             </p>
-            <Button className="w-full" onClick={close}>
-              Close
-            </Button>
+            <Button className="w-full" onClick={close}>{t("rewards.close", "Close")}</Button>
           </div>
         )}
       </DialogContent>

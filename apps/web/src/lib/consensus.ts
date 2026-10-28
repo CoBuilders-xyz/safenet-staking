@@ -1,6 +1,7 @@
 import {
   BETA_END_DAY,
   CHAINS,
+  GNOSIS_AEGIS_FIRST_COMPLETE_DAY,
   GNOSIS_INDEXED_PROGRAMME,
   programmePhase,
   utcDayMs,
@@ -26,7 +27,7 @@ export function utcDayStart(ms: number): number {
 
 /**
  * How many of the newest days the window query reads: the window, plus today and the first
- * indexed day, which are both partial and dropped.
+ * indexed day of Beta, which are both partial and dropped.
  */
 export const CONSENSUS_QUERY_DAYS = CONSENSUS_WINDOW_DAYS + 2
 
@@ -34,11 +35,15 @@ export const CONSENSUS_QUERY_DAYS = CONSENSUS_WINDOW_DAYS + 2
 const NO_BOUND = 2_147_483_647
 
 /**
- * The window query's variables. While the subgraph indexes Beta, which has ended, rows are read
- * up to Beta's last day only.
+ * The window query's variables: the rows of one programme, and for Beta, which has ended, up to
+ * its last day only.
  */
 export function consensusQueryVariables(programme: Programme = GNOSIS_INDEXED_PROGRAMME) {
-  return { days: CONSENSUS_QUERY_DAYS, until: programme === "beta" ? utcDayMs(BETA_END_DAY) / 1000 : NO_BOUND }
+  return {
+    days: CONSENSUS_QUERY_DAYS,
+    until: programme === "beta" ? utcDayMs(BETA_END_DAY) / 1000 : NO_BOUND,
+    programme,
+  }
 }
 
 /**
@@ -84,10 +89,11 @@ export interface ConsensusWindow {
 /**
  * The window figures from one ConsensusWindow answer: the CONSENSUS_WINDOW_DAYS calendar days
  * ending at the newest complete day the subgraph holds, which is yesterday while the network
- * attests. The days counted are consecutive; a day with no row inside them is not counted.
+ * attests. The days counted are consecutive; a fully indexed day with no row contributes zero.
  *
- * Only complete UTC days count: not today, which is still running, and not the first day the
- * subgraph indexed, which it entered part way through. While the subgraph indexes Beta, only Beta
+ * Only complete UTC days count. Today is still running. Beta's first stored day is conservatively
+ * dropped because its index starts part way through history. Aegis is indexed from deployment:
+ * use its verified coverage boundary, not its first attestation day. While reading Beta, only Beta
  * days count: a row dated after Beta ended is a stray ceremony on a closed contract, such as the
  * one on 6 October 2026. Undefined when no complete day remains, as on a subgraph deployed less
  * than two days ago.
@@ -99,13 +105,24 @@ export function deriveConsensusWindow(
 ): ConsensusWindow | undefined {
   const today = utcDayStart(checkedAt)
   const firstIndexed = data.firstDay[0]?.date
+  const firstComplete = programme === "aegis"
+    ? utcDayMs(GNOSIS_AEGIS_FIRST_COMPLETE_DAY) / 1000
+    : firstIndexed === undefined ? undefined : firstIndexed + DAY_SECONDS
   const kept = data.consensusDays
-    .filter((d) => d.date < today && (firstIndexed === undefined || d.date > firstIndexed))
+    .filter((d) => d.date < today && (firstComplete === undefined || d.date >= firstComplete))
     .filter((d) => programme !== "beta" || programmePhase(new Date(d.date * 1000)) === "beta")
     .sort((a, b) => a.date - b.date)
   if (kept.length === 0) return undefined
   const last = kept[kept.length - 1].date
-  const complete = kept.filter((d) => d.date > last - CONSENSUS_WINDOW_DAYS * DAY_SECONDS)
+  const first = Math.max(
+    last - (CONSENSUS_WINDOW_DAYS - 1) * DAY_SECONDS,
+    firstComplete ?? kept[0].date,
+  )
+  const byDate = new Map(kept.map((d) => [d.date, d]))
+  const complete = Array.from({ length: (last - first) / DAY_SECONDS + 1 }, (_, i) => {
+    const date = first + i * DAY_SECONDS
+    return byDate.get(date) ?? { date, attestations: "0", attestationCeremonies: "0", latencyBuckets: [] }
+  })
 
   const counted = new Set(complete.map((d) => d.date))
   const perDay = complete.map((d) => Number(d.attestations))
@@ -124,8 +141,12 @@ export function deriveConsensusWindow(
   const allRows = data.validatorDays.length < PAGE_LIMIT || oldestRow < complete[0].date
 
   let participation: Map<string, ValidatorParticipation> | undefined
-  if (allRows && ceremonies > 0n) {
-    const attended = new Map<string, bigint>()
+  const membership = data.programmeConsensus[0]
+  const allMembers = membership && membership.validators.length < PAGE_LIMIT &&
+    membership.validators.length === membership.validatorCount
+  if (allRows && allMembers && ceremonies > 0n) {
+    // Daily rows exist only after attendance. Membership retains validators that missed every ceremony.
+    const attended = new Map(membership.validators.map((v) => [v.id.toLowerCase(), 0n]))
     for (const v of data.validatorDays) {
       if (!counted.has(v.date)) continue
       const id = v.validator.id.toLowerCase()

@@ -1,5 +1,5 @@
+import { useTranslation } from "react-i18next"
 import type { Address } from "viem"
-import { HHI_DEFINITION } from "@/lib/distribution"
 import { truncateAddress } from "@/lib/format"
 
 /**
@@ -28,17 +28,25 @@ const percent = (share: number) => `${(share * 100).toFixed(1)}%`
 
 /** Stake per validator as one stacked bar, each segment labelled in the list below. */
 export function Distribution({ rows, index }: { rows: readonly DistributionRow[]; index: number }) {
+  const { t } = useTranslation()
   const colours = colourByAddress(rows)
   const name = (r: DistributionRow) => r.label ?? truncateAddress(r.address)
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <span className="font-mono text-2xl tabular-nums tracking-tight">HHI {index.toLocaleString("en-US")}</span>
-        <span className="text-xs text-muted-foreground">{HHI_DEFINITION}</span>
+        <span className="font-mono text-2xl tabular-nums tracking-tight">
+          {t("overview.distribution.index", "HHI {{index}}", { index: index.toLocaleString("en-US") })}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {t(
+            "overview.distribution.definition",
+            "The sum of each validator's squared percentage share: 10,000 if one validator held all stake, 10,000 ÷ n for n equal validators.",
+          )}
+        </span>
       </div>
 
-      <div className="flex h-3 w-full gap-[2px] overflow-hidden rounded-full bg-muted" role="img" aria-label="Stake share per validator">
+      <div className="flex h-3 w-full gap-[2px] overflow-hidden rounded-full bg-muted" role="img" aria-label={t("overview.distribution.barLabel", "Stake share per validator")}>
         {rows
           .filter((r) => r.share > 0)
           .map((r) => (

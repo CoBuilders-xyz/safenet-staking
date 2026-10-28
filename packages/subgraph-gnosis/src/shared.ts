@@ -24,10 +24,19 @@ export const COUNTED_HORIZON = 1000
 /** The oracle's MAX_EXPECTED_LATENCY. Beyond it a sample is excluded, as the oracle excludes it. */
 export const MAX_LATENCY = 64
 
-export function consensus(): Consensus {
-  let c = Consensus.load("1")
+/**
+ * The programmes, as `Programme` in packages/core names them. Each data source's mapping passes
+ * its own; every row it writes carries it.
+ */
+export const BETA = "beta"
+export const AEGIS = "aegis"
+
+/** The totals of one programme. Every other row of that programme is keyed through `c.id`. */
+export function consensus(programme: string): Consensus {
+  let c = Consensus.load(programme)
   if (c == null) {
-    c = new Consensus("1")
+    c = new Consensus(programme)
+    c.programme = programme
     c.attestationCeremonies = ZERO
     c.nonAttestationCeremonies = ZERO
     c.attestations = ZERO
@@ -44,7 +53,9 @@ export function consensus(): Consensus {
 }
 
 /**
- * The validator at `addr`, created on first sight and added to Consensus.validators.
+ * The validator at `addr`, created on first sight, and added to the validators of `c`'s
+ * programme the first time that programme's contracts show it. A Beta validator seen again on
+ * Aegis is the same row, and joins Aegis's list then, not before.
  *
  * `block` is where it was seen. lastSeenBlock only moves forward: a caller may pass a block
  * older than one already recorded, and that must not rewind it.
@@ -58,12 +69,19 @@ export function signingValidator(addr: Bytes, block: BigInt, c: Consensus): Sign
     v.attended = ZERO
     v.firstSeenBlock = block
     v.lastSeenBlock = block
-    c.validatorCount = c.validatorCount + 1
-    const known = c.validators
-    known.push(id)
-    c.validators = known
   } else if (block.gt(v.lastSeenBlock)) {
     v.lastSeenBlock = block
+  }
+  // A handful of validators per programme, so a scan is cheaper than a membership row.
+  const known = c.validators
+  let listed = false
+  for (let i = 0; i < known.length; i++) {
+    if (known[i] == id) { listed = true; break }
+  }
+  if (!listed) {
+    known.push(id)
+    c.validators = known
+    c.validatorCount = c.validatorCount + 1
   }
   return v as SigningValidator
 }
@@ -77,11 +95,12 @@ export function hourStart(ts: BigInt): i32 {
   return (ts.toI32() / HOUR) * HOUR
 }
 
-export function consensusHour(hour: i32): ConsensusHour {
-  const id = hour.toString()
+export function consensusHour(c: Consensus, hour: i32): ConsensusHour {
+  const id = c.id + "-" + hour.toString()
   let h = ConsensusHour.load(id)
   if (h == null) {
     h = new ConsensusHour(id)
+    h.programme = c.programme
     h.hour = hour
     h.attestationCeremonies = 0
     h.attestationCeremoniesOnTheHour = 0
@@ -89,11 +108,12 @@ export function consensusHour(hour: i32): ConsensusHour {
   return h as ConsensusHour
 }
 
-export function validatorHour(validatorId: string, hour: i32): ValidatorHour {
-  const id = validatorId + "-" + hour.toString()
+export function validatorHour(c: Consensus, validatorId: string, hour: i32): ValidatorHour {
+  const id = c.id + "-" + validatorId + "-" + hour.toString()
   let h = ValidatorHour.load(id)
   if (h == null) {
     h = new ValidatorHour(id)
+    h.programme = c.programme
     h.validator = validatorId
     h.hour = hour
     h.ceremonies = 0
@@ -106,12 +126,13 @@ export function validatorHour(validatorId: string, hour: i32): ValidatorHour {
   return h as ValidatorHour
 }
 
-export function validatorDay(v: SigningValidator, ts: BigInt): ValidatorDay {
+export function validatorDay(c: Consensus, v: SigningValidator, ts: BigInt): ValidatorDay {
   const day = dayStart(ts)
-  const id = v.id + "-" + day.toString()
+  const id = c.id + "-" + v.id + "-" + day.toString()
   let d = ValidatorDay.load(id)
   if (d == null) {
     d = new ValidatorDay(id)
+    d.programme = c.programme
     d.validator = v.id
     d.date = day
     d.attended = ZERO
@@ -119,12 +140,13 @@ export function validatorDay(v: SigningValidator, ts: BigInt): ValidatorDay {
   return d as ValidatorDay
 }
 
-export function consensusDay(ts: BigInt): ConsensusDay {
+export function consensusDay(c: Consensus, ts: BigInt): ConsensusDay {
   const day = dayStart(ts)
-  const id = day.toString()
+  const id = c.id + "-" + day.toString()
   let d = ConsensusDay.load(id)
   if (d == null) {
     d = new ConsensusDay(id)
+    d.programme = c.programme
     d.date = day
     d.attestations = ZERO
     d.attestationCeremonies = ZERO
@@ -146,11 +168,12 @@ export function consensusDay(ts: BigInt): ConsensusDay {
  * extra lookup per event.
  */
 export function ceremony(sid: Bytes, block: BigInt, c: Consensus): Ceremony | null {
-  const id = sid.toHexString()
+  const id = c.id + "-" + sid.toHexString()
   let cer = Ceremony.load(id)
   if (cer == null) {
     if (CountedCeremony.load(id) != null) return null
     cer = new Ceremony(id)
+    cer.programme = c.programme
     cer.isAttestation = false
     cer.counted = false
     cer.countedAsNonAttestation = false
@@ -164,7 +187,7 @@ export function ceremony(sid: Bytes, block: BigInt, c: Consensus): Ceremony | nu
 }
 
 /**
- * Records `sid` as counted at `block`, newest last, then removes the records older than
+ * Records the ceremony `sid`, a Ceremony id, as counted at `block`, newest last, then removes the records older than
  * COUNTED_HORIZON blocks from the front of the queue.
  */
 function markCounted(sid: string, block: BigInt, c: Consensus): void {
@@ -256,12 +279,12 @@ export function tryCount(cer: Ceremony, c: Consensus, block: BigInt): void {
   const hour = hourStart(at)
   const onTheHour = at.toI32() == hour ? 1 : 0
 
-  const ch = consensusHour(hour)
+  const ch = consensusHour(c, hour)
   ch.attestationCeremonies = ch.attestationCeremonies + 1
   ch.attestationCeremoniesOnTheHour = ch.attestationCeremoniesOnTheHour + onTheHour
   ch.save()
 
-  const day = consensusDay(at)
+  const day = consensusDay(c, at)
   day.attestationCeremonies = day.attestationCeremonies.plus(ONE)
   day.save()
 
@@ -274,7 +297,7 @@ export function tryCount(cer: Ceremony, c: Consensus, block: BigInt): void {
     for (let j = 0; j < present.length; j++) {
       if (present[j].equals(v.address)) { attended = true; break }
     }
-    const vh = validatorHour(v.id, hour)
+    const vh = validatorHour(c, v.id, hour)
     vh.ceremonies = vh.ceremonies + 1
     vh.ceremoniesOnTheHour = vh.ceremoniesOnTheHour + onTheHour
     if (attended) {
@@ -282,7 +305,7 @@ export function tryCount(cer: Ceremony, c: Consensus, block: BigInt): void {
       vh.attendedOnTheHour = vh.attendedOnTheHour + onTheHour
       v.attended = v.attended.plus(ONE)
       v.save()
-      const vd = validatorDay(v, at)
+      const vd = validatorDay(c, v, at)
       vd.attended = vd.attended.plus(ONE)
       vd.save()
     } else {

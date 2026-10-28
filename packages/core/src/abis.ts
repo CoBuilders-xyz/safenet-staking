@@ -71,6 +71,51 @@ export const INDEXED_EVENTS = [
     signature: "event EpochRolledOver(uint64 indexed newActiveEpoch)" },
   { contract: "safeToken", frequency: "rare",
     signature: "event Transfer(address indexed from, address indexed to, uint256 value)" },
+
+  // --- Gnosis Chain: Aegis ---
+  //
+  // Recovered on 2026-10-27 from every log the three Aegis contracts emitted from the
+  // coordinator's deploy block, 48,617,821, to 48,976,267: 18,268 logs. Each topic0 was first
+  // matched against a public signature database, which gives types without names, then proven
+  // here by keccak, and every log of it decoded under strict ABI decoding with no failure. The
+  // `indexed` flags come from the logs: the topic count, and the values that land in topics and
+  // in data. Parameter names are not on chain; they are taken from the event declarations of
+  // safe-research/safenet `main`, which only label what the chain fixed.
+  //
+  // The two transaction events changed from Beta's. The second parameter is `safeId`, the chain
+  // id shifted left 160 bits over the Safe's address, not a `uint256 chainId`: so it was in all
+  // 567 proposals to 2026-10-27. The third is the `oracle` that checked the transaction, not the
+  // Safe: aegisSentinelOracle in every one. `safeTxHash` equalled the EIP-712 SafeTx hash of the
+  // proposal's `transaction` in all 567.
+  { contract: "aegisConsensus", frequency: "high",
+    signature: "event TransactionProposed(bytes32 indexed safeTxHash, bytes32 indexed safeId, address indexed oracle, uint64 epoch, bytes oracleData, (uint256 chainId, address safe, address to, uint256 value, bytes data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, uint256 nonce) transaction)" },
+  // `signatureId` equalled the sid of a SignCompleted on aegisFrostCoordinator earlier in the
+  // same transaction for all 474 attestations to 2026-10-27, as on Beta. `oracleDataHash` is
+  // the keccak of the proposal's `oracleData`, empty in every proposal so far.
+  { contract: "aegisConsensus", frequency: "high",
+    signature: "event TransactionAttested(bytes32 indexed safeTxHash, bytes32 indexed safeId, address indexed oracle, uint64 epoch, bytes32 oracleDataHash, bytes32 signatureId, ((uint256 x, uint256 y) r, uint256 z) attestation)" },
+  { contract: "aegisConsensus", frequency: "high",
+    signature: "event EpochRolledOver(uint64 indexed newActiveEpoch)" },
+  // Five logs to 2026-10-27, the last at block 48,749,208, before any transaction was proposed.
+  { contract: "aegisConsensus", frequency: "rare",
+    signature: "event ValidatorStakerSet(address indexed validator, address staker)" },
+
+  // The coordinator's three are Beta's signatures unchanged, emitted at a new address.
+  { contract: "aegisFrostCoordinator", frequency: "high",
+    signature: "event SignShared(bytes32 indexed sid, bytes32 indexed selectionRoot, address participant, uint256 z)" },
+  { contract: "aegisFrostCoordinator", frequency: "high",
+    signature: "event SignCompleted(bytes32 indexed sid, bytes32 indexed selectionRoot, ((uint256 x, uint256 y) r, uint256 z) signature)" },
+  // Frequent on Aegis, unlike Beta: 946 logs to 2026-10-27, a key generation every epoch.
+  { contract: "aegisFrostCoordinator", frequency: "high",
+    signature: "event KeyGenConfirmed(bytes32 indexed gid, address participant, bool confirmed)" },
+
+  // SEF's README at 1c18bdc defines `total_transactions_checked` on these two: the requests
+  // with at least one `Revealed`, counted once each; and a sentinel's participation as the share
+  // of `NewRequest` it revealed for.
+  { contract: "aegisSentinelOracle", frequency: "high",
+    signature: "event NewRequest(bytes32 indexed requestId, address indexed sponsor, uint96 fee, uint96 bondTarget, uint24 daoFeeShare, uint96 slashAmount, uint64 commitDeadline, uint64 revealDeadline)" },
+  { contract: "aegisSentinelOracle", frequency: "high",
+    signature: "event Revealed(bytes32 indexed requestId, address indexed sentinel, bool approved, uint96 bondAmount, string reason)" },
 ] as const satisfies readonly IndexedEvent[]
 
 type IndexedEventEntry = (typeof INDEXED_EVENTS)[number]
@@ -158,8 +203,9 @@ function signatureOf<C extends ContractName, N extends string>(contract: C, name
 }
 
 /**
- * The staking contract's calls and errors. `verify:abis` checks that every function selector
- * here is in the deployed bytecode; the errors come from DECODED_ERRORS above.
+ * The staking contract's calls, events and errors. `verify:abis` checks that every function
+ * selector here is in the deployed bytecode; the events come from INDEXED_EVENTS and the errors
+ * from DECODED_ERRORS above.
  */
 export const stakingAbi = parseAbi([
   "function totalStakedAmount() view returns (uint256)",
@@ -167,6 +213,12 @@ export const stakingAbi = parseAbi([
   // Verified 2026-10-04 by eth_call on Mainnet: for a staker with one open withdrawal it
   // returned one (amount, claimableAt) pair whose amount equals that WithdrawalInitiated log.
   "function getPendingWithdrawals(address staker) view returns ((uint256 amount, uint256 claimableAt)[])",
+  // The head of the staker's queue, which claimWithdrawal() pays. Verified 2026-10-27 by eth_call
+  // on Mainnet: for six stakers whose withdrawals were all past their delay it returned the head
+  // of getPendingWithdrawals(), the oldest of two for the staker with two, and (0, 0) for nine
+  // addresses with none. No staker had a withdrawal still in its delay that day, so what it
+  // returns then is not proven here.
+  "function getNextClaimableWithdrawal(address staker) view returns (uint256 amount, uint256 claimableAt)",
   "function stakes(address staker, address validator) view returns (uint256)",
   "function totalStakerStakes(address staker) view returns (uint256)",
   "function totalValidatorStakes(address validator) view returns (uint256)",
@@ -184,6 +236,10 @@ export const stakingAbi = parseAbi([
   // Takes no id. It pays the head of the caller's queue: proven on an Anvil fork on 2026-10-05,
   // where with withdrawals 89 and 90 open and 89 past its delay, the call paid 89.
   "function claimWithdrawal()",
+  signatureOf("staking", "StakeIncreased"),
+  signatureOf("staking", "WithdrawalInitiated"),
+  signatureOf("staking", "WithdrawalClaimed"),
+  signatureOf("staking", "ValidatorUpdated"),
   signatureOf("staking", "InvalidAmount"),
   signatureOf("staking", "NotValidator"),
   signatureOf("staking", "InvalidAddress"),

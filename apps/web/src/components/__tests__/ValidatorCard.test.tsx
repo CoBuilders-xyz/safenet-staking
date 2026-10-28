@@ -56,7 +56,7 @@ describe("ValidatorCard", () => {
     renderCard()
 
     expect(screen.getByText("Gnosis")).toBeInTheDocument()
-    expect(screen.getByText("Commission:")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Commission" })).toBeInTheDocument()
     expect(screen.getByText("5%")).toBeInTheDocument()
     expect(screen.getByText("Participation (14d):")).toBeInTheDocument()
     expect(screen.getByText("99.9%")).toBeInTheDocument()

@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { act, render, screen } from "@testing-library/react"
+import { chooseLanguage } from "@/i18n"
+import es from "@/i18n/locales/es.json"
+import de from "@/i18n/locales/de.json"
 import userEvent from "@testing-library/user-event"
 import { TooltipProvider } from "@radix-ui/react-tooltip"
 import { encodeErrorResult, type Hex } from "viem"
-import { merkleDropAbi } from "@/abi/merkleDropAbi"
+import { merkleDropAbi } from "@cobuilders/safenet-core"
 import type { useRewards } from "@/hooks/useRewards"
 import type { RewardProof } from "@/hooks/useRewardProof"
 import { AMOUNTS, MOCK_VALIDATORS, TEST_ACCOUNTS } from "@/__tests__/test-data"
@@ -129,12 +132,44 @@ function renderDialog({
 const rootUpdated = () =>
   new Error(`Execution reverted: custom error ${encodeErrorResult({ abi: merkleDropAbi, errorName: "MerkleRootWasUpdated" })}`)
 
+/** Stake, then confirm on the "what happens if" step: only the confirmation sends. */
+async function stakeAndConfirm() {
+  await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+  await userEvent.click(screen.getByRole("button", { name: "Confirm stake" }))
+}
+
 /** The claim has confirmed and paid `amount`. */
 function claimed(amount: bigint | undefined) {
   m.claimState = { isSuccess: true, claimedAmount: amount, txHash: `0x${"c1".repeat(32)}` }
 }
 
 describe("ClaimAndStakeDialog", () => {
+  it("keeps the selected validator, typed amount and claim step when the language changes", async () => {
+    const user = userEvent.setup()
+    claimed(100n * SAFE)
+    m.balance = 100n * SAFE
+    renderDialog()
+    await user.selectOptions(screen.getByLabelText("Validator"), MOCK_VALIDATORS[0].address)
+    await user.clear(screen.getByLabelText("Amount"))
+    await user.type(screen.getByLabelText("Amount"), "60")
+
+    await act(() => chooseLanguage("es"))
+    expect(screen.getByLabelText(es.staking.amount)).toHaveValue("60")
+    expect(screen.getByLabelText(es.dashboard.validator)).toHaveValue(MOCK_VALIDATORS[0].address)
+    expect(document.querySelector('[aria-current="step"]')).toHaveTextContent(es.validators.stake)
+
+    await act(() => chooseLanguage("de"))
+    expect(screen.getByLabelText(de.staking.amount)).toHaveValue("60")
+    expect(document.querySelector('[aria-current="step"]')).toHaveTextContent(de.validators.stake)
+    await user.click(screen.getByRole("button", { name: de.validators.stake }))
+    expect(m.stake).not.toHaveBeenCalled()
+    await act(() => chooseLanguage("es"))
+    expect(screen.getByRole("heading", { name: es.onboarding.beforeStake.replace("{{amount}}", "60").replace("{{validator}}", MOCK_VALIDATORS[0].label) })).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: es.onboarding.confirmStake }))
+    expect(m.stake).toHaveBeenCalledWith(MOCK_VALIDATORS[0].address, 60n * SAFE)
+    expect(m.claim).not.toHaveBeenCalled()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     m.claimState = {}
@@ -228,9 +263,43 @@ describe("ClaimAndStakeDialog", () => {
       expect(screen.getByRole("button", { name: "Stake" })).toBeDisabled()
 
       await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
-      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+      await stakeAndConfirm()
 
       expect(m.stake).toHaveBeenCalledWith(TEST_ACCOUNTS.validator1, 60n * SAFE)
+    })
+
+    it("shows a claim with wei precision as a readable amount and stakes every wei of it", async () => {
+      const paid = 12n * SAFE + 345_678_901_234_567_891n
+      claimed(paid)
+      renderDialog()
+
+      expect(screen.getByLabelText("Amount")).toHaveValue("12.3456")
+      expect(screen.getByText(/Shown rounded down to four decimals/)).toBeInTheDocument()
+
+      await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
+      await stakeAndConfirm()
+
+      expect(m.stake).toHaveBeenCalledWith(TEST_ACCOUNTS.validator1, paid)
+    })
+
+    it("stakes what the user typed once the rounded amount is edited, and MAX restores every wei", async () => {
+      const paid = 12n * SAFE + 345_678_901_234_567_891n
+      claimed(paid)
+      renderDialog()
+      const amount = screen.getByLabelText("Amount")
+
+      await userEvent.type(amount, "7")
+      expect(amount).toHaveValue("12.34567")
+      expect(screen.queryByText(/Shown rounded down/)).not.toBeInTheDocument()
+      await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
+      await stakeAndConfirm()
+      expect(m.stake).toHaveBeenLastCalledWith(TEST_ACCOUNTS.validator1, 12_345_670_000_000_000_000n)
+
+      await userEvent.click(screen.getByRole("button", { name: "Back" }))
+      await userEvent.click(screen.getByRole("button", { name: "MAX" }))
+      expect(screen.getByLabelText("Amount")).toHaveValue("12.3456")
+      await stakeAndConfirm()
+      expect(m.stake).toHaveBeenLastCalledWith(TEST_ACCOUNTS.validator1, paid)
     })
 
     it("says what stays in the wallet when the amount is reduced, and refuses more than was claimed", async () => {
@@ -257,7 +326,7 @@ describe("ClaimAndStakeDialog", () => {
 
       await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
       expect(screen.queryByRole("button", { name: /Approve/ })).not.toBeInTheDocument()
-      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+      await stakeAndConfirm()
 
       expect(m.batchApproveAndStake).toHaveBeenCalledWith(TEST_ACCOUNTS.validator1, 60n * SAFE)
     })
@@ -313,7 +382,7 @@ describe("ClaimAndStakeDialog", () => {
       await userEvent.clear(amount)
       await userEvent.type(amount, "50")
       await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
-      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+      await stakeAndConfirm()
       // Edited while the stake confirms: the result still reports what was sent.
       await userEvent.type(amount, "5")
 
@@ -382,7 +451,7 @@ describe("ClaimAndStakeDialog", () => {
       await userEvent.clear(amount)
       await userEvent.type(amount, "50")
       await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
-      await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+      await stakeAndConfirm()
 
       // Closed while the stake confirms: the dialog drops its validator and amount.
       m.stakeState = { isSuccess: false, isConfirmingTx: true, txHash: undefined } as typeof m.stakeState
@@ -417,7 +486,7 @@ describe("ClaimAndStakeDialog", () => {
     expect(screen.getByLabelText("Amount")).toHaveValue("1000")
 
     await userEvent.selectOptions(screen.getByLabelText("Validator"), GNOSIS)
-    await userEvent.click(screen.getByRole("button", { name: "Stake" }))
+    await stakeAndConfirm()
     expect(m.stake).toHaveBeenCalledWith(TEST_ACCOUNTS.validator1, AMOUNTS.userBalance)
   })
 

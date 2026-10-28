@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 import { useAccount } from "wagmi"
 import { Button } from "@/components/ui/button"
@@ -7,6 +8,7 @@ import ArrowDownLeft from "lucide-react/dist/esm/icons/arrow-down-left"
 import HandCoins from "lucide-react/dist/esm/icons/hand-coins"
 
 export function QuickActions() {
+  const { t } = useTranslation()
   const { isConnected } = useAccount()
   const navigate = useNavigate()
   const { data } = useNextClaimable()
@@ -22,20 +24,17 @@ export function QuickActions() {
     <div className="flex flex-wrap gap-3">
       <Button variant="gradient" onClick={() => navigate("/validators")}>
         <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-        Stake
-      </Button>
+        {t("validators.stake", "Stake")}</Button>
       <Button variant="outline" onClick={() => navigate("/validators")}>
         <ArrowDownLeft className="h-4 w-4" aria-hidden="true" />
-        Unstake
-      </Button>
+        {t("validators.unstake", "Unstake")}</Button>
       <Button
         variant="outline"
         className={hasClaimable ? "border-success text-success" : undefined}
         onClick={() => navigate("/withdrawals")}
       >
         <HandCoins className="h-4 w-4" aria-hidden="true" />
-        Withdraw
-      </Button>
+        {t("dashboard.withdraw", "Withdraw")}</Button>
     </div>
   )
 }

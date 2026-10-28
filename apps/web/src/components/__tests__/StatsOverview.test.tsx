@@ -59,6 +59,18 @@ describe("StatsOverview", () => {
     expect(screen.getByText("Your Staked SAFE")).toBeInTheDocument()
   })
 
+  it("says Unavailable, never 0, for a figure whose read failed", () => {
+    mockUseAccount.mockReturnValue({ isConnected: true })
+    mockUseTotalStaked.mockReturnValue({ data: undefined, isLoading: false, isError: true })
+    mockUseUserTotalStake.mockReturnValue({ data: undefined, isLoading: false, isError: true })
+    mockUseValidators.mockReturnValue({ data: undefined, isLoading: false, isError: true })
+
+    render(<StatsOverview />)
+
+    expect(screen.getAllByText("Unavailable")).toHaveLength(3)
+    expect(screen.queryByText("0")).not.toBeInTheDocument()
+  })
+
   it("shows skeletons while loading", () => {
     mockUseTotalStaked.mockReturnValue({ data: undefined, isLoading: true })
     mockUseValidators.mockReturnValue({ data: undefined, isLoading: true })

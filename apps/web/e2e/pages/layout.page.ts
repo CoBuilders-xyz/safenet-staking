@@ -16,6 +16,8 @@ export class LayoutPage {
   readonly footerTerms: Locator
   readonly footerDocs: Locator
   readonly footerFaq: Locator
+  /** Found by role alone: its name is "Language" in English and changes with the language. */
+  readonly languageSelect: Locator
 
   constructor(page: Page) {
     this.page = page
@@ -33,10 +35,20 @@ export class LayoutPage {
     this.footerTerms = page.getByRole("link", { name: "Terms" })
     this.footerDocs = page.getByRole("link", { name: "Documentation" })
     this.footerFaq = page.getByRole("link", { name: "FAQ" })
+    this.languageSelect = page.locator("header").getByRole("combobox")
   }
 
   async goto(path = "/") {
     await this.page.goto(path)
+  }
+
+  async lang(): Promise<string> {
+    return this.page.locator("html").getAttribute("lang").then((l) => l ?? "")
+  }
+
+  /** True when the page is wider than the window: a string too long for its box pushes it out. */
+  async overflowsHorizontally(): Promise<boolean> {
+    return this.page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
   }
 
   async isDarkMode(): Promise<boolean> {

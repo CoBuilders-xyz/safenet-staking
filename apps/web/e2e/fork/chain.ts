@@ -25,9 +25,9 @@ import {
   CONTRACTS,
   MAINNET_FORK_SEF_DATA,
   merkleDropAbi,
+  stakingAbi,
   type SefValidator,
 } from "@cobuilders/safenet-core"
-import { stakingAbi } from "../../src/abi/stakingAbi"
 import { ANVIL_PORT } from "../ports"
 
 export const ANVIL_URL = `http://127.0.0.1:${ANVIL_PORT}`

@@ -1,8 +1,13 @@
-import { Suspense } from "react"
-import { Outlet } from "react-router-dom"
+import { lazy, Suspense } from "react"
+import { useTranslation } from "react-i18next"
 import { Header } from "./Header"
 import { Footer } from "./Footer"
+import { WrongNetworkNotice } from "@/components/WrongNetworkNotice"
 import Loader2 from "lucide-react/dist/esm/icons/loader-2"
+import { routeContentImport } from "@/routes"
+
+// Explanations belong to route content. Keep their positioning code out of startup.
+const RouteContent = lazy(routeContentImport)
 
 const tickStyle = {
   background: `repeating-linear-gradient(
@@ -15,10 +20,11 @@ const tickStyle = {
 } as const
 
 export function Layout() {
+  const { t } = useTranslation()
   return (
     <div className="flex min-h-screen flex-col">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:px-4 focus:py-2 focus:text-foreground">
-        Skip to main content
+        {t("shell.skipToContent", "Skip to main content")}
       </a>
       <Header />
       <div className="relative flex-1">
@@ -36,8 +42,18 @@ export function Layout() {
           />
         </div>
         <main id="main-content" className="container mx-auto max-w-5xl px-4 py-8">
-          <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
-            <Outlet />
+          <WrongNetworkNotice />
+          {/* A full screen tall, so the footer stays below the fold until the page arrives and
+              is not pushed down by it: on a phone that push was the largest layout shift. */}
+          <Suspense
+            fallback={
+              <div className="flex min-h-dvh items-start justify-center py-20" role="status">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden="true" />
+                <span className="sr-only">{t("onboarding.loadingThePage", "Loading the page…")}</span>
+              </div>
+            }
+          >
+            <RouteContent />
           </Suspense>
         </main>
       </div>

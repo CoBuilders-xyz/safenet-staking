@@ -10,10 +10,12 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "release:build": "tsx scripts/release.ts",
+    "budget:bundle": "tsx scripts/check-budget.ts",
+    "budget:lighthouse": "tsx scripts/lighthouse.ts",
     "release:pin": "node --env-file-if-exists=../../.env.local --import tsx scripts/release-pin.ts",
     "preview": "vite preview",
     "test": "vitest run",
-    "check": "pnpm codegen:check && eslint . && tsc -b --noEmit && tsc -p e2e/tsconfig.json",
+    "check": "pnpm codegen:check && pnpm i18n:check && eslint . && tsc -b --noEmit && tsc -p e2e/tsconfig.json",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
@@ -26,7 +28,9 @@
     "generate:proofs": "tsx scripts/generate-merkle-tree.ts",
     "codegen": "graphql-codegen --config codegen.ts",
     "codegen:check": "tsx scripts/codegen-check.ts",
-    "codegen:live-check": "tsx scripts/codegen-live-check.ts"
+    "codegen:live-check": "tsx scripts/codegen-live-check.ts",
+    "i18n:extract": "tsx scripts/i18n-extract.ts",
+    "i18n:check": "tsx scripts/i18n-extract.ts --check"
   },
   "dependencies": {
     "@cobuilders/safenet-core": "workspace:*",
@@ -44,10 +48,12 @@
     "clsx": "2.1.1",
     "graphql": "16.14.2",
     "graphql-request": "7.4.0",
+    "i18next": "26.4.7",
     "lucide-react": "0.563.0",
     "ox": "0.12.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-i18next": "17.0.20",
     "react-router-dom": "7.18.2",
     "recharts": "3.7.0",
     "tailwind-merge": "3.5.0",
@@ -55,6 +61,7 @@
     "wagmi": "3.5.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "9.39.2",
     "@graphql-codegen/add": "7.1.1",
     "@graphql-codegen/cli": "7.4.3",

@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderHook, waitFor } from "@testing-library/react"
 import { MESSAGES } from "@/components/rewards/messages"
 import { answerOperations, meta, mockRequest, queryWrapper, read } from "@/__tests__/subgraph-mocks"
-import { REWARDS_MESSAGES, useRewardsOverview } from "../useRewardsOverview"
+import { rewardsMessages, useRewardsOverview } from "../useRewardsOverview"
+import { i18n } from "@/i18n"
 
 vi.mock("graphql-request", () => ({ request: (o: unknown) => mockRequest(o) }))
 
@@ -53,8 +54,8 @@ describe("useRewardsOverview", () => {
     answerOperations({ NetworkTotals: { _meta: meta(), network: { ...NETWORK, rewardsClaimed: "-5" } } })
     const { result } = render()
     await waitFor(() => expect(result.current.claimed.state).toBe("unavailable"))
-    expect(result.current.claimed).toEqual({ state: "unavailable", reason: REWARDS_MESSAGES.negativeClaims })
-    expect(result.current.unclaimed).toEqual({ state: "unavailable", reason: REWARDS_MESSAGES.negativeClaims })
+    expect(result.current.claimed).toEqual({ state: "unavailable", reason: rewardsMessages(i18n.t).negativeClaims })
+    expect(result.current.unclaimed).toEqual({ state: "unavailable", reason: rewardsMessages(i18n.t).negativeClaims })
   })
 
   it("will not derive unclaimed from the subgraph while the roots differ", async () => {
@@ -62,7 +63,7 @@ describe("useRewardsOverview", () => {
     answerOperations({ NetworkTotals: { _meta: meta(), network: NETWORK } })
     const { result } = render()
     await waitFor(() => expect(result.current.claimed.state).toBe("ready"))
-    expect(result.current.unclaimed).toEqual({ state: "unavailable", reason: REWARDS_MESSAGES.rootDiffers })
+    expect(result.current.unclaimed).toEqual({ state: "unavailable", reason: rewardsMessages(i18n.t).rootDiffers })
   })
 
   it("falls back to the MerkleDrop balance when the subgraph fails", async () => {

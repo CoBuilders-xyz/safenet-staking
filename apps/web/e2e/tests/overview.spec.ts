@@ -1,4 +1,5 @@
 import { test, expect } from "../fixtures/base.fixture"
+import { GNOSIS_SNAPSHOT } from "@cobuilders/safenet-core"
 import { VALIDATORS } from "../fixtures/test-data"
 
 /**
@@ -101,23 +102,44 @@ test.describe("Network Overview", () => {
     await expect(page.getByRole("group", { name: "Attestations per day" })).toContainText("4,800")
   })
 
-  test("dates the Gnosis figures as Beta while the index holds no Aegis day, and keeps them", async ({ disconnectedPage: page }) => {
+  test("shows Aegis days from the subgraph, with no Beta notice", async ({ disconnectedPage: page }) => {
     await page.goto("/")
 
-    // The mocked Gnosis subgraph holds Beta's last days only, as the live one does.
-    const notes = page.getByRole("note", { name: "Beta ended" })
-    await expect(notes.first()).toHaveText("Beta ended on 5 October 2026. Aegis data starts on 13 October 2026.")
-    await expect(notes).toHaveCount(2)
-
+    // The mocked Gnosis subgraph holds Aegis days to today, as the live one does while Aegis attests.
     const attestations = page.getByRole("group", { name: "Attestations per day" })
     await expect(attestations).toContainText("4,800")
-    // The mock also holds the stray ceremony of 6 October, with 1 attestation: the label ends on
-    // Beta's last day and the range leaves the stray out.
-    await expect(attestations).toContainText("Beta, Tue 22 Sep 2026 to Mon 5 Oct 2026. Gnosis subgraph, complete UTC days.")
+    await expect(attestations).toContainText("Gnosis subgraph, complete UTC days")
     await expect(attestations).toContainText("Mean over 14 complete days, range 4,800 to 4,800")
-    await expect(attestations).not.toContainText("Tue 6 Oct")
-    await expect(page.getByRole("group", { name: "Attestation latency" })).toContainText("Beta, Tue 22 Sep 2026 to Mon 5 Oct 2026")
-    await expect(page.getByRole("region", { name: "Validators" })).toContainText("Participation: Beta, Tue 22 Sep 2026 to Mon 5 Oct 2026")
+    await expect(attestations).not.toContainText("Beta")
+    await expect(page.getByRole("group", { name: "Attestation latency" })).not.toContainText("Beta")
+    const validators = page.getByRole("region", { name: "Validators" })
+    await expect(validators).toContainText("the Gnosis subgraph, attestation ceremonies attended over 14 complete UTC days to")
+    await expect(validators).toContainText("99.00%")
+    await expect(validators).not.toContainText("Beta,")
+    await expect(page.getByRole("note", { name: "Beta ended" })).toHaveCount(0)
+  })
+
+  test("shows indexed zero attendance and absences without falling back to SEF", async ({ disconnectedPage: page, mockSubgraph }) => {
+    mockSubgraph.gnosisZeroAttendance = true
+    await page.goto("/")
+    const row = page.getByRole("region", { name: "Validators" }).getByRole("row").filter({ hasText: "Validator B" })
+    await expect(row).toContainText("0.00%")
+    await expect(row).toContainText("14,000")
+    await expect(row).not.toContainText("SEF file")
+  })
+
+  test("shows Beta's dated figures, with the Beta notice, while the index holds no Aegis day", async ({ disconnectedPage: page, mockSubgraph }) => {
+    mockSubgraph.gnosisAegis = false
+    await page.goto("/")
+
+    // The subgraph is live but holds no Aegis day, so the figures are the snapshot measured during Beta.
+    const notes = page.getByRole("note", { name: "Beta ended" })
+    await expect(notes.first()).toHaveText("Beta ended on 5 October 2026. Aegis data starts on 13 October 2026.")
+    const attestations = page.getByRole("group", { name: "Attestations per day" })
+    await expect(attestations).toContainText(GNOSIS_SNAPSHOT.attestationsPerDay.toLocaleString("en-US"))
+    await expect(attestations).toContainText("Snapshot measured")
+    await expect(attestations).toContainText("The Gnosis subgraph has not indexed a complete UTC day yet.")
+    await expect(page.getByRole("status", { name: "Data freshness" })).toContainText("Gnosis subgraph: live")
   })
 
   test("needs no wallet: the overview renders without one connected", async ({ disconnectedPage: page }) => {

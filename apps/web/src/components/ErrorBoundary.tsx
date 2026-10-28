@@ -1,6 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react"
-import { Button } from "@/components/ui/button"
-import AlertTriangle from "lucide-react/dist/esm/icons/triangle-alert"
+import { PageError } from "@/components/PageError"
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -43,19 +42,7 @@ export class ErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback(this.handleRetry)
-      return (
-        <div className="flex flex-col items-center justify-center gap-4 py-24">
-          <AlertTriangle
-            className="h-10 w-10 text-destructive"
-            aria-hidden="true"
-          />
-          <h2 className="text-2xl font-bold">Something went wrong</h2>
-          <p className="text-muted-foreground">
-            An unexpected error occurred while loading this page.
-          </p>
-          <Button onClick={this.handleRetry}>Try Again</Button>
-        </div>
-      )
+      return <PageError onRetry={this.handleRetry} />
     }
 
     return this.props.children

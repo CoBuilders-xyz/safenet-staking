@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderHook, waitFor } from "@testing-library/react"
 import { STALE_AGE, answerOperations, meta, mockRequest, queryWrapper } from "@/__tests__/subgraph-mocks"
-import { RECENT_DAYS, RECENT_MESSAGES, useRecentDays } from "../useRecentDays"
+import { RECENT_DAYS, recentMessages, useRecentDays } from "../useRecentDays"
+import { i18n } from "@/i18n"
 
 vi.mock("graphql-request", () => ({ request: (o: unknown) => mockRequest(o) }))
 
@@ -67,7 +68,7 @@ describe("useRecentDays", () => {
     answerOperations({ RecentDays: { _meta: meta(), dayDatas: [{ ...dayData(0, 1n, 0n, 1), rewardsClaimed: "-1" }] } })
     const { result } = render()
     await waitFor(() => expect(result.current.activity.state).toBe("unavailable"))
-    expect(result.current.activity).toEqual({ state: "unavailable", reason: RECENT_MESSAGES.negative })
+    expect(result.current.activity).toEqual({ state: "unavailable", reason: recentMessages(i18n.t).negative })
   })
 
   it("is unavailable when the subgraph fails", async () => {

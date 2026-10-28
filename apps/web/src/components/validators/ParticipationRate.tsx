@@ -1,5 +1,7 @@
+import { REWARD_PARTICIPATION_THRESHOLD } from "@cobuilders/safenet-core"
+import { useTranslation } from "react-i18next"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { PARTICIPATION_RULE, RATE_NOT_PUBLISHED, THRESHOLD_LABEL, belowThreshold } from "@/lib/programme"
+import { THRESHOLD_LABEL, belowThreshold } from "@/lib/programme"
 import { cn } from "@/lib/utils"
 
 interface ParticipationRateProps {
@@ -17,6 +19,7 @@ interface ParticipationRateProps {
  * coloured alone.
  */
 export function ParticipationRate({ rate, text, className }: ParticipationRateProps) {
+  const { t } = useTranslation()
   const below = belowThreshold(rate)
   return (
     <span className={cn("inline-flex items-center gap-1.5", className)}>
@@ -25,7 +28,7 @@ export function ParticipationRate({ rate, text, className }: ParticipationRatePr
         <TooltipTrigger asChild>
           <button
             type="button"
-            aria-label={`${below ? "Below" : "At or above"} the ${THRESHOLD_LABEL} reward threshold`}
+            aria-label={below ? t("validators.belowThreshold", "Below the {{threshold}} reward threshold", { threshold: THRESHOLD_LABEL }) : t("validators.aboveThreshold", "At or above the {{threshold}} reward threshold", { threshold: THRESHOLD_LABEL })}
             className={cn(
               "inline-flex items-center rounded-sm border px-1 font-mono text-[10px] normal-case leading-4 tracking-normal",
               below ? "border-warning/50 bg-warning/10 text-warning" : "border-border text-faint hover:text-muted-foreground",
@@ -36,7 +39,7 @@ export function ParticipationRate({ rate, text, className }: ParticipationRatePr
           </button>
         </TooltipTrigger>
         <TooltipContent className="max-w-xs text-xs normal-case">
-          <p>{PARTICIPATION_RULE}</p>
+          <p>{t("programme.participationRule", "If a validator's participation is below {{threshold}}% in a reward period, both the validator and its delegators earn no rewards for that period.", { threshold: REWARD_PARTICIPATION_THRESHOLD * 100 })}</p>
         </TooltipContent>
       </Tooltip>
     </span>
@@ -48,6 +51,7 @@ export function ParticipationRate({ rate, text, className }: ParticipationRatePr
  * with no rate; that reads "Not published", with no threshold marker, and never as 0.00%.
  */
 export function PublishedParticipationRate({ percent, className }: { percent: number | null; className?: string }) {
-  if (percent === null) return <span className={cn("text-muted-foreground", className)}>{RATE_NOT_PUBLISHED}</span>
+  const { t } = useTranslation()
+  if (percent === null) return <span className={cn("text-muted-foreground", className)}>{t("programme.rateNotPublished", "Not published")}</span>
   return <ParticipationRate className={className} rate={percent / 100} text={`${percent}%`} />
 }

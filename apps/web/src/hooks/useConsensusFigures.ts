@@ -1,3 +1,5 @@
+import type { TFunction } from "i18next"
+import { useTranslation } from "react-i18next"
 import { GNOSIS_SNAPSHOT } from "@cobuilders/safenet-core"
 import { ConsensusWindowDocument } from "@/graphql/gnosis/generated"
 import {
@@ -12,10 +14,13 @@ import { describeDegradation } from "@/lib/subgraph"
 import { loading, ready, type Figure } from "@/lib/figure"
 import { useSubgraphQuery } from "./useSubgraphQuery"
 
-export const CONSENSUS_MESSAGES = {
-  noCompleteDay: "The Gnosis subgraph has not indexed a complete UTC day yet.",
-  noLatencySample: "No attestation in the Gnosis subgraph's window could be matched to its proposal.",
-} as const
+export const consensusMessages = (t: TFunction) => ({
+  noCompleteDay: t("overview.reason.noCompleteDay", "The Gnosis subgraph has not indexed a complete UTC day yet."),
+  noLatencySample: t(
+    "overview.reason.noLatencySample",
+    "No attestation in the Gnosis subgraph's window could be matched to its proposal.",
+  ),
+})
 
 export interface AttestationRate {
   mean: number
@@ -58,6 +63,8 @@ const SNAPSHOT_LATENCY: Latency = {
  * ceremony or the snapshot's run, is before Aegis.
  */
 export function useConsensusFigures() {
+  const { t } = useTranslation()
+  const messages = consensusMessages(t)
   const subgraph = useSubgraphQuery("gnosis", "consensus-window", ConsensusWindowDocument, () => consensusQueryVariables())
 
   const window: ConsensusWindow | undefined =
@@ -71,7 +78,7 @@ export function useConsensusFigures() {
   if (window) {
     betaOnly = describesBeta(window.lastCeremonyDay)
     attestations = ready({ ...window.attestationsPerDay, days: window.days }, "subgraph")
-    if (window.latencyMedianBlocks === undefined) snapshotReason = CONSENSUS_MESSAGES.noLatencySample
+    if (window.latencyMedianBlocks === undefined) snapshotReason = messages.noLatencySample
     latency =
       window.latencyMedianBlocks === undefined
         ? ready(SNAPSHOT_LATENCY, "snapshot")
@@ -80,7 +87,7 @@ export function useConsensusFigures() {
             "subgraph",
           )
   } else if (subgraph.status !== "loading") {
-    snapshotReason = subgraph.status === "degraded" ? describeDegradation(subgraph.degradation) : CONSENSUS_MESSAGES.noCompleteDay
+    snapshotReason = subgraph.status === "degraded" ? describeDegradation(subgraph.degradation, t) : messages.noCompleteDay
     betaOnly = describesBeta(utcDayStart(Date.parse(GNOSIS_SNAPSHOT.runAt)))
     attestations = ready(SNAPSHOT_RATE, "snapshot")
     latency = ready(SNAPSHOT_LATENCY, "snapshot")

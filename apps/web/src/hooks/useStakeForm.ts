@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useState, useEffect, useCallback, useRef } from "react"
 import type { Address, Hex } from "viem"
 import { useTokenBalance } from "@/hooks/useTokenBalance"
@@ -7,7 +8,7 @@ import { useWithdrawDelay } from "@/hooks/useStakingReads"
 import { useToast } from "@/hooks/useToast"
 import { useTxToast } from "@/hooks/useTxToast"
 import { useGasEstimate } from "@/hooks/useGasEstimate"
-import { truncateAddress, safeParseEther, formatTokenAmountRaw } from "@/lib/format"
+import { truncateAddress, formatTokenAmount, parseAmount, presetAmount, type PresetAmount } from "@/lib/format"
 
 export interface Staked {
   amount: bigint
@@ -52,12 +53,24 @@ export function useStakeForm({
   availableAtLeast,
   pollBalance,
 }: UseStakeFormOptions) {
-  // Null until the user types: the amount then follows `initialAmount`.
-  const [typedAmount, setTypedAmount] = useState<string | null>(null)
-  const amount = typedAmount ?? (initialAmount !== undefined ? formatTokenAmountRaw(initialAmount, 18, 18) : "")
+  const { t } = useTranslation()
+  // Null until the user types or picks a shortcut: the amount then follows `initialAmount`. A
+  // shortcut or the initial amount is a preset, shown rounded and sent exact (see presetAmount).
+  const [entry, setEntry] = useState<{ text: string; preset?: PresetAmount } | null>(null)
+  const preset = entry ? entry.preset : initialAmount !== undefined ? presetAmount(initialAmount) : undefined
+  const amount = entry?.text ?? preset?.text ?? ""
+  const setTypedAmount = useCallback((text: string) => setEntry({ text }), [])
+  const setPresetAmount = useCallback((value: bigint) => {
+    const p = presetAmount(value)
+    setEntry({ text: p.text, preset: p })
+  }, [])
+  // The "what happens if" step between pressing Stake and the wallet's confirmation.
+  const [reviewing, setReviewing] = useState(false)
+  const startReview = useCallback(() => setReviewing(true), [])
+  const cancelReview = useCallback(() => setReviewing(false), [])
   const { data: balance } = useTokenBalance({ refetchInterval: pollBalance && active ? 4_000 : undefined })
 
-  const parsedAmount = safeParseEther(amount)
+  const parsedAmount = parseAmount(amount, preset)
 
   const approval = useApprovalFlow(parsedAmount)
   const { needsApproval, resetApprovalFlow } = approval
@@ -146,16 +159,16 @@ export function useStakeForm({
   const onStakeConfirmed = useCallback(() => finish(stakeTxHash), [finish, stakeTxHash])
   const onBatchConfirmed = useCallback(() => finish(batchTxHash), [finish, batchTxHash])
 
-  const sentAmount = sent ? formatTokenAmountRaw(sent.amount, 18, 18) : amount
+  const sentAmount = formatTokenAmount(sent ? sent.amount : parsedAmount)
   const target = sent ? truncateAddress(sent.validator) : validator ? truncateAddress(validator) : "a validator"
 
   // Stake transaction toasts
   useTxToast(
     {
-      successTitle: "Delegation successful",
-      successDescription: `Staked ${sentAmount} SAFE to ${target}`,
-      errorTitle: "Delegation failed",
-      safeQueuedDescription: "Your delegation has been sent to Safe Wallet for signing.",
+      successTitle: t("staking.delegationSuccessful", "Delegation successful"),
+      successDescription: t("staking.stakedSafeTo", "Staked {{sentAmount}} SAFE to {{target}}", { sentAmount: sentAmount, target: target }),
+      errorTitle: t("staking.delegationFailed", "Delegation failed"),
+      safeQueuedDescription: t("staking.yourDelegationHasBeenSentToSafeWallet", "Your delegation has been sent to Safe Wallet for signing."),
     },
     {
       isSuccess: isStaked,
@@ -170,9 +183,9 @@ export function useStakeForm({
   // Batch transaction toasts
   useTxToast(
     {
-      successTitle: "Delegation successful",
-      successDescription: `Approved and staked ${sentAmount} SAFE to ${target}`,
-      errorTitle: "Delegation failed",
+      successTitle: t("staking.delegationSuccessful", "Delegation successful"),
+      successDescription: t("staking.approvedAndStakedSafeTo", "Approved and staked {{sentAmount}} SAFE to {{target}}", { sentAmount: sentAmount, target: target }),
+      errorTitle: t("staking.delegationFailed", "Delegation failed"),
     },
     {
       isSuccess: isBatchSuccess,
@@ -186,16 +199,17 @@ export function useStakeForm({
 
   useEffect(() => {
     if (isBatchReverted) {
-      toast({ variant: "error", title: "Transaction reverted", description: "The batch transaction was reverted onchain" })
+      toast({ variant: "error", title: t("staking.transactionReverted", "Transaction reverted"), description: t("staking.theBatchTransactionWasRevertedOnchain", "The batch transaction was reverted onchain") })
       resetBatch()
     }
-  }, [isBatchReverted, resetBatch, toast])
+  }, [isBatchReverted, resetBatch, t, toast])
 
   // Resetting a transaction in flight would drop its receipt, and with it the toast and the
   // refreshed balances. So a dialog closed mid-transaction resets once the transaction settles.
   useEffect(() => {
     if (!active && !isBusy) {
-      setTypedAmount(null)
+      setEntry(null)
+      setReviewing(false)
       resetApprovalFlow()
       resetStake()
       resetBatch()
@@ -206,6 +220,13 @@ export function useStakeForm({
     validator,
     amount,
     setAmount: setTypedAmount,
+    setPresetAmount,
+    /** True on the review step, after Stake and before the wallet asks to confirm. */
+    reviewing,
+    startReview,
+    cancelReview,
+    /** The preset behind the amount shown, while the user has not edited it. */
+    preset: preset !== undefined && amount === preset.text ? preset : undefined,
     parsedAmount,
     balanceValue,
     maxAmount,

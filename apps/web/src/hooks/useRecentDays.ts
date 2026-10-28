@@ -1,12 +1,14 @@
+import type { TFunction } from "i18next"
+import { useTranslation } from "react-i18next"
 import { RecentDaysDocument, type RecentDaysQuery } from "@/graphql/mainnet/generated"
 import { utcDayStart } from "@/lib/consensus"
 import { describeDegradation } from "@/lib/subgraph"
 import { loading, ready, unavailable, type Figure } from "@/lib/figure"
 import { selectLive, useSubgraphQuery } from "./useSubgraphQuery"
 
-export const RECENT_MESSAGES = {
-  negative: "The subgraph reports a negative daily amount, which cannot be right.",
-} as const
+export const recentMessages = (t: TFunction) => ({
+  negative: t("overview.reason.negativeDaily", "The subgraph reports a negative daily amount, which cannot be right."),
+})
 
 /** The activity window on the overview, in UTC days, today included. */
 export const RECENT_DAYS = 30
@@ -34,6 +36,7 @@ const windowStart = (ms: number) => utcDayStart(ms) - (RECENT_DAYS - 1) * DAY_SE
  * with the reason.
  */
 export function useRecentDays() {
+  const { t } = useTranslation()
   const subgraph = useSubgraphQuery("mainnet", "recent-days", RecentDaysDocument, () => ({ since: windowStart(Date.now()) }))
   const live = selectLive(subgraph, (d) => d.dayDatas)
 
@@ -41,7 +44,7 @@ export function useRecentDays() {
   if (live.status === "live") {
     const days = live.value
     const negative = days.some((d) => BigInt(d.stakedIn) < 0n || BigInt(d.withdrawnOut) < 0n || BigInt(d.rewardsClaimed) < 0n)
-    activity = negative ? unavailable(RECENT_MESSAGES.negative) : ready(
+    activity = negative ? unavailable(recentMessages(t).negative) : ready(
       {
         since: windowStart(live.freshness.checkedAt),
         days,
@@ -54,7 +57,11 @@ export function useRecentDays() {
       "subgraph",
     )
   } else if (live.status === "degraded") {
-    activity = unavailable(`${describeDegradation(live.degradation)} No contract read gives a daily history.`)
+    activity = unavailable(
+      t("overview.reason.noDailyHistory", "{{why}} No contract read gives a daily history.", {
+        why: describeDegradation(live.degradation, t),
+      }),
+    )
   }
 
   return { subgraph, activity }

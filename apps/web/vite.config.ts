@@ -96,22 +96,10 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        // Split the always-used React runtime without pulling lazy dialogs or tabs into it.
+        onlyExplicitManualChunks: true,
         manualChunks(id) {
-          if (!id.includes('node_modules')) return
-          if (
-            id.includes('@walletconnect/') ||
-            id.includes('@reown/')
-          ) {
-            return 'vendor-walletconnect'
-          }
-          if (
-            id.includes('@radix-ui/') ||
-            id.includes('/class-variance-authority/') ||
-            id.includes('/clsx/') ||
-            id.includes('/tailwind-merge/')
-          ) {
-            return 'vendor-ui'
-          }
+          if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return "vendor-react"
         },
       },
     },

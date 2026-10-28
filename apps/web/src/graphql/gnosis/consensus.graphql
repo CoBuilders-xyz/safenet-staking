@@ -11,22 +11,28 @@ fragment GnosisFreshness on _Meta_ {
 # The window ends at the last day the subgraph holds, not at today: both lists are read newest
 # first. So a network that stopped attesting keeps its last figures, dated, instead of an empty
 # window. $until is the last day of the indexed programme, when it has ended, so stray rows
-# after it do not push its days out of the page.
-query ConsensusWindow($days: Int!, $until: Int!) {
+# after it do not push its days out of the page. $programme keeps the rows to one programme:
+# the subgraph indexes Beta and Aegis, and files every row under one.
+query ConsensusWindow($days: Int!, $until: Int!, $programme: String!) {
   _meta {
     ...GnosisFreshness
   }
-  # The first day the subgraph indexed. It started during that day, so the day is partial.
-  firstDay: consensusDays(first: 1, orderBy: date, orderDirection: asc) {
+  programmeConsensus: consensuses(first: 1, where: { programme: $programme }) {
+    validatorCount
+    validators(first: 1000) { id }
+  }
+  # First stored day. Beta uses it as a conservative partial-day boundary; Aegis coverage
+  # comes from its deployment boundary in core, which precedes its first attestation row.
+  firstDay: consensusDays(first: 1, where: { programme: $programme }, orderBy: date, orderDirection: asc) {
     date
   }
-  consensusDays(first: $days, where: { date_lte: $until }, orderBy: date, orderDirection: desc) {
+  consensusDays(first: $days, where: { date_lte: $until, programme: $programme }, orderBy: date, orderDirection: desc) {
     date
     attestations
     attestationCeremonies
     latencyBuckets
   }
-  validatorDays(first: 1000, where: { date_lte: $until }, orderBy: date, orderDirection: desc) {
+  validatorDays(first: 1000, where: { date_lte: $until, programme: $programme }, orderBy: date, orderDirection: desc) {
     date
     attended
     validator {

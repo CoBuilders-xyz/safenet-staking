@@ -1,4 +1,5 @@
-import type { ReactNode } from "react"
+import { useId, type ReactNode } from "react"
+import { useTranslation } from "react-i18next"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -14,9 +15,13 @@ interface OverviewSectionProps {
   className?: string
 }
 
-/** A card on the overview. Every section names its source, so a reader can check it. */
+/**
+ * A card on the overview. Every section names its source, so a reader can check it. The heading's
+ * id comes from React, not the title: a title in Cyrillic or Chinese has no word characters to
+ * build one from, and every section would share it.
+ */
 export function OverviewSection({ title, source, children, className }: OverviewSectionProps) {
-  const id = `overview-section-${title.toLowerCase().replace(/\W+/g, "-")}`
+  const id = useId()
   return (
     <Card role="region" aria-labelledby={id} className={className}>
       <CardHeader className="pb-4">
@@ -35,14 +40,15 @@ export function OverviewSection({ title, source, children, className }: Overview
  * message in its place and the rest of the page keeps working.
  */
 export function SectionBoundary({ title, children }: { title: string; children: ReactNode }) {
+  const { t } = useTranslation()
   return (
     <ErrorBoundary
       fallback={(retry) => (
         <OverviewSection title={title}>
           <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/50 p-3 text-sm">
-            <span>This section could not be shown.</span>
+            <span>{t("overview.section.failed", "This section could not be shown.")}</span>
             <Button size="sm" variant="outline" onClick={retry}>
-              Retry
+              {t("overview.section.retry", "Retry")}
             </Button>
           </div>
         </OverviewSection>
@@ -62,13 +68,14 @@ interface FigureValueProps<T> {
 
 /** A figure's value, a skeleton while it loads, or "Unavailable" with the reason beside it. */
 export function FigureValue<T>({ figure, format, skeletonClassName }: FigureValueProps<T>) {
+  const { t } = useTranslation()
   if (figure.state === "loading") {
-    return <Skeleton className={cn("inline-block h-5 w-24 align-middle", skeletonClassName)} aria-label="Loading" />
+    return <Skeleton className={cn("inline-block h-5 w-24 align-middle", skeletonClassName)} aria-label={t("overview.figure.loading", "Loading")} />
   }
   if (figure.state === "unavailable") {
     return (
       <span>
-        Unavailable
+        {t("overview.figure.unavailable", "Unavailable")}
         <span className="block font-sans text-xs font-normal text-muted-foreground">{figure.reason}</span>
       </span>
     )

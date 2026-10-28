@@ -8,6 +8,11 @@
 # What survives is per-validator hourly and daily counters, which is what the promised metrics
 # need: participation over a window, attestations per day, latency percentiles.
 #
+# Two programmes share the schema: Beta and Aegis, each on its own consensus contract and FROST
+# coordinator. Every row below that counts something belongs to one programme, named in its
+# `programme` field, "beta" or "aegis", and its id starts with that name. A programme's figures
+# never mix with the other's: its own validator list, its own ceremonies, its own buckets.
+#
 # The cost of aggregating is that a new question needs a resync. On Gnosis that is expensive,
 # so the aggregates below are chosen to answer every metric the interface and API are meant
 # to serve, not to be minimal.
@@ -34,8 +39,9 @@ and the ceremony is filed under the attestation's block either way.
 Removed once counted. Without that, this table would grow by about 4,600 rows a day forever.
 """
 type Ceremony @entity(immutable: false) {
-  "The signature id, sid."
+  "The programme, a dash, the signature id, sid."
   id: ID!
+  programme: String!
 
   "Set by SignCompleted. Null until then."
   winningRoot: Bytes
@@ -81,7 +87,7 @@ Consensus.countedOldest through `next`, so the table holds a few hundred rows, n
 ceremony ever counted.
 """
 type CountedCeremony @entity(immutable: false) {
-  "The signature id, sid."
+  "The programme, a dash, the signature id, sid."
   id: ID!
   countedAtBlock: BigInt!
   "The sid counted after this one. Null for the newest."
@@ -95,7 +101,7 @@ Keyed by sid and root together because a ceremony can see shares for more than o
 only the winner counts. Removed with its ceremony.
 """
 type RootTally @entity(immutable: false) {
-  "sid, a dash, selectionRoot."
+  "The Ceremony id, a dash, selectionRoot."
   id: ID!
   ceremony: Ceremony!
   root: Bytes!
@@ -108,9 +114,15 @@ A proposed transaction awaiting its attestation, held to measure latency.
 Latency is the block distance from TransactionProposed to TransactionAttested for the same
 safeTxHash. The proposal comes first, so it must be stored until the attestation arrives.
 Removed once measured.
+
+The key repeats the indexed parameters both events carry. On Beta they are the chainId and the
+Safe; on Aegis, the safeId, which packs the chain id with the Safe, and the oracle.
 """
 type PendingProposal @entity(immutable: false) {
-  "safeTxHash, a dash, chainId, a dash, safe address."
+  """
+  The programme, then safeTxHash and the two other indexed parameters: chainId and the Safe on
+  Beta, safeId and the oracle on Aegis. Dash separated.
+  """
   id: ID!
   proposedAtBlock: BigInt!
   proposedAtTimestamp: BigInt!
@@ -120,9 +132,10 @@ type PendingProposal @entity(immutable: false) {
 # What survives
 # -----------------------------------------------------------------------------------------
 
-"Network-wide totals for this chain. One row, id \"1\"."
+"Network-wide totals for one programme. One row per programme, its id the programme's name."
 type Consensus @entity(immutable: false) {
   id: ID!
+  programme: String!
 
   "Ceremonies that completed AND carried an attestation. The participation denominator."
   attestationCeremonies: BigInt!
@@ -148,8 +161,10 @@ type Consensus @entity(immutable: false) {
   openCeremonies: Int!
 
   """
-  Every signing validator seen, in the order first seen. A counted attestation ceremony is a
-  miss for each of these that did not share for its winning root; see ValidatorHour.
+  Every signing validator seen on this programme's contracts, in the order first seen. A
+  counted attestation ceremony is a miss for each of these that did not share for its winning
+  root; see ValidatorHour. A validator of both programmes is in both lists, from the first time
+  each programme's contracts showed it.
   """
   validators: [SigningValidator!]!
 
@@ -158,7 +173,10 @@ type Consensus @entity(immutable: false) {
   countedNewest: String
 }
 
-"A validator on this chain, identified by its signing address."
+"""
+A validator on this chain, identified by its signing address, across both programmes. Its
+counts per programme are in its days and hours, which name the programme.
+"""
 type SigningValidator @entity(immutable: false) {
   "The participant address, lowercase hex."
   id: ID!
@@ -173,7 +191,7 @@ type SigningValidator @entity(immutable: false) {
   staker: Bytes
 
   """
-  Winning attestation ceremonies this validator shared in.
+  Winning attestation ceremonies this validator shared in, in both programmes together.
 
   Absences are NOT stored. The oracle derives them: absent = attestationCeremonies - attended.
   A stored counter would be a second source for the same fact and could drift from the first,
@@ -200,12 +218,13 @@ the window selector the validator detail screen is meant to offer.
 Filed by the day of the block the ceremony was attested in, the same rule as ValidatorHour.
 """
 type ValidatorDay @entity(immutable: false) {
-  "validator address, a dash, the UTC day start as a unix timestamp."
+  "The programme, the validator address and the UTC day start as a unix timestamp, dash separated."
   id: ID!
+  programme: String!
   validator: SigningValidator!
   date: Int!
 
-  "Derive absences as ConsensusDay.attestationCeremonies - this."
+  "Derive absences as the same programme's ConsensusDay.attestationCeremonies - this."
   attended: BigInt!
 }
 
@@ -219,8 +238,9 @@ Every figure is filed by the day of its TransactionAttested block: an attestatio
 under the day it was attested in, the same rule as ConsensusHour.
 """
 type ConsensusDay @entity(immutable: false) {
-  "The UTC day start as a unix timestamp, as a string."
+  "The programme, a dash, the UTC day start as a unix timestamp."
   id: ID!
+  programme: String!
   date: Int!
 
   attestations: BigInt!
@@ -254,14 +274,17 @@ type ConsensusDay @entity(immutable: false) {
 # start with such a block. SEF's window from S to E, both on the hour, is then:
 #
 #   the sum of each field over the hours S, S + 1h, ..., E - 1h,
-#   plus the `OnTheHour` field of hour E.
+#   plus the `OnTheHour` field of hour E,
+#
+# over the rows of one programme.
 
 """
 Per hour, network-wide: the participation denominator.
 """
 type ConsensusHour @entity(immutable: false) {
-  "The hour start as a unix timestamp, as a string."
+  "The programme, a dash, the hour start as a unix timestamp."
   id: ID!
+  programme: String!
   hour: Int!
 
   "Attestation ceremonies attested in this hour."
@@ -282,8 +305,9 @@ A validator first seen after a ceremony was counted is not given a miss for it. 
 denominator is the network's: use ConsensusHour, not `ceremonies`, for a rate.
 """
 type ValidatorHour @entity(immutable: false) {
-  "validator address, a dash, the hour start as a unix timestamp."
+  "The programme, the validator address and the hour start as a unix timestamp, dash separated."
   id: ID!
+  programme: String!
   validator: SigningValidator!
   hour: Int!
 

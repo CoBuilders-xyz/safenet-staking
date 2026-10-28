@@ -2,7 +2,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { getAddress } from "viem"
 import { INDEXED_EVENTS } from "./abis.js"
-import { CONTRACTS, type ContractName, type ContractRef } from "./contracts.js"
+import { CONTRACTS, GNOSIS_CONTRACTS, type ContractName, type ContractRef } from "./contracts.js"
 
 const refs = Object.entries(CONTRACTS) as [ContractName, ContractRef][]
 
@@ -52,4 +52,22 @@ test("a contract with a programme can be searched for that programme's end", () 
     if (ref.programme === undefined) continue
     assert.notEqual(ref.deployBlock ?? ref.startBlock, undefined, name)
   }
+})
+
+test("each programme's Gnosis roles name Gnosis contracts of that programme", () => {
+  for (const [programme, roles] of Object.entries(GNOSIS_CONTRACTS)) {
+    for (const [role, name] of Object.entries(roles)) {
+      const ref: ContractRef = CONTRACTS[name as ContractName]
+      assert.equal(ref.chain, "gnosis", `${programme}.${role}`)
+      assert.equal(ref.programme, programme, `${programme}.${role}`)
+      assert.notEqual(ref.deployBlock, undefined, `${programme}.${role}: an indexer starts at the deploy block`)
+    }
+  }
+})
+
+test("every Gnosis contract plays a role in its programme", () => {
+  // A Gnosis contract outside GNOSIS_CONTRACTS is one nothing picks by programme, so the
+  // subgraph and the parity run would never read it.
+  const named = new Set(Object.values(GNOSIS_CONTRACTS).flatMap((roles) => Object.values(roles)))
+  for (const [name, ref] of refs) if (ref.chain === "gnosis") assert.ok(named.has(name), name)
 })

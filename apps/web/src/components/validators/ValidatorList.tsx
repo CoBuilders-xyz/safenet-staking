@@ -1,3 +1,5 @@
+import { REWARD_PARTICIPATION_THRESHOLD } from "@cobuilders/safenet-core"
+import { useTranslation } from "react-i18next"
 import { useMemo } from "react"
 import { useValidators } from "@/hooks/useValidators"
 import {
@@ -9,13 +11,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw"
 import type { Address } from "viem"
-import { PARTICIPATION_RULE } from "@/lib/programme"
 
 export function ValidatorList({
   autoOpenDelegate,
 }: {
   autoOpenDelegate?: string
 }) {
+  const { t } = useTranslation()
   const { data: validators, isLoading, error, refetch } = useValidators()
   const validatorAddresses = useMemo(
     () => (validators ?? []).map((v) => v.address),
@@ -60,22 +62,17 @@ export function ValidatorList({
 
   if (error) {
     return (
-      <div className="border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-        Failed to load validators: {error.message}
-      </div>
+      <div className="border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">{t("validators.failedToLoadValidators", "Failed to load validators. Please try again.")}</div>
     )
   }
 
   if (!validators || validators.length === 0) {
     return (
       <div className="border p-8 text-center space-y-4">
-        <p className="text-muted-foreground">
-          No validators are currently available.
-        </p>
+        <p className="text-muted-foreground">{t("validators.noValidatorsAreCurrentlyAvailable", "No validators are currently available.")}</p>
         <Button variant="outline" size="sm" onClick={() => refetch()}>
           <RefreshCw className="h-4 w-4 mr-2" aria-hidden="true" />
-          Refresh
-        </Button>
+          {t("validators.refresh", "Refresh")}</Button>
       </div>
     )
   }
@@ -99,7 +96,7 @@ export function ValidatorList({
           />
         ))}
       </div>
-      <p className="text-sm text-muted-foreground">{PARTICIPATION_RULE}</p>
+      <p className="text-sm text-muted-foreground">{t("programme.participationRule", "If a validator's participation is below {{threshold}}% in a reward period, both the validator and its delegators earn no rewards for that period.", { threshold: REWARD_PARTICIPATION_THRESHOLD * 100 })}</p>
     </div>
   )
 }

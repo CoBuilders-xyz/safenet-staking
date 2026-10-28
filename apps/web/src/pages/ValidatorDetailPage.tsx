@@ -1,3 +1,5 @@
+import { REWARD_PARTICIPATION_THRESHOLD } from "@cobuilders/safenet-core"
+import { useTranslation } from "react-i18next"
 import { useState } from "react"
 import { useParams, Link } from "react-router-dom"
 import { useAccount } from "wagmi"
@@ -13,14 +15,13 @@ import { useValidators, findValidator } from "@/hooks/useValidators"
 import { formatTokenAmount, asBigint } from "@/lib/format"
 import { copyToClipboard } from "@/lib/clipboard"
 import { useToast } from "@/hooks/useToast"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import { Info } from "lucide-react"
+import { Term } from "@/components/ui/term"
 import { useWrongNetwork } from "@/hooks/useWrongNetwork"
 import { PublishedParticipationRate } from "@/components/validators/ParticipationRate"
-import { PARTICIPATION_RULE, WITHDRAWN, WITHDRAWN_STATUS } from "@/lib/programme"
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left"
 import Copy from "lucide-react/dist/esm/icons/copy"
 export function ValidatorDetailPage() {
+  const { t } = useTranslation()
   const { address: validatorAddress } = useParams<{ address: string }>()
   const { isConnected } = useAccount()
   const wrongNetwork = useWrongNetwork()
@@ -45,11 +46,8 @@ export function ValidatorDetailPage() {
       <div className="space-y-4">
         <Link to="/validators" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Back to Validators
-        </Link>
-        <div className="rounded-lg border p-8 text-center text-muted-foreground">
-          Invalid validator address.
-        </div>
+          {t("validators.backToValidators", "Back to Validators")}</Link>
+        <div className="rounded-lg border p-8 text-center text-muted-foreground">{t("validators.invalidValidatorAddress", "Invalid validator address.")}</div>
       </div>
     )
   }
@@ -68,11 +66,8 @@ export function ValidatorDetailPage() {
       <div className="space-y-4">
         <Link to="/validators" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Back to Validators
-        </Link>
-        <div className="rounded-lg border p-8 text-center text-muted-foreground">
-          Validator not found.
-        </div>
+          {t("validators.backToValidators", "Back to Validators")}</Link>
+        <div className="rounded-lg border p-8 text-center text-muted-foreground">{t("validators.validatorNotFound", "Validator not found.")}</div>
       </div>
     )
   }
@@ -81,8 +76,7 @@ export function ValidatorDetailPage() {
     <div className="space-y-6">
       <Link to="/validators" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        Back to Validators
-      </Link>
+        {t("validators.backToValidators", "Back to Validators")}</Link>
 
       <Card>
         <CardHeader>
@@ -96,64 +90,43 @@ export function ValidatorDetailPage() {
                 <button
                   onClick={async () => {
                     const ok = await copyToClipboard(validator)
-                    if (ok) toast({ variant: "success", title: "Address copied" })
+                    if (ok) toast({ variant: "success", title: t("validators.addressCopied", "Address copied") })
                   }}
                   className="text-muted-foreground hover:text-foreground"
-                  aria-label="Copy address"
+                  aria-label={t("validators.copyAddress", "Copy address")}
                 >
                   <Copy className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </div>
             </div>
             {isActive ? (
-              <Badge variant="secondary" className="text-sm">Active</Badge>
+              <Badge variant="secondary" className="text-sm">{t("validators.active", "Active")}</Badge>
             ) : (
-              <Badge className="bg-warning/20 text-warning hover:bg-warning/30 text-sm">{WITHDRAWN}</Badge>
+              <Badge className="bg-warning/20 text-warning hover:bg-warning/30 text-sm">{t("programme.withdrawn", "Withdrawn")}</Badge>
             )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {!isActive && (
-            <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
-              {WITHDRAWN_STATUS}. Its stake and past participation stay shown; staking with it is off.
-            </p>
+            <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">{t("validators.itsStakeAndPastParticipationStayShownStaking", "{{WITHDRAWN_STATUS}}. Its stake and past participation stay shown; staking with it is off.", { WITHDRAWN_STATUS: t("programme.withdrawnStatus", "Withdrawn, Aegis participation unconfirmed") })}</p>
           )}
           <div className="flex gap-6 text-sm">
             <div className="flex items-center gap-1">
-              <span className="text-muted-foreground">Commission: </span>
+              <span className="text-muted-foreground">
+                <Term term="commission">{t("onboarding.commission", "Commission")}</Term>:{" "}
+              </span>
               <span className="font-medium">{validatorInfo.commission}%</span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button className="text-muted-foreground hover:text-foreground" aria-label="Commission info">
-                    <Info className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs text-xs">
-                  <p>
-                    Validators earn 5% commission on rewards generated by delegated stake.{" "}
-                    <a
-                      href="https://docs.safefoundation.org/safenet/staking/validator-staking"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline text-primary-foreground/80 hover:text-primary-foreground"
-                    >
-                      See here for more details
-                    </a>
-                    .
-                  </p>
-                </TooltipContent>
-              </Tooltip>
             </div>
             <div>
-              <span className="text-muted-foreground">Participation (14d): </span>
+              <span className="text-muted-foreground">{t("validators.participation14d", "Participation (14d):")}</span>
               <PublishedParticipationRate className="font-medium" percent={validatorInfo.participationRate} />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">{PARTICIPATION_RULE}</p>
+          <p className="text-xs text-muted-foreground">{t("programme.participationRule", "If a validator's participation is below {{threshold}}% in a reward period, both the validator and its delegators earn no rewards for that period.", { threshold: REWARD_PARTICIPATION_THRESHOLD * 100 })}</p>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-lg bg-muted/30 p-4">
-              <p className="text-sm text-muted-foreground">Total SAFE Staked</p>
+              <p className="text-sm text-muted-foreground">{t("validators.totalSafeStaked", "Total SAFE Staked")}</p>
               {loadingTotal ? (
                 <Skeleton className="h-7 w-32 mt-1" />
               ) : (
@@ -162,7 +135,7 @@ export function ValidatorDetailPage() {
             </div>
             {isConnected && (
               <div className="rounded-lg bg-muted/30 p-4">
-                <p className="text-sm text-muted-foreground">Your SAFE Staked</p>
+                <p className="text-sm text-muted-foreground">{t("validators.yourSafeStaked", "Your SAFE Staked")}</p>
                 {loadingUser ? (
                   <Skeleton className="h-7 w-32 mt-1" />
                 ) : (
@@ -174,12 +147,8 @@ export function ValidatorDetailPage() {
 
           {isConnected && (
             <div className="flex gap-3">
-              <Button variant="gradient" onClick={() => setDelegateOpen(true)} disabled={!isActive || wrongNetwork}>
-                Stake
-              </Button>
-              <Button variant="outline" disabled={!hasStake || wrongNetwork} onClick={() => setUndelegateOpen(true)}>
-                Unstake
-              </Button>
+              <Button variant="gradient" onClick={() => setDelegateOpen(true)} disabled={!isActive || wrongNetwork}>{t("validators.stake", "Stake")}</Button>
+              <Button variant="outline" disabled={!hasStake || wrongNetwork} onClick={() => setUndelegateOpen(true)}>{t("validators.unstake", "Unstake")}</Button>
             </div>
           )}
         </CardContent>

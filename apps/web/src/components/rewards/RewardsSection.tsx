@@ -1,4 +1,5 @@
-import type { ReactNode } from "react"
+import { useTranslation } from "react-i18next"
+import { useId, type ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -12,7 +13,7 @@ interface RewardsSectionProps {
 
 /** A card on the Rewards page. Every section names its source, so a reader can check it. */
 export function RewardsSection({ title, source, children }: RewardsSectionProps) {
-  const id = `rewards-section-${title.toLowerCase().replace(/\W+/g, "-")}`
+  const id = useId()
   return (
     <Card role="region" aria-labelledby={id}>
       <CardHeader>
@@ -25,8 +26,9 @@ export function RewardsSection({ title, source, children }: RewardsSectionProps)
 }
 
 export function SectionLoading({ rows = 3 }: { rows?: number }) {
+  const { t } = useTranslation()
   return (
-    <div className="space-y-3" role="status" aria-label="Loading">
+    <div className="space-y-3" role="status" aria-label={t("rewards.loading", "Loading")}>
       {Array.from({ length: rows }).map((_, i) => (
         <Skeleton key={i} className="h-10" />
       ))}
@@ -36,13 +38,12 @@ export function SectionLoading({ rows = 3 }: { rows?: number }) {
 
 /** A section-scoped error: the rest of the page keeps working. */
 export function SectionError({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const { t } = useTranslation()
   return (
     <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/50 p-3 text-sm">
       <span>{message}</span>
       {onRetry && (
-        <Button size="sm" variant="outline" onClick={onRetry}>
-          Retry
-        </Button>
+        <Button size="sm" variant="outline" onClick={onRetry}>{t("rewards.retry", "Retry")}</Button>
       )}
     </div>
   )

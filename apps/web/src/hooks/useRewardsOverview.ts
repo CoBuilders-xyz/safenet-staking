@@ -1,17 +1,31 @@
+import type { TFunction } from "i18next"
+import { useTranslation } from "react-i18next"
 import { useProgrammeRewards } from "@/hooks/useProgrammeRewards"
-import { MESSAGES } from "@/components/rewards/messages"
 import { loading, ready, unavailable, type Figure } from "@/lib/figure"
 import { useNetworkQuery } from "./useNetworkTotals"
 import { selectLive } from "./useSubgraphQuery"
 
-export const REWARDS_MESSAGES = {
-  rootDiffers:
+/**
+ * The reasons a rewards figure on the overview is unavailable, in the current language. The first
+ * two say the same as the Rewards page's MESSAGES in components/rewards/messages.ts.
+ */
+export const rewardsMessages = (t: TFunction) => ({
+  latestFileFailed: t("overview.reason.latestFileFailed", "SEF's published rewards file could not be loaded."),
+  contractReadFailed: t("overview.reason.merkleDropReadFailed", "The MerkleDrop contract could not be read from Ethereum."),
+  rootDiffers: t(
+    "overview.reason.rootDiffers",
     "The root on chain differs from the one SEF published, so the published allocation does not match what the contract pays out.",
-  claimsExceedAllocation: "Claims exceed the published allocation, so the difference does not measure what is unclaimed.",
-  negativeClaims: "The subgraph reports a negative claimed total, which cannot be right.",
-  balanceExceedsAllocation:
+  ),
+  claimsExceedAllocation: t(
+    "overview.reason.claimsExceedAllocation",
+    "Claims exceed the published allocation, so the difference does not measure what is unclaimed.",
+  ),
+  negativeClaims: t("overview.reason.negativeClaims", "The subgraph reports a negative claimed total, which cannot be right."),
+  balanceExceedsAllocation: t(
+    "overview.reason.balanceExceedsAllocation",
     "The contract holds more SAFE than the published allocation, so the difference does not measure claims.",
-} as const
+  ),
+})
 
 /**
  * Rewards allocated, claimed and unclaimed, with the on-chain root check.
@@ -23,13 +37,15 @@ export const REWARDS_MESSAGES = {
  * root.
  */
 export function useRewardsOverview() {
+  const { t } = useTranslation()
+  const messages = rewardsMessages(t)
   const subgraph = useNetworkQuery()
   const network = selectLive(subgraph, (d) => d.network)
   const programme = useProgrammeRewards()
   const { latest, onChainRoot, dropBalance, totals, rootMatches } = programme
 
   const allocated: Figure<bigint> = latest.error
-    ? unavailable(MESSAGES.latestFileFailed)
+    ? unavailable(messages.latestFileFailed)
     : latest.data
       ? ready(BigInt(latest.data.tokenTotal), "sef")
       : loading()
@@ -39,21 +55,21 @@ export function useRewardsOverview() {
 
   if (network.status === "live") {
     const sum = BigInt(network.value.rewardsClaimed)
-    claimed = sum < 0n ? unavailable(REWARDS_MESSAGES.negativeClaims) : ready(sum, "subgraph")
-    if (sum < 0n) unclaimed = unavailable(REWARDS_MESSAGES.negativeClaims)
+    claimed = sum < 0n ? unavailable(messages.negativeClaims) : ready(sum, "subgraph")
+    if (sum < 0n) unclaimed = unavailable(messages.negativeClaims)
     else if (allocated.state !== "ready") unclaimed = allocated
-    else if (onChainRoot.error) unclaimed = unavailable(MESSAGES.contractReadFailed)
+    else if (onChainRoot.error) unclaimed = unavailable(messages.contractReadFailed)
     else if (rootMatches === undefined) unclaimed = loading()
-    else if (!rootMatches) unclaimed = unavailable(REWARDS_MESSAGES.rootDiffers)
-    else if (sum > allocated.value) unclaimed = unavailable(REWARDS_MESSAGES.claimsExceedAllocation)
+    else if (!rootMatches) unclaimed = unavailable(messages.rootDiffers)
+    else if (sum > allocated.value) unclaimed = unavailable(messages.claimsExceedAllocation)
     else unclaimed = ready(allocated.value - sum, "subgraph")
   } else if (network.status === "degraded") {
     let fallback: Figure<{ claimed: bigint; unclaimed: bigint }>
-    if (onChainRoot.error || dropBalance.error) fallback = unavailable(MESSAGES.contractReadFailed)
-    else if (latest.error) fallback = unavailable(MESSAGES.latestFileFailed)
-    else if (rootMatches === false) fallback = unavailable(REWARDS_MESSAGES.rootDiffers)
+    if (onChainRoot.error || dropBalance.error) fallback = unavailable(messages.contractReadFailed)
+    else if (latest.error) fallback = unavailable(messages.latestFileFailed)
+    else if (rootMatches === false) fallback = unavailable(messages.rootDiffers)
     else if (!totals) fallback = loading()
-    else if (totals.claimed === undefined) fallback = unavailable(REWARDS_MESSAGES.balanceExceedsAllocation)
+    else if (totals.claimed === undefined) fallback = unavailable(messages.balanceExceedsAllocation)
     else fallback = ready({ claimed: totals.claimed, unclaimed: totals.unclaimed }, "contract")
 
     claimed = fallback.state === "ready" ? ready(fallback.value.claimed, "contract") : fallback

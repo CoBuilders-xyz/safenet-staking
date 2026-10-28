@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { cn } from "@/lib/utils"
 
 interface StepperProps {
@@ -8,8 +9,9 @@ interface StepperProps {
 
 /** Horizontal step indicator: numbered circles joined by lines. Done steps show a tick. */
 export function Stepper({ steps, current }: StepperProps) {
+  const { t } = useTranslation()
   return (
-    <ol aria-label="Progress" className="flex items-center gap-2">
+    <ol aria-label={t("common.progress", "Progress")} className="flex items-center gap-2">
       {steps.map((label, i) => {
         const done = i < current
         const active = i === current
@@ -31,7 +33,7 @@ export function Stepper({ steps, current }: StepperProps) {
             </span>
             <span className={cn("text-sm", active ? "font-medium" : "text-muted-foreground")}>
               {label}
-              {done && <span className="sr-only"> (done)</span>}
+              {done && <span className="sr-only">{t("common.done", "(done)")}</span>}
             </span>
             {i < steps.length - 1 && <span aria-hidden="true" className="h-px flex-1 bg-border" />}
           </li>

@@ -1,0 +1,24 @@
+{
+  "bundle": {
+    "initialJsKb": 200,
+    "initialCssKb": 12,
+    "largestChunkKb": 175,
+    "pageChunkKb": 35
+  },
+  "lighthouse": {
+    "routes": ["/", "/#/dashboard", "/#/validators", "/#/withdrawals", "/#/rewards"],
+    "runs": 3,
+    "minScores": {
+      "performance": 80,
+      "accessibility": 100,
+      "best-practices": 95,
+      "seo": 95
+    },
+    "maxMetrics": {
+      "first-contentful-paint": 2000,
+      "largest-contentful-paint": 4500,
+      "total-blocking-time": 300,
+      "cumulative-layout-shift": 0.1
+    }
+  }
+}

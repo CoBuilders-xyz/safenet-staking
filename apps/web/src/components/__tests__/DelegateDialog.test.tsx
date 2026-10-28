@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { TooltipProvider } from "@radix-ui/react-tooltip"
 import { DelegateDialog } from "../staking/DelegateDialog"
-import { AMOUNTS, TEST_ACCOUNTS } from "@/__tests__/test-data"
+import { AMOUNTS, MOCK_VALIDATORS, TEST_ACCOUNTS } from "@/__tests__/test-data"
 
 // --- Mock all hooks used by DelegateDialog ---
 
@@ -30,6 +30,11 @@ const mockApprovalFlow = {
   approveUnlimited: mockApproveUnlimited,
   resetApprovalFlow: mockResetApprovalFlow,
 }
+
+vi.mock("@/hooks/useValidators", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/useValidators")>()),
+  useValidators: () => ({ data: MOCK_VALIDATORS, isLoading: false, error: null }),
+}))
 
 vi.mock("@/hooks/useWrongNetwork", () => ({
   useWrongNetwork: () => false,
@@ -157,6 +162,8 @@ describe("DelegateDialog", () => {
     const input = screen.getByPlaceholderText("0.0")
     await user.type(input, "100")
     await user.click(screen.getByRole("button", { name: "Stake" }))
+    expect(mockStake).not.toHaveBeenCalled()
+    await user.click(screen.getByRole("button", { name: "Confirm stake" }))
 
     expect(mockStake).toHaveBeenCalledWith(
       TEST_ACCOUNTS.validator1,
@@ -227,7 +234,8 @@ describe("DelegateDialog", () => {
   it("shows unstaking period info", () => {
     render(<TooltipProvider><DelegateDialog {...defaultProps} /></TooltipProvider>)
 
-    expect(screen.getByText(/Unstaking period: 7d 0h 0m/)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Unstaking period" })).toBeInTheDocument()
+    expect(screen.getByRole("dialog")).toHaveTextContent("Unstaking period: 7 days")
   })
 
   it("percentage buttons set correct amounts", async () => {
@@ -345,10 +353,89 @@ describe("DelegateDialog", () => {
 
     await user.type(screen.getByPlaceholderText("0.0"), "100")
     await user.click(screen.getByRole("button", { name: "Stake" }))
+    expect(mockBatchApproveAndStake).not.toHaveBeenCalled()
+    await user.click(screen.getByRole("button", { name: "Confirm stake" }))
 
     expect(mockBatchApproveAndStake).toHaveBeenCalledWith(
       TEST_ACCOUNTS.validator1,
       100n * 10n ** 18n,
     )
+  })
+
+  describe("what happens if, before the wallet confirms", () => {
+    it.each([false, true])("blocks confirmation after the balance falls (batch: %s)", async (batching) => {
+      mockUseBatchStake.supportsBatching = batching
+      mockApprovalFlow.needsApproval = batching
+      const balance = await import("@/hooks/useTokenBalance")
+      const user = userEvent.setup()
+      const { rerender } = render(<TooltipProvider><DelegateDialog {...defaultProps} /></TooltipProvider>)
+      await user.type(screen.getByPlaceholderText("0.0"), "100")
+      await user.click(screen.getByRole("button", { name: "Stake" }))
+
+      vi.mocked(balance.useTokenBalance).mockReturnValue({ data: 0n } as ReturnType<typeof balance.useTokenBalance>)
+      try {
+        rerender(<TooltipProvider><DelegateDialog {...defaultProps} /></TooltipProvider>)
+        const confirm = screen.getByRole("button", { name: "Confirm stake" })
+        expect(confirm).toBeDisabled()
+        await user.click(confirm)
+        expect(mockStake).not.toHaveBeenCalled()
+        expect(mockBatchApproveAndStake).not.toHaveBeenCalled()
+        await user.click(screen.getByRole("button", { name: "Back" }))
+        expect(screen.getByText("You do not have enough SAFE to stake.")).toBeInTheDocument()
+      } finally {
+        vi.mocked(balance.useTokenBalance).mockReturnValue({ data: AMOUNTS.userBalance } as ReturnType<typeof balance.useTokenBalance>)
+      }
+    })
+
+    it("blocks confirmation after allowance changes and lets the user return to approval", async () => {
+      const user = userEvent.setup()
+      const { rerender } = render(<TooltipProvider><DelegateDialog {...defaultProps} /></TooltipProvider>)
+      await user.type(screen.getByPlaceholderText("0.0"), "100")
+      await user.click(screen.getByRole("button", { name: "Stake" }))
+      mockApprovalFlow.needsApproval = true
+      rerender(<TooltipProvider><DelegateDialog {...defaultProps} /></TooltipProvider>)
+      expect(screen.getByRole("button", { name: "Confirm stake" })).toBeDisabled()
+      await user.click(screen.getByRole("button", { name: "Back" }))
+      await user.click(screen.getByRole("button", { name: "Approve exact amount" }))
+      expect(mockApproveExact).toHaveBeenCalledOnce()
+      expect(mockStake).not.toHaveBeenCalled()
+    })
+
+    it("names the amount and validator, and answers each scenario from the contract's figures", async () => {
+      const user = userEvent.setup()
+      render(<TooltipProvider><DelegateDialog {...defaultProps} /></TooltipProvider>)
+
+      await user.type(screen.getByPlaceholderText("0.0"), "100")
+      await user.click(screen.getByRole("button", { name: "Stake" }))
+
+      const review = screen.getByRole("region", { name: /Before you stake 100 SAFE with/ })
+      expect(review).toHaveTextContent(MOCK_VALIDATORS[0].label)
+      for (const question of [
+        "…I want my SAFE back?",
+        "…I want to move to another validator?",
+        "…this validator's participation drops?",
+        "…something goes wrong?",
+        "…rewards are lower than I expect?",
+      ]) {
+        expect(screen.getByText(question)).toBeInTheDocument()
+      }
+      // The unstaking period is the contract's, in words.
+      expect(screen.getByRole("button", { name: "7 days" })).toBeInTheDocument()
+      expect(review).toHaveTextContent("not currently subject to slashing")
+      expect(review).toHaveTextContent("Nothing is sent before that.")
+    })
+
+    it("goes back to the form without sending anything", async () => {
+      const user = userEvent.setup()
+      render(<TooltipProvider><DelegateDialog {...defaultProps} /></TooltipProvider>)
+
+      await user.type(screen.getByPlaceholderText("0.0"), "100")
+      await user.click(screen.getByRole("button", { name: "Stake" }))
+      await user.click(screen.getByRole("button", { name: "Back" }))
+
+      expect(screen.queryByRole("region", { name: /Before you stake/ })).not.toBeInTheDocument()
+      expect(screen.getByPlaceholderText("0.0")).toHaveValue("100")
+      expect(mockStake).not.toHaveBeenCalled()
+    })
   })
 })

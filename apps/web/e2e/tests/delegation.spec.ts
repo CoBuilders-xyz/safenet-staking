@@ -9,7 +9,7 @@ test.describe("Delegation Dialog", () => {
     await expect(page.getByRole("link", { name: "Validator A" })).toBeVisible({ timeout: 15_000 })
 
     // Click Stake on the first validator card
-    const stakeButtons = page.getByRole("button", { name: "Stake" })
+    const stakeButtons = page.getByRole("button", { name: "Stake", exact: true })
     await stakeButtons.first().click()
 
     // Dialog should open
@@ -20,7 +20,7 @@ test.describe("Delegation Dialog", () => {
     await page.goto("/#/validators")
     await expect(page.getByRole("link", { name: "Validator A" })).toBeVisible({ timeout: 15_000 })
 
-    const stakeButtons = page.getByRole("button", { name: "Stake" })
+    const stakeButtons = page.getByRole("button", { name: "Stake", exact: true })
     await stakeButtons.first().click()
 
     // Amount input
@@ -33,7 +33,7 @@ test.describe("Delegation Dialog", () => {
     await page.goto("/#/validators")
     await expect(page.getByRole("link", { name: "Validator A" })).toBeVisible({ timeout: 15_000 })
 
-    const stakeButtons = page.getByRole("button", { name: "Stake" })
+    const stakeButtons = page.getByRole("button", { name: "Stake", exact: true })
     await stakeButtons.first().click()
 
     await expect(page.getByRole("button", { name: "25%" })).toBeVisible()
@@ -46,7 +46,7 @@ test.describe("Delegation Dialog", () => {
     await page.goto("/#/validators")
     await expect(page.getByRole("link", { name: "Validator A" })).toBeVisible({ timeout: 15_000 })
 
-    const stakeButtons = page.getByRole("button", { name: "Stake" })
+    const stakeButtons = page.getByRole("button", { name: "Stake", exact: true })
     await stakeButtons.first().click()
 
     const input = page.getByLabel("Amount")
@@ -62,11 +62,11 @@ test.describe("Delegation Dialog", () => {
     await page.goto("/#/validators")
     await expect(page.getByRole("link", { name: "Validator A" })).toBeVisible({ timeout: 15_000 })
 
-    const stakeButtons = page.getByRole("button", { name: "Stake" })
+    const stakeButtons = page.getByRole("button", { name: "Stake", exact: true })
     await stakeButtons.first().click()
 
     // The "Stake" button inside the dialog should be disabled
-    const dialogStake = page.locator("[role='dialog']").getByRole("button", { name: "Stake" })
+    const dialogStake = page.locator("[role='dialog']").getByRole("button", { name: "Stake", exact: true })
     await expect(dialogStake).toBeDisabled()
   })
 
@@ -74,7 +74,7 @@ test.describe("Delegation Dialog", () => {
     await page.goto("/#/validators")
     await expect(page.getByRole("link", { name: "Validator A" })).toBeVisible({ timeout: 15_000 })
 
-    const stakeButtons = page.getByRole("button", { name: "Stake" })
+    const stakeButtons = page.getByRole("button", { name: "Stake", exact: true })
     await stakeButtons.first().click()
 
     // Should show unstaking period
@@ -85,7 +85,7 @@ test.describe("Delegation Dialog", () => {
     await page.goto("/#/validators")
     await expect(page.getByRole("link", { name: "Validator A" })).toBeVisible({ timeout: 15_000 })
 
-    const stakeButtons = page.getByRole("button", { name: "Stake" })
+    const stakeButtons = page.getByRole("button", { name: "Stake", exact: true })
     await stakeButtons.first().click()
 
     await expect(page.getByRole("heading", { name: "Stake SAFE" })).toBeVisible()
@@ -104,7 +104,7 @@ test.describe("Delegation Dialog", () => {
     await expect(page.getByRole("link", { name: "Validator A" })).toBeVisible({ timeout: 15_000 })
 
     // Validator A renders first
-    await page.getByRole("button", { name: "Stake" }).first().click()
+    await page.getByRole("button", { name: "Stake", exact: true }).first().click()
 
     await expect(page.getByRole("heading", { name: "Stake SAFE" })).toBeVisible()
     await page.getByLabel("Amount").fill("10")
@@ -117,9 +117,11 @@ test.describe("Delegation Dialog", () => {
     // Confirms the actual approve() call was decoded correctly, not just that a toast appeared
     expect(mockChainState.allowance).toBe(10n * 10n ** 18n)
 
-    const dialogStake = page.locator("[role='dialog']").getByRole("button", { name: "Stake" })
+    const dialogStake = page.locator("[role='dialog']").getByRole("button", { name: "Stake", exact: true })
     await expect(dialogStake).toBeEnabled({ timeout: 10_000 })
     await dialogStake.click()
+    // The "what happens if" step comes first; only its Confirm sends the transaction.
+    await page.locator("[role='dialog']").getByRole("button", { name: "Confirm stake" }).click()
 
     await expect(page.getByText("Delegation successful")).toBeVisible({ timeout: 10_000 })
     await expect(page.getByRole("heading", { name: "Stake SAFE" })).not.toBeVisible()
@@ -134,7 +136,7 @@ test.describe("Delegation Dialog", () => {
     await page.goto("/#/validators")
     await expect(page.getByRole("link", { name: "Validator A" })).toBeVisible({ timeout: 15_000 })
 
-    await page.getByRole("button", { name: "Stake" }).first().click()
+    await page.getByRole("button", { name: "Stake", exact: true }).first().click()
     await expect(page.getByRole("heading", { name: "Stake SAFE" })).toBeVisible()
     await page.getByLabel("Amount").fill("15")
 
@@ -146,9 +148,11 @@ test.describe("Delegation Dialog", () => {
     // Confirms the actual approve() call was decoded correctly, not just that a toast appeared
     expect(mockChainState.allowance).toBe(AMOUNTS.unlimitedAllowance)
 
-    const dialogStake = page.locator("[role='dialog']").getByRole("button", { name: "Stake" })
+    const dialogStake = page.locator("[role='dialog']").getByRole("button", { name: "Stake", exact: true })
     await expect(dialogStake).toBeEnabled({ timeout: 10_000 })
     await dialogStake.click()
+    // The "what happens if" step comes first; only its Confirm sends the transaction.
+    await page.locator("[role='dialog']").getByRole("button", { name: "Confirm stake" }).click()
 
     await expect(page.getByText("Delegation successful")).toBeVisible({ timeout: 10_000 })
     await expect(page.getByRole("heading", { name: "Stake SAFE" })).not.toBeVisible()
@@ -163,12 +167,14 @@ test.describe("Delegation Dialog", () => {
     await page.goto("/#/validators")
     await expect(page.getByRole("link", { name: "Validator A" })).toBeVisible({ timeout: 15_000 })
 
-    await page.getByRole("button", { name: "Stake" }).first().click()
+    await page.getByRole("button", { name: "Stake", exact: true }).first().click()
     await expect(page.getByRole("heading", { name: "Stake SAFE" })).toBeVisible()
     await page.getByLabel("Amount").fill("10")
 
-    const dialogStake = page.locator("[role='dialog']").getByRole("button", { name: "Stake" })
+    const dialogStake = page.locator("[role='dialog']").getByRole("button", { name: "Stake", exact: true })
     await dialogStake.click()
+    // The "what happens if" step comes first; only its Confirm sends the transaction.
+    await page.locator("[role='dialog']").getByRole("button", { name: "Confirm stake" }).click()
 
     await expect(page.getByText("Delegation failed")).toBeVisible({ timeout: 10_000 })
     await expect(page.getByText("Transaction rejected")).toBeVisible()
@@ -182,14 +188,16 @@ test.describe("Delegation Dialog", () => {
     await page.goto("/#/validators")
     await expect(page.getByRole("link", { name: "Validator A" })).toBeVisible({ timeout: 15_000 })
 
-    await page.getByRole("button", { name: "Stake" }).first().click()
+    await page.getByRole("button", { name: "Stake", exact: true }).first().click()
     await expect(page.getByRole("heading", { name: "Stake SAFE" })).toBeVisible()
     await page.getByLabel("Amount").fill("10")
 
     // With batching support, there's a single "Stake" button — no separate approve step
     await expect(page.getByRole("button", { name: "Approve exact amount" })).not.toBeVisible()
-    const dialogStake = page.locator("[role='dialog']").getByRole("button", { name: "Stake" })
+    const dialogStake = page.locator("[role='dialog']").getByRole("button", { name: "Stake", exact: true })
     await dialogStake.click()
+    // The "what happens if" step comes first; only its Confirm sends the transaction.
+    await page.locator("[role='dialog']").getByRole("button", { name: "Confirm stake" }).click()
 
     await expect(page.getByText("Delegation successful")).toBeVisible({ timeout: 10_000 })
     await expect(page.getByRole("heading", { name: "Stake SAFE" })).not.toBeVisible()

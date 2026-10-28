@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { formatTokenAmount, formatTokenAmountRaw } from "@/lib/format"
@@ -5,6 +6,11 @@ import { formatTokenAmount, formatTokenAmountRaw } from "@/lib/format"
 interface AmountInputProps {
   value: string
   onChange: (value: string) => void
+  /**
+   * Receives the exact amount a MAX or percentage shortcut picks. Without it, the shortcut writes
+   * the amount into the input with all 18 decimals.
+   */
+  onPreset?: (value: bigint) => void
   maxAmount?: bigint
   label?: string
   /** What `maxAmount` is, in front of its value. */
@@ -17,13 +23,19 @@ const PERCENTAGES = [25, 50, 75, 100] as const
 export function AmountInput({
   value,
   onChange,
+  onPreset,
   maxAmount,
-  label = "Amount",
-  maxLabel = "SAFE Balance",
+  label,
+  maxLabel,
   disabled,
 }: AmountInputProps) {
+  const { t } = useTranslation()
   function setPercentage(pct: number) {
     if (maxAmount === undefined) return
+    if (onPreset) {
+      onPreset((maxAmount * BigInt(pct)) / 100n)
+      return
+    }
     if (pct === 100) {
       onChange(formatTokenAmountRaw(maxAmount, 18, 18))
     } else {
@@ -35,10 +47,10 @@ export function AmountInput({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label htmlFor="amount-input" className="text-sm font-medium">{label}</label>
+        <label htmlFor="amount-input" className="text-sm font-medium">{label ?? t("staking.amount", "Amount")}</label>
         {maxAmount !== undefined && (
           <span className="text-xs text-muted-foreground">
-            {maxLabel}: {formatTokenAmount(maxAmount)}
+            {maxLabel ?? t("staking.safeBalance", "SAFE Balance")}: {formatTokenAmount(maxAmount)}
           </span>
         )}
       </div>
@@ -48,7 +60,7 @@ export function AmountInput({
         autoComplete="off"
         type="text"
         inputMode="decimal"
-        placeholder="0.0"
+        placeholder={"0.0"}
         className="font-mono tabular-nums"
         value={value}
         disabled={disabled}
@@ -70,7 +82,7 @@ export function AmountInput({
               disabled={disabled}
               onClick={() => setPercentage(pct)}
             >
-              {pct === 100 ? "MAX" : `${pct}%`}
+              {pct === 100 ? t("staking.max", "MAX") : `${pct}%`}
             </Button>
           ))}
         </div>

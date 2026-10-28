@@ -36,6 +36,8 @@ const mocked: Pick<PlaywrightTestConfig, "projects" | "webServer"> = {
       // and the gateways. The fork suite below keeps the override, pinned to the fork block.
       VITE_SUBGRAPH_URL_MAINNET: "https://mock-subgraph.test/mainnet",
       VITE_SUBGRAPH_URL_GNOSIS: "https://mock-subgraph.test/gnosis",
+      // The sanctions screening gate, answered by the fixture from `mockChainState.sanctionsApi`.
+      VITE_SANCTIONS_API_URL: "https://mock-sanctions.test/check",
     },
   },
 }

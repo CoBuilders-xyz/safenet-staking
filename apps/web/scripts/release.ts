@@ -10,6 +10,7 @@
  *      Its bundle half compares dist/ with .env.local, which only a developer machine has: on
  *      the CI runner it finds nothing to compare. There the guarantee is that the build job
  *      receives no secret at all.
+ *   3b. scripts/check-budget.ts: the bundle within performance-budget.json, or the release fails.
  *   4. Pack dist/ into release/app.car and write the root CID to release/CID.
  *
  * CID settings are ipfs-car 3.1.0's defaults, which are also the web3.storage defaults:
@@ -74,6 +75,13 @@ try {
   execFileSync(process.execPath, [join(REPO, "tools/check-browser-safety.mjs")], { stdio: "inherit" })
 } catch {
   fail("the browser-safety check failed. Do not publish this build.")
+}
+
+// --- 3b. Within the performance budget ---
+try {
+  execFileSync(process.execPath, ["--import", "tsx", join(APP, "scripts/check-budget.ts")], { stdio: "inherit" })
+} catch {
+  fail("the bundle is over the performance budget in performance-budget.json.")
 }
 
 // --- 4. CAR and CID ---

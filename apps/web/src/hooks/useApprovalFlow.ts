@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useState, useEffect, useCallback } from "react"
 import { useTokenAllowance } from "@/hooks/useTokenAllowance"
 import { useToast } from "@/hooks/useToast"
@@ -11,6 +12,7 @@ import { formatContractError } from "@/lib/errorFormat"
  * single hook that DelegateDialog can consume.
  */
 export function useApprovalFlow(parsedAmount: bigint) {
+  const { t } = useTranslation()
   const {
     allowance,
     approve: rawApprove,
@@ -41,40 +43,39 @@ export function useApprovalFlow(parsedAmount: bigint) {
     if (isApproved) {
       toast({
         variant: "success",
-        title: "Approval confirmed",
-        description: "You can now stake your SAFE tokens",
+        title: t("staking.approvalConfirmed", "Approval confirmed"),
+        description: t("staking.youCanNowStakeYourSafeTokens", "You can now stake your SAFE tokens"),
         txHash: approvalTxHash!,
       })
       setApprovalType(null)
       resetApproval()
     }
-  }, [isApproved, resetApproval, toast, approvalTxHash])
+  }, [isApproved, resetApproval, toast, approvalTxHash, t])
 
   // Toast on approval error
   useEffect(() => {
     if (approvalError) {
       toast({
         variant: "error",
-        title: "Approval failed",
+        title: t("staking.approvalFailed", "Approval failed"),
         description: formatContractError(approvalError),
       })
       setApprovalType(null)
     }
-  }, [approvalError, toast])
+  }, [approvalError, t, toast])
 
   // Toast when approval is queued in Safe wallet
   useEffect(() => {
     if (isSafeApprovalQueued) {
       toast({
         variant: "success",
-        title: "Approval queued in Safe",
+        title: t("staking.approvalQueuedInSafe", "Approval queued in Safe"),
         description:
-          "Once signed and executed in Safe Wallet, " +
-          "return here to complete your delegation.",
+          t("staking.approvalQueuedHelp", "Once signed and executed in Safe Wallet, return here to complete your delegation."),
       })
       resetApproval()
     }
-  }, [isSafeApprovalQueued, resetApproval, toast])
+  }, [isSafeApprovalQueued, resetApproval, t, toast])
 
   const approveExact = useCallback(() => {
     setApprovalType("exact")

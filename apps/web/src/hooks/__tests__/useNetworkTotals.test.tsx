@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderHook, waitFor } from "@testing-library/react"
 import { MOCK_VALIDATORS } from "@/__tests__/test-data"
 import { STALE_AGE, answerOperations, meta, mockRequest, queryWrapper, read } from "@/__tests__/subgraph-mocks"
-import { NETWORK_MESSAGES, useNetworkTotals } from "../useNetworkTotals"
+import { networkMessages, useNetworkTotals } from "../useNetworkTotals"
+import { i18n } from "@/i18n"
 
 vi.mock("graphql-request", () => ({ request: (o: unknown) => mockRequest(o) }))
 
@@ -77,7 +78,7 @@ describe("useNetworkTotals", () => {
     mockValidators.mockReturnValue({ data: undefined, error: new Error("404") })
     const { result } = render()
     await waitFor(() => expect(result.current.totalStaked.state).toBe("unavailable"))
-    expect(result.current.totalStaked).toEqual({ state: "unavailable", reason: NETWORK_MESSAGES.stakingReadFailed })
-    expect(result.current.validatorCounts).toEqual({ state: "unavailable", reason: NETWORK_MESSAGES.validatorListFailed })
+    expect(result.current.totalStaked).toEqual({ state: "unavailable", reason: networkMessages(i18n.t).stakingReadFailed })
+    expect(result.current.validatorCounts).toEqual({ state: "unavailable", reason: networkMessages(i18n.t).validatorListFailed })
   })
 })

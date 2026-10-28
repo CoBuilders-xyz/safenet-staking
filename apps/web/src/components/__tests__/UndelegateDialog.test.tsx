@@ -116,7 +116,8 @@ describe("UndelegateDialog", () => {
   it("shows unstaking period info", () => {
     render(<TooltipProvider><UndelegateDialog {...defaultProps} /></TooltipProvider>)
 
-    expect(screen.getByText(/Unstaking period: 7d 0h 0m/)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Unstaking period" })).toBeInTheDocument()
+    expect(screen.getByRole("dialog")).toHaveTextContent("Unstaking period: 7 days. Tokens will be claimable after this period.")
   })
 
   it("resets form on close", () => {
