@@ -363,6 +363,44 @@ describe("DelegateDialog", () => {
   })
 
   describe("what happens if, before the wallet confirms", () => {
+    it.each([false, true])("blocks confirmation after the balance falls (batch: %s)", async (batching) => {
+      mockUseBatchStake.supportsBatching = batching
+      mockApprovalFlow.needsApproval = batching
+      const balance = await import("@/hooks/useTokenBalance")
+      const user = userEvent.setup()
+      const { rerender } = render(<TooltipProvider><DelegateDialog {...defaultProps} /></TooltipProvider>)
+      await user.type(screen.getByPlaceholderText("0.0"), "100")
+      await user.click(screen.getByRole("button", { name: "Stake" }))
+
+      vi.mocked(balance.useTokenBalance).mockReturnValue({ data: 0n } as ReturnType<typeof balance.useTokenBalance>)
+      try {
+        rerender(<TooltipProvider><DelegateDialog {...defaultProps} /></TooltipProvider>)
+        const confirm = screen.getByRole("button", { name: "Confirm stake" })
+        expect(confirm).toBeDisabled()
+        await user.click(confirm)
+        expect(mockStake).not.toHaveBeenCalled()
+        expect(mockBatchApproveAndStake).not.toHaveBeenCalled()
+        await user.click(screen.getByRole("button", { name: "Back" }))
+        expect(screen.getByText("You do not have enough SAFE to stake.")).toBeInTheDocument()
+      } finally {
+        vi.mocked(balance.useTokenBalance).mockReturnValue({ data: AMOUNTS.userBalance } as ReturnType<typeof balance.useTokenBalance>)
+      }
+    })
+
+    it("blocks confirmation after allowance changes and lets the user return to approval", async () => {
+      const user = userEvent.setup()
+      const { rerender } = render(<TooltipProvider><DelegateDialog {...defaultProps} /></TooltipProvider>)
+      await user.type(screen.getByPlaceholderText("0.0"), "100")
+      await user.click(screen.getByRole("button", { name: "Stake" }))
+      mockApprovalFlow.needsApproval = true
+      rerender(<TooltipProvider><DelegateDialog {...defaultProps} /></TooltipProvider>)
+      expect(screen.getByRole("button", { name: "Confirm stake" })).toBeDisabled()
+      await user.click(screen.getByRole("button", { name: "Back" }))
+      await user.click(screen.getByRole("button", { name: "Approve exact amount" }))
+      expect(mockApproveExact).toHaveBeenCalledOnce()
+      expect(mockStake).not.toHaveBeenCalled()
+    })
+
     it("names the amount and validator, and answers each scenario from the contract's figures", async () => {
       const user = userEvent.setup()
       render(<TooltipProvider><DelegateDialog {...defaultProps} /></TooltipProvider>)

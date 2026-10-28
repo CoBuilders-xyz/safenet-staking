@@ -10,6 +10,15 @@
  * Browser safe: reads no environment. The port and the overrides are passed in by the caller.
  */
 import type { ChainKey } from "./chains.js"
+import type { UtcDay } from "./sef.js"
+
+/**
+ * First complete UTC day covered by both Aegis data sources, indexed from their deploy blocks.
+ * Verified via eth_getBlockByNumber on 2026-10-28: CONTRACTS.aegisConsensus.deployBlock has
+ * timestamp 1791381115 (October 7, 13:51:55 UTC); aegisFrostCoordinator has 1791289120
+ * (October 6, 12:18:40 UTC). The first daily attestation row arrives later and is not partial.
+ */
+export const GNOSIS_AEGIS_FIRST_COMPLETE_DAY: UtcDay = "2026-10-08"
 
 /**
  * The name each subgraph package deploys under on a local graph-node. Read from the

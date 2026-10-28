@@ -21,7 +21,8 @@ query ConsensusWindow($days: Int!, $until: Int!, $programme: String!) {
     validatorCount
     validators(first: 1000) { id }
   }
-  # The first day the subgraph indexed. It started during that day, so the day is partial.
+  # First stored day. Beta uses it as a conservative partial-day boundary; Aegis coverage
+  # comes from its deployment boundary in core, which precedes its first attestation row.
   firstDay: consensusDays(first: 1, where: { programme: $programme }, orderBy: date, orderDirection: asc) {
     date
   }

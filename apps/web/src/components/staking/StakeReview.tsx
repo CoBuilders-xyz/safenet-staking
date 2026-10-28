@@ -61,8 +61,11 @@ export function StakeReview({ form }: StakeReviewProps) {
     },
   ]
 
+  const canConfirm = isBatchFlow
+    ? !!validator && parsedAmount > 0n && form.balanceValue !== undefined && !form.insufficientBalance && !form.aboveMax
+    : form.canDelegate
   const confirm = () => {
-    if (!validator) return
+    if (!validator || !canConfirm || isBusy) return
     if (isBatchFlow) batch.batchApproveAndStake(validator, parsedAmount)
     else stake.stake(validator, parsedAmount)
   }
@@ -94,7 +97,7 @@ export function StakeReview({ form }: StakeReviewProps) {
           isConfirmingTx={confirming}
           signingLabel={isBatchFlow ? t("staking.confirmInSafe", "Confirm in Safe…") : undefined}
           onClick={confirm}
-          disabled={!validator || parsedAmount === 0n}
+          disabled={!canConfirm || isBusy}
         >
           {t("onboarding.confirmStake", "Confirm stake")}</TxButton>
       </div>
