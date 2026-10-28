@@ -140,13 +140,15 @@ Connectors in order: `safe()`, `injected()` as "Browser Wallet" on `window.ether
 WalletConnect when `VITE_WALLETCONNECT_PROJECT_ID` is set, through `deferredWalletConnect`
 (`src/config/walletConnect.ts`): wagmi's connector, loaded only once the user picks it or it was
 the last connector used. Created plainly, it loaded about 300 KB on every first paint. `src/lib/safe.ts` exports
-`isSafeApp`, true inside an iframe. `useAutoConnect` connects the Safe connector when
+`isSafeApp`, true inside an iframe, and `SAFE_INFO_TIMEOUT_MS`. The Safe connector waits two
+seconds for `getSafeInfo`, instead of the default 10 ms. `useAutoConnect` connects the Safe connector when
 `isSafeApp`, and calls wagmi's `reconnect()` otherwise. `useWrongNetwork` is true when the
 wallet's chain is not Mainnet. `useNetworkSwitch` adds whether the connector can switch (the Safe
 connector cannot) and the switch itself. `WrongNetworkNotice`, in `Layout`, then shows on every
 page, and `ConnectButton` shows "Switch to Ethereum", or "Wrong network" when the wallet cannot
 switch. Reads do not go through the wallet, so figures stay correct; `TxButton` disables every
 transaction.
+
 
 ### Contract integration
 
@@ -309,9 +311,9 @@ MerkleDrop's root. This repository sets a root only on an Anvil fork.
   or critical violation fails it. `ACCESSIBILITY.md` says what it covers and what a person checks.
 - `e2e/tests/`: Playwright against a mocked RPC, mocked subgraphs, mocked SEF files and mocked
   gateways (`e2e/mocks/`, `e2e/fixtures/`). Page objects in `e2e/pages/`. WalletConnect is
-  only smoke-tested. `safe-app.spec.ts` frames the app from another origin and checks that the
-  Connect control is hidden and the Safe connector asks the parent for `getSafeInfo`; no real Safe
-  is involved, and the connection itself is not asserted.
+  only smoke-tested. `safe-app.spec.ts` frames the app from another origin: the Connect control is
+  hidden and the Safe connector asks the parent for `getSafeInfo`, and with the parent answering
+  15 ms late, the connection completes. No real Safe is involved.
 - `e2e/fork/`: Playwright against Anvil. `e2e/smoke/`: Playwright against production.
   `e2e/playwright.config.ts` switches suites on `E2E_SUITE`, `fork` or `smoke`, which `test:fork`
   and `test:smoke:web` set.
