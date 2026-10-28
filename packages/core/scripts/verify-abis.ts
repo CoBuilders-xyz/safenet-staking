@@ -225,10 +225,10 @@ for (const anchor of await Promise.all(anchors.values())) {
     `${anchor.block}, the last before ${anchor.closedAt.toISOString()}.\n`,
   )
 }
-console.log(`  ${pad("EVENT", nameWidth)}${pad("CONTRACT", 18)}${pad("TOPIC0", 14)}${pad("LOGS", 8)}${pad(deep ? "FIRST SEEN" : "LAST SEEN", 28)}RESULT`)
+console.log(`  ${pad("EVENT", nameWidth)}${pad("CONTRACT", 23)}${pad("TOPIC0", 14)}${pad("LOGS", 8)}${pad(deep ? "FIRST SEEN" : "LAST SEEN", 28)}RESULT`)
 for (const r of results) {
   console.log(
-    `  ${pad(r.signature, nameWidth)}${pad(r.contract, 18)}${pad(r.topic0.slice(0, 10) + "…", 14)}${pad(r.checked === "bytecode" ? "code" : String(r.logs), 8)}${pad(r.seen, 28)}${r.status}`,
+    `  ${pad(r.signature, nameWidth)}${pad(r.contract, 23)}${pad(r.topic0.slice(0, 10) + "…", 14)}${pad(r.checked === "bytecode" ? "code" : String(r.logs), 8)}${pad(r.seen, 28)}${r.status}`,
   )
 }
 

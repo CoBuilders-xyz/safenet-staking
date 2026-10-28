@@ -27,6 +27,7 @@ import { CONTRACTS, SEF_DATA } from "../src/contracts.js"
 import { SHARE_LOOKBACK_BLOCKS, participationWindow } from "../src/sef.js"
 import { stakingAbi, merkleDropAbi } from "../src/abis.js"
 import { execFileSync } from "node:child_process"
+import { betaWindow } from "./metrics-window.js"
 
 // ---------------------------------------------------------------------------
 const argNum = (flag: string, dflt: number) => {
@@ -52,6 +53,7 @@ const argStr = (flag: string) => {
  */
 const DAYS = argNum("--days", 14)
 const JSON_OUT = argStr("--json")
+const BETA_WINDOW = process.argv.includes("--beta-window") ? betaWindow(DAYS) : undefined
 
 const gnosis = createPublicClient({
   chain: CHAINS.gnosis,
@@ -253,6 +255,13 @@ async function run() {
     console.warn(`  WARNING: could not align to SEF's publish time (${e instanceof Error ? e.message : e}).`)
     console.warn(`           Participation will be compared against a window up to 3 hours out of step.`)
     console.warn(`           Set GITHUB_TOKEN in .env.local to avoid the unauthenticated rate limit.\n`)
+  }
+  // Keep Mainnet's publication comparison at SEF's instant. Only the Gnosis scan moves back.
+  const sefAsOf = endSec
+  if (BETA_WINDOW) {
+    endSec = BETA_WINDOW.end.getTime() / 1000
+    windowSource = "historical Beta window; current SEF participation rates are not comparable"
+    windowAligned = false
   }
   const startSec = endSec - DAYS * 86_400
   const [gFrom, gTo] = await Promise.all([blockAt(startSec, "first"), blockAt(endSec, "last")])
@@ -461,7 +470,6 @@ async function run() {
   // Parity on the headline number, done honestly: SEF's network-info.json is a snapshot taken at
   // their publish time and can be up to three hours behind the chain. Comparing it to a live read
   // measures publish lag. Reconstructing OUR total at THEIR instant measures agreement.
-  const sefAsOf = endSec
   const netAtPublish = movements
     .filter((m) => (tsByBlock.get(m.b) ?? 0) <= sefAsOf)
     .reduce((a, m) => a + m.amt, 0n)
@@ -589,7 +597,7 @@ async function run() {
 
   const participation = sefValidators.map((v) => {
     const n = signed.get(v.address.toLowerCase()) ?? 0
-    return { label: v.label, address: v.address, ours: n / ceremoniesAttest, sef: v.participation_rate_14d, rounds: n }
+    return { label: v.label, address: v.address, ours: n / ceremoniesAttest, sef: BETA_WINDOW ? null : v.participation_rate_14d, rounds: n }
   })
   const worst = participation.reduce((a, b) => (a.ours < b.ours ? a : b))
   const best = participation.reduce((a, b) => (a.ours > b.ours ? a : b))
@@ -611,7 +619,9 @@ async function run() {
       ? `EXACT: all ${participation.length} rates are bit-identical to SEF's published doubles ` +
         `(same numerators over denominator ${ceremoniesAttest}).`
       : published.length === 0
-        ? `NOT COMPARED: SEF publishes no rate for any of the ${participation.length} validators.`
+        ? BETA_WINDOW
+          ? "NOT COMPARED: historical Beta counts do not share the current SEF participation window."
+          : `NOT COMPARED: SEF publishes no rate for any of the ${participation.length} validators.`
         : (unpublished ? `${unpublished} of ${participation.length} validators have no published rate and are not compared. ` : "") +
         (windowAligned ? "" : "NOT ALIGNED to SEF's publish hour, so this comparison is not meaningful. ") +
         `largest gap vs SEF's published figure: ${(maxDelta * 100).toFixed(4)} percentage points. ` +
@@ -843,7 +853,7 @@ async function run() {
   for (const p of participation.sort((a, b) => b.ours - a.ours)) {
     console.log(
       `  ${pad(p.label, 22)}${pad((p.ours * 100).toFixed(3) + "%", 10)}` +
-      `${pad(p.sef === null ? "not published" : (p.sef * 100).toFixed(3) + "%", 10)}` +
+      `${pad(p.sef === null ? (BETA_WINDOW ? "not compared" : "not published") : (p.sef * 100).toFixed(3) + "%", 10)}` +
       `${pad(p.sef === null ? "" : ((p.ours - p.sef) * 100).toFixed(3) + "pp", 10)}${(ceremoniesAttest - p.rounds).toLocaleString("en-US")}`,
     )
   }
@@ -857,6 +867,11 @@ async function run() {
     writeFileSync(JSON_OUT, JSON.stringify({
       runAt: new Date().toISOString(), mainnetBlock: String(mLatest), gnosisBlock: String(gLatest),
       gnosisBlockTime: gBlockTime, windowDays: DAYS,
+      programme: "beta",
+      window: {
+        start: new Date(startSec * 1000).toISOString(), end: new Date(endSec * 1000).toISOString(),
+        fromBlock: String(gFrom), toBlock: String(gTo),
+      },
       // Machine-readable figures. Consumers must never parse them out of a display string:
       // doing that once turned 4,641 per day into 460,413.
       figures: {

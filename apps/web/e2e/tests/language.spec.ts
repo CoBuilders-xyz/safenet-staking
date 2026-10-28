@@ -55,6 +55,16 @@ test.describe("Language", () => {
         await expect(page.getByRole("heading", { name: strings.overview.hero.title })).toBeVisible()
         await expect(page.getByRole("group", { name: strings.overview.headline.totalStaked })).toContainText("12,345")
         expect(await layout.overflowsHorizontally()).toBe(false)
+        if (width >= 1280) {
+          const wallet = layout.header.getByRole("button", { name: strings.wallet.connectWallet, exact: true })
+          await expect(wallet).toBeInViewport({ ratio: 1 })
+          const walletBox = await wallet.boundingBox()
+          const navBox = await layout.header.getByRole("navigation").boundingBox()
+          expect(walletBox).not.toBeNull()
+          expect(navBox).not.toBeNull()
+          expect(walletBox!.y + walletBox!.height).toBeLessThanOrEqual(navBox!.y)
+          expect(await wallet.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+        }
       })
     }
   }

@@ -3,6 +3,23 @@
 Consensus and signing on Gnosis Chain. The manifest and ABIs are generated from `packages/core`;
 the root `CLAUDE.md` explains why and lists the commands.
 
+## Two programmes
+
+One deployment indexes both programmes, each from its own contracts in `GNOSIS_CONTRACTS` in
+`packages/core`: Beta, which ended, through the data sources `Consensus` and `FROSTCoordinator`,
+and Aegis through `AegisConsensus` and `AegisFROSTCoordinator`. Each mapping file passes its
+programme, `"beta"` or `"aegis"`, to the shared handlers in `src/handlers.ts`. Every counting row
+carries it in `programme` and starts its id with it, and the `Consensus` row of a programme has
+the programme as its id. The two programmes never share a validator list, a ceremony or a
+bucket: a validator of both is one `SigningValidator`, listed by each programme from the first
+time that programme's contracts show it. So a query for one programme filters on `programme`.
+
+Aegis changed the two transaction events, so each consensus data source has its own mapping;
+the coordinator's events are Beta's. Every one of 474 Aegis attestations to 2026-10-27 named the
+sid of a `SignCompleted` earlier in the same transaction, as on Beta, so the counting rules below
+hold unchanged. They reproduce SEF's Aegis `participation_rate_14d` bit for bit: recomputed from
+the logs at SEF's data commit 99963fb, all six validators matched as the identical double.
+
 ## Deploy to Studio
 
 ```
@@ -14,12 +31,14 @@ It generates the manifest with `--days 16`, runs `codegen` and `build`, then run
 is the short git SHA, with `-dirty` when the tree has uncommitted changes; set `VERSION_LABEL` to
 override it.
 
-Why 16 days and not the full history: the full history is about 15 million logs, which takes an
+Aegis always starts at each contract's deploy block: its three weeks to 2026-10-27 held 18,268
+logs. `--days 16` applies to Beta only, and starts it 16 days before the end of its last day,
+`BETA_END_DAY`, found by timestamp; its data sources run on from there, so a stray ceremony after
+the end is still seen. Why not Beta's full history: it is about 15 million logs, which takes an
 indexer far longer to sync. The Network Overview reads a 14-day window and drops the partial first
-day, so 16 days cover it with a day to spare. The start block is fixed when the manifest is
-generated, so the deployment keeps every block from then on; it does not roll. A windowed
-deployment cannot answer validator registration history or the epoch record. Those need `--full`,
-as a separate deployment.
+day, so 16 days of Beta cover its history with a day to spare. A windowed deployment cannot answer
+Beta's validator registration history or epoch record. Those need `--full`, as a separate
+deployment.
 
 The deploy key is `GRAPH_DEPLOY_KEY`. Locally it comes from `.env.local` (`pnpm env:pull`), which
 the script reads itself. In CI it is the secret of the same name, and
@@ -31,18 +50,28 @@ version. A deploy retires older version labels of the slug, so the same change m
 chain's default query URL in `packages/core/src/subgraphs.ts`; the web app and the parity run
 read it from there.
 
-To compare a deployed version with the oracle, generate the oracle over the same window and point
-the differential at the query URL:
+`metrics-poc.ts` scans Beta's contracts. Use its explicit historical window for the
+Beta differential. Today's SEF participation rates describe Aegis and cannot validate Beta.
+The oracle's `--beta-window` ends at the end of `BETA_END_DAY`, from core. Generate 14 days
+against the deployment's 16 days, leaving two days for ceremonies already in progress:
 
-```
-cd packages/core && node --env-file-if-exists=../../.env.local --import tsx \
-  scripts/metrics-poc.ts --days 16 --json /tmp/oracle-16d.json
-ORACLE=/tmp/oracle-16d.json ORACLE_DAYS=16 SUBGRAPH_URL=<studio query URL> \
+```sh
+(cd packages/core && node --env-file-if-exists=../../.env.local --import tsx \
+  scripts/metrics-poc.ts --beta-window --days 14 --json /tmp/oracle-beta.json)
+ORACLE=/tmp/oracle-beta.json ORACLE_DAYS=14 SUBGRAPH_URL=<studio-query-url> \
   pnpm --filter @cobuilders/safenet-subgraph-gnosis differential
 ```
 
-The comparison only holds shortly after a deploy. Once the deployment has indexed past its
-16 days, its counts cover more than the oracle's window.
+The oracle records both timestamp and block boundaries. Its other metrics still read current
+Mainnet state; historical Beta rates are explicitly not compared with current SEF rates.
+The differential requires those boundaries and reads every hourly page at one indexed block.
+It compares exact attendance and ceremony counts inside that window, including the block at its
+end. Later Beta activity does not enter the comparison. Programme membership keeps a validator
+with zero attendance in the result. Missing history, indexing errors and incomplete membership
+fail the check. This comparison remains valid after the deployment catches up to today's head.
+
+`pnpm test:scripts` runs the offline differential regressions; `pnpm test` includes them.
+Aegis is compared with SEF's published rates by `test:parity` after its endpoint switch.
 
 ## The buckets
 
@@ -75,7 +104,8 @@ Without `SUBGRAPH_URL_GNOSIS` it reads the default in `packages/core/src/subgrap
 Studio deployment. `scripts/parity.ts` compares each validator's participation with
 `participation_rate_14d` in SEF's `validator-info.json`, at the commit that last wrote the file.
 The window is SEF's: 14 days ending at the top of that hour, both ends included, by the block the
-ceremony was attested in. The run sums the hourly rows inside that window from a current query,
+ceremony was attested in. The run sums the hourly rows of `GNOSIS_INDEXED_PROGRAMME`, Aegis, inside
+that window from a current query,
 with `participationFromHours` in `packages/core`: SEF's numerator and denominator. The rate is the
 same division, and is compared as the identical double.
 
@@ -85,16 +115,16 @@ COMPARABLE, exits 0, and says why in one line. So does a deployment that starts 
 blocks before the window: a ceremony attested at the window's first block counts shares from
 before it. A real difference still fails.
 
+A deployment that files no `programme` on its rows, built before it indexed Aegis, is NOT
+COMPARABLE too: `lacksProgrammes` in `packages/core` recognises graph-node's answer to the filter.
+
 Two more cases are NOT COMPARABLE, with exit 0 and the reason in the job summary, because SEF
 gives nothing to compare:
 
-- SEF's window lies after the programme this deployment indexes, `GNOSIS_INDEXED_PROGRAMME` in
-  `packages/core`: the window starts after that programme's last day. SEF computes its rates over
-  the programme running when it publishes, and from 22 October 2026 that is Aegis, while this
-  deployment indexes Beta. `windowOutsideProgramme` in `packages/core/src/parity/compare.ts`
-  decides it from the calendar in `src/sef.ts`. It stops applying by itself once
-  `GNOSIS_INDEXED_PROGRAMME` names Aegis, which has no last day. A window that still holds an
-  hour of Beta is compared as before, and a lagging or broken subgraph still fails.
+- SEF's window lies after the programme `GNOSIS_INDEXED_PROGRAMME` names: the window starts after
+  that programme's last day. `windowOutsideProgramme` in `packages/core/src/parity/compare.ts`
+  decides it from the calendar in `src/sef.ts`. Aegis has no last day, so it does not apply while
+  the programme is Aegis.
 - SEF lists a validator with `participation_rate_14d: null`. That row reads "SEF publishes no
   rate".
 

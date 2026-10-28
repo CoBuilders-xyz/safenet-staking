@@ -24,7 +24,7 @@ The bundle, gzipped, from a release build:
 
 | Limit | Value | Why |
 |---|---|---|
-| Initial JavaScript | at most 200 KB | The entry script and its preloads, which download before anything draws. About 10% above today's size |
+| Initial JavaScript | at most 200 KB | The entry script and its preloads, which download before anything draws. About 10% above the standalone onboarding build |
 | Initial CSS | at most 12 KB | The one stylesheet |
 | Largest chunk | at most 175 KB | WalletConnect's provider, loaded only when the user picks WalletConnect |
 | Largest page chunk | at most 35 KB | The Overview, the heaviest page |
@@ -50,9 +50,22 @@ A limit is raised only with the measurement that justifies it, in the same chang
 - The page-loading placeholder is a screen tall, and the subgraph freshness lines keep room for
   their answer, so content arriving does not push what is below it.
 
-## Last measured
+## Integrated bundle — 2026-10-28
 
-On 2026-10-27, release build, the median of three runs per route:
+The combined Aegis, onboarding and eight-language release passes the unchanged bundle limits:
+initial JavaScript 183.7 KB, CSS 8.4 KB, largest chunk 159.2 KB, largest page 25.1 KB.
+Initial JavaScript has 16.3 KB of headroom.
+
+Rollup explicitly splits the React runtime. It leaves other dependencies with their importers,
+so shared UI code does not eagerly load Radix dialogs and tabs through a manual UI chunk.
+The tooltip provider loads with route content after access checks. The header uses no tooltip,
+so its positioning code is not needed while the app starts. All route explanations share the
+same provider, preserving hover timing and keyboard/touch behavior.
+
+## Earlier onboarding measurements
+
+On 2026-10-27, the standalone onboarding release, before language and Aegis integration.
+These scores do not describe the integrated build. Median of three runs per route:
 
 | Route | Performance | Accessibility | Best practices | SEO | FCP | LCP | TBT | CLS |
 |---|---|---|---|---|---|---|---|---|

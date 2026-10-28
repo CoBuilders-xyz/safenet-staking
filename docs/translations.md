@@ -13,6 +13,9 @@ a native speaker reviews a language, treat its text as a draft. Corrections are 
 
 The catalogues cover the shell, Overview, Dashboard, validator list and details, Rewards,
 Withdrawals, wallet controls, and the claim, approval, staking and withdrawal dialogs.
+The staking review, contextual term explanations, access restrictions and wrong-network notices
+also follow the selected language. Country names and waiting-period units use the browser's
+locale formatters for that language.
 Application-authored transaction messages, loading states, errors, tooltips and accessible
 labels follow the selected language. Validator names, token symbols and addresses stay unchanged.
 Wallet extensions and external provider/contract error strings are outside these catalogues.

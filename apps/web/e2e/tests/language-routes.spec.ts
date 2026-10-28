@@ -46,6 +46,7 @@ for (const [code, copy] of languages) {
   })
 
   test(`${code}: claim, approve and stake advance through translated steps`, async ({ connectedPage: page, mockChainState }) => {
+    await page.setViewportSize({ width: code === "es" || code === "ru" ? 390 : 1280, height: 720 })
     mockChainState.rewardProof = REWARD_PROOFS.claimable
     mockChainState.allowance = 0n
     const before = mockChainState.stakes.get(VALIDATORS.validatorA.toLowerCase()) ?? 0n

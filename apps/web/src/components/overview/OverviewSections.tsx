@@ -295,8 +295,8 @@ export function ValidatorsPanel() {
       }
     })
 
-  // The caption names the sources the rows actually use. A validator with no ValidatorDay row in
-  // the window falls back to SEF's figure even while the subgraph is live; such rows are marked.
+  // The caption names the sources the rows actually use. A validator outside the programme
+  // membership falls back to SEF's figure even while the subgraph is live; such rows are marked.
   const fromSubgraph = participation && window && rows.state === "ready" && rows.value.some((r) => participation.has(r.address.toLowerCase()))
   // The rows that fall back to SEF's file are the ones it lists. A validator SEF does not list has
   // no SEF figure and says nothing about SEF's rates. SEF's file can also list every validator with

@@ -2,7 +2,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { parseAbiItem, toEventSelector, type Abi, type AbiEvent } from "viem"
 import { DECODED_ERRORS, INDEXED_EVENTS, erc20Abi, indexedEvent, merkleDropAbi, stakingAbi } from "./abis.js"
-import { CONTRACTS } from "./contracts.js"
+import { CONTRACTS, GNOSIS_CONTRACTS, type ContractName } from "./contracts.js"
 
 // These prove the registry is well formed. Whether the chain still emits each signature is
 // what verify:abis proves; no test here touches the network.
@@ -19,12 +19,38 @@ test("every indexed event names a contract in CONTRACTS", () => {
   for (const ev of INDEXED_EVENTS) assert.ok(ev.contract in CONTRACTS, ev.contract)
 })
 
-test("topic0 is unique across the registry", () => {
+test("topic0 is unique on each contract", () => {
+  // Two contracts may emit one signature, as Aegis's coordinator emits Beta's; one contract
+  // registering it twice would be proven once and read twice.
   const seen = new Map<string, string>()
   for (const ev of INDEXED_EVENTS) {
-    const topic0 = toEventSelector(parseAbiItem(ev.signature) as AbiEvent)
-    assert.ok(!seen.has(topic0), `${ev.signature} has the same topic0 as ${seen.get(topic0)}`)
-    seen.set(topic0, ev.signature)
+    const key = `${ev.contract} ${toEventSelector(parseAbiItem(ev.signature) as AbiEvent)}`
+    assert.ok(!seen.has(key), `${ev.signature} has the same topic0 as ${seen.get(key)} on ${ev.contract}`)
+    seen.set(key, ev.signature)
+  }
+})
+
+test("each programme's consensus and coordinator register the events the Gnosis subgraph handles", () => {
+  const names = (contract: ContractName) =>
+    INDEXED_EVENTS.filter((ev) => ev.contract === contract).map((ev) => (parseAbiItem(ev.signature) as AbiEvent).name).sort()
+  for (const [programme, roles] of Object.entries(GNOSIS_CONTRACTS)) {
+    assert.deepEqual(
+      names(roles.consensus),
+      ["EpochRolledOver", "TransactionAttested", "TransactionProposed", "ValidatorStakerSet"],
+      programme,
+    )
+    assert.deepEqual(names(roles.frostCoordinator), ["KeyGenConfirmed", "SignCompleted", "SignShared"], programme)
+  }
+})
+
+test("an Aegis attestation names its ceremony by signatureId, as Beta's does", () => {
+  // The Gnosis subgraph joins TransactionAttested to SignCompleted on this parameter.
+  for (const roles of Object.values(GNOSIS_CONTRACTS)) {
+    // The name is checked at runtime here, so the literal-type check is bypassed on purpose.
+    const inputs = (indexedEvent(roles.consensus, "TransactionAttested" as never) as AbiEvent).inputs
+    const sid = inputs.find((i) => i.name === "signatureId")
+    assert.equal(sid?.type, "bytes32", roles.consensus)
+    assert.equal(sid && "indexed" in sid ? sid.indexed : undefined, undefined, roles.consensus)
   }
 })
 

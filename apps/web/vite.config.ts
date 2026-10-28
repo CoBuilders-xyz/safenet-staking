@@ -96,20 +96,10 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // WalletConnect is not given a chunk of its own here. A manual chunk also takes in the
-        // shared modules it depends on, React and viem among them, and every page then loaded
-        // all of WalletConnect on first paint. Left alone, Rollup keeps it in the chunks the
-        // connector imports when the user picks it.
+        // Split the always-used React runtime without pulling lazy dialogs or tabs into it.
+        onlyExplicitManualChunks: true,
         manualChunks(id) {
-          if (!id.includes('node_modules')) return
-          if (
-            id.includes('@radix-ui/') ||
-            id.includes('/class-variance-authority/') ||
-            id.includes('/clsx/') ||
-            id.includes('/tailwind-merge/')
-          ) {
-            return 'vendor-ui'
-          }
+          if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return "vendor-react"
         },
       },
     },

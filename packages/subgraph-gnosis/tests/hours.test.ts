@@ -23,7 +23,7 @@ const DAY1 = 1775088000
 const H = DAY1 + 3 * 3600
 
 function hourId(v: string, hour: i32): string {
-  return v + "-" + hour.toString()
+  return "beta-" + v + "-" + hour.toString()
 }
 
 /** One complete attestation ceremony: shares, completion and attestation in one block. */
@@ -42,11 +42,11 @@ describe("hourly buckets", () => {
     ceremonyAt(SID, [V1], 10, H - 5)
     ceremonyAt(SID2, [V1], 11, H)
 
-    const before = (H - 3600).toString()
+    const before = "beta-" + (H - 3600).toString()
     assert.fieldEquals("ConsensusHour", before, "attestationCeremonies", "1")
     assert.fieldEquals("ConsensusHour", before, "attestationCeremoniesOnTheHour", "0")
-    assert.fieldEquals("ConsensusHour", H.toString(), "attestationCeremonies", "1")
-    assert.fieldEquals("ConsensusHour", H.toString(), "attestationCeremoniesOnTheHour", "1")
+    assert.fieldEquals("ConsensusHour", "beta-" + H.toString(), "attestationCeremonies", "1")
+    assert.fieldEquals("ConsensusHour", "beta-" + H.toString(), "attestationCeremoniesOnTheHour", "1")
     assert.fieldEquals("ValidatorHour", hourId(V1, H), "attended", "1")
     assert.fieldEquals("ValidatorHour", hourId(V1, H), "attendedOnTheHour", "1")
     assert.fieldEquals("ValidatorHour", hourId(V1, H - 3600), "attendedOnTheHour", "0")
@@ -58,8 +58,8 @@ describe("hourly buckets", () => {
     handleTransactionAttested(transactionAttested(TXH, 1, SAFE, SID, 11, H + 5, 1))
 
     assert.entityCount("ConsensusHour", 1)
-    assert.fieldEquals("ConsensusHour", H.toString(), "attestationCeremonies", "1")
-    assert.fieldEquals("ConsensusHour", H.toString(), "attestationCeremoniesOnTheHour", "0")
+    assert.fieldEquals("ConsensusHour", "beta-" + H.toString(), "attestationCeremonies", "1")
+    assert.fieldEquals("ConsensusHour", "beta-" + H.toString(), "attestationCeremoniesOnTheHour", "0")
     assert.fieldEquals("ValidatorHour", hourId(V1, H), "attended", "1")
   })
 
@@ -71,7 +71,7 @@ describe("hourly buckets", () => {
     handleTransactionAttested(transactionAttested(TXH, 1, SAFE, SID, 11, H, 0))
 
     assert.entityCount("ConsensusHour", 1)
-    assert.fieldEquals("ConsensusHour", H.toString(), "attestationCeremoniesOnTheHour", "1")
+    assert.fieldEquals("ConsensusHour", "beta-" + H.toString(), "attestationCeremoniesOnTheHour", "1")
   })
 
   test("the attestation block decides, also when SignCompleted counts the ceremony later", () => {
@@ -82,8 +82,8 @@ describe("hourly buckets", () => {
     handleSignCompleted(signCompleted(SID, WIN, 12, H + 5, 0))
 
     assert.entityCount("ConsensusHour", 1)
-    assert.fieldEquals("ConsensusHour", H.toString(), "attestationCeremonies", "1")
-    assert.fieldEquals("ConsensusHour", H.toString(), "attestationCeremoniesOnTheHour", "1")
+    assert.fieldEquals("ConsensusHour", "beta-" + H.toString(), "attestationCeremonies", "1")
+    assert.fieldEquals("ConsensusHour", "beta-" + H.toString(), "attestationCeremoniesOnTheHour", "1")
     assert.fieldEquals("ValidatorHour", hourId(V1, H), "attendedOnTheHour", "1")
   })
 
@@ -96,7 +96,7 @@ describe("hourly buckets", () => {
     handleSignCompleted(signCompleted(SID2, WIN, 11, H + 10, 2))
     handleTransactionAttested(transactionAttested(TXH, 1, SAFE, SID2, 11, H + 10, 3))
 
-    assert.fieldEquals("ConsensusHour", H.toString(), "attestationCeremonies", "2")
+    assert.fieldEquals("ConsensusHour", "beta-" + H.toString(), "attestationCeremonies", "2")
     assert.fieldEquals("ValidatorHour", hourId(V1, H), "ceremonies", "2")
     assert.fieldEquals("ValidatorHour", hourId(V1, H), "attended", "2")
     assert.fieldEquals("ValidatorHour", hourId(V1, H), "missed", "0")
@@ -128,12 +128,12 @@ describe("hourly buckets", () => {
     let v1 = 0
     let v2 = 0
     for (let hour = H; hour < end; hour += 3600) {
-      const c = ConsensusHour.load(hour.toString())!
+      const c = ConsensusHour.load("beta-" + hour.toString())!
       ceremonies += c.attestationCeremonies
       v1 += ValidatorHour.load(hourId(V1, hour))!.attended
       v2 += ValidatorHour.load(hourId(V2, hour))!.attended
     }
-    ceremonies += ConsensusHour.load(end.toString())!.attestationCeremoniesOnTheHour
+    ceremonies += ConsensusHour.load("beta-" + end.toString())!.attestationCeremoniesOnTheHour
     v1 += ValidatorHour.load(hourId(V1, end))!.attendedOnTheHour
     v2 += ValidatorHour.load(hourId(V2, end))!.attendedOnTheHour
 
@@ -141,7 +141,7 @@ describe("hourly buckets", () => {
     assert.i32Equals(3, v1)
     assert.i32Equals(2, v2)
     // The end hour's row holds both of its ceremonies; only the one on the hour is in the window.
-    assert.fieldEquals("ConsensusHour", end.toString(), "attestationCeremonies", "2")
+    assert.fieldEquals("ConsensusHour", "beta-" + end.toString(), "attestationCeremonies", "2")
   })
 
   test("daily buckets are filed by the attestation, not the first share", () => {
@@ -151,8 +151,8 @@ describe("hourly buckets", () => {
     handleSignCompleted(signCompleted(SID, WIN, 11, midnight + 5, 0))
     handleTransactionAttested(transactionAttested(TXH, 1, SAFE, SID, 11, midnight + 5, 1))
 
-    assert.fieldEquals("ConsensusDay", midnight.toString(), "attestationCeremonies", "1")
-    assert.fieldEquals("ValidatorDay", V1 + "-" + midnight.toString(), "attended", "1")
-    assert.notInStore("ValidatorDay", V1 + "-" + DAY1.toString())
+    assert.fieldEquals("ConsensusDay", "beta-" + midnight.toString(), "attestationCeremonies", "1")
+    assert.fieldEquals("ValidatorDay", "beta-" + V1 + "-" + midnight.toString(), "attended", "1")
+    assert.notInStore("ValidatorDay", "beta-" + V1 + "-" + DAY1.toString())
   })
 })

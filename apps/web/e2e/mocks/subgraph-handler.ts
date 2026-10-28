@@ -16,10 +16,13 @@ export type SubgraphMode = "ok" | "fail" | "stale"
 export interface MockSubgraphState {
   mainnet: SubgraphMode
   gnosis: SubgraphMode
+  /** Whether the Gnosis subgraph holds Aegis days. False: it answers an Aegis query with no row. */
+  gnosisAegis: boolean
+  gnosisZeroAttendance: boolean
 }
 
 export function createMockSubgraphState(): MockSubgraphState {
-  return { mainnet: "ok", gnosis: "ok" }
+  return { mainnet: "ok", gnosis: "ok", gnosisAegis: true, gnosisZeroAttendance: false }
 }
 
 const SAFE = 10n ** 18n
@@ -79,23 +82,38 @@ function mainnet(operation: string, mode: SubgraphMode): unknown {
   throw new Error(`no mock for mainnet ${operation}`)
 }
 
-function gnosis(operation: string, mode: SubgraphMode): unknown {
+/**
+ * The Gnosis subgraph files every row under a programme, and the query names one.
+ *
+ * Aegis: the 16 days to today, as the live subgraph holds them while Aegis attests. The first day
+ * is partial and today is running, so the Overview counts the 14 days to yesterday. With
+ * `gnosisAegis` false the Aegis rows are empty, as on a deployment that holds no Aegis day.
+ *
+ * Beta: its last days. Attestations on the Beta Consensus contract stopped on Beta's last day,
+ * with one stray ceremony the day after. The first day is partial and dropped, and the stray is
+ * not a Beta day, so the window is the 14 days to Beta's end, and the Overview dates it as Beta.
+ * The mock answers whatever the query's date bound, so the stray reaches the client, which must
+ * leave it out.
+ *
+ * Both carry the same daily figures, so a test reads the same numbers from either.
+ */
+function gnosis(operation: string, mode: SubgraphMode, programme: unknown, aegis: boolean, zeroAttendance: boolean): unknown {
   if (operation !== "ConsensusWindow") throw new Error(`no mock for gnosis ${operation}`)
-  // Beta's last days, as the live subgraph holds them: attestations on the Beta Consensus contract
-  // stopped on Beta's last day, with one stray ceremony the day after. The first day is partial
-  // and dropped, and the stray is not a Beta day, so the window is the 14 days to Beta's end,
-  // whatever today is, and the Overview dates it as Beta. The mock answers whatever the query's
-  // date bound, so the stray reaches the client, which must leave it out.
-  const betaEnd = utcDayMs(BETA_END_DAY) / 1000
-  const dates = Array.from({ length: 16 }, (_, i) => betaEnd - (15 - i) * DAY)
-  const stray = betaEnd + DAY
+  const _meta = meta(SUBGRAPH_FIGURES.gnosisBlock, mode)
+  if (programme === "aegis" && !aegis) return { _meta, firstDay: [], programmeConsensus: [], consensusDays: [], validatorDays: [] }
+  if (programme !== "aegis" && programme !== "beta") throw new Error(`no mock for the programme ${String(programme)}`)
+  const today = Math.floor(Date.now() / 1000 / DAY) * DAY
+  const last = programme === "aegis" ? today : utcDayMs(BETA_END_DAY) / 1000
+  const dates = Array.from({ length: 16 }, (_, i) => last - (15 - i) * DAY)
+  const strays = programme === "beta" ? [last + DAY] : []
   const buckets = Array.from({ length: 65 }, (_, i) => (i === SUBGRAPH_FIGURES.latencyMedianBlocks ? "100" : "0"))
   return {
-    _meta: meta(SUBGRAPH_FIGURES.gnosisBlock, mode),
+    _meta,
+    programmeConsensus: [{ validatorCount: 3, validators: Object.values(VALIDATORS).map((id) => ({ id })) }],
     firstDay: [{ date: dates[0] }],
     // Newest first, as the query orders them.
     consensusDays: [
-      { date: stray, attestations: "1", attestationCeremonies: "1", latencyBuckets: buckets },
+      ...strays.map((date) => ({ date, attestations: "1", attestationCeremonies: "1", latencyBuckets: buckets })),
       ...[...dates].reverse().map((date) => ({
         date,
         attestations: String(SUBGRAPH_FIGURES.attestationsPerDay),
@@ -104,10 +122,10 @@ function gnosis(operation: string, mode: SubgraphMode): unknown {
       })),
     ],
     validatorDays: [
-      { date: stray, attended: "1", validator: { id: VALIDATORS.validatorA } },
+      ...strays.map((date) => ({ date, attended: "1", validator: { id: VALIDATORS.validatorA } })),
       ...[...dates].reverse().flatMap((date) => [
         { date, attended: "1000", validator: { id: VALIDATORS.validatorA } },
-        { date, attended: "990", validator: { id: VALIDATORS.validatorB } },
+        ...(zeroAttendance ? [] : [{ date, attended: "990", validator: { id: VALIDATORS.validatorB } }]),
         { date, attended: "980", validator: { id: VALIDATORS.validatorC } },
       ]),
     ],
@@ -122,8 +140,10 @@ export function createSubgraphHandler(state: MockSubgraphState) {
       await route.fulfill({ status: 500, contentType: "text/plain", body: "subgraph unavailable" })
       return
     }
-    const { operationName } = route.request().postDataJSON() as { operationName?: string }
-    const data = chain === "gnosis" ? gnosis(operationName ?? "", mode) : mainnet(operationName ?? "", mode)
+    const { operationName, variables } = route.request().postDataJSON() as { operationName?: string; variables?: Record<string, unknown> }
+    const data = chain === "gnosis"
+      ? gnosis(operationName ?? "", mode, variables?.programme, state.gnosisAegis, state.gnosisZeroAttendance)
+      : mainnet(operationName ?? "", mode)
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data }) })
   }
 }

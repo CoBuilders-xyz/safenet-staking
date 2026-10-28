@@ -192,8 +192,6 @@ src/
 ├── graphql/      GraphQL documents per chain and their generated types
 ├── hooks/        contract reads and writes, subgraph queries, rewards, compliance checks
 ├── i18n/         languages, detection, and the catalogues in locales/
-├── lib/          formatting, errors, figures, programme copy, Safe detection
-
 ├── lib/          formatting, errors, figures, programme copy, restriction copy, Safe detection
 └── pages/        one component per route
 e2e/

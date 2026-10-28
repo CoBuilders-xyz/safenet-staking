@@ -41,7 +41,6 @@ export function Header() {
             </span>
             <span className="text-xs leading-none text-muted-foreground">{t("shell.byCoBuilders", "by CoBuilders")}</span>
           </Link>
-
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <LanguageSwitcher />
@@ -69,23 +68,23 @@ export function Header() {
         </div>
       </div>
 
-          <nav className="container mx-auto hidden xl:flex items-stretch min-h-12 gap-1 px-4 -mb-px">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                aria-current={pathname === item.path ? "page" : undefined}
-                className={cn(
-                  "flex items-center px-4 py-3 text-sm font-medium uppercase tracking-wider leading-5 transition-colors border-b-2",
-                  pathname === item.path
-                    ? "text-foreground border-primary"
-                    : "text-muted-foreground border-transparent hover:text-foreground",
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+      <nav className="container mx-auto hidden xl:flex items-stretch min-h-12 gap-1 px-4 -mb-px">
+        {navItems.map((item) => (
+          <Link
+            key={item.path}
+            to={item.path}
+            aria-current={pathname === item.path ? "page" : undefined}
+            className={cn(
+              "flex items-center px-4 py-3 text-sm font-medium uppercase tracking-wider leading-5 transition-colors border-b-2",
+              pathname === item.path
+                ? "text-foreground border-primary"
+                : "text-muted-foreground border-transparent hover:text-foreground",
+            )}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </nav>
 
       {mobileMenuOpen && (
         <div className="border-t xl:hidden">

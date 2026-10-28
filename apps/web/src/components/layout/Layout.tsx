@@ -1,10 +1,12 @@
-import { Suspense } from "react"
+import { lazy, Suspense } from "react"
 import { useTranslation } from "react-i18next"
-import { Outlet } from "react-router-dom"
 import { Header } from "./Header"
 import { Footer } from "./Footer"
 import { WrongNetworkNotice } from "@/components/WrongNetworkNotice"
 import Loader2 from "lucide-react/dist/esm/icons/loader-2"
+
+// Explanations belong to route content. Keep their positioning code out of startup.
+const RouteContent = lazy(() => import("./RouteContent"))
 
 const tickStyle = {
   background: `repeating-linear-gradient(
@@ -50,7 +52,7 @@ export function Layout() {
               </div>
             }
           >
-            <Outlet />
+            <RouteContent />
           </Suspense>
         </main>
       </div>

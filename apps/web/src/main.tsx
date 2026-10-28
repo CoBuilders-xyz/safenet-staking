@@ -5,7 +5,6 @@ import { QueryClientProvider } from "@tanstack/react-query"
 import { config } from "@/config/wagmi"
 import { queryClient } from "@/config/queryClient"
 import { ToastProvider } from "@/hooks/ToastProvider"
-import { TooltipProvider } from "@/components/ui/tooltip"
 import { initI18n } from "@/i18n"
 import App from "./App"
 import "./index.css"
@@ -15,11 +14,9 @@ function render() {
     <StrictMode>
       <WagmiProvider config={config} reconnectOnMount={false}>
         <QueryClientProvider client={queryClient}>
-          <TooltipProvider delayDuration={100}>
-            <ToastProvider>
-              <App />
-            </ToastProvider>
-          </TooltipProvider>
+          <ToastProvider>
+            <App />
+          </ToastProvider>
         </QueryClientProvider>
       </WagmiProvider>
     </StrictMode>,
