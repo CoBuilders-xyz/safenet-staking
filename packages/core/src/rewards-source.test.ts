@@ -1,7 +1,12 @@
 import { mock, test } from "node:test"
 import assert from "node:assert/strict"
-import { bytesToHex, numberToHex, pad, stringToBytes, zeroAddress, type Hex } from "viem"
-import { normalize } from "viem/ens"
+import {
+  RpcRequestError, bytesToHex, decodeFunctionData, encodeErrorResult, encodeFunctionResult, numberToHex, pad, stringToBytes,
+  toHex, type Hex,
+} from "viem"
+import { mainnet } from "viem/chains"
+import { namehash, normalize, packetToBytes } from "viem/ens"
+import { ensResolverAbi, ensUniversalResolverAbi } from "./abis.js"
 import {
   IPFS_GATEWAYS, REPOSITORY_REWARDS_BASE, RewardsReadError, SEF_REWARDS_ENS_NAME,
   datasetMiss, decodeContenthash, ipfsGateways, readRewardsEnsState, readRewardsFile, resolveRewardsSource, rewardsDataBases,
@@ -20,22 +25,39 @@ const IPNS_CONTENTHASH: Hex =
   "0xe50101720024080112200102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
 const IPNS_KEY = "bafzaajaiaejcaaicamcakbqhbaequcymbuha6earcijrifiwc4mbsgq3dqor4hza"
 
-// A made-up resolver, so no file here types an address.
+// Made-up resolvers, so no file here types an address: the name's own, and a bridge resolver on
+// its second-level name, which the Universal Resolver reached through ENSIP-10 on 2026-10-27.
 const RESOLVER = pad(numberToHex(0xe75), { size: 20 })
+const BRIDGE_RESOLVER = pad(numberToHex(0xb41d6e), { size: 20 })
 
-/** A client whose ENS name resolves to `contenthash`, or whose reads fail with `error`. */
+/** A reverted eth_call, as viem's HTTP transport reports one: the revert bytes in `data`. */
+const reverted = (data: Hex) =>
+  new RpcRequestError({ body: {}, url: "", error: { code: 3, message: "execution reverted", data } })
+
+/**
+ * A Mainnet node answering the one eth_call resolution makes: the Universal Resolver's `resolve`
+ * for the name, carrying `contenthash(node)`. It answers with `contenthash` through `resolver`,
+ * reverts with `revert`, or fails with `error`. Any other call fails the test.
+ */
 function ensClient(
   contenthash: Hex,
-  options: { resolver?: Hex; offset?: bigint; error?: Error; hang?: boolean } = {},
+  options: { resolver?: Hex; revert?: Hex; error?: Error; hang?: boolean } = {},
 ): EnsReadClient {
   return {
-    readContract: (async (p: { functionName: string }) => {
+    request: (async ({ method, params }: { method: string; params: [{ to: Hex; data: Hex }, string] }) => {
       if (options.hang) return new Promise(() => {})
       if (options.error) throw options.error
-      if (p.functionName === "findResolver") return [options.resolver ?? RESOLVER, `0x${"00".repeat(32)}`, options.offset ?? 0n]
-      if (p.functionName === "contenthash") return contenthash
-      throw new Error(`unexpected ${p.functionName}`)
-    }) as unknown as EnsReadClient["readContract"],
+      assert.equal(method, "eth_call")
+      const [{ to, data }] = params
+      assert.equal(to, mainnet.contracts.ensUniversalResolver.address)
+      const { functionName, args } = decodeFunctionData({ abi: ensUniversalResolverAbi, data })
+      assert.equal(functionName, "resolve")
+      assert.equal(args[0], toHex(packetToBytes(SEF_REWARDS_ENS_NAME)))
+      assert.deepEqual(decodeFunctionData({ abi: ensResolverAbi, data: args[1] }).args, [namehash(SEF_REWARDS_ENS_NAME)])
+      if (options.revert) throw reverted(options.revert)
+      const answer = encodeFunctionResult({ abi: ensResolverAbi, functionName: "contenthash", result: contenthash })
+      return encodeFunctionResult({ abi: ensUniversalResolverAbi, functionName: "resolve", result: [answer, options.resolver ?? RESOLVER] })
+    }) as unknown as EnsReadClient["request"],
   }
 }
 
@@ -88,13 +110,62 @@ test("an empty contenthash leaves only the repository", async () => {
   assert.deepEqual(source.bases, [REPOSITORY_REWARDS_BASE])
 })
 
-test("a name with no resolver reads as empty", async () => {
-  assert.deepEqual(await readRewardsEnsState(ensClient(IPFS_CONTENTHASH, { resolver: zeroAddress })), { status: "empty" })
+test("a name with its own resolver reads its contenthash", async () => {
+  const state = await readRewardsEnsState(ensClient(IPFS_CONTENTHASH))
+  assert.deepEqual(state, { status: "set", contenthash: { protocol: "ipfs", cid: IPFS_CID }, raw: IPFS_CONTENTHASH })
 })
 
-test("a resolver found on a parent name is a wildcard resolver, reported unsupported without a read", async () => {
-  const state = await readRewardsEnsState(ensClient(IPFS_CONTENTHASH, { offset: 8n }))
-  assert.deepEqual(state, { status: "unsupported", raw: null, reason: "the name is served by a parent's wildcard resolver" })
+test("a name the Universal Resolver answers through a bridge resolver on its parent reads the same", async () => {
+  // Mainnet on 2026-10-27: findResolver named a bridge resolver at offset 8 for this name, and
+  // resolve answered with the contenthash of the name's own record.
+  const state = await readRewardsEnsState(ensClient(IPFS_CONTENTHASH, { resolver: BRIDGE_RESOLVER }))
+  assert.deepEqual(state, { status: "set", contenthash: { protocol: "ipfs", cid: IPFS_CID }, raw: IPFS_CONTENTHASH })
+})
+
+test("a name with no resolver reads as empty", async () => {
+  const revert = encodeErrorResult({
+    abi: ensUniversalResolverAbi, errorName: "ResolverNotFound", args: [toHex(packetToBytes(SEF_REWARDS_ENS_NAME))],
+  })
+  assert.deepEqual(await readRewardsEnsState(ensClient("0x", { revert })), { status: "empty" })
+})
+
+test("an OffchainLookup revert is reported unsupported with its reason, and nothing is fetched", async () => {
+  const revert = encodeErrorResult({
+    abi: ensUniversalResolverAbi,
+    errorName: "OffchainLookup",
+    args: [mainnet.contracts.ensUniversalResolver.address, ["https://gateway.example.org/{data}"], "0x", "0x12345678", "0x"],
+  })
+  const fetched = mock.method(globalThis, "fetch", async () => new Response("{}"))
+  try {
+    const state = await readRewardsEnsState(ensClient("0x", { revert }))
+    assert.deepEqual(state, {
+      status: "unsupported", raw: null,
+      reason: "the name's resolver answers only offchain, through CCIP-read, which this code does not follow",
+    })
+    assert.equal(fetched.mock.callCount(), 0)
+  } finally {
+    fetched.mock.restore()
+  }
+})
+
+test("a resolver that reverts is reported unsupported with its reason", async () => {
+  const revert = encodeErrorResult({ abi: ensUniversalResolverAbi, errorName: "ResolverError", args: ["0x"] })
+  assert.deepEqual(await readRewardsEnsState(ensClient("0x", { revert })), {
+    status: "unsupported", raw: null, reason: "the name's resolver reverted when asked for the contenthash",
+  })
+})
+
+test("a revert this code does not know reads as unreadable, not as a state it is not", async () => {
+  const state = await readRewardsEnsState(ensClient("0x", { revert: "0x12345678" }))
+  assert.equal(state.status, "unreadable")
+})
+
+test("revert bytes nested one level in the error still decode", async () => {
+  const data = encodeErrorResult({
+    abi: ensUniversalResolverAbi, errorName: "ResolverNotFound", args: [toHex(packetToBytes(SEF_REWARDS_ENS_NAME))],
+  })
+  const error = Object.assign(new Error("execution reverted"), { cause: { code: 3, data: { data } } })
+  assert.deepEqual(await readRewardsEnsState(ensClient("0x", { error })), { status: "empty" })
 })
 
 test("an IPFS contenthash puts the dataset first, through each gateway in order, then the repository", async () => {

@@ -21,9 +21,10 @@ The deployed Safenet contracts match **neither** published branch of `safe-resea
 - If it fails, the contract was probably redeployed. Recover the real signature from chain data,
   update `src/abis.ts`, and tell the team. Do not guess, and do not read a branch.
 - `ensUniversalResolverAbi` and `ensResolverAbi` are the exception: standard ENS interfaces,
-  the Universal Resolver's `findResolver` and ENSIP-7's `contenthash`, read only to find SEF's
-  reward dataset. They are outside the Safenet check, in neither `INDEXED_EVENTS` nor the
-  bytecode scan; the CLI smoke test reads them on Mainnet nightly.
+  the Universal Resolver's `resolve`, with three of its errors, and ENSIP-7's `contenthash`,
+  read only to find SEF's reward dataset. They are outside the Safenet check, in neither
+  `INDEXED_EVENTS` nor the bytecode scan; `src/abis.ts` records the `eth_call`s that proved them,
+  and the CLI smoke test reads them on Mainnet nightly.
 
 Custom errors and functions emit no log, so they are proven differently: every run checks that
 the 4-byte selector of each error in `DECODED_ERRORS` and of each function in the staking,
@@ -58,7 +59,9 @@ because it will never log that programme's events again and a scan from the head
   `GNOSIS_INDEXED_PROGRAMME`, the programme whose contracts the Gnosis subgraph indexes.
 - `src/rewards-source.ts` — where reward data is read from. The ENS name SEF declares canonical,
   `SEF_REWARDS_ENS_NAME`, and the public gateways, `IPFS_GATEWAYS`, live here and nowhere else.
-  It resolves the name's contenthash, lists the bases to try, the IPFS dataset through each
+  It reads the name's contenthash with one plain `eth_call` to the Universal Resolver's
+  `resolve`, which follows ENSIP-10, and decodes a revert itself, so CCIP-read is never followed,
+  whatever client it is given. It lists the bases to try, the IPFS dataset through each
   gateway and then the repository mirror, and reads a file from the first base that answers. A
   file is absent only when the repository, or a configured override, answers 404: the dataset's
   layout under the contenthash is assumed to repeat the repository's `assets/rewards` until SEF
