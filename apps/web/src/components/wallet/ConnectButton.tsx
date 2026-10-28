@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useRef, useState, useEffect, useCallback } from "react"
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,7 @@ import { SafeTokenBadge } from "@/components/ui/SafeTokenBadge"
 import { isSafeApp } from "@/lib/safe"
 
 function ConnectWalletButton({ onClick, ref: buttonRef, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { ref?: React.Ref<HTMLButtonElement> }) {
+  const { t } = useTranslation()
   return (
     <button
       ref={buttonRef}
@@ -19,7 +21,7 @@ function ConnectWalletButton({ onClick, ref: buttonRef, ...props }: React.Button
       className="flex items-center gap-10 rounded-md bg-primary text-primary-foreground text-sm font-medium uppercase tracking-wide pl-3 pr-2 py-2 h-10 transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       {...props}
     >
-      <span>Connect Wallet</span>
+      <span>{t("wallet.connectWallet", "Connect Wallet")}</span>
       <span className="flex items-center justify-center w-6 h-6 rounded-sm border border-primary-foreground/50">
         <ArrowUpRight className="w-4 h-4" aria-hidden="true" />
       </span>
@@ -28,6 +30,7 @@ function ConnectWalletButton({ onClick, ref: buttonRef, ...props }: React.Button
 }
 
 export function ConnectButton() {
+  const { t } = useTranslation()
   const hasInjectedWallet = typeof window.ethereum !== "undefined"
   const { address, isConnected, chain } = useAccount()
   const { connect: rawConnect, connectors: allConnectors } = useConnect()
@@ -57,14 +60,14 @@ export function ConnectButton() {
           }
           toast({
             variant: "error",
-            title: "Connection failed",
-            description: error.message.slice(0, 150),
+            title: t("wallet.connectionFailed", "Connection failed"),
+            description: t("wallet.connectionHelp", "Could not connect to your wallet. Open it and try again."),
           })
           options?.onError?.(error, variables, undefined, undefined as never)
         },
       })
     },
-    [rawConnect, disconnectAsync, toast],
+    [rawConnect, toast, t, disconnectAsync],
   )
 
   // Close on outside click
@@ -152,7 +155,7 @@ export function ConnectButton() {
                 {connector.icon && (
                   <img src={connector.icon} alt="" className="h-5 w-5 shrink-0 rounded" aria-hidden="true" />
                 )}
-                {connector.name}
+                {connector.id === "browserWallet" ? t("wallet.browserWallet", "Browser Wallet") : connector.name}
               </button>
             ))}
           </div>
@@ -163,9 +166,7 @@ export function ConnectButton() {
 
   if (chain?.id !== activeChain.id) {
     return (
-      <Button variant="destructive" onClick={() => switchChain({ chainId: activeChain.id })}>
-        Switch to {activeChain.name}
-      </Button>
+      <Button variant="destructive" onClick={() => switchChain({ chainId: activeChain.id })}>{t("wallet.switchTo", "Switch to {{name}}", { name: activeChain.name })}</Button>
     )
   }
 
@@ -189,17 +190,15 @@ export function ConnectButton() {
         onClick={async () => {
           if (!address) return
           const ok = await copyToClipboard(address)
-          if (ok) toast({ variant: "success", title: "Address copied" })
+          if (ok) toast({ variant: "success", title: t("validators.addressCopied", "Address copied") })
         }}
-        title="Copy address"
+        title={t("validators.copyAddress", "Copy address")}
       >
         {truncateAddress(address ?? "")}
         <Copy className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
       </button>
       {!isSafeApp && (
-        <Button variant="outline" size="sm" onClick={() => disconnect()}>
-          Disconnect
-        </Button>
+        <Button variant="outline" size="sm" onClick={() => disconnect()}>{t("wallet.disconnect", "Disconnect")}</Button>
       )}
     </div>
   )

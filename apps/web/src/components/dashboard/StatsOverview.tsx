@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useAccount } from "wagmi"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -6,6 +7,7 @@ import { useValidators } from "@/hooks/useValidators"
 import { formatTokenAmount, asBigint } from "@/lib/format"
 
 export function StatsOverview() {
+  const { t } = useTranslation()
   const { isConnected } = useAccount()
   const { data: totalStaked, isLoading: loadingTotalStaked } = useTotalStaked()
   const { data: userTotalStake, isLoading: loadingUserStake } = useUserTotalStake()
@@ -15,12 +17,12 @@ export function StatsOverview() {
 
   const globalStats = [
     {
-      title: "Total SAFE Staked",
+      title: t("validators.totalSafeStaked", "Total SAFE Staked"),
       value: loadingTotalStaked ? null : formatTokenAmount(asBigint(totalStaked), 18, 0),
       loading: loadingTotalStaked,
     },
     {
-      title: "Active Validators",
+      title: t("dashboard.activeValidators", "Active Validators"),
       value: loadingValidators ? null : `${activeCount}`,
       loading: loadingValidators,
     },
@@ -29,7 +31,7 @@ export function StatsOverview() {
   const userStats = isConnected
     ? [
         {
-          title: "Your Staked SAFE",
+          title: t("dashboard.yourStakedSafe", "Your Staked SAFE"),
           value: loadingUserStake ? null : formatTokenAmount(asBigint(userTotalStake), 18, 0),
           loading: loadingUserStake,
         },

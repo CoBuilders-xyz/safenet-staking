@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useState, useEffect, useCallback, useRef } from "react"
 import type { Address, Hex } from "viem"
 import { useTokenBalance } from "@/hooks/useTokenBalance"
@@ -52,6 +53,7 @@ export function useStakeForm({
   availableAtLeast,
   pollBalance,
 }: UseStakeFormOptions) {
+  const { t } = useTranslation()
   // Null until the user types: the amount then follows `initialAmount`.
   const [typedAmount, setTypedAmount] = useState<string | null>(null)
   const amount = typedAmount ?? (initialAmount !== undefined ? formatTokenAmountRaw(initialAmount, 18, 18) : "")
@@ -147,15 +149,15 @@ export function useStakeForm({
   const onBatchConfirmed = useCallback(() => finish(batchTxHash), [finish, batchTxHash])
 
   const sentAmount = sent ? formatTokenAmountRaw(sent.amount, 18, 18) : amount
-  const target = sent ? truncateAddress(sent.validator) : validator ? truncateAddress(validator) : "a validator"
+  const target = sent ? truncateAddress(sent.validator) : validator ? truncateAddress(validator) : t("staking.aValidator", "a validator")
 
   // Stake transaction toasts
   useTxToast(
     {
-      successTitle: "Delegation successful",
-      successDescription: `Staked ${sentAmount} SAFE to ${target}`,
-      errorTitle: "Delegation failed",
-      safeQueuedDescription: "Your delegation has been sent to Safe Wallet for signing.",
+      successTitle: t("staking.delegationSuccessful", "Delegation successful"),
+      successDescription: t("staking.stakedSafeTo", "Staked {{sentAmount}} SAFE to {{target}}", { sentAmount: sentAmount, target: target }),
+      errorTitle: t("staking.delegationFailed", "Delegation failed"),
+      safeQueuedDescription: t("staking.yourDelegationHasBeenSentToSafeWallet", "Your delegation has been sent to Safe Wallet for signing."),
     },
     {
       isSuccess: isStaked,
@@ -170,9 +172,9 @@ export function useStakeForm({
   // Batch transaction toasts
   useTxToast(
     {
-      successTitle: "Delegation successful",
-      successDescription: `Approved and staked ${sentAmount} SAFE to ${target}`,
-      errorTitle: "Delegation failed",
+      successTitle: t("staking.delegationSuccessful", "Delegation successful"),
+      successDescription: t("staking.approvedAndStakedSafeTo", "Approved and staked {{sentAmount}} SAFE to {{target}}", { sentAmount: sentAmount, target: target }),
+      errorTitle: t("staking.delegationFailed", "Delegation failed"),
     },
     {
       isSuccess: isBatchSuccess,
@@ -186,10 +188,10 @@ export function useStakeForm({
 
   useEffect(() => {
     if (isBatchReverted) {
-      toast({ variant: "error", title: "Transaction reverted", description: "The batch transaction was reverted onchain" })
+      toast({ variant: "error", title: t("staking.transactionReverted", "Transaction reverted"), description: t("staking.theBatchTransactionWasRevertedOnchain", "The batch transaction was reverted onchain") })
       resetBatch()
     }
-  }, [isBatchReverted, resetBatch, toast])
+  }, [isBatchReverted, resetBatch, t, toast])
 
   // Resetting a transaction in flight would drop its receipt, and with it the toast and the
   // refreshed balances. So a dialog closed mid-transaction resets once the transaction settles.

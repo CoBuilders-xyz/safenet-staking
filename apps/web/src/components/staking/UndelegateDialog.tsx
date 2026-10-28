@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useState, useEffect, useCallback } from "react"
 import { type Address } from "viem"
 import {
@@ -25,6 +26,7 @@ interface UndelegateDialogProps {
 }
 
 export function UndelegateDialog({ validator, open, onOpenChange }: UndelegateDialogProps) {
+  const { t } = useTranslation()
   const [amount, setAmount] = useState("")
   const { data: userStake } = useUserStakeOnValidator(validator)
   const { initiateWithdrawal, isSigningTx, isConfirmingTx, isSuccess, isSafeQueued, error, reset, txHash } = useInitiateWithdrawal()
@@ -42,10 +44,10 @@ export function UndelegateDialog({ validator, open, onOpenChange }: UndelegateDi
 
   useTxToast(
     {
-      successTitle: "Unstaking initiated",
-      successDescription: `Queued withdrawal of ${amount} SAFE from ${truncateAddress(validator)}`,
-      errorTitle: "Unstaking failed",
-      safeQueuedDescription: "Your withdrawal request has been sent to Safe Wallet for signing.",
+      successTitle: t("staking.unstakingInitiated", "Unstaking initiated"),
+      successDescription: t("staking.queuedWithdrawalOfSafeFrom", "Queued withdrawal of {{amount}} SAFE from {{address}}", { amount: amount, address: truncateAddress(validator) }),
+      errorTitle: t("staking.unstakingFailed", "Unstaking failed"),
+      safeQueuedDescription: t("staking.yourWithdrawalRequestHasBeenSentToSafe", "Your withdrawal request has been sent to Safe Wallet for signing."),
     },
     {
       isSuccess,
@@ -69,23 +71,21 @@ export function UndelegateDialog({ validator, open, onOpenChange }: UndelegateDi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Unstake SAFE</DialogTitle>
-          <DialogDescription>
-            Initiate withdrawal from validator {truncateAddress(validator)}. Tokens enter a withdrawal queue with a time delay before they can be claimed.
-          </DialogDescription>
+          <DialogTitle>{t("staking.unstakeSafe", "Unstake SAFE")}</DialogTitle>
+          <DialogDescription>{t("staking.initiateWithdrawalFromValidatorTokensEnterAWithdrawal", "Initiate withdrawal from validator {{address}}. Tokens enter a withdrawal queue with a time delay before they can be claimed.", { address: truncateAddress(validator) })}</DialogDescription>
         </DialogHeader>
 
         <AmountInput
           value={amount}
           onChange={setAmount}
           maxAmount={userStakeValue}
-          label="Unstake Amount"
+          label={t("staking.unstakeAmount", "Unstake Amount")}
         />
 
         {gasEstimate && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Fuel className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Estimated gas: ~{parseFloat(gasEstimate).toFixed(6)} ETH</span>
+            <span>{t("staking.estimatedGasEth", "Estimated gas: ~{{value}} ETH", { value: parseFloat(gasEstimate).toFixed(6) })}</span>
           </div>
         )}
 
@@ -93,16 +93,16 @@ export function UndelegateDialog({ validator, open, onOpenChange }: UndelegateDi
           <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
             <Tooltip>
               <TooltipTrigger asChild>
-                <button type="button" className="shrink-0" aria-label="Unstaking period info">
+                <button type="button" className="shrink-0" aria-label={t("staking.unstakingPeriodInfo", "Unstaking period info")}>
                   <Info className="h-4 w-4" aria-hidden="true" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-xs text-xs">
-                <p>During the unstaking period, your tokens are locked and do not earn rewards.</p>
-                <p className="mt-1">After the period ends, you must manually claim them from the Withdrawals page.</p>
+                <p>{t("staking.duringTheUnstakingPeriodYourTokensAreLocked", "During the unstaking period, your tokens are locked and do not earn rewards.")}</p>
+                <p className="mt-1">{t("staking.afterThePeriodEndsYouMustManuallyClaim", "After the period ends, you must manually claim them from the Withdrawals page.")}</p>
               </TooltipContent>
             </Tooltip>
-            <span>Unstaking period: {formatCountdown(Number(withdrawDelay))}. Tokens will be claimable after this period.</span>
+            <span>{t("staking.unstakingPeriodTokensWillBeClaimableAfterThis", "Unstaking period: {{period}}. Tokens will be claimable after this period.", { period: formatCountdown(Number(withdrawDelay)) })}</span>
           </div>
         )}
 
@@ -111,9 +111,7 @@ export function UndelegateDialog({ validator, open, onOpenChange }: UndelegateDi
           isConfirmingTx={isConfirmingTx}
           onClick={() => initiateWithdrawal(validator, parsedAmount)}
           disabled={!canUndelegate}
-        >
-          Initiate Withdrawal
-        </TxButton>
+        >{t("staking.initiateWithdrawal", "Initiate Withdrawal")}</TxButton>
       </DialogContent>
     </Dialog>
   )

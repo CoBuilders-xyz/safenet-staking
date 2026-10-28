@@ -7,9 +7,22 @@ import {
   nest,
   pluralForms,
   sourceCatalogue,
+  untranslatedJsx,
 } from "../i18n-catalogues"
 
 const header = `import { useTranslation, Trans } from "react-i18next"\n`
+
+describe("untranslated JSX gate", () => {
+  it("rejects an entire route with no i18n import, including accessible names", () => {
+    const errors = untranslatedJsx("Dashboard.tsx", '<><h1>Stake your SAFE</h1><Hero title="Withdrawals" /><button aria-label="Claim rewards" /></>')
+    expect(errors).toHaveLength(3)
+    expect(errors.join("\n")).toContain("Stake your SAFE")
+  })
+
+  it("accepts translated copy, interpolation, protocol units and proper names", () => {
+    expect(untranslatedJsx("Dashboard.tsx", '<><h1>{t("title", "Dashboard")}</h1><Trans i18nKey="help" defaults="Visit <link>Validators</link>" /><span>{amount} SAFE</span><a>Safenet Staking</a><input placeholder="0.0" /></>')).toEqual([])
+  })
+})
 
 function englishOf(source: string) {
   const { usages, errors } = extractUsages("src/x.tsx", header + source)

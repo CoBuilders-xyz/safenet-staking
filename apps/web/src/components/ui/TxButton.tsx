@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import * as React from "react"
 import { Button, type ButtonProps } from "./button"
 import Loader2 from "lucide-react/dist/esm/icons/loader-2"
@@ -26,14 +27,15 @@ const TxButton = React.forwardRef<HTMLButtonElement, TxButtonProps>(
     {
       isSigningTx,
       isConfirmingTx,
-      signingLabel = "Confirm in Wallet\u2026",
-      confirmingLabel = "Confirming onchain\u2026",
+      signingLabel,
+      confirmingLabel,
       disabled,
       children,
       ...rest
     },
     ref,
   ) => {
+    const { t } = useTranslation()
     const wrongNetwork = useWrongNetwork()
     const isBusy = isSigningTx || isConfirmingTx
 
@@ -49,7 +51,7 @@ const TxButton = React.forwardRef<HTMLButtonElement, TxButtonProps>(
               className="animate-spin"
               aria-hidden="true"
             />
-            {signingLabel}
+            {signingLabel ?? t("common.confirmInWallet", "Confirm in Wallet…")}
           </>
         ) : isConfirmingTx ? (
           <>
@@ -57,7 +59,7 @@ const TxButton = React.forwardRef<HTMLButtonElement, TxButtonProps>(
               className="animate-spin"
               aria-hidden="true"
             />
-            {confirmingLabel}
+            {confirmingLabel ?? t("common.confirmingOnchain", "Confirming onchain…")}
           </>
         ) : (
           children

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useToast, type ToastVariant } from "@/hooks/useToast"
 import { truncateAddress } from "@/lib/format"
 import X from "lucide-react/dist/esm/icons/x"
@@ -25,6 +26,7 @@ function getExplorerTxUrl(hash: string): string {
 }
 
 export function Toaster() {
+  const { t } = useTranslation()
   const { toasts, dismiss } = useToast()
 
   if (toasts.length === 0) return null
@@ -51,15 +53,13 @@ export function Toaster() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs underline opacity-80 hover:opacity-100 font-mono"
-                  >
-                    Tx: {truncateAddress(toast.txHash)}
-                  </a>
+                  >{t("common.tx", "Tx: {{address}}", { address: truncateAddress(toast.txHash) })}</a>
                 )}
               </div>
               <button
                 onClick={() => dismiss(toast.id)}
                 className="shrink-0 rounded-sm opacity-60 hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="Dismiss notification"
+                aria-label={t("common.dismissNotification", "Dismiss notification")}
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>

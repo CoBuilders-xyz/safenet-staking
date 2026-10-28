@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useEffect } from "react"
 import { useToast } from "@/hooks/useToast"
 import { formatContractError } from "@/lib/errorFormat"
@@ -38,6 +39,7 @@ export function useTxToast(
   options: TxToastOptions,
   state: TxToastState,
 ) {
+  const { t } = useTranslation()
   const { toast } = useToast()
   const {
     isSuccess,
@@ -83,20 +85,13 @@ export function useTxToast(
     if (isSafeQueued) {
       toast({
         variant: "success",
-        title: options.safeQueuedTitle ?? "Transaction queued in Safe",
+        title: options.safeQueuedTitle ?? t("common.transactionQueuedInSafe", "Transaction queued in Safe"),
         description:
           options.safeQueuedDescription ??
-          "Your transaction has been sent to Safe Wallet for signing.",
+          t("common.yourTransactionHasBeenSentToSafeWallet", "Your transaction has been sent to Safe Wallet for signing."),
       })
       reset()
       onSuccess?.()
     }
-  }, [
-    isSafeQueued,
-    toast,
-    options.safeQueuedTitle,
-    options.safeQueuedDescription,
-    reset,
-    onSuccess,
-  ])
+  }, [isSafeQueued, toast, options.safeQueuedTitle, options.safeQueuedDescription, reset, onSuccess, t])
 }

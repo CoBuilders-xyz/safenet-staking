@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useState } from "react"
 import { useAccount } from "wagmi"
 import { PageHero } from "@/components/PageHero"
@@ -13,6 +14,7 @@ import { useTokenBalance } from "@/hooks/useTokenBalance"
 import { useWrongNetwork } from "@/hooks/useWrongNetwork"
 
 export function RewardsPage() {
+  const { t } = useTranslation()
   const { isConnected } = useAccount()
   const wrongNetwork = useWrongNetwork()
   const rewards = useRewards()
@@ -27,8 +29,8 @@ export function RewardsPage() {
   return (
     <div className="space-y-6">
       <PageHero
-        title="Rewards"
-        subtitle="Claim your Safenet rewards and check them against the chain"
+        title={t("rewards.rewards", "Rewards")}
+        subtitle={t("rewards.claimYourSafenetRewardsAndCheckThemAgainst", "Claim your Safenet rewards and check them against the chain")}
       />
       <div className="grid gap-6 md:grid-cols-2">
         <YourRewardsSection isConnected={isConnected} rewards={rewards} />

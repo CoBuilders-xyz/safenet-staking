@@ -1,15 +1,16 @@
+import { i18n } from "@/i18n"
 import { BaseError, ContractFunctionRevertedError, decodeErrorResult, type Abi } from "viem"
 
 const CUSTOM_ERROR_MESSAGES: Record<string, string> = {
-  InvalidAmount: "Amount must be greater than zero",
-  NotValidator: "This validator is not registered",
-  InsufficientStake: "Insufficient delegation balance",
-  WithdrawalQueueEmpty: "No pending withdrawals to claim",
-  NoClaimableWithdrawal: "No withdrawal is ready to claim yet",
-  InvalidAddress: "Invalid address provided",
-  InvalidProof: "Invalid merkle proof — rewards data may be outdated",
-  NothingToClaim: "No rewards available to claim",
-  MerkleRootWasUpdated: "Rewards data was updated — please try again",
+  get InvalidAmount() { return i18n.t("errors.InvalidAmount", "Amount must be greater than zero") },
+  get NotValidator() { return i18n.t("errors.NotValidator", "This validator is not registered") },
+  get InsufficientStake() { return i18n.t("errors.InsufficientStake", "Insufficient delegation balance") },
+  get WithdrawalQueueEmpty() { return i18n.t("errors.WithdrawalQueueEmpty", "No pending withdrawals to claim") },
+  get NoClaimableWithdrawal() { return i18n.t("errors.NoClaimableWithdrawal", "No withdrawal is ready to claim yet") },
+  get InvalidAddress() { return i18n.t("errors.InvalidAddress", "Invalid address provided") },
+  get InvalidProof() { return i18n.t("errors.InvalidProof", "Invalid merkle proof — rewards data may be outdated") },
+  get NothingToClaim() { return i18n.t("errors.NothingToClaim", "No rewards available to claim") },
+  get MerkleRootWasUpdated() { return i18n.t("errors.MerkleRootWasUpdated", "Rewards data was updated — please try again") },
 }
 
 export function formatContractError(error: Error): string {
@@ -17,7 +18,7 @@ export function formatContractError(error: Error): string {
 
   // 1. User rejected
   if (msg.includes("User rejected") || msg.includes("user rejected")) {
-    return "Transaction rejected"
+    return i18n.t("errors.Transactionrejected", "Transaction rejected")
   }
 
   // 2. Known custom error name (viem decoded)
@@ -46,7 +47,7 @@ export function formatContractError(error: Error): string {
     msg.includes("exceeds the balance") ||
     msg.includes("not enough funds")
   ) {
-    return "Insufficient ETH for gas fees"
+    return i18n.t("errors.InsufficientETHforgasfees", "Insufficient ETH for gas fees")
   }
 
   // 5. Network/RPC error
@@ -58,11 +59,11 @@ export function formatContractError(error: Error): string {
     msg.includes("ECONNREFUSED") ||
     msg.includes("could not coalesce")
   ) {
-    return "Network error — please try again"
+    return i18n.t("errors.Networkerrorpleasetryagain", "Network error — please try again")
   }
 
   // 6. Fallback — generic message (avoid leaking RPC URLs or internal state)
-  return "An unexpected error occurred. Please try again."
+  return i18n.t("errors.AnunexpectederroroccurredPleasetry", "An unexpected error occurred. Please try again.")
 }
 
 /**

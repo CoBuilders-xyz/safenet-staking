@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { act, render, screen } from "@testing-library/react"
+import { chooseLanguage } from "@/i18n"
+import es from "@/i18n/locales/es.json"
+import de from "@/i18n/locales/de.json"
 import userEvent from "@testing-library/user-event"
 import { TooltipProvider } from "@radix-ui/react-tooltip"
 import { encodeErrorResult, type Hex } from "viem"
@@ -135,6 +138,28 @@ function claimed(amount: bigint | undefined) {
 }
 
 describe("ClaimAndStakeDialog", () => {
+  it("keeps the selected validator, typed amount and claim step when the language changes", async () => {
+    const user = userEvent.setup()
+    claimed(100n * SAFE)
+    m.balance = 100n * SAFE
+    renderDialog()
+    await user.selectOptions(screen.getByLabelText("Validator"), MOCK_VALIDATORS[0].address)
+    await user.clear(screen.getByLabelText("Amount"))
+    await user.type(screen.getByLabelText("Amount"), "60")
+
+    await act(() => chooseLanguage("es"))
+    expect(screen.getByLabelText(es.staking.amount)).toHaveValue("60")
+    expect(screen.getByLabelText(es.dashboard.validator)).toHaveValue(MOCK_VALIDATORS[0].address)
+    expect(document.querySelector('[aria-current="step"]')).toHaveTextContent(es.validators.stake)
+
+    await act(() => chooseLanguage("de"))
+    expect(screen.getByLabelText(de.staking.amount)).toHaveValue("60")
+    expect(document.querySelector('[aria-current="step"]')).toHaveTextContent(de.validators.stake)
+    await user.click(screen.getByRole("button", { name: de.validators.stake }))
+    expect(m.stake).toHaveBeenCalledWith(MOCK_VALIDATORS[0].address, 60n * SAFE)
+    expect(m.claim).not.toHaveBeenCalled()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     m.claimState = {}

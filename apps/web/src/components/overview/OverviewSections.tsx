@@ -37,8 +37,8 @@ function mainnetSource(source: FigureSource, t: TFunction): string {
 }
 
 /**
- * SEF's reward rule. `PARTICIPATION_RULE` in lib/programme.ts says it in English for the screens
- * that are not translated yet; src/i18n/__tests__ holds the two to the same text, as it does the
+ * SEF's reward rule. `PARTICIPATION_RULE` in lib/programme.ts retains the reference English;
+ * src/i18n/__tests__ holds the two to the same text, as it does the
  * other `programme.*` keys and their constants.
  */
 const participationRule = (t: TFunction) =>

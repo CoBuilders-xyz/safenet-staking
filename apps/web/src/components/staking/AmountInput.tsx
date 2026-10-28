@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { formatTokenAmount, formatTokenAmountRaw } from "@/lib/format"
@@ -18,10 +19,11 @@ export function AmountInput({
   value,
   onChange,
   maxAmount,
-  label = "Amount",
-  maxLabel = "SAFE Balance",
+  label,
+  maxLabel,
   disabled,
 }: AmountInputProps) {
+  const { t } = useTranslation()
   function setPercentage(pct: number) {
     if (maxAmount === undefined) return
     if (pct === 100) {
@@ -35,10 +37,10 @@ export function AmountInput({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label htmlFor="amount-input" className="text-sm font-medium">{label}</label>
+        <label htmlFor="amount-input" className="text-sm font-medium">{label ?? t("staking.amount", "Amount")}</label>
         {maxAmount !== undefined && (
           <span className="text-xs text-muted-foreground">
-            {maxLabel}: {formatTokenAmount(maxAmount)}
+            {maxLabel ?? t("staking.safeBalance", "SAFE Balance")}: {formatTokenAmount(maxAmount)}
           </span>
         )}
       </div>
@@ -70,7 +72,7 @@ export function AmountInput({
               disabled={disabled}
               onClick={() => setPercentage(pct)}
             >
-              {pct === 100 ? "MAX" : `${pct}%`}
+              {pct === 100 ? t("staking.max", "MAX") : `${pct}%`}
             </Button>
           ))}
         </div>

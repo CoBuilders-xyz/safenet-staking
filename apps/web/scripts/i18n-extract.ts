@@ -10,7 +10,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { join, relative, resolve } from "node:path"
 import { LANGUAGES, SOURCE_LANGUAGE } from "../src/i18n/languages"
-import { checkEnglish, checkTranslation, extractUsages, flatten, serialise, sourceCatalogue, type Usage } from "./i18n-catalogues"
+import { checkEnglish, checkTranslation, extractUsages, flatten, serialise, sourceCatalogue, untranslatedJsx, type Usage } from "./i18n-catalogues"
 
 const ROOT = resolve(import.meta.dirname, "..")
 const SRC = join(ROOT, "src")
@@ -35,9 +35,11 @@ function fail(errors: string[], hint: string): never {
 const usages: Usage[] = []
 const readErrors: string[] = []
 for (const file of sourceFiles()) {
-  const result = extractUsages(relative(ROOT, file), readFileSync(file, "utf8"))
+  const source = readFileSync(file, "utf8")
+  const result = extractUsages(relative(ROOT, file), source)
   usages.push(...result.usages)
   readErrors.push(...result.errors)
+  readErrors.push(...untranslatedJsx(relative(ROOT, file), source))
 }
 const { catalogue: english, plural, errors: sourceErrors } = sourceCatalogue(usages, SOURCE_LANGUAGE)
 if (readErrors.length + sourceErrors.length > 0) {

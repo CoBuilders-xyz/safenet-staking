@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { Progress } from "@/components/ui/progress"
 import {
   formatTokenAmount,
@@ -34,6 +35,7 @@ export function WithdrawalCard({
   validator,
   validators,
 }: WithdrawalCardProps) {
+  const { t } = useTranslation()
   const secondsLeft = useCountdown(claimableAt)
   const wrongNetwork = useWrongNetwork()
   const canClaim = isFirst && secondsLeft === 0 && !wrongNetwork
@@ -51,7 +53,7 @@ export function WithdrawalCard({
   const isZero =
     validator === "0x0000000000000000000000000000000000000000"
   const validatorLabel = isZero
-    ? "Unknown validator"
+    ? t("withdrawals.unknownValidator", "Unknown validator")
     : metadata
       ? metadata.label
       : validator
@@ -86,9 +88,7 @@ export function WithdrawalCard({
                 text-success
                 bg-success/15
                 border border-success/40"
-            >
-              Ready to withdraw
-            </span>
+            >{t("withdrawals.readyToWithdraw", "Ready to withdraw")}</span>
           ) : (
             <span
               className="inline-flex items-center self-start rounded-sm
@@ -125,20 +125,17 @@ export function WithdrawalCard({
                     className="h-4 w-4 animate-spin"
                     aria-hidden="true"
                   />
-                  Signing…
-                </>
+                  {t("withdrawals.signing", "Signing…")}</>
               ) : isConfirmingTx ? (
                 <>
                   <Loader2
                     className="h-4 w-4 animate-spin"
                     aria-hidden="true"
                   />
-                  Confirming…
-                </>
+                  {t("withdrawals.confirming", "Confirming…")}</>
               ) : (
                 <>
-                  Claim
-                  <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                  {t("rewards.claim2", "Claim")}<ArrowUpRight className="h-4 w-4" aria-hidden="true" />
                 </>
               )}
             </button>
@@ -153,7 +150,7 @@ export function WithdrawalCard({
             className="flex items-center justify-between
               text-xs text-muted-foreground"
           >
-            <span>Cooldown progress</span>
+            <span>{t("withdrawals.cooldownProgress", "Cooldown progress")}</span>
             <span>{Math.round(progress)}%</span>
           </div>
           <Progress value={progress} size="sm" />

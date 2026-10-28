@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useAccount } from "wagmi"
 import { usePendingWithdrawals } from "@/hooks/useWithdrawals"
 import { useWithdrawDelay } from "@/hooks/useStakingReads"
@@ -16,6 +17,7 @@ import Info from "lucide-react/dist/esm/icons/info"
 import Loader2 from "lucide-react/dist/esm/icons/loader-2"
 
 export function WithdrawalQueue() {
+  const { t } = useTranslation()
   const { isConnected } = useAccount()
   const { data: withdrawals, isLoading } = usePendingWithdrawals()
   const { data: withdrawDelay } = useWithdrawDelay()
@@ -67,10 +69,10 @@ export function WithdrawalQueue() {
 
   useTxToast(
     {
-      successTitle: "Withdrawal claimed",
-      successDescription: "SAFE tokens sent to your wallet",
-      errorTitle: "Claim failed",
-      safeQueuedDescription: "Your claim has been sent to Safe Wallet for signing.",
+      successTitle: t("withdrawals.withdrawalClaimed", "Withdrawal claimed"),
+      successDescription: t("withdrawals.safeTokensSentToYourWallet", "SAFE tokens sent to your wallet"),
+      errorTitle: t("dashboard.claimFailed", "Claim failed"),
+      safeQueuedDescription: t("withdrawals.yourClaimHasBeenSentToSafeWallet", "Your claim has been sent to Safe Wallet for signing."),
     },
     {
       isSuccess: isClaimed,
@@ -83,29 +85,27 @@ export function WithdrawalQueue() {
 
   useEffect(() => {
     if (isBatchClaimed) {
-      toast({ variant: "success", title: "All withdrawals claimed", description: "SAFE tokens sent to your wallet", txHash: batchTxHash })
+      toast({ variant: "success", title: t("withdrawals.allWithdrawalsClaimed", "All withdrawals claimed"), description: t("withdrawals.safeTokensSentToYourWallet", "SAFE tokens sent to your wallet"), txHash: batchTxHash })
       resetBatch()
     }
-  }, [isBatchClaimed, toast, batchTxHash, resetBatch])
+  }, [isBatchClaimed, toast, batchTxHash, resetBatch, t])
 
   useEffect(() => {
     if (batchError) {
-      toast({ variant: "error", title: "Batch claim failed", description: formatContractError(batchError) })
+      toast({ variant: "error", title: t("withdrawals.batchClaimFailed", "Batch claim failed"), description: formatContractError(batchError) })
     }
-  }, [batchError, toast])
+  }, [batchError, t, toast])
 
   useEffect(() => {
     if (isBatchReverted) {
-      toast({ variant: "error", title: "Batch claim reverted", description: "The batch transaction was reverted onchain" })
+      toast({ variant: "error", title: t("withdrawals.batchClaimReverted", "Batch claim reverted"), description: t("staking.theBatchTransactionWasRevertedOnchain", "The batch transaction was reverted onchain") })
       resetBatch()
     }
-  }, [isBatchReverted, resetBatch, toast])
+  }, [isBatchReverted, resetBatch, t, toast])
 
   if (!isConnected) {
     return (
-      <div className="rounded-lg border p-8 text-center text-muted-foreground">
-        Connect your wallet to view withdrawal queue.
-      </div>
+      <div className="rounded-lg border p-8 text-center text-muted-foreground">{t("withdrawals.connectYourWalletToViewWithdrawalQueue", "Connect your wallet to view withdrawal queue.")}</div>
     )
   }
 
@@ -121,9 +121,7 @@ export function WithdrawalQueue() {
 
   if (!withdrawals || withdrawals.length === 0) {
     return (
-      <div className="rounded-lg border p-8 text-center text-muted-foreground">
-        No pending withdrawals.
-      </div>
+      <div className="rounded-lg border p-8 text-center text-muted-foreground">{t("withdrawals.noPendingWithdrawals", "No pending withdrawals.")}</div>
     )
   }
 
@@ -131,16 +129,14 @@ export function WithdrawalQueue() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">Pending Withdrawals</h2>
+          <h2 className="text-lg font-semibold">{t("withdrawals.pendingWithdrawals", "Pending Withdrawals")}</h2>
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className="text-muted-foreground hover:text-foreground" aria-label="Withdrawal queue info">
+              <button className="text-muted-foreground hover:text-foreground" aria-label={t("withdrawals.withdrawalQueueInfo", "Withdrawal queue info")}>
                 <Info className="h-4 w-4" aria-hidden="true" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="right" className="max-w-xs">
-              Withdrawals are processed in FIFO order. The oldest withdrawal must be claimed first before newer ones become available.
-            </TooltipContent>
+            <TooltipContent side="right" className="max-w-xs">{t("withdrawals.withdrawalsAreProcessedInFifoOrderTheOldest", "Withdrawals are processed in FIFO order. The oldest withdrawal must be claimed first before newer ones become available.")}</TooltipContent>
           </Tooltip>
         </div>
         {showClaimAll && (
@@ -152,15 +148,13 @@ export function WithdrawalQueue() {
             {isBatchSigning ? (
               <>
                 <Loader2 className="animate-spin" aria-hidden="true" />
-                Confirm in Wallet…
-              </>
+                {t("common.confirmInWallet", "Confirm in Wallet…")}</>
             ) : isBatchConfirming ? (
               <>
                 <Loader2 className="animate-spin" aria-hidden="true" />
-                Confirming onchain…
-              </>
+                {t("common.confirmingOnchain", "Confirming onchain…")}</>
             ) : (
-              `Claim All (${claimableCount})`
+              t("withdrawals.claimAll", "Claim All ({{claimableCount}})", { claimableCount: claimableCount })
             )}
           </Button>
         )}

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useCallback } from "react"
 import { type Address } from "viem"
 import {
@@ -18,6 +19,7 @@ interface DelegateDialogProps {
 }
 
 export function DelegateDialog({ validator, open, onOpenChange }: DelegateDialogProps) {
+  const { t } = useTranslation()
   const close = useCallback(() => onOpenChange(false), [onOpenChange])
   const form = useStakeForm({ validator, active: open, onStaked: close })
 
@@ -25,10 +27,8 @@ export function DelegateDialog({ validator, open, onOpenChange }: DelegateDialog
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Stake SAFE</DialogTitle>
-          <DialogDescription>
-            Stake tokens to validator {truncateAddress(validator)}
-          </DialogDescription>
+          <DialogTitle>{t("staking.stakeSafe", "Stake SAFE")}</DialogTitle>
+          <DialogDescription>{t("staking.stakeTokensToValidator", "Stake tokens to validator {{address}}", { address: truncateAddress(validator) })}</DialogDescription>
         </DialogHeader>
 
         <StakeForm form={form} />

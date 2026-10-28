@@ -7,12 +7,15 @@ is one file of text, a catalogue, that anyone can correct or extend.
 ## Status of the catalogues
 
 **The seven non-English catalogues are machine-translated and wait for review by native
-speakers.** They were written in a formal register with one term per concept, listed below. Until
+speakers.** They use the terminology listed below. Until
 a native speaker reviews a language, treat its text as a draft. Corrections are welcome; see
 [Contributing a translation](#contributing-a-translation).
 
-Today the catalogues cover the header, the footer, the app-wide messages and the Network
-Overview at `/`. The other screens are still in English in every language.
+The catalogues cover the shell, Overview, Dashboard, validator list and details, Rewards,
+Withdrawals, wallet controls, and the claim, approval, staking and withdrawal dialogs.
+Application-authored transaction messages, loading states, errors, tooltips and accessible
+labels follow the selected language. Validator names, token symbols and addresses stay unchanged.
+Wallet extensions and external provider/contract error strings are outside these catalogues.
 
 ## How it works
 
@@ -24,7 +27,10 @@ Overview at `/`. The other screens are still in English in every language.
   `apps/web/src` and writes `en.json`. Nobody edits `en.json` by hand.
 - `pnpm --filter @cobuilders/safenet-web i18n:check` writes nothing. It fails when `en.json` is
   not what the source says, or when another catalogue misses a key, keeps a key the source no
-  longer uses, leaves a text empty, or changes a placeholder or a tag. `pnpm check` runs it, so
+  longer uses, leaves a text empty, or changes a placeholder or a tag. It also rejects raw JSX
+  text and literal user-facing attributes outside a small allowlist of protocol units and
+  proper names, even in files without an i18n import. This catches untranslated routes, not
+  just missing catalogue entries. Runtime strings still need review. `pnpm check` runs it, so
   CI's `check` job fails on any of these.
 - English is in the main bundle. Every other catalogue is its own file in the build, fetched
   from the same origin only when a reader chooses that language, so the interface works from
@@ -57,7 +63,9 @@ language needs. A form may leave out `{{count}}` where the language says the num
 
 Texts about compliance, sanctions, region restrictions, risk or legal matters need a second
 reviewer before they merge: `shell.accessRestricted.*`, `shell.walletRestricted.*`,
-`footer.terms`, `footer.privacy`, `footer.imprint` and `programme.participationRule`.
+`footer.terms`, `footer.privacy`, `footer.imprint`, `programme.participationRule`,
+`dashboard.complianceNote`, `dashboard.kycMayBeRequiredToClaimRewards`,
+`rewards.sefHoldsThisPartOfYourRewardUntil`, and staking/withdrawal risk explanations.
 
 ## Terminology
 
@@ -79,8 +87,8 @@ reviewer before they merge: `shell.accessRestricted.*`, `shell.walletRestricted.
 | snapshot | instantánea | Momentaufnahme | instantané | istantanea | snapshot | снимок | 快照 |
 | wallet | wallet | Wallet | portefeuille | wallet | carteira | кошелёк | 钱包 |
 
-Unstake, cooldown and delegate join this table when the screens that use them move to the
-catalogues.
+Use one consistent translation of unstake, cooldown and delegate throughout the transaction
+dialogs. Distinguish leaving staking from claiming the tokens after the waiting period.
 
 Portuguese is written in Brazilian Portuguese. Chinese covers Simplified script only: a browser
 that asks for Traditional Chinese (`zh-TW`, `zh-HK`, `zh-Hant`) gets its next preferred language,
@@ -93,8 +101,9 @@ then English.
    `matchLanguage` in the same file and its tests.
 2. Copy `en.json` to `<code>.json` in `apps/web/src/i18n/locales/` and translate every text.
 3. Run `i18n:check` until it passes. It requires each plural form the language uses.
-4. Open the Overview in the new language at a phone's width and at 1280 px, and add the
-   language to the width checks in `apps/web/e2e/tests/language.spec.ts` if its words run long.
+4. Open all routes in the new language at a phone's width and at 1280 px. Add it to the
+   route and transaction checks in `apps/web/e2e/tests/language-routes.spec.ts` and the
+   Overview/header width checks in `apps/web/e2e/tests/language.spec.ts`.
 5. Note in [Status of the catalogues](#status-of-the-catalogues) how the new catalogue was
    written and who reviewed it.
 

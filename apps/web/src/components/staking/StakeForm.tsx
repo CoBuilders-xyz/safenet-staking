@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import type { ReactNode } from "react"
 import { TxButton } from "@/components/ui/TxButton"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
@@ -19,6 +20,7 @@ interface StakeFormProps {
 
 /** Amount, gas, unstaking period, and the approve and stake buttons. State comes from `useStakeForm`. */
 export function StakeForm({ form, maxLabel, aboveMaxMessage, notes }: StakeFormProps) {
+  const { t } = useTranslation()
   const {
     validator,
     amount,
@@ -61,15 +63,11 @@ export function StakeForm({ form, maxLabel, aboveMaxMessage, notes }: StakeFormP
       />
 
       {hasZeroBalance && (
-        <p className="text-sm text-destructive">
-          You do not have enough SAFE to stake.
-        </p>
+        <p className="text-sm text-destructive">{t("staking.youDoNotHaveEnoughSafeToStake", "You do not have enough SAFE to stake.")}</p>
       )}
 
       {insufficientBalance && !hasZeroBalance && (
-        <p className="text-sm text-destructive">
-          You do not have enough SAFE to stake this amount.
-        </p>
+        <p className="text-sm text-destructive">{t("staking.youDoNotHaveEnoughSafeToStake2", "You do not have enough SAFE to stake this amount.")}</p>
       )}
 
       {aboveMax && !insufficientBalance && aboveMaxMessage && (
@@ -81,7 +79,7 @@ export function StakeForm({ form, maxLabel, aboveMaxMessage, notes }: StakeFormP
       {!isBatchFlow && gasEstimate && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Fuel className="h-3.5 w-3.5" aria-hidden="true" />
-          <span>Estimated gas: ~{parseFloat(gasEstimate).toFixed(6)} ETH</span>
+          <span>{t("staking.estimatedGasEth", "Estimated gas: ~{{value}} ETH", { value: parseFloat(gasEstimate).toFixed(6) })}</span>
         </div>
       )}
 
@@ -89,16 +87,16 @@ export function StakeForm({ form, maxLabel, aboveMaxMessage, notes }: StakeFormP
         <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
           <Tooltip>
             <TooltipTrigger asChild>
-              <button type="button" className="shrink-0" aria-label="Unstaking period info">
+              <button type="button" className="shrink-0" aria-label={t("staking.unstakingPeriodInfo", "Unstaking period info")}>
                 <Info className="h-4 w-4" aria-hidden="true" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs">
-              <p>If you undelegate, your tokens will be locked during the unstaking period and will not earn rewards.</p>
-              <p className="mt-1">After the period ends, you must manually claim them from the Withdrawals page.</p>
+              <p>{t("staking.ifYouUndelegateYourTokensWillBeLocked", "If you undelegate, your tokens will be locked during the unstaking period and will not earn rewards.")}</p>
+              <p className="mt-1">{t("staking.afterThePeriodEndsYouMustManuallyClaim", "After the period ends, you must manually claim them from the Withdrawals page.")}</p>
             </TooltipContent>
           </Tooltip>
-          <span>Unstaking period: {formatCountdown(Number(withdrawDelay))}</span>
+          <span>{t("staking.unstakingPeriod", "Unstaking period: {{period}}", { period: formatCountdown(Number(withdrawDelay)) })}</span>
         </div>
       )}
 
@@ -107,38 +105,32 @@ export function StakeForm({ form, maxLabel, aboveMaxMessage, notes }: StakeFormP
           <TxButton
             isSigningTx={batch.isSigningTx}
             isConfirmingTx={batch.isConfirmingTx}
-            signingLabel="Confirm in Safe…"
+            signingLabel={t("staking.confirmInSafe", "Confirm in Safe…")}
             onClick={() => validator && batch.batchApproveAndStake(validator, parsedAmount)}
             disabled={!validator || parsedAmount === 0n || insufficientBalance || aboveMax}
-          >
-            Stake
-          </TxButton>
+          >{t("validators.stake", "Stake")}</TxButton>
         ) : needsApproval ? (
           <>
             {approvalType !== "unlimited" && (
               <TxButton
                 isSigningTx={isSigningApproval && approvalType === "exact"}
                 isConfirmingTx={isConfirmingApproval && approvalType === "exact"}
-                signingLabel="Confirm Approval in Wallet…"
-                confirmingLabel="Approval confirming…"
+                signingLabel={t("staking.confirmApprovalInWallet", "Confirm Approval in Wallet…")}
+                confirmingLabel={t("staking.approvalConfirming", "Approval confirming…")}
                 onClick={approveExact}
                 disabled={isApprovalPending || parsedAmount === 0n || aboveMax}
-              >
-                Approve exact amount
-              </TxButton>
+              >{t("staking.approveExactAmount", "Approve exact amount")}</TxButton>
             )}
             {approvalType !== "exact" && (
               <TxButton
                 variant="outline"
                 isSigningTx={isSigningApproval && approvalType === "unlimited"}
                 isConfirmingTx={isConfirmingApproval && approvalType === "unlimited"}
-                signingLabel="Confirm Approval in Wallet…"
-                confirmingLabel="Approval confirming…"
+                signingLabel={t("staking.confirmApprovalInWallet", "Confirm Approval in Wallet…")}
+                confirmingLabel={t("staking.approvalConfirming", "Approval confirming…")}
                 onClick={approveUnlimited}
                 disabled={isApprovalPending || parsedAmount === 0n || aboveMax}
-              >
-                Approve unlimited
-              </TxButton>
+              >{t("staking.approveUnlimited", "Approve unlimited")}</TxButton>
             )}
           </>
         ) : (
@@ -147,9 +139,7 @@ export function StakeForm({ form, maxLabel, aboveMaxMessage, notes }: StakeFormP
             isConfirmingTx={stake.isConfirmingTx}
             onClick={() => validator && stake.stake(validator, parsedAmount)}
             disabled={!canDelegate}
-          >
-            Stake
-          </TxButton>
+          >{t("validators.stake", "Stake")}</TxButton>
         )}
       </div>
     </>

@@ -82,9 +82,10 @@ string literals, or `i18n:check` fails; `scripts/i18n-catalogues.ts` has the rul
 language. A function outside a component takes `t` as a parameter (`describeDegradation`,
 `formatAge`, the `*Messages(t)` helpers in the overview hooks).
 
-The catalogues cover the shell, the header, the footer and the Overview route. The other routes
-still use English literals, and `lib/programme.ts` keeps its English constants for them; a test
-in `src/i18n/__tests__/` holds those constants equal to the `programme.*` keys.
+The catalogues cover every route and the wallet/transaction dialogs. The check also rejects
+raw JSX copy and literal user-facing attributes, even in files that do not import i18n.
+`lib/programme.ts` retains reference English constants; a test in `src/i18n/__tests__/`
+holds those constants equal to the `programme.*` keys. Render the translated keys in UI code.
 
 ### Routing (`src/App.tsx`)
 
@@ -226,8 +227,7 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
 ### Libraries
 
 - `src/lib/format.ts`: token amounts, addresses, countdowns, participation rates, UTC dates.
-- `src/lib/programme.ts`: English copy built on the programme calendar in core, for the routes
-  not yet translated: `PARTICIPATION_RULE`,
+- `src/lib/programme.ts`: reference English copy built on the programme calendar in core: `PARTICIPATION_RULE`,
   `RATE_NOT_PUBLISHED` for a rate SEF lists as null, `belowThreshold`, the dated Beta notice, the withdrawn status for a validator SEF lists as
   inactive.
 - `src/lib/errorFormat.ts`: `formatContractError`, `revertedErrorName`.

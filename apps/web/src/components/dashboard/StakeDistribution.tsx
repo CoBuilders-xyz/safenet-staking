@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useMemo, lazy, Suspense } from "react"
 import { useAccount } from "wagmi"
 import { useValidators } from "@/hooks/useValidators"
@@ -65,6 +66,7 @@ interface ChartEntry {
 }
 
 export function StakeDistribution() {
+  const { t } = useTranslation()
   const { isConnected } = useAccount()
   const { data: validators } = useValidators()
   const validatorAddresses = useMemo(() => validators?.map((v) => v.address) ?? [], [validators])
@@ -96,7 +98,7 @@ export function StakeDistribution() {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader><CardTitle>Your Stake Distribution</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t("dashboard.yourStakeDistribution", "Your Stake Distribution")}</CardTitle></CardHeader>
         <CardContent><Skeleton className="h-48" /></CardContent>
       </Card>
     )
@@ -106,7 +108,7 @@ export function StakeDistribution() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Your Stake Distribution</CardTitle>
+        <CardTitle>{t("dashboard.yourStakeDistribution", "Your Stake Distribution")}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-64">

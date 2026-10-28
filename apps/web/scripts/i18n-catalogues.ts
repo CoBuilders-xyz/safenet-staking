@@ -36,6 +36,33 @@ export interface Usage {
 
 const I18N_MODULES = new Set(["i18next", "react-i18next", "@/i18n"])
 
+/** Catch visible JSX that never entered the catalogues, even in an untranslated file. */
+export function untranslatedJsx(fileName: string, text: string): string[] {
+  if (!fileName.endsWith(".tsx")) return []
+  const file = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const invariant = new Set(["SAFE", "ETH", "Safenet Staking", "rewards/latest.json"])
+  const visibleAttributes = new Set([
+    "title", "subtitle", "label", "maxLabel", "aboveMaxMessage", "aria-label",
+    "signingLabel", "confirmingLabel", "source", "message", "placeholder",
+  ])
+  const errors: string[] = []
+  const check = (node: ts.Node, value: string) => {
+    const normalized = value.replace(/\s+/g, " ").trim()
+    if (!/[a-zA-Z]{2}/.test(normalized) || invariant.has(normalized)) return
+    const line = file.getLineAndCharacterOfPosition(node.getStart()).line + 1
+    errors.push(`${fileName}:${line}: untranslated JSX ${JSON.stringify(normalized)}; use t or Trans`)
+  }
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxText(node)) check(node, node.text)
+    if (ts.isJsxAttribute(node) && visibleAttributes.has(node.name.getText(file)) && node.initializer && ts.isStringLiteral(node.initializer)) {
+      check(node, node.initializer.text)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(file)
+  return errors
+}
+
 function importsI18n(file: ts.SourceFile): boolean {
   return file.statements.some(
     (s) => ts.isImportDeclaration(s) && ts.isStringLiteral(s.moduleSpecifier) && I18N_MODULES.has(s.moduleSpecifier.text),
