@@ -1,6 +1,7 @@
-import { useTranslation } from "react-i18next"
+import { Trans, useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { PageHero } from "@/components/PageHero"
+import { Term } from "@/components/ui/term"
 import { Button } from "@/components/ui/button"
 import { SectionBoundary } from "@/components/overview/OverviewSection"
 import {
@@ -22,7 +23,7 @@ export function OverviewPage() {
     <div className="space-y-6">
       <PageHero
         title={t("overview.hero.title", "Network overview")}
-        subtitle={t("overview.hero.subtitle", "The state of Safenet staking and consensus. No wallet needed.")}
+        subtitle={<Trans i18nKey="onboarding.hero.overview" defaults="The state of <network>Safenet</network> <staking>staking</staking> and consensus. No wallet needed." components={{ network: <Term term="safenet" children={null} />, staking: <Term term="staking" children={null} /> }} />}
       >
         <Button asChild variant="outline" className="mt-6">
           <Link to="/dashboard">{t("overview.hero.openDashboard", "Open the staking dashboard")}</Link>

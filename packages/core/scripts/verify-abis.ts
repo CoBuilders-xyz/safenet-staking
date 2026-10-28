@@ -216,6 +216,8 @@ async function verifyFunctions(): Promise<Result[]> {
 const results = [...(await verify()), ...(await verifyErrors()), ...(await verifyFunctions())]
 
 const pad = (s: string, n: number) => s.padEnd(n)
+// Wide enough for the longest name, so a long function name never runs into the contract column.
+const nameWidth = Math.max(24, ...results.map((r) => r.signature.length + 2))
 console.log(`\n  verify:abis  ${deep ? "deep scan from deploy block" : "recent window, widened when quiet, high-frequency events"}\n`)
 for (const anchor of await Promise.all(anchors.values())) {
   console.log(
@@ -223,10 +225,10 @@ for (const anchor of await Promise.all(anchors.values())) {
     `${anchor.block}, the last before ${anchor.closedAt.toISOString()}.\n`,
   )
 }
-console.log(`  ${pad("EVENT", 24)}${pad("CONTRACT", 18)}${pad("TOPIC0", 14)}${pad("LOGS", 8)}${pad(deep ? "FIRST SEEN" : "LAST SEEN", 28)}RESULT`)
+console.log(`  ${pad("EVENT", nameWidth)}${pad("CONTRACT", 18)}${pad("TOPIC0", 14)}${pad("LOGS", 8)}${pad(deep ? "FIRST SEEN" : "LAST SEEN", 28)}RESULT`)
 for (const r of results) {
   console.log(
-    `  ${pad(r.signature, 24)}${pad(r.contract, 18)}${pad(r.topic0.slice(0, 10) + "…", 14)}${pad(r.checked === "bytecode" ? "code" : String(r.logs), 8)}${pad(r.seen, 28)}${r.status}`,
+    `  ${pad(r.signature, nameWidth)}${pad(r.contract, 18)}${pad(r.topic0.slice(0, 10) + "…", 14)}${pad(r.checked === "bytecode" ? "code" : String(r.logs), 8)}${pad(r.seen, 28)}${r.status}`,
   )
 }
 

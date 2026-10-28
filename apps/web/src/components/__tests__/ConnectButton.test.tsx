@@ -14,7 +14,7 @@ vi.mock("wagmi", () => ({
   useAccount: () => mockUseAccount(),
   useConnect: () => mockUseConnect(),
   useDisconnect: () => ({ disconnect: mockDisconnect }),
-  useSwitchChain: () => ({ switchChain: mockSwitchChain }),
+  useSwitchChain: () => ({ switchChain: mockSwitchChain, isPending: false, error: null }),
 }))
 
 vi.mock("@/hooks/useTokenBalance", () => ({
@@ -65,23 +65,41 @@ describe("ConnectButton", () => {
     )
   })
 
-  it("shows switch chain button when on wrong chain", () => {
+  it("shows switch chain button when on wrong chain", async () => {
     mockUseAccount.mockReturnValue({
       isConnected: true,
       address: TEST_ACCOUNTS.user,
-      chain: { id: 11155111 }, // a chain the app does not support
+      chainId: 11155111, // a chain the app does not support; wagmi then leaves `chain` undefined
+      chain: undefined,
+      connector: { switchChain: vi.fn() },
     })
 
     render(<ConnectButton />)
 
-    expect(screen.getByRole("button", { name: "Switch to Ethereum" })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: "Switch to Ethereum" }))
+    expect(mockSwitchChain).toHaveBeenCalledWith({ chainId: 1 })
+  })
+
+  it("says wrong network without a switch when the wallet cannot switch", () => {
+    mockUseAccount.mockReturnValue({
+      isConnected: true,
+      address: TEST_ACCOUNTS.user,
+      chainId: 100,
+      chain: undefined,
+      connector: {},
+    })
+
+    render(<ConnectButton />)
+
+    expect(screen.getByText("Wrong network")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Switch to Ethereum" })).not.toBeInTheDocument()
   })
 
   it("shows address and balance when connected on correct chain", () => {
     mockUseAccount.mockReturnValue({
       isConnected: true,
       address: TEST_ACCOUNTS.user,
-      chain: { id: 1 },
+      chainId: 1,
     })
 
     render(<ConnectButton />)
@@ -94,7 +112,7 @@ describe("ConnectButton", () => {
     mockUseAccount.mockReturnValue({
       isConnected: true,
       address: TEST_ACCOUNTS.user,
-      chain: { id: 1 },
+      chainId: 1,
     })
 
     render(<ConnectButton />)
@@ -106,7 +124,7 @@ describe("ConnectButton", () => {
     mockUseAccount.mockReturnValue({
       isConnected: true,
       address: TEST_ACCOUNTS.user,
-      chain: { id: 1 },
+      chainId: 1,
     })
     const user = userEvent.setup()
 

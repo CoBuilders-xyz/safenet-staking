@@ -10,6 +10,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "release:build": "tsx scripts/release.ts",
+    "budget:bundle": "tsx scripts/check-budget.ts",
+    "budget:lighthouse": "tsx scripts/lighthouse.ts",
     "release:pin": "node --env-file-if-exists=../../.env.local --import tsx scripts/release-pin.ts",
     "preview": "vite preview",
     "test": "vitest run",
@@ -59,6 +61,7 @@
     "wagmi": "3.5.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "9.39.2",
     "@graphql-codegen/add": "7.1.1",
     "@graphql-codegen/cli": "7.4.3",

@@ -12,11 +12,7 @@ as `pnpm <script>` from `apps/web`.
 - **Dev server:** `dev`. Vite reads env from the repository root, not from this directory.
 - **Build:** `build` (`tsc -b && vite build`)
 - **Check:** `check`: `codegen:check`, which fails if `src/graphql/<chain>/generated.ts` is stale,
-  `i18n:check`, which fails if a catalogue in `src/i18n/locales/` misses a key, keeps an unused
-  one or changes a placeholder, then ESLint, `tsc -b --noEmit` and the e2e TypeScript project. The
-  root `pnpm check` runs it.
-- **Translations:** `i18n:extract` writes `src/i18n/locales/en.json` from the source;
-  `docs/translations.md` at the repository root is the guide
+  then ESLint, `tsc -b --noEmit` and the e2e TypeScript project. The root `pnpm check` runs it.
 - **Lint only:** `lint`
 - **Unit tests:** `test` (Vitest, `src/**` and `scripts/**`); `test:watch`; `test:coverage`
 - **E2E, mocked RPC:** `test:e2e` (Playwright, `e2e/tests/`); `test:e2e:ui`; `test:e2e:headed`.
@@ -31,8 +27,12 @@ as `pnpm <script>` from `apps/web`.
 - **Manual QA fork:** `fork:up`, `fork:reset`, `fork:down`, also from the repository root as
   `pnpm fork:up` and so on. The tool is `scripts/fork-env/`; the guide is
   `docs/manual-qa-fork.md` at the repository root
-- **IPFS release:** `release:build` builds from `build.env` alone and writes
-  `release/app.car` and `release/CID`; `release:pin` pins the CAR to Pinata and checks the
+- **Performance budget:** `budget:bundle` checks a built `dist/` against the bundle limits in
+  `performance-budget.json`, and `release:build` runs it; `budget:lighthouse` serves `dist/` on
+  loopback and checks Lighthouse mobile, the median of three runs per route, against the rest.
+  `PERFORMANCE.md` explains each limit. Raise one only with the measurement that justifies it.
+- **IPFS release:** `release:build` builds from `build.env` alone, checks the bundle budget, and
+  writes `release/app.car` and `release/CID`; `release:pin` pins the CAR to Pinata and checks the
   gateways, with `PINATA_JWT` and `PINATA_GATEWAY`. `VERIFY.md` at the root rebuilds a release;
   `.github/workflows/release.yml` runs both on a `v*` tag or by hand
 
@@ -63,9 +63,8 @@ TanStack Query, Radix UI, graphql-request and Recharts.
 
 ### Provider stack (`src/main.tsx`)
 
-`initI18n()` first; the first render waits for the reader's catalogue. Then `StrictMode` →
-`WagmiProvider` (`reconnectOnMount={false}`) → `QueryClientProvider` → `TooltipProvider` →
-`ToastProvider` → `App`
+`initI18n()` loads the selected catalogue before rendering. Then `StrictMode` → `WagmiProvider` (`reconnectOnMount={false}`) → `QueryClientProvider` →
+`TooltipProvider` → `ToastProvider` → `App`
 
 ### Languages (`src/i18n/`)
 
@@ -106,33 +105,47 @@ wrapped in `ErrorBoundary`:
   the on-chain root checked against SEF's published one
 - `*` → `NotFoundPage`
 
-Pages are lazy-loaded with `React.lazy()` and preloaded after first paint through
-`requestIdleCallback`.
+Pages are lazy-loaded with `React.lazy()` from `src/routes.ts`. The page of the URL opened starts
+loading at once, alongside the gates (`routeImportFor`); the others preload after the `load`
+event, when the browser is idle.
 
-App-level gates, each rendering `RestrictedScreen`:
+App-level gates, each rendering `RestrictedScreen` with a `Restriction` (`src/lib/restriction.ts`):
+the gate, and whether it refused or could not answer. Each hook returns `allowed`, `isLoading` and
+`restriction`; `App.tsx` blocks on `!allowed` alone, so a block without a reason still blocks, as
+a failed check. `chooseRestriction` picks the one to name: a refusal before a failed check, then
+the sanctions screening before the location check.
 
 - `useGeoblockCheck` looks up the country (country.is, then ipapi.co) and blocks the countries
-  listed in the hook. It fails closed. The result is cached in `localStorage` for
-  `VITE_GEOBLOCK_CACHE_DAYS` days, 7 by default.
-- `useSanctionsCheck` fetches `VITE_SANCTIONS_API_URL` when set; a 403 or an error blocks.
+  listed in the hook, naming the country. It fails closed: a failed lookup is "unavailable". The
+  result is cached in `localStorage` for `VITE_GEOBLOCK_CACHE_DAYS` days, 7 by default.
+- `useSanctionsCheck` fetches `VITE_SANCTIONS_API_URL` when set; a 403 refuses, an error is
+  "unavailable".
 - `WalletSanctionsGate` uses `useWalletSanctionsCheck`, which reads `isSanctioned` on the
-  sanctions oracle from core for the connected address. It allows only an explicit `false`.
+  sanctions oracle from core for the connected address. It allows only an explicit `false`; `true`
+  refuses and anything else is "unavailable", with `refetch` behind Try again.
 
 `DisconnectWatcher` shows a toast when the wallet disconnects.
 
 ### Wallets (`src/config/wagmi.ts`)
 
 Connectors in order: `safe()`, `injected()` as "Browser Wallet" on `window.ethereum`, and
-`walletConnect()` when `VITE_WALLETCONNECT_PROJECT_ID` is set. `src/lib/safe.ts` exports
+WalletConnect when `VITE_WALLETCONNECT_PROJECT_ID` is set, through `deferredWalletConnect`
+(`src/config/walletConnect.ts`): wagmi's connector, loaded only once the user picks it or it was
+the last connector used. Created plainly, it loaded about 300 KB on every first paint. `src/lib/safe.ts` exports
 `isSafeApp`, true inside an iframe. `useAutoConnect` connects the Safe connector when
 `isSafeApp`, and calls wagmi's `reconnect()` otherwise. `useWrongNetwork` is true when the
-wallet's chain is not Mainnet; `ConnectButton` then shows "Switch to Ethereum".
+wallet's chain is not Mainnet. `useNetworkSwitch` adds whether the connector can switch (the Safe
+connector cannot) and the switch itself. `WrongNetworkNotice`, in `Layout`, then shows on every
+page, and `ConnectButton` shows "Switch to Ethereum", or "Wrong network" when the wallet cannot
+switch. Reads do not go through the wallet, so figures stay correct; `TxButton` disables every
+transaction.
 
 ### Contract integration
 
-- **ABIs:** `src/abi/`. Staking, ERC-20 and sanctions oracle use viem's `parseAbi`.
-  `merkleDropAbi.ts` re-exports the MerkleDrop ABI from core, whose events and errors
-  `verify:abis` proves against the chain.
+- **ABIs:** every ABI is imported from `@cobuilders/safenet-core` (`stakingAbi`, `erc20Abi`,
+  `sanctionsOracleAbi`, `merkleDropAbi`, `safeTokenEventsAbi`), and events through
+  `indexedEvent()`. `verify:abis` proves each function, event and error against the chain. No
+  ABI or signature is written in this package; a function the interface needs is added to core.
 - **Reads** (`src/hooks/useStakingReads.ts`): wrappers around `useReadContract` and
   `useReadContracts`, polling every 30 seconds. Per-user hooks are enabled only with an address.
 - **Writes** (`src/hooks/useStakingWrites.ts`): `useStake`, `useInitiateWithdrawal`,
@@ -153,7 +166,11 @@ wallet's chain is not Mainnet; `ConnectButton` then shows "Switch to Ethereum".
 - **Approval** (`src/hooks/useApprovalFlow.ts`): wraps `useTokenAllowance` with the exact or
   unlimited approval type and its toasts.
 - **Stake form** (`src/hooks/useStakeForm.ts`): amount, approval, stake and the approve-and-stake
-  batch behind `StakeForm`. `DelegateDialog` and Claim & Stake both run on it.
+  batch behind `StakeForm`. `DelegateDialog` and Claim & Stake both run on it. Stake opens the
+  "what happens if" step, `StakeReview`; only its Confirm stake sends the stake or the batch. An amount the
+  interface fills in, the claimed amount or a MAX or percentage shortcut, is a `PresetAmount`
+  (`src/lib/format.ts`): shown rounded down to four decimals and sent exact while its text is
+  unchanged.
 - **Claim step** (`src/hooks/useClaimStep.ts`): the claim inside Claim & Stake. Simulates first,
   sends through `wallet_sendCalls` in a batching wallet, and reads the claimed amount from the
   SAFE `Transfer` in the receipt (`src/lib/claimReceipt.ts`).
@@ -204,7 +221,8 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
 ### Components
 
 - `src/components/ui/`: Radix primitives wrapped with CVA and tailwind-merge (`cn()` in
-  `src/lib/utils.ts`), after shadcn/ui. `TxButton` shows the signing and confirming phases;
+  `src/lib/utils.ts`), after shadcn/ui. `Term` explains a term where it appears, from
+  `src/lib/glossary.ts`: a button that opens on hover, focus or a tap, and closes on Escape. `TxButton` shows the signing and confirming phases;
   `stepper.tsx` drives Claim → Stake → Done.
 - `src/components/overview/`: the Network Overview sections.
 - `src/components/dashboard/`: `StatsOverview`, `QuickActions`, `StakingSection`,
@@ -220,14 +238,18 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
   rate in percent: a null reads "Not published", with no marker, never 0.00%. The validator
   cards, the detail page and the dashboard positions use it; the Overview table says "Not
   published" for a row SEF lists with a null rate.
-- `src/components/staking/`: `AmountInput`, `DelegateDialog`, `StakeForm`, `ValidatorSelect`,
-  `UndelegateDialog`.
+- `src/components/staking/`: `AmountInput`, `DelegateDialog`, `StakeForm`, `StakeReview`,
+  `ValidatorSelect`, `UndelegateDialog`.
 - `src/components/withdrawals/`: `WithdrawalQueue`, `WithdrawalCard`.
 
 ### Libraries
 
-- `src/lib/format.ts`: token amounts, addresses, countdowns, participation rates, UTC dates.
-- `src/lib/programme.ts`: reference English copy built on the programme calendar in core: `PARTICIPATION_RULE`,
+- `src/lib/format.ts`: token amounts, preset amounts, addresses, countdowns, participation rates,
+  UTC dates.
+- `src/lib/restriction.ts`: the gates' `Restriction` and the restricted screen's copy.
+- `src/lib/glossary.ts`: what each term means, restating SEF's staking documentation. Figures come
+  from core or the staking contract, never from the text.
+- `src/lib/programme.ts`: copy built on the programme calendar in core: `PARTICIPATION_RULE`,
   `RATE_NOT_PUBLISHED` for a rate SEF lists as null, `belowThreshold`, the dated Beta notice, the withdrawn status for a validator SEF lists as
   inactive.
 - `src/lib/errorFormat.ts`: `formatContractError`, `revertedErrorName`.
@@ -254,8 +276,7 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
 - `scripts/release.ts`, `scripts/release-pin.ts`, `scripts/release-gateways.ts`: the IPFS
   release behind `release:build` and `release:pin`. `build.env` is the release build's only env
   input; it is public and holds no secret.
-- `scripts/i18n-extract.ts`, `scripts/i18n-catalogues.ts`: `i18n:extract` and `i18n:check`.
-- `scripts/__tests__/`: Vitest tests for the tree, the generator and the catalogue check.
+- `scripts/__tests__/`: Vitest tests for the tree and the generator.
 
 To use generated proofs, serve the output and point `VITE_REWARDS_BASE_URL` at it, then set the
 MerkleDrop's root. This repository sets a root only on an Anvil fork.
@@ -264,6 +285,8 @@ MerkleDrop's root. This repository sets a root only on an Anvil fork.
 
 - `src/**/__tests__/`: Vitest with jsdom. `src/__tests__/` holds the wagmi mock, the setup and
   shared test data.
+- `e2e/tests/accessibility.spec.ts`: axe, WCAG 2.2 A and AA, on every route and state; a serious
+  or critical violation fails it. `ACCESSIBILITY.md` says what it covers and what a person checks.
 - `e2e/tests/`: Playwright against a mocked RPC, mocked subgraphs, mocked SEF files and mocked
   gateways (`e2e/mocks/`, `e2e/fixtures/`). Page objects in `e2e/pages/`. The Safe App and
   WalletConnect are only smoke-tested.

@@ -1,7 +1,8 @@
-import { useTranslation } from "react-i18next"
+import { Trans, useTranslation } from "react-i18next"
 import { useState } from "react"
 import { useAccount } from "wagmi"
 import { PageHero } from "@/components/PageHero"
+import { Term } from "@/components/ui/term"
 import { ClaimRewardsDialog } from "@/components/dashboard/ClaimRewardsDialog"
 import { ClaimAndStakeDialog, type ClaimAndStakeMode } from "@/components/rewards/ClaimAndStakeDialog"
 import { YourRewardsSection } from "@/components/rewards/YourRewardsSection"
@@ -30,7 +31,7 @@ export function RewardsPage() {
     <div className="space-y-6">
       <PageHero
         title={t("rewards.rewards", "Rewards")}
-        subtitle={t("rewards.claimYourSafenetRewardsAndCheckThemAgainst", "Claim your Safenet rewards and check them against the chain")}
+        subtitle={<Trans i18nKey="onboarding.hero.rewards" defaults="Claim your Safenet <rewards>rewards</rewards> and check them against the chain" components={{ rewards: <Term term="rewards" children={null} /> }} />}
       />
       <div className="grid gap-6 md:grid-cols-2">
         <YourRewardsSection isConnected={isConnected} rewards={rewards} />

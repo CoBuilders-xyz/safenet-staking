@@ -34,6 +34,9 @@
     "scripts/release-gateways.ts",
     "scripts/i18n-catalogues.ts",
     "scripts/i18n-extract.ts",
-    "src/i18n/languages.ts"
+    "src/i18n/languages.ts",
+    "scripts/budget.ts",
+    "scripts/check-budget.ts",
+    "scripts/lighthouse.ts"
   ]
 }

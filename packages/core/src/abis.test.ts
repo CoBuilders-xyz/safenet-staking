@@ -69,6 +69,19 @@ test("the staking ABI has the writes the CLI sends, and claimWithdrawal takes no
   assert.deepEqual(fn("withdrawalNodes")?.outputs.map((o) => ("name" in o ? o.name : undefined)), ["amount", "claimableAt", "previous", "next"])
 })
 
+test("the staking ABI carries the registered staking events and the next claimable read", () => {
+  const events = stakingAbi.filter((i) => i.type === "event").map((i) => i.name).sort()
+  assert.deepEqual(events, ["StakeIncreased", "ValidatorUpdated", "WithdrawalClaimed", "WithdrawalInitiated"])
+  for (const item of stakingAbi) {
+    if (item.type !== "event") continue
+    assert.deepEqual(item, indexedEvent("staking", item.name), item.name)
+  }
+  const next = stakingAbi.find((i) => i.type === "function" && i.name === "getNextClaimableWithdrawal")
+  assert.ok(next && next.type === "function")
+  assert.equal(next.stateMutability, "view")
+  assert.deepEqual(next.outputs.map((o) => o.name), ["amount", "claimableAt"])
+})
+
 test("the ERC-20 ABI reads the allowance and sends the approval", () => {
   const fn = (name: string) => erc20Abi.find((i) => i.name === name)
   assert.equal(fn("allowance")?.stateMutability, "view")

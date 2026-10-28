@@ -21,6 +21,11 @@ Safe Foundation's safenet-staking-ui; see [License](#license).
 | `/rewards` | `RewardsPage` | Your rewards, Claim, Claim & Stake, the programme totals, and the root on chain checked against SEF's published one |
 | `*` | `NotFoundPage` | 404 |
 
+Terms are explained where they appear: a dotted-underlined word opens its explanation on hover,
+focus or a tap (`Term`, from `src/lib/glossary.ts`). Before a stake goes to the wallet, "What
+happens if" answers five questions: getting the SAFE back, switching validators, a drop in
+participation, something going wrong, and lower rewards.
+
 The router is `HashRouter` (`src/App.tsx`), so every path is served from one `index.html`
 under `#/`, which a static host and an IPFS gateway can both serve.
 
@@ -112,6 +117,8 @@ The release build reads none of this. It reads [`build.env`](build.env) only; se
 | `generate:proofs` | Builds a reward Merkle tree and its files; see [Reward proofs](#reward-proofs) |
 | `release:build` | The reproducible production build from `build.env`, packed into `release/app.car` with its root CID in `release/CID`; see [Deployment](#deployment) |
 | `release:pin` | Pins `release/app.car` to Pinata and checks that the gateways serve it |
+| `budget:bundle` | Checks a built `dist/` against the bundle limits in `performance-budget.json`; `release:build` runs it |
+| `budget:lighthouse` | Lighthouse mobile on a built `dist/`, three runs per route, checked against the rest of the budget; see [`PERFORMANCE.md`](./PERFORMANCE.md) |
 
 The root also has `pnpm test:e2e`, `pnpm test:fork`, `pnpm fork:up`, `pnpm fork:reset` and
 `pnpm fork:down`, which run the same scripts.
@@ -127,7 +134,8 @@ See [`MANUAL_TESTING.md`](./MANUAL_TESTING.md) for the pre-release manual checkl
   listening there. An injected test wallet answers from a mocked RPC, and the subgraphs, SEF's
   files and the gateways are mocked too, so the suite needs no network and no secret. It proves
   the interface behaves, not that a transaction works. The Safe App and WalletConnect are only
-  smoke-tested there.
+  smoke-tested there. `e2e/tests/accessibility.spec.ts`, in the same suite, runs axe against
+  WCAG 2.2 AA on every route; see [`ACCESSIBILITY.md`](./ACCESSIBILITY.md).
 - **Fork**: below.
 
 ### Fork suite
@@ -178,7 +186,6 @@ CI runs it nightly, not on pull requests, because every run reads from the archi
 
 ```
 src/
-├── abi/          contract ABIs; the MerkleDrop ABI comes from packages/core
 ├── assets/       images bundled with the app
 ├── components/   dashboard, layout, overview, rewards, staking, ui, validators, wallet, withdrawals
 ├── config/       chain and transports, contract addresses, wagmi, QueryClient, subgraph endpoints
@@ -186,6 +193,8 @@ src/
 ├── hooks/        contract reads and writes, subgraph queries, rewards, compliance checks
 ├── i18n/         languages, detection, and the catalogues in locales/
 ├── lib/          formatting, errors, figures, programme copy, Safe detection
+
+├── lib/          formatting, errors, figures, programme copy, restriction copy, Safe detection
 └── pages/        one component per route
 e2e/
 ├── tests/        the mocked suite
@@ -202,6 +211,9 @@ scripts/
 public/           static files, including the Safe App manifest
 ```
 
+Every ABI comes from `packages/core`, where `pnpm verify:abis` checks each function, event and
+error against the deployed contracts. The interface keeps no copy of its own.
+
 ## Wallets
 
 `src/config/wagmi.ts` configures one chain, Mainnet, and these connectors:
@@ -211,7 +223,9 @@ public/           static files, including the Safe App manifest
 2. **Browser Wallet**, `injected()` on `window.ethereum`: MetaMask, Rabby and other extensions.
 3. **WalletConnect**, only when `VITE_WALLETCONNECT_PROJECT_ID` is set.
 
-A wallet on another chain sees a "Switch to Ethereum" prompt in place of its actions.
+A wallet on another chain sees a "Wrong network" notice on every page, with Switch to Ethereum
+when the wallet can switch from here, and every action that sends a transaction stops. The figures
+stay: the interface reads Ethereum through its own RPC, not through the wallet.
 
 When the wallet supports EIP-5792 atomic batching, as a Safe does, approve and stake go out as
 one batch, and two or more ready withdrawals can be claimed with one Claim All.
@@ -221,12 +235,18 @@ The interface says Delegate and Undelegate; the contract and the hooks say stake
 
 ## Compliance gates
 
-- `useGeoblockCheck` looks up the visitor's country and blocks the app with "Access Restricted"
-  for the countries listed in `src/hooks/useGeoblockCheck.ts`. A failed lookup blocks too.
-- `useSanctionsCheck` blocks the app when `VITE_SANCTIONS_API_URL` is set and answers 403 or
-  fails.
+Each gate fails closed. The restricted screen names the gate that closed the app, says whether it
+refused or could not answer, and offers what the visitor can do: Reload or Try again after a
+failed check, Disconnect wallet for a wallet. `MANUAL_TESTING.md` has the states of every screen.
+
+- `useGeoblockCheck` looks up the visitor's country and blocks the app with "Access Restricted",
+  naming the country, for the countries listed in `src/hooks/useGeoblockCheck.ts`. A failed
+  lookup shows "Access Check Failed".
+- `useSanctionsCheck` blocks the app when `VITE_SANCTIONS_API_URL` is set: "Access Restricted" on
+  a 403, "Access Check Failed" when the request fails.
 - `useWalletSanctionsCheck` asks the sanctions oracle named in `packages/core` about the
-  connected address, and shows "Wallet Restricted" unless it answers no.
+  connected address. It shows "Wallet Restricted" when the oracle lists it, and "Wallet Check
+  Failed" when the read fails; only an explicit no opens the app.
 
 ## Where reward data comes from
 

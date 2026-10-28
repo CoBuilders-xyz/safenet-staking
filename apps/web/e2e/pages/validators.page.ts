@@ -22,7 +22,7 @@ export class ValidatorsPage {
   }
 
   getDelegateButton(cardLocator: Locator): Locator {
-    return cardLocator.getByRole("button", { name: "Stake" })
+    return cardLocator.getByRole("button", { name: "Stake", exact: true })
   }
 
   getUndelegateButton(cardLocator: Locator): Locator {

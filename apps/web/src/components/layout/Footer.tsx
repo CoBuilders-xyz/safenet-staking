@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next"
+import { SEF_DOCS } from "@cobuilders/safenet-core"
 
-const docsUrl = import.meta.env.VITE_DOCS_URL || "https://docs.safefoundation.org/safenet/"
+const docsUrl = import.meta.env.VITE_DOCS_URL || SEF_DOCS.home
 const termsUrl = import.meta.env.VITE_TERMS_URL as string | undefined
 const privacyUrl = import.meta.env.VITE_PRIVACY_URL as string | undefined
 const imprintUrl = import.meta.env.VITE_IMPRINT_URL as string | undefined
@@ -35,9 +36,8 @@ export function Footer() {
           <a href={docsUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
             {t("footer.documentation", "Documentation")}
           </a>
-          <a href="https://docs.safefoundation.org/safenet/resources/faq" target="_blank" rel="noopener noreferrer" className={linkClass}>
-            {t("footer.faq", "FAQ")}
-          </a>
+          <a href={SEF_DOCS.faq} target="_blank" rel="noopener noreferrer" className={linkClass}>
+            {t("footer.faq", "FAQ")}</a>
         </div>
       </div>
     </footer>

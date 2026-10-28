@@ -34,9 +34,9 @@
   --sn-accent-ink: #0a6357;
   --sn-accent-soft: #ddede9;
   --sn-on-accent: #ffffff;
-  --sn-amber: #9b5d12;
+  --sn-amber: #804c0e;
   --sn-flag: #b42318;
-  --sn-ok: #2c7a3f;
+  --sn-ok: #246a36;
   --sn-on-status: #ffffff;
 
   /* Categorical series, for charts only */
@@ -183,5 +183,17 @@
     @apply bg-background text-foreground font-sans antialiased;
     margin: 0;
     min-height: 100vh;
+  }
+}
+
+/* Under reduced motion nothing animates, spinners included: each still says what it waits for. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

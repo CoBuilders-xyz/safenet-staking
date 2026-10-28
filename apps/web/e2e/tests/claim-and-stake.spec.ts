@@ -31,6 +31,12 @@ async function claimFromDialog(page: Page): Promise<Locator> {
   return dialog
 }
 
+/** Stake, then confirm on the "what happens if" step: only the confirmation sends. */
+async function stakeAndConfirm(dialog: Locator) {
+  await dialog.getByRole("button", { name: "Stake", exact: true }).click()
+  await dialog.getByRole("button", { name: "Confirm stake" }).click()
+}
+
 test.describe("Claim & Stake", () => {
   test("in a Safe: claims, then approves and stakes the claimed amount in one batch", async ({
     batchingPage: page,
@@ -48,7 +54,7 @@ test.describe("Claim & Stake", () => {
     await dialog.getByLabel("Validator").selectOption({ label: VALIDATOR_A })
     // One button, no separate approval: the batch carries approve and stake together.
     await expect(dialog.getByRole("button", { name: /Approve/ })).toHaveCount(0)
-    await dialog.getByRole("button", { name: "Stake" }).click()
+    await stakeAndConfirm(dialog)
 
     await expect(dialog.getByText("Staked 100 SAFE with Validator A.")).toBeVisible({ timeout: 10_000 })
     expect(stakeOf(mockChainState, VALIDATORS.validatorA) - before).toBe(100n * SAFE)
@@ -65,10 +71,11 @@ test.describe("Claim & Stake", () => {
     await dialog.getByLabel("Validator").selectOption({ label: VALIDATOR_A })
 
     await dialog.getByRole("button", { name: "Approve exact amount" }).click()
-    const stake = dialog.getByRole("button", { name: "Stake" })
+    const stake = dialog.getByRole("button", { name: "Stake", exact: true })
     await expect(stake).toBeEnabled({ timeout: 10_000 })
     expect(mockChainState.allowance).toBe(100n * SAFE)
     await stake.click()
+    await dialog.getByRole("button", { name: "Confirm stake" }).click()
 
     await expect(dialog.getByText("Staked 100 SAFE with Validator A.")).toBeVisible({ timeout: 10_000 })
     expect(stakeOf(mockChainState, VALIDATORS.validatorA) - before).toBe(100n * SAFE)
@@ -89,7 +96,7 @@ test.describe("Claim & Stake", () => {
 
     await dialog.getByLabel("Amount").fill("60")
     await expect(dialog.getByText("40 SAFE stays in your wallet, not staked.")).toBeVisible()
-    await dialog.getByRole("button", { name: "Stake" }).click()
+    await stakeAndConfirm(dialog)
 
     await expect(dialog.getByText("Staked 60 SAFE with Validator B. 40 SAFE stays in your wallet.")).toBeVisible({
       timeout: 10_000,
@@ -122,7 +129,7 @@ test.describe("Claim & Stake", () => {
     await expect(reopened.getByRole("heading", { name: "Stake your balance" })).toBeVisible()
     await expect(reopened.getByLabel("Amount")).toHaveValue("1100")
     await reopened.getByLabel("Validator").selectOption({ label: VALIDATOR_A })
-    await reopened.getByRole("button", { name: "Stake" }).click()
+    await stakeAndConfirm(reopened)
     await expect(reopened.getByText("Staked 1,100 SAFE with Validator A.")).toBeVisible({ timeout: 10_000 })
   })
 

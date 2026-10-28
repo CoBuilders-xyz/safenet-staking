@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import { useReadContract, useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi"
 import { maxUint256 } from "viem"
-import { erc20Abi } from "@/abi/erc20Abi"
+import { erc20Abi } from "@cobuilders/safenet-core"
 import { getContractAddresses } from "@/config/contracts"
 import { activeChain } from "@/config/chains"
 import { queryClient } from "@/config/queryClient"

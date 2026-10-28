@@ -1,35 +1,26 @@
+import { i18n } from "@/i18n"
 import { lazy, useEffect, useRef, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { HashRouter, Routes, Route } from "react-router-dom"
-import { useAccount } from "wagmi"
+import { useAccount, useDisconnect } from "wagmi"
 import { Layout } from "@/components/layout/Layout"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { Toaster } from "@/components/ui/toaster"
 import { RestrictedScreen } from "@/components/RestrictedScreen"
+import { Button } from "@/components/ui/button"
+import { chooseRestriction, type Restriction } from "@/lib/restriction"
 import { Analytics } from "@/components/Analytics"
 import { useAutoConnect } from "@/hooks/useAutoConnect"
 import { useSanctionsCheck } from "@/hooks/useSanctionsCheck"
 import { useGeoblockCheck } from "@/hooks/useGeoblockCheck"
 import { useWalletSanctionsCheck } from "@/hooks/useWalletSanctionsCheck"
 import { useToast } from "@/hooks/useToast"
+import { pageImports, routeImportFor } from "@/routes"
 import Loader2 from "lucide-react/dist/esm/icons/loader-2"
 
-const pageImports = {
-  Overview: () => import("@/pages/OverviewPage")
-    .then(m => ({ default: m.OverviewPage })),
-  Dashboard: () => import("@/pages/DashboardPage")
-    .then(m => ({ default: m.DashboardPage })),
-  Validators: () => import("@/pages/ValidatorsPage")
-    .then(m => ({ default: m.ValidatorsPage })),
-  ValidatorDetail: () => import("@/pages/ValidatorDetailPage")
-    .then(m => ({ default: m.ValidatorDetailPage })),
-  Withdrawals: () => import("@/pages/WithdrawalsPage")
-    .then(m => ({ default: m.WithdrawalsPage })),
-  Rewards: () => import("@/pages/RewardsPage")
-    .then(m => ({ default: m.RewardsPage })),
-  NotFound: () => import("@/pages/NotFoundPage")
-    .then(m => ({ default: m.NotFoundPage })),
-}
+// The first page's code loads while the gates are still answering, rather than after them.
+// Only code: nothing renders until every gate is open.
+void routeImportFor(window.location.hash)()
 
 const OverviewPage = lazy(pageImports.Overview)
 const DashboardPage = lazy(pageImports.Dashboard)
@@ -44,6 +35,36 @@ function preloadAllRoutes() {
   for (const load of Object.values(pageImports)) {
     void load()
   }
+}
+
+/**
+ * Three seconds after the page has loaded, when the browser is idle, so the other routes never
+ * compete with the first one for the network or the main thread. The `load` event alone comes too
+ * early: it fires once the entry script has run, before the first page has drawn.
+ */
+const PRELOAD_AFTER_LOAD_MS = 3_000
+
+function preloadWhenIdle(): () => void {
+  let cancel = () => {}
+  const whenIdle = () => {
+    if ("requestIdleCallback" in window) {
+      const id = requestIdleCallback(preloadAllRoutes, { timeout: 5_000 })
+      cancel = () => cancelIdleCallback(id)
+    } else {
+      preloadAllRoutes()
+    }
+  }
+  const schedule = () => {
+    const id = setTimeout(whenIdle, PRELOAD_AFTER_LOAD_MS)
+    cancel = () => clearTimeout(id)
+  }
+  if (document.readyState === "complete") {
+    schedule()
+  } else {
+    window.addEventListener("load", schedule, { once: true })
+    cancel = () => window.removeEventListener("load", schedule)
+  }
+  return () => cancel()
 }
 
 function DisconnectWatcher() {
@@ -69,22 +90,31 @@ function DisconnectWatcher() {
 }
 
 function WalletSanctionsGate({ children }: { children: ReactNode }) {
-  const { allowed, isLoading } = useWalletSanctionsCheck()
-  const { t } = useTranslation()
+  const { allowed, isLoading, restriction: reported, refetch } = useWalletSanctionsCheck()
+  const { disconnect } = useDisconnect()
+  useTranslation()
 
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center" role="status" aria-live="polite">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden="true" />
+        <span className="sr-only">{i18n.t("onboarding.checkingAccess", "Checking access…")}</span>
       </div>
     )
   }
 
   if (!allowed) {
+    // Blocked without a reason is still blocked: fail closed, and call it a failed check.
+    const restriction: Restriction = reported ?? { gate: "walletSanctions", reason: "unavailable" }
     return (
       <RestrictedScreen
-        title={t("shell.walletRestricted.title", "Wallet Restricted")}
-        description={t("shell.walletRestricted.description", "This wallet address has been flagged and cannot use SAFE Staking.")}
+        restriction={restriction}
+        actions={
+          <>
+            {restriction.reason === "unavailable" && <Button onClick={refetch}>{i18n.t("onboarding.tryAgain", "Try again")}</Button>}
+            <Button variant="outline" onClick={() => disconnect()}>{i18n.t("onboarding.disconnectWallet", "Disconnect wallet")}</Button>
+          </>
+        }
       />
     )
   }
@@ -93,35 +123,36 @@ function WalletSanctionsGate({ children }: { children: ReactNode }) {
 }
 
 function App() {
-  const { t } = useTranslation()
+  useTranslation()
   useAutoConnect()
-  const { allowed: sanctionsAllowed, isLoading: sanctionsLoading } = useSanctionsCheck()
-  const { allowed: geoAllowed, isLoading: geoLoading } = useGeoblockCheck()
+  const sanctions = useSanctionsCheck()
+  const geo = useGeoblockCheck()
 
-  // Preload route chunks after first paint so they don't
-  // compete with critical initial resources.
-  useEffect(() => {
-    if ("requestIdleCallback" in window) {
-      const id = requestIdleCallback(preloadAllRoutes)
-      return () => cancelIdleCallback(id)
-    }
-    const id = setTimeout(preloadAllRoutes, 1000)
-    return () => clearTimeout(id)
-  }, [])
+  useEffect(() => preloadWhenIdle(), [])
 
-  if (sanctionsLoading || geoLoading) {
+  if (sanctions.isLoading || geo.isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center" role="status" aria-live="polite">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden="true" />
+        <span className="sr-only">{i18n.t("onboarding.checkingAccess", "Checking access…")}</span>
       </div>
     )
   }
 
-  if (!sanctionsAllowed || !geoAllowed) {
+  // Sanctions screening is checked first. A refusal is named before a failed check.
+  const restriction = chooseRestriction([
+    { gate: "sanctionsApi", ...sanctions },
+    { gate: "geoblock", ...geo },
+  ])
+  if (restriction) {
     return (
       <RestrictedScreen
-        title={t("shell.accessRestricted.title", "Access Restricted")}
-        description={t("shell.accessRestricted.description", "SAFE Staking and Rewards are unavailable in your region.")}
+        restriction={restriction}
+        actions={
+          restriction.reason === "unavailable" && (
+            <Button onClick={() => window.location.reload()}>{i18n.t("onboarding.reload", "Reload")}</Button>
+          )
+        }
       />
     )
   }

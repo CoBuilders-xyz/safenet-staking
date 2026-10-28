@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { TooltipProvider } from "@radix-ui/react-tooltip"
 import { WithdrawalQueue } from "../withdrawals/WithdrawalQueue"
 import { MOCK_VALIDATORS } from "@/__tests__/test-data"
@@ -17,6 +18,9 @@ vi.mock("wagmi", () => ({
   useAccount: () => mockUseAccount(),
   useReadContract: vi.fn(() => ({ data: undefined, isLoading: false })),
 }))
+
+const mockWrongNetwork = vi.fn(() => false)
+vi.mock("@/hooks/useWrongNetwork", () => ({ useWrongNetwork: () => mockWrongNetwork() }))
 
 vi.mock("@/hooks/useWithdrawals", () => ({
   usePendingWithdrawals: () => mockUsePendingWithdrawals(),
@@ -54,6 +58,7 @@ vi.mock("@/hooks/useCountdown", () => ({
 describe("WithdrawalQueue", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockWrongNetwork.mockReturnValue(false)
     mockUseClaimWithdrawal.mockReturnValue({
       claimWithdrawal: mockClaimWithdrawal,
       isSigningTx: false,
@@ -112,6 +117,37 @@ describe("WithdrawalQueue", () => {
     renderQueue()
 
     expect(screen.getByText("No pending withdrawals.")).toBeInTheDocument()
+  })
+
+  it("says the queue could not be read, rather than that it is empty, and retries", async () => {
+    const refetch = vi.fn()
+    mockUseAccount.mockReturnValue({ isConnected: true })
+    mockUsePendingWithdrawals.mockReturnValue({ data: undefined, isLoading: false, isError: true, refetch })
+
+    renderQueue()
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Your withdrawal queue could not be read from Ethereum.")
+    expect(screen.queryByText("No pending withdrawals.")).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }))
+    expect(refetch).toHaveBeenCalledOnce()
+  })
+
+  it("disables Claim All while the wallet is on another network", () => {
+    const past = BigInt(Math.floor(Date.now() / 1000) - 3600)
+    mockUseAccount.mockReturnValue({ isConnected: true })
+    mockUsePendingWithdrawals.mockReturnValue({
+      data: [{ amount: 10n ** 18n, claimableAt: past }, { amount: 10n ** 18n, claimableAt: past }],
+      isLoading: false,
+    })
+    mockUseBatchClaimWithdrawals.mockReturnValue({ ...mockUseBatchClaimWithdrawals(), supportsBatching: true })
+
+    const { unmount } = renderQueue()
+    expect(screen.getByRole("button", { name: /Claim All/ })).toBeEnabled()
+    unmount()
+
+    mockWrongNetwork.mockReturnValue(true)
+    renderQueue()
+    expect(screen.getByRole("button", { name: /Claim All/ })).toBeDisabled()
   })
 
   it("renders withdrawal cards when withdrawals exist", () => {

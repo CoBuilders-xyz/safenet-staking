@@ -1,5 +1,5 @@
 import { useAccount, useReadContract } from "wagmi"
-import { merkleDropAbi } from "@/abi/merkleDropAbi"
+import { merkleDropAbi } from "@cobuilders/safenet-core"
 import { getContractAddresses } from "@/config/contracts"
 import { activeChain } from "@/config/chains"
 import { useRewardProof, useRewardProofSource } from "./useRewardProof"

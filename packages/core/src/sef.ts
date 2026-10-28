@@ -213,3 +213,14 @@ export function programmePhase(at: Date): ProgrammePhase {
   if (day >= utcDayMs(AEGIS_START_DAY)) return "aegis"
   return "gap"
 }
+
+/**
+ * SEF's documentation pages the interface links to. Checked on 2026-10-27: each answers 200. The
+ * FAQ and the rewards page moved under the Aegis section; their former addresses under /safenet/
+ * answer 404.
+ */
+export const SEF_DOCS = {
+  home: "https://docs.safefoundation.org/safenet/",
+  faq: "https://docs.safefoundation.org/safenet-aegis/resources/faqs",
+  rewards: "https://docs.safefoundation.org/safenet-aegis/staking/rewards",
+} as const

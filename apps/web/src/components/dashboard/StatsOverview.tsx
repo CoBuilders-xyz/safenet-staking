@@ -6,24 +6,28 @@ import { useTotalStaked, useUserTotalStake } from "@/hooks/useStakingReads"
 import { useValidators } from "@/hooks/useValidators"
 import { formatTokenAmount, asBigint } from "@/lib/format"
 
+/** Shown instead of a figure whose read failed, so a failure never reads as zero. */
+
+
 export function StatsOverview() {
   const { t } = useTranslation()
+  const UNAVAILABLE = t("overview.common.unavailable", "Unavailable")
   const { isConnected } = useAccount()
-  const { data: totalStaked, isLoading: loadingTotalStaked } = useTotalStaked()
-  const { data: userTotalStake, isLoading: loadingUserStake } = useUserTotalStake()
-  const { data: validators, isLoading: loadingValidators } = useValidators()
+  const { data: totalStaked, isLoading: loadingTotalStaked, isError: totalStakedFailed } = useTotalStaked()
+  const { data: userTotalStake, isLoading: loadingUserStake, isError: userStakeFailed } = useUserTotalStake()
+  const { data: validators, isLoading: loadingValidators, isError: validatorsFailed } = useValidators()
 
   const activeCount = validators ? validators.filter((v) => v.isActive).length : 0
 
   const globalStats = [
     {
       title: t("validators.totalSafeStaked", "Total SAFE Staked"),
-      value: loadingTotalStaked ? null : formatTokenAmount(asBigint(totalStaked), 18, 0),
+      value: loadingTotalStaked ? null : totalStakedFailed && totalStaked === undefined ? UNAVAILABLE : formatTokenAmount(asBigint(totalStaked), 18, 0),
       loading: loadingTotalStaked,
     },
     {
       title: t("dashboard.activeValidators", "Active Validators"),
-      value: loadingValidators ? null : `${activeCount}`,
+      value: loadingValidators ? null : validatorsFailed && !validators ? UNAVAILABLE : `${activeCount}`,
       loading: loadingValidators,
     },
   ]
@@ -32,7 +36,7 @@ export function StatsOverview() {
     ? [
         {
           title: t("dashboard.yourStakedSafe", "Your Staked SAFE"),
-          value: loadingUserStake ? null : formatTokenAmount(asBigint(userTotalStake), 18, 0),
+          value: loadingUserStake ? null : userStakeFailed && userTotalStake === undefined ? UNAVAILABLE : formatTokenAmount(asBigint(userTotalStake), 18, 0),
           loading: loadingUserStake,
         },
       ]

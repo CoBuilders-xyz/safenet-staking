@@ -14,7 +14,7 @@ import { TxButton } from "@/components/ui/TxButton"
 import { Stepper } from "@/components/ui/stepper"
 import { StakeForm } from "@/components/staking/StakeForm"
 import { ValidatorSelect } from "@/components/staking/ValidatorSelect"
-import { merkleDropAbi } from "@/abi/merkleDropAbi"
+import { merkleDropAbi } from "@cobuilders/safenet-core"
 import { useClaimStep } from "@/hooks/useClaimStep"
 import { useStakeForm, type Staked } from "@/hooks/useStakeForm"
 import { useTokenBalance } from "@/hooks/useTokenBalance"
@@ -264,7 +264,8 @@ export function ClaimAndStakeDialog({ open, onOpenChange, mode, rewards }: Claim
                   : t("rewards.yourRewardsAreClaimedAndInYourWallet", "Your rewards are claimed and in your wallet. Their amount could not be read from the transaction receipt, so enter the amount to stake.")}
               </p>
             )}
-            <ValidatorSelect value={validator} onChange={setValidator} disabled={form.isBusy} />
+            {/* The review names the validator; it is chosen before it. */}
+            {!form.reviewing && <ValidatorSelect value={validator} onChange={setValidator} disabled={form.isBusy} />}
             <StakeForm
               form={form}
               maxLabel={t("rewards.claimed", "Claimed")}

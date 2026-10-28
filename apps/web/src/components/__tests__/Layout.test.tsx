@@ -7,6 +7,10 @@ vi.mock("../layout/Header", () => ({
   Header: () => <div data-testid="header">Header</div>,
 }))
 
+vi.mock("../WrongNetworkNotice", () => ({
+  WrongNetworkNotice: () => <div data-testid="wrong-network">Wrong network</div>,
+}))
+
 vi.mock("../layout/Footer", () => ({
   Footer: () => <div data-testid="footer">Footer</div>,
 }))
@@ -22,5 +26,6 @@ describe("Layout", () => {
     expect(screen.getByTestId("header")).toBeInTheDocument()
     expect(screen.getByTestId("footer")).toBeInTheDocument()
     expect(screen.getByText("Skip to main content")).toBeInTheDocument()
+    expect(screen.getByRole("main")).toContainElement(screen.getByTestId("wrong-network"))
   })
 })

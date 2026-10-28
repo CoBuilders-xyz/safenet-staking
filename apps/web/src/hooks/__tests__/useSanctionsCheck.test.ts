@@ -26,7 +26,7 @@ describe("useSanctionsCheck", () => {
   })
 
   describe("when VITE_SANCTIONS_API_URL is set", () => {
-    let useSanctionsCheck: () => { allowed: boolean; isLoading: boolean }
+    let useSanctionsCheck: typeof import("../useSanctionsCheck").useSanctionsCheck
     let useQueryMock: Mock
 
     beforeEach(async () => {
@@ -77,6 +77,7 @@ describe("useSanctionsCheck", () => {
 
         expect(result.current.isLoading).toBe(false)
         expect(result.current.allowed).toBe(false)
+        expect(result.current.restriction).toEqual({ gate: "sanctionsApi", reason: "refused" })
       })
 
       it("returns allowed=false on error (fail-closed)", () => {
@@ -90,6 +91,7 @@ describe("useSanctionsCheck", () => {
 
         expect(result.current.isLoading).toBe(false)
         expect(result.current.allowed).toBe(false)
+        expect(result.current.restriction).toEqual({ gate: "sanctionsApi", reason: "unavailable" })
       })
     })
 

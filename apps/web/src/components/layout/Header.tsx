@@ -11,11 +11,7 @@ import Moon from "lucide-react/dist/esm/icons/moon"
 import { Button } from "@/components/ui/button"
 import { LanguageSwitcher } from "./LanguageSwitcher"
 
-/**
- * The full navigation shows from `xl`, below that the menu button. From `md` the five items and
- * the wallet button overflowed the window even in English; at `lg` German and Russian wrap the
- * logo and the wallet button. `e2e/tests/language.spec.ts` checks the widths in three languages.
- */
+/** Desktop navigation has its own row so wallet controls fit with longer translated labels. */
 export function Header() {
   const { t } = useTranslation()
   const { pathname } = useLocation()
@@ -45,25 +41,9 @@ export function Header() {
             </span>
             <span className="text-xs leading-none text-muted-foreground">{t("shell.byCoBuilders", "by CoBuilders")}</span>
           </Link>
-          <nav className="hidden xl:flex items-stretch h-16 gap-1 -mb-px">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                aria-current={pathname === item.path ? "page" : undefined}
-                className={cn(
-                  "flex items-center px-5 text-sm font-medium uppercase tracking-wider leading-5 transition-colors border-b-2",
-                  pathname === item.path
-                    ? "text-foreground border-primary"
-                    : "text-muted-foreground border-transparent hover:text-foreground",
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <LanguageSwitcher />
           <Button
             variant="ghost"
@@ -88,6 +68,24 @@ export function Header() {
           </Button>
         </div>
       </div>
+
+          <nav className="container mx-auto hidden xl:flex items-stretch min-h-12 gap-1 px-4 -mb-px">
+            {navItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                aria-current={pathname === item.path ? "page" : undefined}
+                className={cn(
+                  "flex items-center px-4 py-3 text-sm font-medium uppercase tracking-wider leading-5 transition-colors border-b-2",
+                  pathname === item.path
+                    ? "text-foreground border-primary"
+                    : "text-muted-foreground border-transparent hover:text-foreground",
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
 
       {mobileMenuOpen && (
         <div className="border-t xl:hidden">

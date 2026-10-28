@@ -3,6 +3,7 @@ import { DEPLOYMENTS, type SefValidator } from "@cobuilders/safenet-core"
 /** Mainnet addresses, from core, so no address is written twice. */
 export const STAKING_CONTRACT = DEPLOYMENTS[1].staking.toLowerCase()
 export const TOKEN_CONTRACT = DEPLOYMENTS[1].token.toLowerCase()
+export const SANCTIONS_ORACLE_CONTRACT = (DEPLOYMENTS[1].sanctionsOracle ?? "").toLowerCase()
 /** Mock MerkleDrop contract address (set via VITE_MERKLE_DROP_ADDRESS in playwright.config.ts) */
 export const MERKLE_DROP_CONTRACT = "0x9999999999999999999999999999999999999999".toLowerCase()
 

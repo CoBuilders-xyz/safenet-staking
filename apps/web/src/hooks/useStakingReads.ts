@@ -1,5 +1,5 @@
 import { useReadContract, useAccount, useReadContracts } from "wagmi"
-import { stakingAbi } from "@/abi/stakingAbi"
+import { stakingAbi } from "@cobuilders/safenet-core"
 import { getContractAddresses } from "@/config/contracts"
 import { activeChain } from "@/config/chains"
 import type { Address } from "viem"

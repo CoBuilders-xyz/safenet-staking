@@ -11,11 +11,10 @@ import { RewardsSection, SectionError, SectionLoading, SectionNote, StatRow } fr
  * read, from whichever source answered, once one has.
  */
 export function PublishedFileLink({ href }: { href: string | undefined }) {
-  if (!href) return <>rewards/latest.json</>
+  if (!href) return <>{"rewards/latest.json"}</>
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
-      rewards/latest.json
-    </a>
+      {"rewards/latest.json"}</a>
   )
 }
 

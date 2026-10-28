@@ -17,8 +17,9 @@ import { truncateAddress, formatTokenAmount } from "@/lib/format"
 import Info from "lucide-react/dist/esm/icons/info"
 import { PublishedParticipationRate } from "@/components/validators/ParticipationRate"
 import type { Address } from "viem"
+import { SEF_DOCS } from "@cobuilders/safenet-core"
 
-const rewardsDocsUrl = "https://docs.safefoundation.org/safenet/staking/rewards"
+const rewardsDocsUrl = SEF_DOCS.rewards
 
 interface Position {
   validator: Address
@@ -84,7 +85,7 @@ function PositionRow({ position, validators }: { position: Position; validators?
 export function StakingSection() {
   const { t } = useTranslation()
   const { isConnected, address } = useAccount()
-  const { data: validators } = useValidators()
+  const { data: validators, isError: validatorsFailed, refetch: refetchValidators } = useValidators()
   const validatorAddresses = useMemo(
     () => (validators ?? []).map((v) => v.address),
     [validators],
@@ -95,6 +96,21 @@ export function StakingSection() {
 
   if (!isConnected) {
     return null
+  }
+
+  if (validatorsFailed && !validators) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("dashboard.yourRewards", "Your Rewards")}</CardTitle>
+        </CardHeader>
+        <CardContent role="alert" className="space-y-3 text-sm text-muted-foreground">
+          <p>{t("onboarding.sefsValidatorListCouldNotBeLoadedSoYour", "SEF's validator list could not be loaded, so your stakes cannot be listed.")}</p>
+          <Button variant="outline" size="sm" onClick={() => void refetchValidators()}>
+            {t("rewards.retry", "Retry")}</Button>
+        </CardContent>
+      </Card>
+    )
   }
 
   if (isLoading || !validators) {

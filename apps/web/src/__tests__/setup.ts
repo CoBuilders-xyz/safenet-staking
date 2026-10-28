@@ -6,8 +6,9 @@ import { LANGUAGE_STORAGE_KEY } from "@/i18n/languages"
 
 // Every test starts in English, the catalogue in the bundle. jsdom's navigator says en-US, so
 // detection picks English; a test that switches language is put back here.
-await initI18n()
+if (typeof document !== "undefined") await initI18n()
 afterEach(async () => {
+  if (typeof localStorage === "undefined") return
   localStorage.removeItem(LANGUAGE_STORAGE_KEY)
   if (i18n.language !== "en") await i18n.changeLanguage("en")
 })

@@ -1,6 +1,7 @@
 interface PageHeroProps {
   title: string
-  subtitle: string
+  /** Text, which may hold a `Term`. */
+  subtitle: React.ReactNode
   children?: React.ReactNode
 }
 

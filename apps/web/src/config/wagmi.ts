@@ -1,6 +1,7 @@
 import { createConfig } from "wagmi"
-import { injected, walletConnect, safe } from "wagmi/connectors"
+import { injected, safe } from "wagmi/connectors"
 import { activeChain, transports } from "./chains"
+import { deferredWalletConnect } from "./walletConnect"
 
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID
 
@@ -14,7 +15,7 @@ const connectors = [
     },
   }),
   ...(projectId && projectId.length > 0
-    ? [walletConnect({ projectId })]
+    ? [deferredWalletConnect({ projectId })]
     : []),
 ]
 

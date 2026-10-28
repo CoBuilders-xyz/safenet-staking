@@ -25,7 +25,8 @@ export function ChainFreshness({ chain, result, fallback }: ChainFreshnessProps)
         )}
         aria-hidden="true"
       />
-      <p>
+      {/* Room for the answer while it is checked, so the figures below do not move when it arrives. */}
+      <p className="min-h-[3lh] sm:min-h-[2lh] lg:min-h-0">
         <span className="font-medium">{t("overview.freshness.chain", "{{chain}} subgraph:", { chain })} </span>
         {result.status === "loading" && t("overview.freshness.checking", "checking.")}
         {result.status === "live" && (

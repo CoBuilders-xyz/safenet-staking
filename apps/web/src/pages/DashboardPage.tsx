@@ -1,9 +1,10 @@
-import { useTranslation } from "react-i18next"
+import { Trans, useTranslation } from "react-i18next"
 import { StatsOverview } from "@/components/dashboard/StatsOverview"
 import { QuickActions } from "@/components/dashboard/QuickActions"
 import { StakingSection } from "@/components/dashboard/StakingSection"
 import { StakeDistribution } from "@/components/dashboard/StakeDistribution"
 import { PageHero } from "@/components/PageHero"
+import { Term } from "@/components/ui/term"
 
 const termsUrl = import.meta.env.VITE_TERMS_URL as string | undefined
 
@@ -13,7 +14,7 @@ export function DashboardPage() {
     <div className="space-y-6">
       <PageHero
         title={t("dashboard.stakeYourSafe", "Stake your SAFE")}
-        subtitle={t("dashboard.earnRewardsForHelpingSecureSafenet", "Earn rewards for helping secure Safenet")}
+        subtitle={<Trans i18nKey="onboarding.hero.dashboard" defaults="Earn <rewards>rewards</rewards> for helping secure <network>Safenet</network>" components={{ rewards: <Term term="rewards" children={null} />, network: <Term term="safenet" children={null} /> }} />}
       >
         <p className="mt-4 text-xs text-muted-foreground">
           {t("dashboard.rewardsAreNotGuaranteedAndMayVary", "Rewards are not guaranteed and may vary.")}{" "}

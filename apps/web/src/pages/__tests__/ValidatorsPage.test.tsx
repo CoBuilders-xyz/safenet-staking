@@ -3,6 +3,9 @@ import { render, screen } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { ValidatorsPage } from "../ValidatorsPage"
 
+// The terms render as their words here; Term has its own tests.
+vi.mock("@/components/ui/term", () => ({ Term: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
+
 vi.mock("@/components/validators/ValidatorList", () => ({
   ValidatorList: ({ autoOpenDelegate }: { autoOpenDelegate?: string }) => (
     <div data-testid="validator-list" data-auto-open={autoOpenDelegate ?? ""}>
