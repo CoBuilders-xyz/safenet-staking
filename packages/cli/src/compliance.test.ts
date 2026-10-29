@@ -1,9 +1,12 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
+import { fileURLToPath } from "node:url"
+import { CHAINS } from "@cobuilders/safenet-core"
 import { bytesToHex } from "viem"
 import { mnemonicToAccount, toAccount } from "viem/accounts"
 import { run } from "./cli.js"
 import { localSigner, type Signer } from "./lib/index.js"
+import { walletConnectSigner, type WalletBridge } from "./commands/walletconnect.js"
 import {
   SANCTIONS_ENDPOINT, STAKER, TEST_MNEMONIC, VALIDATOR_A, fakeRuntime, type FakeOptions,
 } from "./test-support.js"
@@ -91,6 +94,65 @@ test("an address on the sanctions list is refused by every write before anything
   }
 })
 
+test("environment and keystore signers refuse sanctioned accounts on every write, dry and live", async () => {
+  const keystoreAccount = mnemonicToAccount(TEST_MNEMONIC, { addressIndex: 1 })
+  const keystore = fileURLToPath(new URL("./fixtures/keystore-anvil-1.json", import.meta.url))
+  const signers = [
+    { address: testAccount.address, flags: ["--private-key-env", "SAFENET_TEST_KEY"], env: KEY_ENV },
+    { address: keystoreAccount.address, flags: ["--keystore", keystore, "--password-env", "PW"], env: { PW: "safenet fixture" } },
+  ]
+  for (const signer of signers) for (const argv of WRITES) for (const dryRun of [false, true]) {
+    const r = await cli([...argv, ...signer.flags, "--json", ...(dryRun ? ["--dry-run"] : [])], {
+      env: signer.env, sanctioned: [signer.address],
+    })
+    assert.equal(r.code, 1, r.err)
+    assert.equal(JSON.parse(r.out).compliance.address, signer.address)
+    assert.match(r.err, /sanctions oracle: the address is on the sanctions list/)
+    assert.deepEqual(r.sends, { prepared: 0, broadcast: 0 })
+  }
+})
+
+test("WalletConnect passes every write through the gates before review, signature, or broadcast", async () => {
+  const cases: { options: FakeOptions; flags: string[]; reason: RegExp }[] = [
+    { options: { sanctioned: [STAKER] }, flags: [], reason: /sanctions oracle: the address is on the sanctions list/ },
+    { options: { oracleError: true }, flags: [], reason: /sanctions oracle: the oracle could not be read/ },
+    { options: { sanctionsEndpoint: 403 }, flags: ["--sanctions-endpoint", SANCTIONS_ENDPOINT], reason: /sanctions endpoint: the endpoint refused/ },
+    { options: { country: "IR" }, flags: ["--geo-check"], reason: /geo check: this machine appears to be in IR/ },
+  ]
+  for (const argv of WRITES) for (const dryRun of [false, true]) for (const scenario of cases) {
+    let paired = 0
+    let reviewed = 0
+    let requested = 0
+    let closed = 0
+    const bridge: WalletBridge = {
+      connect: async () => {
+        paired++
+        return { uri: "wc:unit-test-pairing", approval: async () => ({
+          topic: "unit-test-session",
+          namespaces: { eip155: { accounts: [`eip155:${CHAINS.mainnet.id}:${STAKER}`], methods: ["eth_signTransaction"] } },
+        }) }
+      },
+      request: async () => { requested++; throw new Error("signature tripwire") },
+      onChange: () => () => {},
+      close: async () => { closed++ },
+    }
+    const r = await cli([...argv, "--walletconnect", "--wallet-account", STAKER, ...scenario.flags,
+      ...(dryRun ? ["--dry-run"] : [])], {
+      ...scenario.options,
+      loadSigner: async (request, ctx) => {
+        assert.equal(request.kind, "walletconnect")
+        return walletConnectSigner(ctx, STAKER, bridge, {
+          showUri: async () => {}, confirm: async () => { reviewed++; return true },
+        })
+      },
+    })
+    assert.equal(r.code, 1, r.err)
+    assert.match(r.err, scenario.reason)
+    assert.deepEqual({ paired, reviewed, requested, closed }, { paired: 1, reviewed: 0, requested: 0, closed: 1 })
+    assert.deepEqual(r.sends, { prepared: 0, broadcast: 0 })
+  }
+})
+
 test("a refusal with --json prints the report as one document, and the sentence on stderr", async () => {
   const r = await cli(dry(["stake", VALIDATOR_A, "1"], "--json"), { sanctioned: [STAKER] })
   assert.equal(r.code, 1)
@@ -132,10 +194,13 @@ test("--sanctions-endpoint passes on 200, and refuses on 403, on any other statu
 })
 
 test("--sanctions-endpoint takes an http or https URL, and a wrong value is not repeated", async () => {
-  const r = await cli(dry(["stake", VALIDATOR_A, "1"], "--sanctions-endpoint", "Hunter2_not_a_url"))
-  assert.equal(r.code, 2)
-  assert.match(r.err, /--sanctions-endpoint takes an http or https URL/)
-  assert.doesNotMatch(r.err, /Hunter2/)
+  for (const value of ["Hunter2_not_a_url", "https://:8080", "https://user:fixture-password@:8080/?key=fixture-token", "file:///fixture-token"]) {
+    const r = await cli(dry(["stake", VALIDATOR_A, "1"], "--sanctions-endpoint", value))
+    assert.equal(r.code, 2)
+    assert.match(r.err, /--sanctions-endpoint takes an http or https URL/)
+    assert.doesNotMatch(r.out + r.err, /Hunter2|fixture-password|fixture-token|:8080/)
+    assert.deepEqual(r.sends, { prepared: 0, broadcast: 0 })
+  }
 })
 
 // --- the geo check, when asked -----------------------------------------------------------

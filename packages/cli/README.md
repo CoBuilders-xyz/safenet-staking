@@ -189,7 +189,7 @@ An unsupported method is an acceptance blocker; record the device, firmware, app
 6. Read the receipts, allowance, and stake from the fork. Confirm the stake increased by exactly one SAFE.
 7. Repeat and reject on the device. Test terminal cancellation, disconnect, account change, chain change, and timeout.
 8. Confirm no broadcast after each refusal. If approval already confirmed, record that partial result accurately.
-9. After compliance integration, use a sanctioned fixture and confirm refusal before any device signature request.
+9. Use a sanctioned fixture and confirm refusal before any device signature request.
 10. Record public transaction hashes, receipt status, stake differences, device/app versions, and elapsed time in Linear.
 
 Keep pairing URIs, keys, passwords, seed words, RPC credentials, and terminal recordings out of acceptance evidence.
@@ -210,6 +210,9 @@ sentence that names each gate that refused and why. With `--json`, stdout also h
 `{ "refused": true, "compliance": { ... } }`. A write that passes prints the gates it passed, and
 its `--json` result carries the same report as `compliance`. The endpoint's URL is never printed:
 it may carry a key.
+
+These gates do not provide full five-list sanctions screening. That work remains separate.
+The web visitor endpoint remains unset; CLI operators can still supply their own endpoint.
 
 ## Settings
 

@@ -3,6 +3,8 @@ import assert from "node:assert/strict"
 import { parseUnits } from "viem"
 import { ComplianceRefusal, DEFAULT_HISTORY_LIMIT, ScanError, type WriteMode } from "@cobuilders/safenet-cli/lib"
 import { readConfig } from "./config.js"
+import { library } from "./library.js"
+import { fakeContext, VALIDATOR_A } from "../../cli/src/test-support.js"
 import {
   BLOCK, connect, fakeLibrary, KEY_LIKE_VALUE, PASSWORD_VALUE, SIGNER_ADDRESS, STAKER, textOf, tripwire, VALIDATOR,
   WRITES_OFF, WRITES_ON,
@@ -336,6 +338,48 @@ test("the rewards_history summary says how many periods the subgraph gave, and w
 })
 
 // --- compliance gates --------------------------------------------------------------------
+
+test("real library refuses sanctioned addresses through every MCP write before signing", async () => {
+  for (const config of [WRITES_OFF, WRITES_ON]) for (const [name, args] of WRITES) {
+    const address = config.writes.allowed ? SIGNER_ADDRESS : STAKER
+    const sends = { prepared: 0, broadcast: 0 }
+    const ctx = fakeContext({ sanctioned: [address] }, sends)
+    const fake = fakeLibrary({ ...library, createContext: () => ctx })
+    const trip = tripwire(address)
+    const s = await connect(config, { fake, trip })
+    try {
+      const r = await s.call(name, { ...args, ...(args.validator ? { validator: VALIDATOR_A } : {}), from: address, dryRun: false })
+      assert.equal(r.isError, true, name)
+      assert.match(textOf(r), /sanctions oracle: the address is on the sanctions list/)
+      assert.equal((r.structuredContent as { refused: boolean }).refused, true)
+      assert.deepEqual(trip.reached, [], name)
+      assert.deepEqual(sends, { prepared: 0, broadcast: 0 }, name)
+    } finally { await s.close() }
+  }
+})
+
+test("MCP checks the oracle again when a dry run passes but the live run becomes sanctioned", async () => {
+  for (const [name, args] of WRITES) {
+    const sends = { prepared: 0, broadcast: 0 }
+    const ctx = fakeContext({}, sends)
+    const read = ctx.client.readContract
+    let oracleReads = 0
+    ctx.client.readContract = ((params) => params.functionName === "isSanctioned"
+      ? Promise.resolve(++oracleReads > 1)
+      : read(params)) as typeof read
+    const fake = fakeLibrary({ ...library, createContext: () => ctx })
+    const trip = tripwire(STAKER)
+    const s = await connect(WRITES_ON, { fake, trip })
+    try {
+      const r = await s.call(name, { ...args, ...(args.validator ? { validator: VALIDATOR_A } : {}), dryRun: false })
+      assert.equal(r.isError, true, `${name}: ${textOf(r)}`)
+      assert.match(textOf(r), /sanctions oracle: the address is on the sanctions list/)
+      assert.equal(oracleReads, 2, name)
+      assert.deepEqual(trip.reached, [], name)
+      assert.deepEqual(sends, { prepared: 0, broadcast: 0 }, name)
+    } finally { await s.close() }
+  }
+})
 
 /** WRITES_ON's settings, plus both opt-in gates. */
 const GATES_ON = readConfig({

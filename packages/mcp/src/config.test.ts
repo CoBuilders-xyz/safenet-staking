@@ -1,6 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { fileURLToPath } from "node:url"
+import { spawnSync } from "node:child_process"
 import { bytesToHex } from "viem"
 import { mnemonicToAccount } from "viem/accounts"
 import { ANVIL_TEST_MNEMONIC } from "@cobuilders/safenet-core"
@@ -45,6 +46,26 @@ test("the compliance gates are settings: off by default, the endpoint an http or
   // The value is not repeated: it may be a key typed where the URL belongs.
   refused({ SAFENET_MCP_SANCTIONS_ENDPOINT: "Hunter2_not_a_url" }, /^SAFENET_MCP_SANCTIONS_ENDPOINT must be an http or https URL$/)
   refused({ SAFENET_MCP_GEO_CHECK: "yes" }, /^SAFENET_MCP_GEO_CHECK takes 1 to refuse writes from a blocked country, or 0 or nothing to skip the check$/)
+})
+
+test("malformed sanctions endpoints stop startup without echoing sensitive input", () => {
+  for (const value of [
+    "https://:8080", "https://user:fixture-password@:8080/check?key=fixture-token",
+    "https://[invalid]/fixture-token", "https://sanctions.invalid:99999/fixture-token",
+    "file:///fixture-token", "ws://sanctions.invalid/fixture-token", "fixture-token",
+  ]) {
+    refused({ SAFENET_MCP_SANCTIONS_ENDPOINT: value }, /^SAFENET_MCP_SANCTIONS_ENDPOINT must be an http or https URL$/)
+  }
+  for (const value of ["http://localhost:8080/check", "https://sanctions.invalid/check?key=fixture-token"]) {
+    assert.equal(readConfig({ SAFENET_MCP_SANCTIONS_ENDPOINT: value }).compliance.sanctionsEndpoint, value)
+  }
+  const result = spawnSync(process.execPath, ["--conditions=source", "--import", "tsx", fileURLToPath(new URL("./index.ts", import.meta.url))], {
+    env: { PATH: process.env.PATH, SAFENET_MCP_SANCTIONS_ENDPOINT: "https://user:fixture-password@:8080/?key=fixture-token" },
+    encoding: "utf8", timeout: 10_000,
+  })
+  assert.equal(result.status, 2)
+  assert.equal(result.stdout, "")
+  assert.equal(result.stderr, "safenet-mcp: not started: SAFENET_MCP_SANCTIONS_ENDPOINT must be an http or https URL.\n")
 })
 
 test("writes are allowed only with SAFENET_MCP_ALLOW_WRITES=1 and a signer", () => {

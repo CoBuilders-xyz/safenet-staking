@@ -84,7 +84,7 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   and broadcasts through the selected RPC. Session storage is memory only. Command cleanup closes the signer.
   Cancellation, account/chain changes, disconnect, expiry, and timeouts prevent further signatures and broadcasts.
   `src/fork/signers.test.ts` proves effects using an emulated transport; it does not prove physical hardware.
-- Every write passes the compliance gates first, dry runs included, before any other read:
+- Every write passes the compliance gates before operation reads and signing, dry runs included:
   `checkCompliance()` in `src/lib/compliance.ts`, over core's `src/compliance.ts`. The sanctions
   oracle on chain is always read for the signer's address, or `--from`; only an explicit false
   passes. `--sanctions-endpoint <url>` adds a GET that refuses on 403 or any failure, and
@@ -93,6 +93,7 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   A refusal throws `ComplianceRefusal`: one sentence naming each refused gate, exit 1, and with
   `--json` the report `{ refused, compliance }` on stdout. A write that passes carries the report
   as `compliance`. The endpoint's URL is never printed.
+  WalletConnect identifies the approved account before these gates; refusal closes the session without requesting a signature.
 - A live write first checks that the endpoint is on chain 1. Each transaction's hash goes to
   stderr the moment it is sent, and its receipt when it confirms, so `--json` stays one document
   on stdout. A hash whose receipt cannot be read is reported as sent, with the hash, and is not

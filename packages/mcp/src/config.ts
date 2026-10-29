@@ -78,8 +78,14 @@ export function readConfig(env: Env): ServerConfig {
     throw new ConfigError("SAFENET_MCP_RPC_URL must be an http or https URL")
   }
   const sanctionsEndpoint = set(env.SAFENET_MCP_SANCTIONS_ENDPOINT) ? env.SAFENET_MCP_SANCTIONS_ENDPOINT : null
-  if (sanctionsEndpoint !== null && !/^https?:\/\/[^\s]+$/.test(sanctionsEndpoint)) {
-    throw new ConfigError("SAFENET_MCP_SANCTIONS_ENDPOINT must be an http or https URL")
+  if (sanctionsEndpoint !== null) {
+    try {
+      const url = new URL(sanctionsEndpoint)
+      if (!url.hostname || !["http:", "https:"].includes(url.protocol)) throw new Error()
+    } catch {
+      // URL errors can carry the input, including credentials. Never forward them.
+      throw new ConfigError("SAFENET_MCP_SANCTIONS_ENDPOINT must be an http or https URL")
+    }
   }
   const geo = env.SAFENET_MCP_GEO_CHECK
   if (set(geo) && geo !== "1" && geo !== "0") {
