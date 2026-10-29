@@ -20,6 +20,11 @@ as `pnpm <script>` from `apps/web`.
   which `pnpm bootstrap` also runs.
 - **E2E, Anvil fork:** `test:fork` (Playwright, `e2e/fork/`). Needs `anvil` and the archive
   `MAINNET_RPC_URL`.
+- **Production smoke:** `test:smoke:web` (Playwright, `e2e/smoke/`), against `PRODUCTION_URL`,
+  no wallet, no mocks. Fails when `PRODUCTION_URL` is unset.
+- **Availability:** `availability` (`scripts/availability.ts`): production answers with the title
+  and serves its entry script; with a root `deployments.json`, each gateway in core serves the
+  latest release. Needs `PRODUCTION_URL`.
 - **GraphQL types:** `codegen` regenerates them; `codegen:live-check` validates the documents
   against a running graph-node
 - **Reward proofs:** `generate:proofs [--out <dir>]` reads `scripts/merkle-config.json` and writes
@@ -135,13 +140,15 @@ Connectors in order: `safe()`, `injected()` as "Browser Wallet" on `window.ether
 WalletConnect when `VITE_WALLETCONNECT_PROJECT_ID` is set, through `deferredWalletConnect`
 (`src/config/walletConnect.ts`): wagmi's connector, loaded only once the user picks it or it was
 the last connector used. Created plainly, it loaded about 300 KB on every first paint. `src/lib/safe.ts` exports
-`isSafeApp`, true inside an iframe. `useAutoConnect` connects the Safe connector when
+`isSafeApp`, true inside an iframe, and `SAFE_INFO_TIMEOUT_MS`. The Safe connector waits two
+seconds for `getSafeInfo`, instead of the default 10 ms. `useAutoConnect` connects the Safe connector when
 `isSafeApp`, and calls wagmi's `reconnect()` otherwise. `useWrongNetwork` is true when the
 wallet's chain is not Mainnet. `useNetworkSwitch` adds whether the connector can switch (the Safe
 connector cannot) and the switch itself. `WrongNetworkNotice`, in `Layout`, then shows on every
 page, and `ConnectButton` shows "Switch to Ethereum", or "Wrong network" when the wallet cannot
 switch. Reads do not go through the wallet, so figures stay correct; `TxButton` disables every
 transaction.
+
 
 ### Contract integration
 
@@ -288,7 +295,10 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
 - `scripts/release.ts`, `scripts/release-pin.ts`, `scripts/release-gateways.ts`: the IPFS
   release behind `release:build` and `release:pin`. `build.env` is the release build's only env
   input; it is public and holds no secret.
-- `scripts/__tests__/`: Vitest tests for the tree and the generator.
+- `scripts/availability.ts`, `scripts/availability-checks.ts`: `availability`. The checks take
+  `fetch` as an argument, so each branch is unit-tested.
+- `scripts/__tests__/`: Vitest tests for the tree, the generator, the release gateways and the
+  availability checks.
 
 To use generated proofs, serve the output and point `VITE_REWARDS_BASE_URL` at it, then set the
 MerkleDrop's root. This repository sets a root only on an Anvil fork.
@@ -300,10 +310,13 @@ MerkleDrop's root. This repository sets a root only on an Anvil fork.
 - `e2e/tests/accessibility.spec.ts`: axe, WCAG 2.2 A and AA, on every route and state; a serious
   or critical violation fails it. `ACCESSIBILITY.md` says what it covers and what a person checks.
 - `e2e/tests/`: Playwright against a mocked RPC, mocked subgraphs, mocked SEF files and mocked
-  gateways (`e2e/mocks/`, `e2e/fixtures/`). Page objects in `e2e/pages/`. The Safe App and
-  WalletConnect are only smoke-tested.
-- `e2e/fork/`: Playwright against Anvil. `e2e/playwright.config.ts` switches suites on
-  `E2E_SUITE=fork`, which `test:fork` sets.
+  gateways (`e2e/mocks/`, `e2e/fixtures/`). Page objects in `e2e/pages/`. WalletConnect is
+  only smoke-tested. `safe-app.spec.ts` frames the app from another origin: the Connect control is
+  hidden and the Safe connector asks the parent for `getSafeInfo`, and with the parent answering
+  15 ms late, the connection completes. No real Safe is involved.
+- `e2e/fork/`: Playwright against Anvil. `e2e/smoke/`: Playwright against production.
+  `e2e/playwright.config.ts` switches suites on `E2E_SUITE`, `fork` or `smoke`, which `test:fork`
+  and `test:smoke:web` set.
 
 Ports come from `.env.ports` at the repository root: `E2E_PORT`, `FORK_PORT`, `ANVIL_PORT`
 (`e2e/ports.ts`). Without the file, 5174, 5178 and 8545.

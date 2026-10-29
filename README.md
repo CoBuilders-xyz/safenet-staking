@@ -6,10 +6,16 @@ the `safenet` command-line interface, and an MCP server that gives an AI client 
 They share one package of constants, so every address, start block and ABI is written once.
 
 [![Parity with SEF](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml/badge.svg)](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml)
+[![Availability](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/availability.yml/badge.svg)](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/availability.yml)
 
 Each day, the Studio deployments named in `packages/core/src/subgraphs.ts` are compared with
 SEF's published figures at their publish instant: the Mainnet staked total to the wei, and each
 validator's Gnosis participation rate as the identical double.
+
+Every six hours, the production deployment is checked: it answers with the interface's title and
+serves the entry script of its build. Once a release is recorded in `deployments.json`, each
+public IPFS gateway in `packages/core` must also serve it. A red run of the nightly, parity or
+availability workflow opens an issue labelled `ci-red`, or comments on the open one.
 
 ## Layout
 
@@ -93,6 +99,34 @@ and compare. [`VERIFY.md`](VERIFY.md) has the exact commands.
 pnpm --filter @cobuilders/safenet-web release:build   # writes apps/web/release/CID and app.car
 pnpm --filter @cobuilders/safenet-web release:pin     # needs PINATA_JWT and PINATA_GATEWAY
 ```
+
+### deployments.json
+
+`deployments.json` at the repository root records each pinned release, so the availability check
+knows which CID the gateways must serve. Nothing in the repository writes it: after `release:pin`
+succeeds, whoever ran the release adds the entry by hand, in a pull request. It is a JSON array,
+one object per release:
+
+```json
+[
+  { "cid": "bafy…", "tag": "v1.0.0", "pinnedAt": "2026-11-02T10:00:00Z" }
+]
+```
+
+- `cid`: the root CID that `release:build` wrote to `apps/web/release/CID` and Pinata confirmed.
+  Rebuild it as `VERIFY.md` shows before recording it: the same commit gives the same CID.
+- `tag`: the git tag of the release. A manual run without a tag records the branch and the
+  commit it built, as `main@<short sha>`.
+- `pinnedAt`: when the pin was confirmed, ISO 8601, in UTC. When only the release run is known,
+  the time that run ended.
+
+The check reads the entry with the latest `pinnedAt`, not the last one in the file. It fails
+when an entry lacks a field, when `cid` is not a CID, or when `pinnedAt` is not a date, and a
+unit test reads the committed file so a bad edit fails its pull request first. Without the file,
+it checks no gateway and says so in its summary.
+
+The record names no ENS name. The interface's ENS name is recorded here only once its
+contenthash points at a recorded CID on chain.
 
 ## License
 

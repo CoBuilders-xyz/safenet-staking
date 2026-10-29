@@ -4,11 +4,14 @@
  * small number so no file in this package types one out.
  */
 import {
-  ContractFunctionRevertedError, HttpRequestError, WaitForTransactionReceiptTimeoutError, encodeAbiParameters, encodeErrorResult, encodeEventTopics, numberToHex, pad,
+  ContractFunctionRevertedError, HttpRequestError, WaitForTransactionReceiptTimeoutError, decodeFunctionData, encodeAbiParameters,
+  encodeErrorResult, encodeEventTopics, encodeFunctionResult, numberToHex, pad,
   type Abi, type Hex, type PublicClient,
 } from "viem"
+import { mainnet } from "viem/chains"
 import {
-  ANVIL_TEST_MNEMONIC, CONTRACTS, REWARDS_LATEST_PATH, SEF_DATA, rewardProofPath, rewardProofUrl, safeTokenEventsAbi,
+  ANVIL_TEST_MNEMONIC, CONTRACTS, REWARDS_LATEST_PATH, SEF_DATA, ensResolverAbi, ensUniversalResolverAbi, rewardProofPath,
+  rewardProofUrl, safeTokenEventsAbi,
 } from "@cobuilders/safenet-core"
 import type { Context, Signer } from "./lib/index.js"
 import type { Io, Runtime } from "./cli.js"
@@ -119,9 +122,6 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
     withdrawalQueues: () => [1n, 2n],
     withdrawalNodes: ([, id]) =>
       id === 1n ? [5n * SAFE, BLOCK_TIME - 60n, 0n, 2n] : [2n * SAFE, BLOCK_TIME + 90_000n, 1n, 0n],
-    // SEF's ENS name: the Universal Resolver names the resolver, the resolver the contenthash.
-    findResolver: () => [ENS_RESOLVER, fakeRoot(0), 0n],
-    contenthash: () => o.ensContenthash ?? "0x",
   }
   let lastSent: { to: Hex; account: { address: Hex } } | undefined
   const receiptFor = () => ({
@@ -185,6 +185,19 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
       fail()
       const n = p?.blockNumber ?? BLOCK
       return { number: n, timestamp: BLOCK_TIME - (BLOCK - n) * 12n }
+    },
+    // SEF's ENS name, read with one plain eth_call: the Universal Resolver's resolve, carrying
+    // contenthash(node), answered through a made-up resolver.
+    request: async ({ method, params }: { method: string; params: [{ to: Hex; data: Hex }, string] }) => {
+      fail()
+      const [call] = params
+      if (method !== "eth_call" || call.to !== mainnet.contracts.ensUniversalResolver.address) {
+        throw new Error(`fake chain: no ${method} to ${call?.to}`)
+      }
+      const { functionName } = decodeFunctionData({ abi: ensUniversalResolverAbi, data: call.data })
+      if (functionName !== "resolve") throw new Error(`fake chain: no ${functionName}`)
+      const answer = encodeFunctionResult({ abi: ensResolverAbi, functionName: "contenthash", result: o.ensContenthash ?? "0x" })
+      return encodeFunctionResult({ abi: ensUniversalResolverAbi, functionName: "resolve", result: [answer, ENS_RESOLVER] })
     },
     readContract: async (p: { functionName: string; args?: readonly unknown[] }) => {
       fail()

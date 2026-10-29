@@ -11,7 +11,7 @@ import { ensResolverAbi, ensUniversalResolverAbi, sanctionsOracleAbi } from "@co
 import { AMOUNTS, STAKING_CONTRACT, TOKEN_CONTRACT, MERKLE_DROP_CONTRACT, SANCTIONS_ORACLE_CONTRACT, VALIDATORS } from "../fixtures/test-data"
 import type { MockChainState } from "./mock-chain-state"
 
-/** The resolver the mock Universal Resolver names for SEF's ENS name. Made up. */
+/** The resolver the mock Universal Resolver reports for SEF's ENS name. Made up. */
 const ENS_RESOLVER = pad(numberToHex(0xe75), { size: 20 })
 
 export interface RewardProof {
@@ -239,14 +239,15 @@ export function buildCallResponses(userAddress: string, state: MockChainState): 
     "0x" + toUint256(18n)
   )
 
-  // ENS: the Universal Resolver names the resolver of SEF's rewards name, and the resolver
-  // answers its contenthash from state. Every name gets the same answer; only one is asked.
-  const findResolver = ensUniversalResolverAbi[0]
-  responses.set(key(mainnet.contracts.ensUniversalResolver.address.toLowerCase(), toFunctionSelector(findResolver)), () =>
-    encodeFunctionResult({ abi: ensUniversalResolverAbi, functionName: "findResolver", result: [ENS_RESOLVER, pad("0x", { size: 32 }), 0n] }),
-  )
-  responses.set(key(ENS_RESOLVER, toFunctionSelector(ensResolverAbi[0])), () =>
-    encodeFunctionResult({ abi: ensResolverAbi, functionName: "contenthash", result: state.ensContenthash }),
+  // ENS: the Universal Resolver's resolve answers the contenthash of SEF's rewards name from
+  // state, through a made-up resolver. Every name gets the same answer; only one is asked.
+  const resolve = ensUniversalResolverAbi.find((item) => item.type === "function" && item.name === "resolve")!
+  responses.set(key(mainnet.contracts.ensUniversalResolver.address.toLowerCase(), toFunctionSelector(resolve)), () =>
+    encodeFunctionResult({
+      abi: ensUniversalResolverAbi,
+      functionName: "resolve",
+      result: [encodeFunctionResult({ abi: ensResolverAbi, functionName: "contenthash", result: state.ensContenthash }), ENS_RESOLVER],
+    }),
   )
 
   return responses

@@ -101,3 +101,15 @@ jobs:
             echo "::error title=Parity state missing::Expected exactly two state files, one for mainnet and one for gnosis; found ${count}. A chain that wrote no state proved nothing."
             exit 1
           fi
+
+  # A red run reaches a person: an issue labelled ci-red, or a comment on the open one.
+  page:
+    name: page
+    needs: [parity]
+    if: ${{ failure() }}
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/page-on-red.yml
+    with:
+      needs: ${{ toJSON(needs) }}

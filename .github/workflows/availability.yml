@@ -1,0 +1,71 @@
+name: Availability
+
+# Every six hours: the production deployment answers with the interface's title and serves the
+# entry script of its build, and, once deployments.json at the repository root records a release,
+# each public IPFS gateway in packages/core serves that release's index.html. The table goes to
+# the job summary, and the badge in README.md shows the last result.
+#
+# On a pull request only when the check or the release record changes, so either runs once
+# before it merges. A red scheduled or dispatched run pages; a red pull request run is seen by its author.
+
+on:
+  schedule:
+    # Away from the top of the hour, when scheduled runs queue longest.
+    - cron: "29 */6 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/availability.yml
+      - apps/web/scripts/availability.ts
+      - apps/web/scripts/availability-checks.ts
+      - deployments.json
+
+concurrency:
+  group: availability-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  availability:
+    name: availability
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+    steps:
+      - name: Require the production URL
+        run: |
+          if [ -z "${PRODUCTION_URL}" ]; then
+            echo "::error title=PRODUCTION_URL is not set::The availability check needs the repository variable PRODUCTION_URL, the URL of the production deployment."
+            exit 1
+          fi
+      # Pin actions to full SHA: mutable tags can be moved to malicious code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      # Writes its own table to the job summary.
+      - name: Check production and the IPFS gateways
+        run: pnpm --filter @cobuilders/safenet-web availability
+
+  page:
+    name: page
+    needs: [availability]
+    if: ${{ failure() && github.event_name != 'pull_request' }}
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/page-on-red.yml
+    with:
+      needs: ${{ toJSON(needs) }}
