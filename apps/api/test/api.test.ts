@@ -108,6 +108,37 @@ test("health reports dependency degradation and stays uncached", async () => {
   assert.equal(r.headers.get("Cache-Control"), "no-store")
   assert.match(await r.text(), /degraded/)
 })
+test("health and stats share bounded successful reads, then expose an outage after expiry", async () => {
+  for (const first of ["health", "system/stats"]) {
+    const entries = new Map<string, Response>()
+    let time = NOW, queries = 0, offline = false
+    const original = upstream()
+    const a = createApp({ ens: async () => null, now: () => time,
+      fetch: (async (url, init) => {
+        if (init?.method === "POST") {
+          queries++
+          if (offline) throw new Error("upstream unavailable")
+        }
+        return original(url, init)
+      }) as typeof fetch,
+      cache: { match: async key => entries.get(String(key instanceof Request ? key.url : key))?.clone(),
+        put: async (key, response) => { entries.set(String(key instanceof Request ? key.url : key), response) } } })
+    assert.equal((await a.request(`http://api.test/v1/${first}`, {}, ENV)).status, 200)
+    offline = true
+    for (const route of ["health", "system/stats", "health"]) {
+      const r = await a.request(`http://api.test/v1/${route}`, {}, ENV)
+      assert.equal(r.status, 200)
+      if (route === "health") assert.equal(r.headers.get("Cache-Control"), "no-store")
+    }
+    assert.equal(queries, 2)
+    time += 60_001
+    const degraded = await a.request("http://api.test/v1/health", {}, ENV)
+    assert.equal(degraded.status, 503)
+    assert.match(await degraded.text(), /degraded/)
+    assert.equal(queries, 4)
+    assert.equal((await a.request("http://api.test/v1/system/stats", {}, ENV)).status, 502)
+  }
+})
 test("upstream exceptions are redacted and GraphQL errors cannot be mistaken for empty results", async () => {
   const a = createApp({ fetch: async () => { throw Error("https://secret.example/token") }, now: () => NOW })
   const r = await a.request("http://api.test/v1/validators", {}, ENV)

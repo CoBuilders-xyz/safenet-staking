@@ -62,6 +62,22 @@ export function createApp(dependencies: Dependencies = {}) {
       }
       return fresh
     }
+    const readStats = async () => {
+      const sourceKey = new Request(new URL("/__internal/system-stats", url.origin))
+      const cached = await cache?.match(sourceKey)
+      if (cached && Number(cached.headers.get("X-Data-Expires-At")) > start) {
+        return await cached.json() as Awaited<ReturnType<typeof stats>>
+      }
+      const fresh = await stats(fetcher, c.env, start)
+      const expiry = Math.min(fresh.expiresAt, start + 60_000)
+      if (cache && expiry > now()) {
+        await cache.put(sourceKey, new Response(JSON.stringify(fresh), { headers: {
+          "Content-Type": "application/json", "Cache-Control": `public, max-age=${Math.floor((expiry - now()) / 1000)}`,
+          "X-Data-Expires-At": String(expiry),
+        } })).catch(() => { console.error(JSON.stringify({ event: "cache_write_failed" })) })
+      }
+      return fresh
+    }
     const cacheable = path !== "/v1/health"
     if (target) url.pathname = path.replace(match![1]!, target.toLowerCase())
     url.searchParams.sort()
@@ -76,13 +92,13 @@ export function createApp(dependencies: Dependencies = {}) {
     }
     let result: Result<unknown>
     if (path === "/v1/health") {
-      const checks = await Promise.allSettled([readValidators(), stats(fetcher, c.env, start)])
+      const checks = await Promise.allSettled([readValidators(), readStats()])
       const sources = checks.flatMap(r => r.status === "fulfilled" ? r.value.sources : [])
       const failures = checks.flatMap((r, i) => r.status === "rejected" ? [{ dependency: i === 0 ? "sef" : "subgraphs", code: r.reason instanceof ApiError ? r.reason.code : "upstream_failed" }] : [])
       c.header("Cache-Control", "no-store")
       return c.json({ status: failures.length ? "degraded" : "ok", checkedAt: new Date(start).toISOString(), sources, failures }, failures.length ? 503 : 200)
     } else if (path === "/v1/system/stats") {
-      result = await stats(fetcher, c.env, start)
+      result = await readStats()
     } else {
       const list = await readValidators()
       if (!target) result = list

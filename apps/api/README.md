@@ -81,9 +81,14 @@ indexed block within core's fifteen-minute threshold. Unknown time is not fresh.
 
 Response caching lasts at most 60 seconds and never exceeds source freshness. Shared SEF/ENS
 metadata caching lasts at most five minutes per Cloudflare location, also bounded by freshness.
-Health responses and errors are not cached. Health can use that bounded metadata cache.
+Health responses and errors are not cached. Health uses the bounded metadata cache and shares
+successful subgraph stats with `/v1/system/stats` for at most 60 seconds, within source freshness.
+Dependency readiness can therefore lag a new outage by up to 60 seconds. After expiry, failed
+reads return degraded health; an old success is never served beyond its expiry.
 The Cache API is local to each Cloudflare location; this is not a global quota limiter.
 Unauthenticated GitHub API limits and Studio quotas remain deployment capacity dependencies.
+Before public deployment, configure edge rate limits for health and data routes. Successful-data
+caching does not limit uncached failed requests or concurrent cache misses during an outage.
 No stale-on-error fallback fabricates healthy data.
 
 ## Reference compatibility
