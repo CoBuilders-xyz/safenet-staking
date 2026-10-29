@@ -166,6 +166,12 @@ fails, a last job `page` calls `page-on-red.yml`, which runs `tools/page-on-red.
 issue; a person closes it once the cause is fixed. A red availability run on a pull request does
 not page.
 
+`cli-binaries.yml` builds `safenet` as a standalone binary on Linux, macOS and Windows, runs each
+one alone against Mainnet with `MAINNET_RPC_URL`, or the binary's public endpoints when the secret
+is empty, and writes `SHA256SUMS`. On a tag `cli-v<version>`, whose version must be the package's
+and not 0.0.0, its `release` job, the only one with `contents: write`, attaches them to the tag's
+GitHub Release. On a pull request that changes the build, and by hand, it stops before that job.
+
 ## What happens when you edit
 
 `.claude/settings.json` runs `tools/hook-check.mjs` after every Edit or Write. For a TypeScript
