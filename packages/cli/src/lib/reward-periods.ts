@@ -77,9 +77,18 @@ async function query<T>(ctx: Context, url: string, text: string): Promise<T> {
   return body.data
 }
 
-/** The endpoint: the override when set, else core's Mainnet deployment. */
+/** Parse the endpoint before fetch can repeat a malformed setting in an error. */
 export function subgraphUrl(ctx: Context): string {
-  return ctx.subgraphUrl || SUBGRAPH_ENDPOINTS.mainnet
+  let url: URL
+  try {
+    url = new URL(ctx.subgraphUrl || SUBGRAPH_ENDPOINTS.mainnet)
+    if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error()
+  } catch {
+    // Do not attach the parser error: it can carry the entire setting, including credentials.
+    throw new Error("SUBGRAPH_URL_MAINNET must be an HTTP or HTTPS URL")
+  }
+  // Canonicalize the scheme so URL redaction also covers mixed-case input in fetch errors.
+  return url.href
 }
 
 /**

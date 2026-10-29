@@ -1,7 +1,8 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { run } from "./cli.js"
-import { BLOCK, STAKER, fakeRuntime, type FakeOptions } from "./test-support.js"
+import { rewardsHistory } from "./lib/rewards.js"
+import { BLOCK, STAKER, fakeContext, fakeRuntime, type FakeOptions } from "./test-support.js"
 
 // `rewards history`'s periods, against the fake chain and the fake Mainnet subgraph in
 // test-support.ts: two periods, a claim of 6 SAFE in the first and of 4 SAFE in the second.
@@ -107,4 +108,74 @@ test("SUBGRAPH_URL_MAINNET replaces core's endpoint, and its URL is never printe
   // The fake answers 404 for any URL it does not know, so the override was the one asked.
   assert.equal(h.periodsReason, "the subgraph could not give the periods (the subgraph answered HTTP 404)")
   assert.doesNotMatch(r.out + r.err, /subgraph\.invalid|user:key/)
+})
+
+test("invalid subgraph settings never reach fetch or escape through CLI text or JSON", async () => {
+  for (const url of [
+    "not-a-url-private-marker",
+    "https://user:private-marker@[broken/query",
+    "ftp://user:private-marker@subgraph.invalid/query",
+    "data:text/plain,private-marker",
+  ]) {
+    for (const flags of [[], ["--json"]]) {
+      const rt = fakeRuntime({ env: { SUBGRAPH_URL_MAINNET: url } })
+      let fetches = 0
+      const code = await run(["rewards", "history", STAKER, ...flags], {
+        ...rt,
+        createContext: (options) => ({
+          ...rt.createContext(options),
+          fetch: (...args) => { fetches++; return globalThis.fetch(...args) },
+        }),
+      })
+      assert.equal(code, 0)
+      assert.equal(fetches, 0)
+      assert.doesNotMatch(rt.stdout() + rt.stderr(), /private-marker|subgraph\.invalid/)
+      assert.match(rt.stdout(), /SUBGRAPH_URL_MAINNET must be an HTTP or HTTPS URL/)
+      if (flags.length) {
+        const h = JSON.parse(rt.stdout())
+        assert.equal(h.periods, null)
+        assert.equal(h.count, 2)
+        assert.equal(h.sumMatchesChain, true)
+      }
+    }
+  }
+})
+
+test("mixed-case HTTP settings are normalized and redacted when fetch repeats the endpoint", async () => {
+  const rt = fakeRuntime({ env: { SUBGRAPH_URL_MAINNET: "HTTPS://user:private-marker@subgraph.invalid/query" } })
+  let requested = ""
+  assert.equal(await run(["rewards", "history", STAKER, "--json"], {
+    ...rt,
+    createContext: (options) => ({
+      ...rt.createContext(options),
+      fetch: async (input) => { requested = String(input); throw new Error(`Request failed: ${requested}`) },
+    }),
+  }), 0)
+  assert.equal(requested, "https://user:private-marker@subgraph.invalid/query")
+  assert.doesNotMatch(rt.stdout() + rt.stderr(), /private-marker|subgraph\.invalid/)
+  assert.equal(JSON.parse(rt.stdout()).periodsReason, "the subgraph could not give the periods (Request failed: <url>)")
+})
+
+test("period and account queries share the indexed block, while a full page stays unknown rather than partial", async () => {
+  const ctx = fakeContext()
+  const queries: string[] = []
+  const full = await rewardsHistory({
+    ...ctx,
+    fetch: async (input, init) => {
+      const query = (JSON.parse(String(init?.body)) as { query: string }).query
+      queries.push(query)
+      const response = await ctx.fetch(input, init)
+      if (query.includes("_meta")) return response
+      const body = await response.json() as { data: { rewardClaims: unknown[] } }
+      body.data.rewardClaims = Array.from({ length: 1000 }, () => body.data.rewardClaims[0])
+      return Response.json(body)
+    },
+  }, STAKER)
+  assert.equal(queries.length, 2)
+  assert.equal(queries[1]!.match(new RegExp(`block: \\{ number: ${BLOCK} \\}`, "g"))?.length, 2)
+  assert.ok(queries[1]!.includes(`account: "${STAKER.toLowerCase()}"`))
+  assert.equal(full.periods, null)
+  assert.match(full.periodsReason!, /1000 or more rows/)
+  assert.equal(full.count, 2)
+  assert.equal(full.sumMatchesChain, true)
 })
