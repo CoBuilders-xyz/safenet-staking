@@ -65,13 +65,21 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   `eth_estimateGas`, which sees mined state only; it is simulated with `eth_simulateV1` after the
   calls before it, and its gas is the gas the simulation used. A dry run has no signer: the
   library is given an address, not a key.
-- Signing is a local key only: `--private-key-env <NAME>` reads it from the environment variable
+- Local signing: `--private-key-env <NAME>` reads it from the environment variable
   NAME, never from a flag value; `--keystore <path>` decrypts a version 3 keystore, asking for the
   password without echo or reading it from `--password-env <NAME>`. A value passed where a variable
   name belongs is refused without being repeated, and no message repeats the name given for a
   variable, which could be the secret typed in its place. Without `--dry-run` and without a signer
   option, a write exits 2. `--from <address>` sets the address of a dry run without a signer.
-  Wallets and compliance flags are not here.
+  Every environment-key invocation emits an exposure warning, including dry runs.
+- `--walletconnect --wallet-account <address>` loads the external signer in `commands/walletconnect.ts`.
+  It requires a terminal, `WALLETCONNECT_PROJECT_ID`, and WalletConnect v2 `eth_signTransaction` support.
+  Pairing URI display requires deliberate confirmation. Never capture the URI in evidence.
+  It verifies the approved chain/account, reviews each simulated transaction, validates returned signed bytes,
+  and broadcasts through the selected RPC. Session storage is memory only. Command cleanup closes the signer.
+  Cancellation, account/chain changes, disconnect, expiry, and timeouts prevent further signatures and broadcasts.
+  `src/fork/signers.test.ts` proves effects using an emulated transport; it does not prove physical hardware.
+  Compliance gates remain owned by the compliance integration branch.
 - A live write first checks that the endpoint is on chain 1. Each transaction's hash goes to
   stderr the moment it is sent, and its receipt when it confirms, so `--json` stays one document
   on stdout. A hash whose receipt cannot be read is reported as sent, with the hash, and is not

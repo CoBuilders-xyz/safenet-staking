@@ -59,7 +59,9 @@ too, and no tool takes one. A new CLI command needs a tool: `src/parity.test.ts`
   to stderr as it is sent and when it confirms.
 - Signing works as in the CLI: a private key from the variable the operator named, or a version 3
   keystore decrypted with the password from the variable named for it. There is no prompt: stdin
-  is the protocol. While writes are on, the key is loaded for every write call, dry runs
+  is the protocol. Interactive WalletConnect is CLI-only; no tool receives pairing or signer flags.
+  Environment-key configuration emits an exposure warning at server startup.
+  While writes are on, the key is loaded for every write call, dry runs
   included, because a dry run simulates from the signer's address; it is kept nowhere between
   calls. While writes are off, it is never loaded.
 

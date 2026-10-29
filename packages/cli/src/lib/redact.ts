@@ -14,7 +14,7 @@ const URL_PATTERN = /https?:\/\/[^\s"'<>]+/g
 
 /** Every URL in the text replaced by `<url>`. */
 export function redactUrls(text: string): string {
-  return text.replace(URL_PATTERN, "<url>")
+  return text.replace(/wc:[^\s"'<>]+/gi, "<walletconnect-uri>").replace(URL_PATTERN, "<url>")
 }
 
 /**

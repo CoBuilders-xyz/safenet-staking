@@ -20,6 +20,10 @@ try {
   process.exit(2)
 }
 
+if (config.writes.allowed && config.writes.signer.kind === "private-key-env") {
+  log("Warning: environment private keys enter this process and can leak through process inspection or diagnostics.")
+}
+
 // Where the RPC endpoint comes from, never the URL: it can carry a key.
 const rpc = config.rpcUrl
   ? "SAFENET_MCP_RPC_URL"
