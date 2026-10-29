@@ -71,7 +71,17 @@ export async function browserChannel(vapidKey: string) {
   if (ready.scope !== registration.scope) throw new Error("scope")
   ready.active?.postMessage({ type: "alerts-config", api: alertsApi })
   const key = Uint8Array.from(atob(vapidKey.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0))
-  const subscription = await registration.pushManager.getSubscription() ?? await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key })
+  let subscription = await registration.pushManager.getSubscription()
+  if (subscription) {
+    const existing = subscription.options.applicationServerKey
+    const matches = existing !== null && existing.byteLength === key.byteLength
+      && new Uint8Array(existing).every((byte, index) => byte === key[index])
+    if (!matches) {
+      if (!await subscription.unsubscribe()) throw new Error("push")
+      subscription = null
+    }
+  }
+  subscription ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key })
   const json = subscription.toJSON()
   if (!json.endpoint || !json.keys) throw new Error("push")
   return { kind: "push", endpoint: json.endpoint, keys: json.keys }

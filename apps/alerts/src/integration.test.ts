@@ -203,6 +203,34 @@ test("partial source failure delivers successful conditions while keeping the ru
   } finally { await db.pg.close() }
 })
 
+test("a Gnosis failure is attempted once per poll without delaying later independent deliveries", async () => {
+  const db = new SqlDatabase(); await db.setup()
+  try {
+    for (const signature of ["first", "second"]) {
+      await db.rpc("subscribe", { owner_wallet: account.address, signature, link: signature, settings: {
+        triggers: ["cooldown", "missed"], participation: 75, missed: 3,
+        channel: { kind: "push", endpoint: `https://fcm.googleapis.com/${signature}`, keys: {} },
+      } })
+    }
+    let attempts = 0, sent = 0
+    const io = { ...adapters,
+      telegramUpdates: async () => {},
+      advanceChronology: async () => { attempts++; throw new Error("Gnosis unavailable") },
+      walletConditions: async () => ({ failed: 0, validators: [], events: [{ trigger: "cooldown" as const, key: "cooldown:1", body: "ready" }] }),
+      sendEvent: async () => { sent++; return "accepted" as const },
+    }
+    await poll(env, db, io)
+    assert.equal(attempts, 1)
+    assert.equal(sent, 2)
+    const [run] = await db.request<{ ok: boolean; accepted: number; failed: number }[]>("alerts_runs")
+    assert.equal(run!.ok, false)
+    assert.equal(run!.accepted, 2)
+    assert.equal(run!.failed, 2)
+    await poll(env, db, io)
+    assert.equal(attempts, 2) // A new poll retries; the failure is not cached across invocations.
+  } finally { await db.pg.close() }
+})
+
 test("a stale delivery attempt cannot overwrite a reclaimed lease", async () => {
   const db = new SqlDatabase(); await db.setup()
   try {

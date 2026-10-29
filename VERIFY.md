@@ -7,8 +7,8 @@ CID you build matches the CID being served, the interface you load is the source
 ## What you need
 
 - Git.
-- Node **22.14.0**, the version in `.nvmrc` and the one the release workflow uses. Node
-  22.22.0 gave the same CID when this file was written, but use 22.14.0 to compare.
+- Node **22.23.4**, pinned in `.nvmrc` and used by the release workflow. For an older release,
+  use the `.nvmrc` from that release's tag or commit. The current minimum is Node 22.18.0.
 - pnpm **10.28.2**, the version in the `packageManager` field of `package.json`.
   `corepack enable` selects it for you.
 
@@ -65,7 +65,7 @@ public values; a value there ships to every visitor.
 ## If your CID differs
 
 1. `git status` must be clean, and `git rev-parse HEAD` must be the released commit.
-2. `node --version` must print `v22.14.0`, and `pnpm --version` must print `10.28.2`.
+2. `node --version` must match the checked-out `.nvmrc` (`v22.23.4` currently), and `pnpm --version` must print `10.28.2`.
    The release build forces `NODE_ENV=production`. If you changed the script, check that
    your shell's `NODE_ENV` does not reach Vite: `NODE_ENV=development` gives another CID.
 3. `pnpm install` must have run with `--frozen-lockfile`, so the lockfile did not change.

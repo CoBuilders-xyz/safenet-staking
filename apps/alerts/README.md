@@ -107,6 +107,9 @@ No participation or streak alert is sent until it reaches the current finalized 
 checkpoint hash must match; a finalized history mismatch fails closed for operator investigation.
 No Gnosis schema change is needed. Existing Aegis frontend/subgraph semantics remain unchanged.
 Unresolved rounds are retained; excessive unresolved history fails visibly rather than being skipped.
+The 10,000-ceremony capacity includes unattested sessions. Reaching it stops chronology advancement;
+deployment acceptance must measure headroom. Automatic age pruning needs a verified attestation-delay
+bound or archival recovery first, because dropping old winning shares can manufacture missed rounds.
 
 Delivery events have unique subscription/condition keys and a two-minute claim lease. Failures retry
 on later polls. Provider acceptance stops automatic resends. A crash between sending and storing

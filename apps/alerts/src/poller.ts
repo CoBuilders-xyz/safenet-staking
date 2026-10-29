@@ -17,6 +17,7 @@ export async function poll(env: Env, db = new Database(env), io = adapters) {
     // Keep the run unhealthy so the failed linking/receipt poll remains visible.
     try { await io.telegramUpdates(db, env) } catch { failed++ }
     let chronology: Awaited<ReturnType<typeof advanceChronology>> | undefined
+    let chronologyFailed = false
     const savedCursor = await db.request<{ value: string }[]>("alerts_state?key=eq.subscription_cursor")
     let cursor = savedCursor[0]?.value ?? ""
     for (;;) {
@@ -35,10 +36,13 @@ export async function poll(env: Env, db = new Database(env), io = adapters) {
             if (outcome === "failed" || outcome === "expired") failed++
           }
           if (sub.triggers.includes("participation") || sub.triggers.includes("missed")) {
+            if (chronologyFailed) throw new Error("Aegis chronology unavailable")
             if (!chronology) {
-              const rows = await db.request<{ value: Chronology }[]>("alerts_state?key=eq.aegis")
-              chronology = await io.advanceChronology(env, rows[0]?.value ?? initialChronology())
-              await db.rpc("save_state", { state_key: "aegis", state_value: chronology.state })
+              try {
+                const rows = await db.request<{ value: Chronology }[]>("alerts_state?key=eq.aegis")
+                chronology = await io.advanceChronology(env, rows[0]?.value ?? initialChronology())
+                await db.rpc("save_state", { state_key: "aegis", state_value: chronology.state })
+              } catch (error) { chronologyFailed = true; throw error }
             }
             if (!chronology.current) failed++
             else for (const validator of validators) {

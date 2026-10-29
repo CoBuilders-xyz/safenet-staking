@@ -59,3 +59,13 @@ test("late shares and repeated attestations cannot rewrite counted rounds", () =
   assert.equal(next.rounds.length, 1)
   assert.equal(next.members[signer]!.misses, 1)
 })
+
+test("a delayed attestation still uses retained winning shares instead of inventing a miss", () => {
+  const initial = foldChronology(initialChronology(), [event(0, 0, { participant: signer, staker }),
+    ...round(1, "delayed", signer).filter(e => e.kind !== "attested")], first + 1n, "x", now)
+  // No verified maximum attestation delay exists in the indexed interface. Age alone cannot
+  // justify deleting these shares: a later attestation must still count their attendance.
+  const next = foldChronology(initial, [event(100_000, 0, { kind: "attested", sid: "delayed", time: now })], first + 100_000n, "y", now)
+  assert.equal(next.members[signer]!.misses, 0)
+  assert.deepEqual(next.rounds[0]!.present, [signer])
+})

@@ -6,6 +6,7 @@ import { PageHero } from "@/components/PageHero"
 import { Button } from "@/components/ui/button"
 import { ConnectButton } from "@/components/wallet/ConnectButton"
 import { alertRequest, alertsApi, browserChannel, useAlerts, type AlertTrigger } from "@/hooks/useAlerts"
+import { currentLanguage } from "@/i18n"
 
 export function AlertsPage() {
   const { t } = useTranslation()
@@ -43,7 +44,8 @@ function ConnectedAlerts({ address }: { address: Address }) {
     void run(async () => {
       const delivery = channel === "telegram" ? { kind: "telegram" } : await browserChannel(alerts.config.data?.vapidPublicKey ?? "")
       const result = await alertRequest<{ telegramUrl: string | null }>("/subscriptions", alerts.token,
-        { triggers: selected, participation, missed, channel: delivery })
+        { triggers: selected, participation: selected.includes("participation") ? participation : 75,
+          missed: selected.includes("missed") ? missed : 3, channel: delivery })
       setTelegramUrl(result.telegramUrl)
       await alerts.refresh()
     })
@@ -59,7 +61,7 @@ function ConnectedAlerts({ address }: { address: Address }) {
       {!!alerts.subscriptions.data?.length && <section aria-label={t("alerts.subscriptions", "Your subscriptions")} className="space-y-4">
         {alerts.subscriptions.data.map(sub => <article key={sub.id} className="rounded-lg border p-4 space-y-3">
           <p className="font-medium">{sub.channel === "telegram" ? t("alerts.telegram", "Telegram") : t("alerts.browser", "Browser notifications")}</p>
-          <ul className="list-disc pl-5">{sub.triggers.map(trigger => <li key={trigger}>{labels[trigger]}{trigger === "participation" ? ` (${sub.participation}%)` : trigger === "missed" ? ` (${sub.missed})` : ""}</li>)}</ul>
+          <ul className="list-disc pl-5">{sub.triggers.map(trigger => <li key={trigger}>{labels[trigger]}{trigger === "participation" ? ` (${new Intl.NumberFormat(currentLanguage(), { style: "percent", maximumFractionDigits: 1 }).format(sub.participation / 100)})` : trigger === "missed" ? ` (${sub.missed.toLocaleString(currentLanguage())})` : ""}</li>)}</ul>
           <p role="status">{sub.status === "verified" ? t("alerts.verified", "Delivery confirmed") : sub.status === "expired" ? t("alerts.expired", "Delivery expired. Delete and subscribe again.") : t("alerts.unverified", "Subscribed — delivery unverified. Confirmation appears after a notification reaches this browser or you confirm receipt in Telegram.")}</p>
           {!sub.linked && <p>{t("alerts.unlinked", "Open the Telegram link and press Start within ten minutes. If the link is lost, delete and subscribe again.")}</p>}
           <Button variant="outline" disabled={busy} onClick={() => void run(() => alerts.remove(sub.id))}>{t("alerts.delete", "Delete subscription")}</Button>
@@ -73,8 +75,8 @@ function ConnectedAlerts({ address }: { address: Address }) {
             <input type="checkbox" checked={selected.includes(trigger)} onChange={e => setSelected(e.target.checked ? [...selected, trigger] : selected.filter(t => t !== trigger))} />
             {labels[trigger]}
           </label>)}
-          {selected.includes("participation") && <label className="block space-y-2">{t("alerts.threshold", "Participation threshold (%)")}<input className="block w-full rounded border p-3 bg-background" type="number" min="0" max="100" step="0.1" value={participation} required onChange={e => setParticipation(e.target.valueAsNumber)} /></label>}
-          {selected.includes("missed") && <label className="block space-y-2">{t("alerts.rounds", "Consecutive rounds (1–1000)")}<input className="block w-full rounded border p-3 bg-background" type="number" min="1" max="1000" value={missed} required onChange={e => setMissed(e.target.valueAsNumber)} /></label>}
+          {selected.includes("participation") && <label className="block space-y-2">{t("alerts.threshold", "Participation threshold (%)")}<input className="block w-full rounded border p-3 bg-background" type="number" min="0" max="100" step="0.1" value={Number.isNaN(participation) ? "" : participation} required onChange={e => setParticipation(e.target.valueAsNumber)} /></label>}
+          {selected.includes("missed") && <label className="block space-y-2">{t("alerts.rounds", "Consecutive rounds (1–1000)")}<input className="block w-full rounded border p-3 bg-background" type="number" min="1" max="1000" value={Number.isNaN(missed) ? "" : missed} required onChange={e => setMissed(e.target.valueAsNumber)} /></label>}
         </fieldset>
         <label className="block space-y-2">{t("alerts.channel", "Delivery channel")}
           <select className="block w-full rounded border p-3 bg-background" value={channel} disabled={busy} onChange={e => setChannel(e.target.value)}>

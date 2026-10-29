@@ -58,6 +58,25 @@ test("signs, selects all five triggers, links Telegram, shows unverified deliver
   await expect(page.getByText("You have no alert subscriptions.")).toBeVisible()
 })
 
+test("cleared thresholds do not invalidate a subscription after their triggers are removed", async ({ connectedPage: page }) => {
+  const subscriptions = await service(page)
+  await page.goto("/#/alerts")
+  await page.getByRole("button", { name: "Sign to manage alerts" }).click()
+  for (const [trigger, input] of [
+    ["Participation below my threshold", "Participation threshold (%)"],
+    ["Consecutive missed signing rounds", "Consecutive rounds (1–1000)"],
+  ]) {
+    await page.getByRole("checkbox", { name: trigger, exact: true }).check()
+    await page.getByRole("spinbutton", { name: input }).fill("")
+    await page.getByRole("checkbox", { name: trigger, exact: true }).uncheck()
+  }
+  await page.getByRole("button", { name: "Subscribe", exact: true }).click()
+  await expect(page.getByText(/Subscribed — delivery unverified/)).toBeVisible()
+  expect(subscriptions[0]!.triggers).toEqual(["cooldown"])
+  expect(subscriptions[0]!.participation).toBe(75)
+  expect(subscriptions[0]!.missed).toBe(3)
+})
+
 test("browser permission failure remains visible and creates no subscription", async ({ connectedPage: page }) => {
   const subscriptions = await service(page)
   await page.goto("/#/alerts")

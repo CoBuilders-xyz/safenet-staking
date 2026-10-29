@@ -62,8 +62,8 @@ export function foldChronology(previous: Chronology, events: RoundEvent[], throu
     state.counted[sid] = through.toString()
     delete state.pending[sid]
   }
-  // Keep unresolved ceremonies: dropping them would invent chronology. Stop visibly if corrupt
-  // upstream data grows without bound, rather than quietly skipping an unknown round.
+  // Without a verified maximum attestation delay, pruning unmatched shares can invent misses.
+  // Bound memory and fail visibly at capacity, including for long-lived unattested ceremonies.
   if (Object.keys(state.pending).length > 10_000) throw new Error("Unresolved ceremony capacity reached")
   for (const [sid, block] of Object.entries(state.counted)) if (BigInt(block) + 1000n < through) delete state.counted[sid]
   state.rounds = state.rounds.filter(r => r.time >= now - 16 * 86400)
