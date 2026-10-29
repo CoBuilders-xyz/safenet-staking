@@ -8,7 +8,7 @@
 import { Command, CommanderError } from "commander"
 import pkg from "../package.json" with { type: "json" }
 import {
-  createContext, errorSentence as librarySentence, redactUrls, rpcEndpoints, rpcHosts, scrubSecrets, ScanError,
+  createContext, errorSentence as librarySentence, redactUrls, rpcEndpoints, rpcHosts, scrubSecrets, ScanError, SafenetError,
   type Context, type ContextOptions, type Progress, type Signer, type WriteMode,
 } from "./lib/index.js"
 import { ARCHIVE_ADVICE, toJson } from "./commands/format.js"
@@ -92,6 +92,9 @@ function commandRuntime(runtime: Runtime): CommandRuntime {
         // writeSchema allows no signer only for a dry run with --from.
         return { dryRun: true, from: request.from! }
       }
+      if (request.signer.kind === "private-key-env") {
+        runtime.io.err("Warning: environment private keys enter this process and can leak through process inspection or diagnostics. Prefer a hardware wallet.\n")
+      }
       const signer = await runtime.loadSigner(request.signer, ctx)
       if (request.from && request.from !== signer.address) {
         throw new UsageError(`--from ${request.from} is not the signer's address ${signer.address}`)
@@ -133,7 +136,12 @@ export function buildProgram(runtime: Runtime): Command {
 
 /** Runs one command line (without `node` and the script) and returns the exit code. */
 export async function run(argv: readonly string[], runtime: Runtime): Promise<number> {
-  const program = buildProgram(runtime)
+  const signers: Signer[] = []
+  const program = buildProgram({ ...runtime, loadSigner: async (request, ctx) => {
+    const signer = await runtime.loadSigner(request, ctx)
+    signers.push(signer)
+    return signer
+  } })
   try {
     await program.parseAsync([...argv], { from: "user" })
     return 0
@@ -154,6 +162,8 @@ export async function run(argv: readonly string[], runtime: Runtime): Promise<nu
       }
     }
     return 1
+  } finally {
+    await Promise.allSettled(signers.map((signer) => signer.close?.()))
   }
 }
 
@@ -165,7 +175,33 @@ export function processRuntime(): Runtime {
     },
     env: process.env,
     createContext,
-    loadSigner: (request, ctx) =>
-      loadSigner(request, ctx, { env: process.env, askPassword: terminalPasswordPrompt() }),
+    async loadSigner(request, ctx) {
+      const prompt = terminalPasswordPrompt()
+      if (request.kind !== "walletconnect") return loadSigner(request, ctx, { env: process.env, askPassword: prompt })
+      if (!prompt) throw new UsageError("WalletConnect needs an interactive terminal; use --dry-run --from for automation")
+      const controller = new AbortController()
+      const cancel = () => controller.abort()
+      process.once("SIGINT", cancel)
+      process.once("SIGTERM", cancel)
+      const off = () => { process.off("SIGINT", cancel); process.off("SIGTERM", cancel) }
+      try {
+        const signer = await loadSigner(request, ctx, {
+          env: process.env, askPassword: prompt,
+          wallet: {
+            signal: controller.signal,
+            async showUri(uri, signal) {
+              const answer = await terminalPasswordPrompt(signal)!("Pairing URI is sensitive. Stop terminal recording. Type connect to display it: ")
+              if (answer !== "connect") throw new SafenetError("Wallet pairing cancelled")
+              process.stderr.write(`Paste this URI into your hardware wallet companion app. Never share it:\n${uri}\n`)
+            },
+            async confirm(review, signal) {
+              process.stderr.write(`Review transaction (amounts and fees in wei):\n${review}\n`)
+              return await terminalPasswordPrompt(signal)!("Compare with your device. Type sign to request its signature: ") === "sign"
+            },
+          },
+        })
+        return { ...signer, async close() { try { await signer.close?.() } finally { off() } } }
+      } catch (err) { off(); throw err }
+    },
   }
 }

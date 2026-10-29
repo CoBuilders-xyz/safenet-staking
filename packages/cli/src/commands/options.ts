@@ -82,19 +82,23 @@ export const writeSchema = z
   .object({
     dryRun: z.boolean().default(false),
     privateKeyEnv: envName("--private-key-env").optional(),
+    walletconnect: z.boolean().default(false),
+    walletAccount: addressSchema.optional(),
     keystore: z.string().min(1).optional(),
     passwordEnv: envName("--password-env").optional(),
     from: addressSchema.optional(),
   })
   .refine((o) => !(o.privateKeyEnv && o.keystore), { error: "--private-key-env and --keystore cannot be used together" })
+  .refine((o) => !o.walletconnect || !(o.privateKeyEnv || o.keystore), { error: "Choose only one signer mode" })
+  .refine((o) => o.walletconnect === Boolean(o.walletAccount), { error: "--walletconnect requires --wallet-account <address>, and vice versa" })
   .refine((o) => !o.passwordEnv || o.keystore, { error: "--password-env only works with --keystore" })
   .refine((o) => !o.from || o.dryRun, {
     error: "--from only works with --dry-run: a transaction is sent from the signer's address",
   })
-  .refine((o) => o.dryRun || o.privateKeyEnv || o.keystore, {
-    error: "Sending a transaction needs a signer: pass --private-key-env <NAME> or --keystore <path>, or use --dry-run",
+  .refine((o) => o.dryRun || o.privateKeyEnv || o.keystore || o.walletconnect, {
+    error: "Sending a transaction needs a signer: pass --private-key-env <NAME> or --keystore <path> or --walletconnect --wallet-account <address>, or use --dry-run",
   })
-  .refine((o) => !o.dryRun || o.from || o.privateKeyEnv || o.keystore, {
+  .refine((o) => !o.dryRun || o.from || o.privateKeyEnv || o.keystore || o.walletconnect, {
     error: "A dry run needs an address to simulate from: pass --from <address>, or a signer option",
   })
   .transform((o) => ({
@@ -104,7 +108,9 @@ export const writeSchema = z
       ? ({ kind: "private-key-env", name: o.privateKeyEnv } as const)
       : o.keystore
         ? ({ kind: "keystore", path: o.keystore, passwordEnv: o.passwordEnv ?? null } as const)
-        : null,
+        : o.walletconnect
+          ? ({ kind: "walletconnect", address: o.walletAccount! } as const)
+          : null,
   }))
 export type WriteRequest = z.output<typeof writeSchema>
 

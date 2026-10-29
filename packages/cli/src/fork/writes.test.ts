@@ -169,7 +169,7 @@ test("withdrawals claim refuses inside the delay, where the contract reverts wit
   const before = await state()
   const r = await safenet(["withdrawals", "claim", "--all"])
   assert.equal(r.code, 1)
-  assert.match(r.err, /^error: None of .*'s 1 pending withdrawal is claimable yet; the oldest, id \d+, is claimable at .* UTC\.\n$/)
+  assert.match(r.err.replace(/^Warning:.*\n/, ""), /^error: None of .*'s 1 pending withdrawal is claimable yet; the oldest, id \d+, is claimable at .* UTC\.\n$/)
   // The revert the CLI's refusal stands in for, decoded from core's ABI: core's proof of it.
   await assert.rejects(
     c.chain.simulateContract({ account: user.address, address: STAKING, abi: stakingAbi, functionName: "claimWithdrawal" }),
@@ -194,7 +194,7 @@ test("after the delay, claim --all pays what is past it and names what is not", 
 test("withdrawals claim <id> waits for that id's delay, then pays it", { skip, timeout: TIMEOUT }, async () => {
   const early = await safenet(["withdrawals", "claim", String(secondId)])
   assert.equal(early.code, 1)
-  assert.match(early.err, new RegExp(`^error: Withdrawal ${secondId} is not claimable yet: it is in its delay until `))
+  assert.match(early.err.replace(/^Warning:.*\n/, ""), new RegExp(`^error: Withdrawal ${secondId} is not claimable yet: it is in its delay until `))
   await warp(c, (await withdrawDelay(c)) + 1n)
   const safeBefore = await safeBalance(c, user.address)
   const r = ok(await safenet(["withdrawals", "claim", String(secondId)]), "withdrawals claim <id>")
@@ -251,7 +251,7 @@ test("claim-and-stake --amount stakes that much when it is lower, and the rest s
       impersonatedSigner(c, claimer.account),
     )
     assert.equal(over.code, 1)
-    assert.match(over.err, /^error: The amount to stake, .* SAFE, is more than the .* SAFE .* can claim, so nothing was claimed or staked\.\n$/)
+    assert.match(over.err.replace(/^Warning:.*\n/, ""), /^error: The amount to stake, .* SAFE, is more than the .* SAFE .* can claim, so nothing was claimed or staked\.\n$/)
     assert.equal(await claimed(c, claimer.account), claimedBefore)
     const [stakeBefore, safeBefore] = [await stakeOf(c, claimer.account, validator), await safeBalance(c, claimer.account)]
     const r = ok(

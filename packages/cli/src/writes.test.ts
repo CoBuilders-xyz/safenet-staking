@@ -163,7 +163,7 @@ test("claim-and-stake refuses --amount above the claimable amount before anythin
     { env: KEY_ENV, proofAccount: testAccount.address },
   )
   assert.equal(live.code, 1)
-  assert.match(live.err, expected)
+  assert.match(live.err.replace(/^Warning:.*\n/, ""), expected)
   assert.deepEqual(live.sends, { prepared: 0, broadcast: 0 })
 })
 
@@ -225,7 +225,7 @@ test("without --dry-run and without a signer option, a write exits 2 with one se
     assert.equal(r.code, 2, argv.join(" "))
     assert.equal(
       r.err,
-      "error: Sending a transaction needs a signer: pass --private-key-env <NAME> or --keystore <path>, or use --dry-run\n",
+      "error: Sending a transaction needs a signer: pass --private-key-env <NAME> or --keystore <path> or --walletconnect --wallet-account <address>, or use --dry-run\n",
     )
     assert.deepEqual(r.sends, { prepared: 0, broadcast: 0 })
   }
@@ -264,7 +264,7 @@ test("a live write signs with the key from the environment, reports each hash, a
   assert.deepEqual(r.sends, { prepared: 2, broadcast: 2 })
   assert.match(r.out, new RegExp(`from ${testAccount.address}`))
   assert.match(r.out, new RegExp(`sent +${TX_HASH}, block 26,000,001, status success`))
-  assert.match(r.err, new RegExp(`^sent SAFE token.approve: ${TX_HASH}, waiting for its receipt\n`))
+  assert.match(r.err, new RegExp(`sent SAFE token.approve: ${TX_HASH}, waiting for its receipt\n`))
   assert.match(r.err, /confirmed Staking.stake: .* status success/)
   for (const text of [r.out, r.err]) assert.ok(!text.includes(TEST_KEY.slice(2)))
 })
@@ -332,7 +332,7 @@ test("a secret in a misplaced --flag=value, or typed as an argument, is not echo
 test("a broadcast that fails names the hash of the signed transaction, which may still land", async () => {
   const r = await cli(["unstake", VALIDATOR_A, "0.5", "--private-key-env", "SAFENET_TEST_KEY"], { env: KEY_ENV, broadcastError: true })
   assert.equal(r.code, 1)
-  assert.match(r.err, /^error: The transaction 0x[0-9a-f]{64} was signed, but broadcasting it failed \(HTTP request failed\.\); it may still reach the network, so look the hash up before sending again\.\n$/)
+  assert.match(r.err.replace(/^Warning:.*\n/, ""), /^error: The transaction 0x[0-9a-f]{64} was signed, but broadcasting it failed \(HTTP request failed\.\); it may still reach the network, so look the hash up before sending again\.\n$/)
   assert.ok(!r.err.includes("not-a-real-key"))
 })
 

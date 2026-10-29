@@ -22,6 +22,8 @@ export interface Signer {
   readonly address: Address
   /** Signs and broadcasts one transaction, and returns its hash. */
   send(tx: TransactionToSend): Promise<Hash>
+  /** Release an interactive wallet session after the command, including failed or dry runs. */
+  close?(): Promise<void>
 }
 
 /**

@@ -11,7 +11,7 @@ type Command = ReturnType<typeof buildProgram>
 // side only, fails here.
 
 /** Options that configure the signer. The server takes them at start, never in a tool call. */
-const SIGNER_OPTIONS = ["privateKeyEnv", "keystore", "passwordEnv"]
+const SIGNER_OPTIONS = ["privateKeyEnv", "keystore", "passwordEnv", "walletconnect", "walletAccount"]
 
 const unused = () => {
   throw new Error("the parity test only reads the command definitions")
