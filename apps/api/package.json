@@ -1,0 +1,34 @@
+{
+  "name": "@cobuilders/safenet-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "cf dev",
+    "build": "cf workers types && tsc --noEmit && cf build",
+    "check": "cf workers types && pnpm lint && tsc --noEmit",
+    "lint": "eslint .",
+    "test": "node ../../tools/run-node-tests.mjs test",
+    "load": "node --import tsx scripts/load.ts",
+    "smoke": "node --import tsx scripts/smoke.ts",
+    "test:reference": "node --import tsx scripts/reference.ts",
+    "bootstrap": "cf workers types"
+  },
+  "dependencies": {
+    "@cobuilders/safenet-core": "workspace:*",
+    "hono": "4.13.14",
+    "viem": "2.46.2"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "2.0.0-beta.v.8",
+    "@playwright/test": "1.58.2",
+    "@types/node": "22.19.2",
+    "cf": "1.0.0-beta.25",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "7.3.1"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}
