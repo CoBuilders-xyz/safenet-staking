@@ -1,0 +1,33 @@
+{
+  "name": "@cobuilders/safenet-alerts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bootstrap": "tsc --noEmit",
+    "dev": "cf dev",
+    "build": "cf build",
+    "check": "eslint . && tsc --noEmit",
+    "lint": "eslint .",
+    "test": "node ../../tools/run-node-tests.mjs src && pnpm test:runtime",
+    "test:runtime": "pnpm build && node --import tsx scripts/runtime.ts",
+    "report:uptime": "node --env-file-if-exists=../../.env.local --import tsx scripts/uptime.ts"
+  },
+  "dependencies": {
+    "@cobuilders/safenet-core": "workspace:*",
+    "viem": "2.46.2",
+    "web-push": "3.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "2.0.0-beta.v.8",
+    "@cloudflare/workers-types": "5.20261029.1",
+    "@electric-sql/pglite": "0.3.14",
+    "@types/node": "24.10.13",
+    "@types/web-push": "3.6.4",
+    "cf": "1.0.0-beta.25",
+    "miniflare": "5.20261023.3-beta",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "7.3.7"
+  }
+}

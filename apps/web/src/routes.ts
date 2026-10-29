@@ -15,6 +15,7 @@ export const pageImports = {
     .then(m => ({ default: m.WithdrawalsPage })),
   Rewards: () => import("@/pages/RewardsPage")
     .then(m => ({ default: m.RewardsPage })),
+  Alerts: () => import("@/pages/AlertsPage").then(m => ({ default: m.AlertsPage })),
   NotFound: () => import("@/pages/NotFoundPage")
     .then(m => ({ default: m.NotFoundPage })),
 }
@@ -28,5 +29,6 @@ export function routeImportFor(hash: string): () => Promise<unknown> {
   if (/^\/validators\/[^/]+$/.test(path)) return pageImports.ValidatorDetail
   if (path === "/withdrawals") return pageImports.Withdrawals
   if (path === "/rewards") return pageImports.Rewards
+  if (path === "/alerts") return pageImports.Alerts
   return pageImports.NotFound
 }
