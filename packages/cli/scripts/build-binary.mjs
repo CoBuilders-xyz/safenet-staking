@@ -4,6 +4,7 @@
 // blob injected into a copy of the Node binary running this script.
 //
 //   node scripts/build-binary.mjs                     writes binaries/safenet-<os>-<arch>[.exe]
+//   node scripts/build-binary.mjs --verify-reproducible builds twice and compares final SHA256
 //   node scripts/build-binary.mjs --bundle-only <dir>  writes only the bundle, <dir>/safenet.cjs,
 //                                                      which the unit test runs with plain node
 //
@@ -15,6 +16,9 @@ import { execFileSync } from "node:child_process"
 import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { isBuiltin } from "node:module"
+import { createHash } from "node:crypto"
+import { fileURLToPath } from "node:url"
 import { inject } from "postject"
 import { build } from "tsup"
 
@@ -39,7 +43,41 @@ async function bundle(dir) {
     clean: false,
     silent: true,
     config: false,
+    tsconfig: join(PACKAGE, "tsconfig.json"),
+    metafile: true,
+    esbuildPlugins: [{
+      name: "ws-javascript-fallback",
+      setup(builder) {
+        // ws 7 predates WS_NO_* flags. Its guarded require catches this module's error and
+        // selects the built-in JavaScript fallback. ws 8 follows the same contract.
+        builder.onResolve({ filter: /^(bufferutil|utf-8-validate)$/ }, ({ path }) => ({
+          path, namespace: "optional-ws-native",
+        }))
+        builder.onLoad({ filter: /.*/, namespace: "optional-ws-native" }, () => ({
+          contents: 'throw new Error("Use the bundled WebSocket JavaScript implementation")',
+          loader: "js",
+        }))
+      },
+    }],
+    esbuildOptions(options) {
+      options.absWorkingDir = PACKAGE
+      // ws has complete JavaScript implementations. Never load optional native addons from
+      // outside a standalone executable, even when the build host has them installed.
+      options.define = {
+        "process.env.WS_NO_BUFFER_UTIL": '"1"',
+        "process.env.WS_NO_UTF_8_VALIDATE": '"1"',
+      }
+      options.minifySyntax = true
+    },
   })
+  const metadata = JSON.parse(readFileSync(join(dir, "metafile-cjs.json"), "utf8"))
+  for (const output of Object.values(metadata.outputs)) {
+    for (const dependency of output.imports) {
+      if (dependency.external && !isBuiltin(dependency.path)) {
+        throw new Error(`standalone bundle leaves an external dependency: ${dependency.path}`)
+      }
+    }
+  }
   return join(dir, "safenet.cjs")
 }
 
@@ -55,6 +93,10 @@ if (only >= 0) {
 }
 
 const os = { linux: "linux", darwin: "macos", win32: "windows" }[process.platform]
+const pinnedNode = readFileSync(join(PACKAGE, "../../.nvmrc"), "utf8").trim()
+if (process.versions.node !== pinnedNode) {
+  throw new Error(`build:binary requires Node ${pinnedNode} from .nvmrc; running ${process.versions.node}`)
+}
 if (!os) {
   console.error(`build-binary: no binary for ${process.platform}`)
   process.exit(1)
@@ -65,17 +107,18 @@ const out = join(outDir, name)
 const work = mkdtempSync(join(tmpdir(), "safenet-binary-"))
 
 try {
-  const script = await bundle(work)
+  await bundle(work)
   const blob = join(work, "safenet.blob")
   const seaConfig = join(work, "sea-config.json")
   writeFileSync(seaConfig, JSON.stringify({
-    main: script,
-    output: blob,
+    // Node stores the main script name in the blob. Keep temporary checkout paths out of it.
+    main: "safenet.cjs",
+    output: "safenet.blob",
     disableExperimentalSEAWarning: true,
     useCodeCache: false,
     useSnapshot: false,
   }))
-  execFileSync(process.execPath, ["--experimental-sea-config", seaConfig], { stdio: "inherit" })
+  execFileSync(process.execPath, ["--experimental-sea-config", seaConfig], { cwd: work, stdio: "inherit" })
 
   mkdirSync(outDir, { recursive: true })
   rmSync(out, { force: true })
@@ -90,6 +133,16 @@ try {
 
   const reported = execFileSync(out, ["--version"], { encoding: "utf8" }).trim()
   if (reported !== version) throw new Error(`the binary reports version ${reported}, the package ${version}`)
+  const digest = () => createHash("sha256").update(readFileSync(out)).digest("hex")
+  const checksum = digest()
+  if (process.argv.includes("--verify-reproducible")) {
+    // The second invocation uses a fresh temporary directory, the same pinned Node, and no
+    // snapshots or code cache. Hash the final signed/injected executable, not just the bundle.
+    execFileSync(process.execPath, [fileURLToPath(import.meta.url)], { cwd: PACKAGE, stdio: "inherit" })
+    if (digest() !== checksum) throw new Error("two clean binary builds produced different SHA256 checksums")
+    console.log(`build-binary: repeated build matches ${checksum}`)
+  }
+  writeFileSync(join(outDir, `${name}.sha256`), `${checksum}  ${name}\n`)
   console.log(`build-binary: ${out}, safenet ${version}, Node ${process.version}`)
 } finally {
   rmSync(work, { recursive: true, force: true })

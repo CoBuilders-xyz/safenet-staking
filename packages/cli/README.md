@@ -51,11 +51,28 @@ The binary carries its own Node.js. The macOS one is signed ad hoc, not by a dev
 certificate, and the Windows one is unsigned, so each system may ask before it runs one
 downloaded from the web.
 
-To build the binary for your own system from this repository:
+To build the binary for your own system, use the Node version in `.nvmrc` and the locked dependencies:
 
 ```sh
-pnpm --filter @cobuilders/safenet-cli build:binary
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm --filter @cobuilders/safenet-cli build:binary --verify-reproducible
 ```
+
+This builds twice in separate temporary directories and compares the final executable's SHA256.
+It writes the executable and its `.sha256` file under `packages/cli/binaries/`.
+Reproduction requires the same source, lockfile, official Node binary, operating system and architecture.
+Cross-platform binaries have different checksums. WalletConnect uses bundled JavaScript WebSocket
+implementations; no optional native addon or external `node_modules` directory is required.
+
+The workflow checks each executable in an isolated directory with only that directory on `PATH`.
+It runs a read and an unstake dry run against a loopback fixture, rejects headless WalletConnect,
+and checks Mainnet `status --json`. The checksum job requires all three platforms and verifies
+their individual checksums before creating `SHA256SUMS`.
+These checks do not prove pairing or signing with a physical wallet.
+Before publication, rerun the binary workflow against the final CLI tree, including later CLI integrations.
+
+On macOS, compare `shasum -a 256 safenet-macos-arm64` with its entry in `SHA256SUMS`.
+On Windows, compare `(Get-FileHash .\safenet-windows-x64.exe -Algorithm SHA256).Hash` with its entry.
 
 ## Commands
 

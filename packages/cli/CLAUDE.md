@@ -153,7 +153,16 @@ one; `src/lib/sef.test.ts` fails to type-check when it differs from core's.
 with `scripts/build-binary.mjs`: Node's single executable applications. The CLI and every
 dependency are bundled into one CommonJS script from `src/sea.ts`, which waits on `run()` because
 a CommonJS script has no top-level await, and the script's blob is injected with `postject` into a
-copy of the Node running the build. On macOS the copy is signed ad hoc. `src/sea.test.ts` runs that
-bundle with plain node from an empty directory. `.github/workflows/cli-binaries.yml` builds the
+copy of the Node running the build, which must match `.nvmrc`. On macOS the copy is signed ad hoc.
+The bundle includes WalletConnect's dynamic imports, uses the JavaScript fallback for optional
+WebSocket native addons, and fails the build if a non-Node import remains external.
+`--verify-reproducible` compares two clean builds of the final executable. Relative SEA script
+names keep temporary paths out of the blob. The entry flushes output before exiting, as `index.ts` does.
+`src/sea.test.ts` runs that bundle with plain node from an empty directory.
+`scripts/smoke-binary.ts` checks a read and a dry-run simulation using the existing fake chain over
+an isolated loopback RPC port, with no signing or broadcast. CI runs it against every native binary.
+`.github/workflows/cli-binaries.yml` builds the
 binary for Linux x64, macOS arm64 and Windows x64, runs each alone against Mainnet, writes
-`SHA256SUMS`, and attaches them to the GitHub Release of a `cli-v<version>` tag.
+`SHA256SUMS`, verifies all three individual build sums, and attaches them to the GitHub Release
+of a `cli-v<version>` tag. CLI, core, lockfile and runtime changes trigger the platform checks.
+Physical wallet acceptance and a rerun against the final integrated CLI remain release requirements.
