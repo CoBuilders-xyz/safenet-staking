@@ -25,7 +25,8 @@ export async function poll(env: Env, db = new Database(env), io = adapters) {
         if (sub.channel.kind === "telegram" && !sub.telegram_chat) continue
         evaluated++
         try {
-          const { events, validators } = await io.walletConditions(env, sub)
+          const { events, validators, failed: sourceFailures } = await io.walletConditions(env, sub)
+          failed += sourceFailures
           // Deliver independent chain conditions before attempting Gnosis indexing.
           const pending: Condition[] = []
           for (const event of events) {

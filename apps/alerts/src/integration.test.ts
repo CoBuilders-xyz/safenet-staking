@@ -94,7 +94,7 @@ test("all five conditions reach delivery adapters; repeated Cron runs deduplicat
     const io = { ...adapters,
       telegramUpdates: async () => {},
       advanceChronology: async () => ({ state, current: true, time }),
-      walletConditions: async () => ({ validators: [staker], events: [
+      walletConditions: async () => ({ failed: 0, validators: [staker], events: [
         { trigger: "cooldown" as const, key: "cooldown:1", body: "ready" },
         { trigger: "rewards" as const, key: "rewards:root", body: "claimable" },
         { trigger: "deregistered" as const, key: "deregistered:1", body: "deregistered" },
@@ -171,10 +171,31 @@ test("Telegram polling failure does not block browser delivery and keeps run hea
     let sent = 0
     await poll(env, db, { ...adapters,
       telegramUpdates: async () => { throw new Error("Telegram unavailable") },
-      walletConditions: async () => ({ validators: [], events: [{ trigger: "cooldown", key: "cooldown:1", body: "ready" }] }),
+      walletConditions: async () => ({ failed: 0, validators: [], events: [{ trigger: "cooldown", key: "cooldown:1", body: "ready" }] }),
       sendEvent: async () => { sent++; return "accepted" },
     })
     assert.equal(sent, 1)
+    const [run] = await db.request<{ ok: boolean; accepted: number; failed: number }[]>("alerts_runs")
+    assert.equal(run!.ok, false)
+    assert.equal(run!.accepted, 1)
+    assert.equal(run!.failed, 1)
+  } finally { await db.pg.close() }
+})
+
+test("partial source failure delivers successful conditions while keeping the run unhealthy", async () => {
+  const db = new SqlDatabase(); await db.setup()
+  try {
+    await db.rpc("subscribe", { owner_wallet: account.address, signature: "sig", link: "link", settings: {
+      triggers: ["cooldown", "rewards"], participation: 75, missed: 3,
+      channel: { kind: "push", endpoint: "https://fcm.googleapis.com/test", keys: {} },
+    } })
+    const delivered: string[] = []
+    await poll(env, db, { ...adapters,
+      telegramUpdates: async () => {},
+      walletConditions: async () => ({ failed: 1, validators: [], events: [{ trigger: "cooldown", key: "cooldown:1", body: "ready" }] }),
+      sendEvent: async (_db, _env, _sub, key) => { delivered.push(key); return "accepted" },
+    })
+    assert.deepEqual(delivered, ["cooldown:1"])
     const [run] = await db.request<{ ok: boolean; accepted: number; failed: number }[]>("alerts_runs")
     assert.equal(run!.ok, false)
     assert.equal(run!.accepted, 1)

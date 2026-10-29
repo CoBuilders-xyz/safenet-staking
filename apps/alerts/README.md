@@ -84,12 +84,15 @@ The service worker caches only the API location, under its own deployment scope.
 Every five minutes, a single leased poller evaluates subscriptions. It reads finalized chain blocks,
 checks their freshness and verifies chain IDs. Mainnet delegation discovery pages the subgraph at
 one finalized block and verifies each positive stake and validator registration on chain.
+Mainnet finalized blocks may trail by 13–19 minutes normally; a 30-minute age limit rejects stalled
+finality. Subgraph freshness remains bounded separately. Withdrawal, reward and delegation source
+failures mark the run unhealthy but do not discard verified conditions from independent sources.
 
 * **Cooldown:** walk contract withdrawal IDs; alert for each positive amount past `claimableAt`.
 * **Rewards:** resolve core's canonical dataset; verify the Merkle proof, current on-chain root and
   cumulative claimed amount. Missing, stale-root or invalid proofs cannot produce an alert.
-* **Deregistered:** notify a delegator whose validator is no longer registered. The subgraph's update
-  block distinguishes registration episodes.
+* **Deregistered:** notify a delegator whose validator is no longer registered. The subgraph's
+  `registeredAtBlock` distinguishes registration episodes without resending after stake activity.
 * **Participation:** count attendance over up to 14 complete Aegis UTC days, ending at the latest
   complete day with an attested ceremony. Use core's complete-day boundary. Known members with no
   attendance count as zero. Notify below the user's percentage, at most once per complete-day check.

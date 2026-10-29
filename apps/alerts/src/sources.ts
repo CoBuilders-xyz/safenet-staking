@@ -41,86 +41,97 @@ export async function advanceChronology(env: Env, previous: Chronology) {
 }
 export interface Condition { trigger: Trigger; key: string; body: string }
 
-export async function walletConditions(env: Env, sub: Subscription): Promise<{ events: Condition[]; validators: Address[] }> {
+// Mainnet finality normally trails by 2–3 epochs (about 13–19 minutes).
+// Allow that lag plus margin; the subgraph's 15-minute bound is not a finality bound.
+const MAINNET_FINALIZED_MAX_AGE_SECONDS = 30 * 60
+
+export async function walletConditions(env: Env, sub: Subscription): Promise<{ events: Condition[]; validators: Address[]; failed: number }> {
   const wallet = getAddress(sub.wallet)
   const client = mainnetClient(env)
   if (await client.getChainId() !== CHAINS.mainnet.id) throw new Error("Mainnet chain mismatch")
   const block = await client.getBlock({ blockTag: "finalized" })
-  if (Date.now() / 1000 - Number(block.timestamp) > SUBGRAPH_STALE_AFTER_SECONDS) throw new Error("Mainnet head stale")
+  if (Date.now() / 1000 - Number(block.timestamp) > MAINNET_FINALIZED_MAX_AGE_SECONDS) throw new Error("Mainnet head stale")
   const events: Condition[] = []
+  let failed = 0
   if (sub.triggers.includes("cooldown")) {
-    // Follow contract queue IDs so two equal withdrawals cannot share a deduplication key.
-    const [head] = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "withdrawalQueues", args: [wallet], blockNumber: block.number })
-    let id = head
-    let count = 0
-    while (id !== 0n) {
-      if (++count > 1000) throw new Error("Withdrawal queue exceeds poll budget")
-      const [amount, claimableAt, , next] = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "withdrawalNodes", args: [wallet, id], blockNumber: block.number })
-      if (amount > 0n && claimableAt <= block.timestamp) events.push({ trigger: "cooldown", key: `cooldown:${id}`, body: "A withdrawal cooldown has ended. Open Safenet to review and claim." })
-      id = next
-    }
+    try {
+      // Follow contract queue IDs so two equal withdrawals cannot share a deduplication key.
+      const [head] = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "withdrawalQueues", args: [wallet], blockNumber: block.number })
+      let id = head
+      let count = 0
+      while (id !== 0n) {
+        if (++count > 1000) throw new Error("Withdrawal queue exceeds poll budget")
+        const [amount, claimableAt, , next] = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "withdrawalNodes", args: [wallet, id], blockNumber: block.number })
+        if (amount > 0n && claimableAt <= block.timestamp) events.push({ trigger: "cooldown", key: `cooldown:${id}`, body: "A withdrawal cooldown has ended. Open Safenet to review and claim." })
+        id = next
+      }
+    } catch { failed++ }
   }
   if (sub.triggers.includes("rewards")) {
-    const bases = env.REWARDS_BASE_URL ? [{ kind: "override" as const, url: env.REWARDS_BASE_URL.replace(/\/$/, "") }] : (await resolveRewardsSource(client)).bases
-    const { value: proof } = await readRewardsFile<{ cumulativeAmount: string; merkleRoot: Hex; proof: Hex[] | null }>({
-      bases, path: rewardProofPath(wallet), attempt: async (url, signal) => {
-        const response = await fetch(url, { signal })
-        if (response.status === 404) return null
-        if (!response.ok) throw new Error("Reward proof unavailable")
-        return response.json()
-      },
-    })
-    if (proof) {
-      if (!/^\d+$/.test(proof.cumulativeAmount)) throw new Error("Invalid reward amount")
-      if (proof.proof !== null) {
-        if (!Array.isArray(proof.proof) || proof.proof.length > 128) throw new Error("Invalid reward proof")
-        let leaf = keccak256(encodePacked(["address", "uint256"], [wallet, BigInt(proof.cumulativeAmount)]))
-        for (const sibling of proof.proof) {
-          if (!/^0x[\da-f]{64}$/i.test(sibling)) throw new Error("Invalid reward proof")
-          leaf = keccak256(encodePacked(["bytes32", "bytes32"], leaf.toLowerCase() < sibling.toLowerCase() ? [leaf, sibling] : [sibling, leaf]))
-        }
-        const [root, claimed] = await Promise.all([
-          client.readContract({ address: CONTRACTS.merkleDrop.address, abi: merkleDropAbi, functionName: "merkleRoot", blockNumber: block.number }),
-          client.readContract({ address: CONTRACTS.merkleDrop.address, abi: merkleDropAbi, functionName: "cumulativeClaimed", args: [wallet], blockNumber: block.number }),
-        ])
-        if (leaf.toLowerCase() === root.toLowerCase() && proof.merkleRoot.toLowerCase() === root.toLowerCase() && BigInt(proof.cumulativeAmount) > claimed) {
-          events.push({ trigger: "rewards", key: `rewards:${root}:${proof.cumulativeAmount}`, body: "Rewards are claimable. Open Safenet to review the verified reward proof." })
+    try {
+      const bases = env.REWARDS_BASE_URL ? [{ kind: "override" as const, url: env.REWARDS_BASE_URL.replace(/\/$/, "") }] : (await resolveRewardsSource(client)).bases
+      const { value: proof } = await readRewardsFile<{ cumulativeAmount: string; merkleRoot: Hex; proof: Hex[] | null }>({
+        bases, path: rewardProofPath(wallet), attempt: async (url, signal) => {
+          const response = await fetch(url, { signal })
+          if (response.status === 404) return null
+          if (!response.ok) throw new Error("Reward proof unavailable")
+          return response.json()
+        },
+      })
+      if (proof) {
+        if (!/^\d+$/.test(proof.cumulativeAmount)) throw new Error("Invalid reward amount")
+        if (proof.proof !== null) {
+          if (!Array.isArray(proof.proof) || proof.proof.length > 128) throw new Error("Invalid reward proof")
+          let leaf = keccak256(encodePacked(["address", "uint256"], [wallet, BigInt(proof.cumulativeAmount)]))
+          for (const sibling of proof.proof) {
+            if (!/^0x[\da-f]{64}$/i.test(sibling)) throw new Error("Invalid reward proof")
+            leaf = keccak256(encodePacked(["bytes32", "bytes32"], leaf.toLowerCase() < sibling.toLowerCase() ? [leaf, sibling] : [sibling, leaf]))
+          }
+          const [root, claimed] = await Promise.all([
+            client.readContract({ address: CONTRACTS.merkleDrop.address, abi: merkleDropAbi, functionName: "merkleRoot", blockNumber: block.number }),
+            client.readContract({ address: CONTRACTS.merkleDrop.address, abi: merkleDropAbi, functionName: "cumulativeClaimed", args: [wallet], blockNumber: block.number }),
+          ])
+          if (leaf.toLowerCase() === root.toLowerCase() && proof.merkleRoot.toLowerCase() === root.toLowerCase() && BigInt(proof.cumulativeAmount) > claimed) {
+            events.push({ trigger: "rewards", key: `rewards:${root}:${proof.cumulativeAmount}`, body: "Rewards are claimable. Open Safenet to review the verified reward proof." })
+          }
         }
       }
-    }
+    } catch { failed++ }
   }
   const validators: Address[] = []
   if (sub.triggers.some(t => ["deregistered", "participation", "missed"].includes(t))) {
-    // Pin all pagination to one indexed block. Verify each position and status on chain.
-    let cursor = ""
-    let indexedBlock: number | undefined
-    for (;;) {
-      const response = await fetch(env.SUBGRAPH_URL_MAINNET || SUBGRAPH_ENDPOINTS.mainnet, {
-        method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(10_000),
-        body: JSON.stringify({ query: `query($wallet: Bytes!, $cursor: ID!, $block: Block_height) {
-          _meta(block: $block) { block { number timestamp } hasIndexingErrors }
-          delegations(first: 100, orderBy: id, orderDirection: asc, block: $block, where: {staker: $wallet, amount_gt: "0", id_gt: $cursor}) { id validator { id lastUpdatedAtBlock } }
-        }`, variables: { wallet: wallet.toLowerCase(), cursor, block: indexedBlock ? { number: indexedBlock } : { number: Number(block.number) } } }),
-      })
-      if (!response.ok) throw new Error("Delegation index unavailable")
-      const json = await response.json() as { errors?: unknown; data?: { _meta: { block: { number: number; timestamp: number }; hasIndexingErrors: boolean }; delegations: { id: string; validator: { id: Address; lastUpdatedAtBlock: string } }[] } }
-      const data = json.data
-      if (json.errors || !data || data._meta.hasIndexingErrors || Number(block.timestamp) - data._meta.block.timestamp > SUBGRAPH_STALE_AFTER_SECONDS) throw new Error("Delegation index stale")
-      indexedBlock = data._meta.block.number
-      for (const row of data.delegations) {
-        const validator = getAddress(row.validator.id)
-        const stake = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "stakes", args: [wallet, validator], blockNumber: block.number })
-        if (stake === 0n) continue
-        validators.push(validator)
-        if (sub.triggers.includes("deregistered")) {
-          const registered = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "isValidator", args: [validator], blockNumber: block.number })
-          if (!registered) events.push({ trigger: "deregistered", key: `deregistered:${validator}:${row.validator.lastUpdatedAtBlock}`, body: `Your validator ${validator} is deregistered. Review your delegation.` })
+    try {
+      // Pin all pagination to one indexed block. Verify each position and status on chain.
+      let cursor = ""
+      let indexedBlock: number | undefined
+      for (;;) {
+        const response = await fetch(env.SUBGRAPH_URL_MAINNET || SUBGRAPH_ENDPOINTS.mainnet, {
+          method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(10_000),
+          body: JSON.stringify({ query: `query($wallet: Bytes!, $cursor: ID!, $block: Block_height) {
+            _meta(block: $block) { block { number timestamp } hasIndexingErrors }
+            delegations(first: 100, orderBy: id, orderDirection: asc, block: $block, where: {staker: $wallet, amount_gt: "0", id_gt: $cursor}) { id validator { id registeredAtBlock } }
+          }`, variables: { wallet: wallet.toLowerCase(), cursor, block: indexedBlock ? { number: indexedBlock } : { number: Number(block.number) } } }),
+        })
+        if (!response.ok) throw new Error("Delegation index unavailable")
+        const json = await response.json() as { errors?: unknown; data?: { _meta: { block: { number: number; timestamp: number }; hasIndexingErrors: boolean }; delegations: { id: string; validator: { id: Address; registeredAtBlock: string | null } }[] } }
+        const data = json.data
+        if (json.errors || !data || data._meta.hasIndexingErrors || Number(block.timestamp) - data._meta.block.timestamp > SUBGRAPH_STALE_AFTER_SECONDS) throw new Error("Delegation index stale")
+        indexedBlock = data._meta.block.number
+        for (const row of data.delegations) {
+          const validator = getAddress(row.validator.id)
+          const stake = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "stakes", args: [wallet, validator], blockNumber: block.number })
+          if (stake === 0n) continue
+          validators.push(validator)
+          if (sub.triggers.includes("deregistered")) {
+            const registered = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "isValidator", args: [validator], blockNumber: block.number })
+            if (!registered) events.push({ trigger: "deregistered", key: `deregistered:${validator}:${row.validator.registeredAtBlock ?? "unknown"}`, body: `Your validator ${validator} is deregistered. Review your delegation.` })
+          }
         }
+        if (data.delegations.length < 100) break
+        cursor = data.delegations.at(-1)!.id
+        if (validators.length > 1000) throw new Error("Delegation poll budget exceeded")
       }
-      if (data.delegations.length < 100) break
-      cursor = data.delegations.at(-1)!.id
-      if (validators.length > 1000) throw new Error("Delegation poll budget exceeded")
-    }
+    } catch { failed++ }
   }
-  return { events, validators }
+  return { events, validators, failed }
 }
