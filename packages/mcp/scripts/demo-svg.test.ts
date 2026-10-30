@@ -23,9 +23,20 @@ test("a validator's label is redacted before it replaces an address, since a rep
 })
 
 test("mixed-case credential-bearing URLs stay out of demo text and validator labels", () => {
-  const input = "HTTPS://user:fixture-password@rpc.invalid/?key=fixture-token"
-  assert.equal(redact(input, new Map()), "<redacted-url>")
-  assert.equal(validatorLabel(input), "<validator <redacted-url>>")
+  for (const scheme of ["HTTPS", "http", "WSS", "ws"]) {
+    const input = `${scheme}://user:fixture-password@rpc.invalid/?key=fixture-token`
+    assert.equal(redact(input, new Map()), "<redacted-url>")
+    assert.equal(validatorLabel(input), "<validator <redacted-url>>")
+  }
+})
+
+test("underscore suffixes do not prevent address or hash redaction", () => {
+  const labels = new Map([[address(5).toLowerCase(), "<staker>"]])
+  assert.equal(redact(`${address(5)}_owner ${hash}_proof`, labels), "<staker>_owner <hash>_proof")
+  assert.equal(validatorLabel(`${address(6).toUpperCase()}_owner ${hash.toUpperCase()}_proof`),
+    "<validator <address>_owner <hash>_proof>")
+  // A longer hex value must not be partially replaced as an address or hash.
+  assert.equal(redact(`${address(5)}f ${hash}f`, labels), `${address(5)}f ${hash}f`)
 })
 
 test("wrap breaks at spaces within the width, and cuts a word longer than it", () => {

@@ -73,15 +73,21 @@ Once the package is on npm, the entry needs no clone:
 {
   "mcpServers": {
     "safenet": {
-      "command": "npx",
-      "args": ["-y", "@cobuilders/safenet-mcp"],
+      "command": "/absolute/path/to/node",
+      "args": ["/absolute/path/to/npm/bin/npx-cli.js", "-y", "@cobuilders/safenet-mcp"],
       "env": {
+        "PATH": "/absolute/path/to/node-directory:/usr/local/bin:/usr/bin:/bin",
         "MAINNET_RPC_URL": "<your archive RPC endpoint>"
       }
     }
   }
 }
 ```
+
+Use the `npx-cli.js` from your Node installation's npm package. Keep the Node executable's
+directory in the child `PATH`: the installed MCP command uses `env node`. Preserve your other
+system `PATH` entries. On Windows use absolute Windows paths, escaped backslashes, and `;`
+between `PATH` entries. Paste the expanded path value; JSON does not expand `$PATH` or `%PATH%`.
 
 The config file is plain text. Many RPC providers put the API key in the URL: if yours does, do
 not paste the URL here. Start the server through a wrapper that reads the URL from your secret
@@ -93,7 +99,7 @@ manager, and point `command` at the wrapper. This one keeps writes off, and load
 # Replace <command> with the one that prints the secret.
 export SAFENET_MCP_ALLOW_WRITES=0
 unset SAFENET_MCP_PRIVATE_KEY_ENV SAFENET_MCP_KEYSTORE SAFENET_MCP_PASSWORD_ENV
-export MAINNET_RPC_URL="$(<command that prints your RPC URL>)"
+export SAFENET_MCP_RPC_URL="$(<command that prints your RPC URL>)"
 exec /absolute/path/to/node /absolute/path/to/safenet-staking/packages/mcp/dist/index.js
 ```
 
@@ -112,6 +118,9 @@ without the lines that set `SAFENET_SIGNING_KEY`, `SAFENET_MCP_PRIVATE_KEY_ENV` 
 with `$env:SAFENET_MCP_ALLOW_WRITES = "0"` instead of `"1"`. Remove inherited signer settings
 from that wrapper with `Remove-Item Env:SAFENET_MCP_PRIVATE_KEY_ENV, Env:SAFENET_MCP_KEYSTORE,
 Env:SAFENET_MCP_PASSWORD_ENV -ErrorAction SilentlyContinue`.
+
+The wrappers set `SAFENET_MCP_RPC_URL`, which takes precedence over `MAINNET_RPC_URL`, so an
+inherited endpoint cannot override the URL loaded from your secret manager.
 
 ## 3. Restart and check
 
@@ -157,7 +166,7 @@ for the RPC URL alone, use the read-only wrapper in step 2. On macOS:
 #!/bin/sh
 # safenet-mcp-writes: starts safenet-mcp with writes allowed. Each secret comes from the
 # secret manager; replace each <command> with the one that prints that secret.
-export MAINNET_RPC_URL="$(<command that prints your RPC URL>)"
+export SAFENET_MCP_RPC_URL="$(<command that prints your RPC URL>)"
 export SAFENET_SIGNING_KEY="$(<command that prints the private key>)"
 export SAFENET_MCP_PRIVATE_KEY_ENV=SAFENET_SIGNING_KEY
 export SAFENET_MCP_ALLOW_WRITES=1
@@ -180,7 +189,7 @@ this guide and not run on Windows:
 ```powershell
 # safenet-mcp-writes.ps1: starts safenet-mcp with writes allowed. Replace each <command> with the
 # one that prints that secret.
-$env:MAINNET_RPC_URL = (<command that prints your RPC URL>)
+$env:SAFENET_MCP_RPC_URL = (<command that prints your RPC URL>)
 $env:SAFENET_SIGNING_KEY = (<command that prints the private key>)
 $env:SAFENET_MCP_PRIVATE_KEY_ENV = "SAFENET_SIGNING_KEY"
 $env:SAFENET_MCP_ALLOW_WRITES = "1"

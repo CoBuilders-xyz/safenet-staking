@@ -33,9 +33,9 @@ const STEP_DELAY = 1.6
 /** Labels for known addresses; any other address becomes `<address>`. */
 export function redact(text: string, labels: ReadonlyMap<string, string>): string {
   return text
-    .replace(/https?:\/\/[^\s"]+/gi, "<redacted-url>")
-    .replace(/0x[0-9a-fA-F]{64}\b/g, "<hash>")
-    .replace(/0x[0-9a-fA-F]{40}\b/g, (a) => labels.get(a.toLowerCase()) ?? "<address>")
+    .replace(/(?:https?|wss?):\/\/[^\s"]+/gi, "<redacted-url>")
+    .replace(/0x[0-9a-f]{64}(?![0-9a-f])/gi, "<hash>")
+    .replace(/0x[0-9a-f]{40}(?![0-9a-f])/gi, (a) => labels.get(a.toLowerCase()) ?? "<address>")
 }
 
 /**
