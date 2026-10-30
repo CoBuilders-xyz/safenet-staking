@@ -64,6 +64,10 @@ jobs:
             push)
               packages="[\"${REF_NAME%%-v*}\"]"
               tag_version="${REF_NAME#*-v}"
+              if [ -z "$tag_version" ]; then
+                echo "::error::The tag must include a version after cli-v or mcp-v."
+                exit 1
+              fi
               publish=true ;;
             workflow_dispatch)
               packages="[\"$INPUT_PACKAGE\"]"
