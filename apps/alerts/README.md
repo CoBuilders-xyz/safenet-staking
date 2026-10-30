@@ -180,5 +180,8 @@ Real acceptance remains open until both actual deliveries occur. Mocks, an encry
 a successful build and a bot API response alone do not satisfy this acceptance gate.
 
 Counted SIDs retain compact durable tombstones after the in-memory deduplication window expires.
+This includes queued rounds released by another ceremony's completion, even without a new event for their SID.
+An atomic commit permits 11,000 archive writes: 10,000 previously blocked rounds plus 1,000 input events.
+The 8 MiB transfer/checkpoint bounds and 64 KiB ceremony bound still apply.
 A repeated attestation cannot create a missing-completion blocker or count attendance twice.
 Uncounted ceremonies still retain their shares for a delayed first attestation.

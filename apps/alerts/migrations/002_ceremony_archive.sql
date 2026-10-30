@@ -74,7 +74,9 @@ begin
     or jsonb_typeof(archive_writes) is distinct from 'object' or octet_length(archive_writes::text)>8388608
     or jsonb_typeof(archive_deletes) is distinct from 'array'
     or jsonb_array_length(archive_deletes)>1000
-    or (select count(*) from jsonb_each(archive_writes))>1000
+    -- A batch of 1,000 events can release all 10,000 previously blocked attestations.
+    -- Their compact tombstones must commit atomically with the checkpoint.
+    or (select count(*) from jsonb_each(archive_writes))>11000
     or (select count(*) from jsonb_each(state_value->'pending'))>10000
     or exists(select 1 from jsonb_each(state_value->'pending') p where not p.value ? 'at')
     or (state_value->>'cursor')::bigint < coalesce((select (value->>'cursor')::bigint from alerts_state where key='aegis'),0)

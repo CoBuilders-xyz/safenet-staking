@@ -44,7 +44,10 @@ export async function persistChronologyBatch(db: Database, holder: string, previ
   const { state, writes } = foldArchivedBatch(hydrated, events, through, hash, now)
   // Keep compact tombstones after the in-memory deduplication window expires. A repeated
   // attestation must not recreate an incomplete ceremony and block all subsequent rounds.
-  for (const sid of sids) {
+  // One completion can release older attested rounds with no event in this batch.
+  // Archive those rounds too, before their in-memory counted entries can expire.
+  const countedCandidates = new Set([...sids, ...Object.keys(state.counted).filter(sid => !previous.counted[sid])])
+  for (const sid of countedCandidates) {
     if (state.counted[sid] || previous.counted[sid] || recovered[sid]?.counted) writes[sid] = { shares: {}, counted: true }
   }
   state.revision = (previous.revision ?? 0) + 1

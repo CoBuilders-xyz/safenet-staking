@@ -78,6 +78,41 @@ test("archive recovery preserves completion blocking, chronological order and at
     assert.deepEqual(state.rounds.map(r => r.sid), ["early", "later"])
     assert.equal(state.members[signer]!.misses, 1)
     assert.equal(state.members[newcomer]!.misses, 1)
+    // Completing "early" also releases "later", although this batch has no event for it.
+    assert.deepEqual(await db.rpc("load_ceremonies", { holder, expected_revision: state.revision, sids: ["later"] }),
+      { later: { shares: {}, counted: true } })
+    state = await persistChronologyBatch(db, holder, state, [], first + 2000n, "pruned", now)
+    assert.equal(state.counted.later, undefined)
+    state = await persistChronologyBatch(db, holder, await checkpoint(db), [
+      event(2001, 0, { kind: "attested", sid: "later" }),
+    ], first + 2001n, "repeated", now)
+    assert.deepEqual(state.pending, {})
+    assert.deepEqual(state.rounds.map(r => r.sid), ["early", "later"])
+  } finally { await db.pg.close() }
+})
+
+test("one completion archives every newly released round beyond the input-event batch limit", async () => {
+  const db = new SqlDatabase(); await db.setup()
+  try {
+    const holder = await lease(db)
+    let state = await persistChronologyBatch(db, holder, initialChronology(), [
+      event(0, 0, { kind: "attested", sid: "blocked" }),
+    ], first, "blocked", now)
+    for (let page = 0; page < 3; page++) {
+      const events = Array.from({ length: 400 }, (_, i) => `queued-${page * 400 + i}`).flatMap((sid, i) => [
+        event(page + 1, i * 2, { kind: "completed", sid, root: "winner" }),
+        event(page + 1, i * 2 + 1, { kind: "attested", sid }),
+      ])
+      state = await persistChronologyBatch(db, holder, state, events, first + BigInt(page + 1), `page-${page}`, now)
+    }
+    assert.equal(Object.keys(state.pending).length, 1201)
+    state = await persistChronologyBatch(db, holder, state, [
+      event(4, 0, { kind: "completed", sid: "blocked", root: "winner" }),
+    ], first + 4n, "released", now)
+    assert.equal(state.rounds.length, 1201)
+    assert.deepEqual(state.pending, {})
+    assert.equal((await db.pg.query<{ count: number }>("select count(*)::int as count from alerts_ceremonies where ceremony ? 'counted'")).rows[0]!.count, 1201)
+    assert.deepEqual(await checkpoint(db), state)
   } finally { await db.pg.close() }
 })
 
