@@ -40,7 +40,7 @@ export function renderCompliance(c: ComplianceReport): string {
     const state = !g.checked ? "not asked for" : g.allowed ? "passed" : "REFUSED"
     return g.checked ? `  ${g.gate}: ${state}, ${g.reason} (${g.source})` : `  ${g.gate}: ${state}`
   })
-  return [`Compliance gates for ${c.address}, block ${formatCount(c.block)}:`, ...lines].join("\n")
+  return [`Compliance gates for ${c.address}, block ${c.block === null ? "unavailable" : formatCount(c.block)}:`, ...lines].join("\n")
 }
 
 export type FigureRow = readonly [string, string, string]

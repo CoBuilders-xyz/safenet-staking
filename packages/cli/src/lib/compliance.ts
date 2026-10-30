@@ -43,8 +43,8 @@ export interface GateResult {
 
 export interface ComplianceReport {
   readonly address: Address
-  /** The block the oracle was read at. */
-  readonly block: bigint
+  /** The block the oracle was read at, or null when the head could not be read. */
+  readonly block: bigint | null
   readonly allowed: boolean
   readonly gates: readonly GateResult[]
 }
@@ -69,8 +69,9 @@ const result = (gate: GateName, checked: boolean, allowed: boolean, reason: stri
 /** Ten seconds for each request: a gate that hangs refuses rather than waits. */
 const TIMEOUT_MS = 10_000
 
-async function oracleGate(ctx: Context, address: Address, block: bigint): Promise<GateResult> {
+async function oracleGate(ctx: Context, address: Address, block: bigint | null): Promise<GateResult> {
   const oracle = (allowed: boolean, reason: string) => result("sanctions oracle", true, allowed, reason, ORACLE_SOURCE)
+  if (block === null) return oracle(false, "the chain head could not be read, so the gate fails closed")
   try {
     const sanctioned = await ctx.client.readContract({
       address: CONTRACTS.sanctionsList.address,
@@ -92,6 +93,7 @@ async function endpointGate(ctx: Context, url: string | null | undefined): Promi
   if (!url) return result("sanctions endpoint", false, true, "not asked for", "none")
   try {
     const response = await ctx.fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+    await response.body?.cancel()
     if (response.status === SANCTIONS_ENDPOINT_REFUSED_STATUS) {
       return endpoint(false, `the endpoint refused this client (HTTP ${response.status})`)
     }
@@ -106,7 +108,10 @@ async function endpointGate(ctx: Context, url: string | null | undefined): Promi
 
 async function lookUpCountry(ctx: Context, lookup: GeoLookup): Promise<string> {
   const response = await ctx.fetch(lookup.url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  if (!response.ok) {
+    await response.body?.cancel()
+    throw new Error(`HTTP ${response.status}`)
+  }
   const country = lookup.format === "json"
     ? ((await response.json()) as { country?: unknown }).country
     : (await response.text()).trim()
@@ -138,7 +143,7 @@ function errorText(err: unknown): string {
 
 /** Runs every gate for `address` and returns the report; throws ComplianceRefusal when one refuses. */
 export async function checkCompliance(ctx: Context, address: Address, options: ComplianceOptions = {}): Promise<ComplianceReport> {
-  const block = await ctx.client.getBlockNumber()
+  const block = await ctx.client.getBlockNumber().catch(() => null)
   const gates = await Promise.all([
     oracleGate(ctx, address, block),
     endpointGate(ctx, options.sanctionsEndpoint),

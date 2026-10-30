@@ -256,3 +256,31 @@ test("every refused gate is named in the one sentence", async () => {
   assert.equal(r.code, 1)
   assert.match(r.err, /sanctions oracle: the address is on the sanctions list; sanctions endpoint: the endpoint refused this client \(HTTP 403\); geo check: this machine appears to be in KP, a blocked country\./)
 })
+
+test("unreadable chain head produces a redacted structured refusal for every CLI write", async () => {
+  for (const argv of WRITES) {
+    const rt = fakeRuntime()
+    const ctx = fakeContext({}, rt.sends)
+    ctx.client.getBlockNumber = async () => { throw new Error("private-head-marker") }
+    assert.equal(await run(dry(argv, "--json"), { ...rt, createContext: () => ctx }), 1)
+    const r = JSON.parse(rt.stdout())
+    assert.equal(r.refused, true)
+    assert.equal(r.compliance.block, null)
+    assert.equal(r.compliance.allowed, false)
+    assert.match(rt.stderr(), /chain head could not be read/)
+    assert.doesNotMatch(rt.stdout() + rt.stderr(), /private-head-marker/)
+    assert.deepEqual(rt.sends, { prepared: 0, broadcast: 0 })
+  }
+})
+
+test("status-only endpoint and failed geo responses cancel their bodies", async () => {
+  let cancelled = 0
+  const rt = fakeRuntime()
+  const ctx = { ...fakeContext({}, rt.sends), fetch: (async (url) => new Response(new ReadableStream({
+    cancel() { cancelled++ },
+  }), { status: String(url) === SANCTIONS_ENDPOINT ? 200 : 503 })) as typeof fetch }
+  assert.equal(await run(dry(["stake", VALIDATOR_A, "1"], "--sanctions-endpoint", SANCTIONS_ENDPOINT, "--geo-check"),
+    { ...rt, createContext: () => ctx }), 1)
+  assert.equal(cancelled, 3)
+  assert.deepEqual(rt.sends, { prepared: 0, broadcast: 0 })
+})

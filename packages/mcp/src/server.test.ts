@@ -460,3 +460,21 @@ test("a refused gate is a tool error: one sentence, and the report as structured
     await s.close()
   }
 })
+
+test("unreadable chain head returns structured compliance refusal without signing in MCP", async () => {
+  const ctx = fakeContext()
+  ctx.client.getBlockNumber = async () => { throw new Error("private-head-marker") }
+  const fake = fakeLibrary({ ...library, createContext: () => ctx })
+  const trip = tripwire(STAKER)
+  const s = await connect(WRITES_ON, { fake, trip })
+  try {
+    const r = await s.call("stake", { validator: VALIDATOR_A, amount: "1", dryRun: false })
+    assert.equal(r.isError, true)
+    const structured = r.structuredContent as { refused: boolean; compliance: { block: null; allowed: boolean } }
+    assert.equal(structured.refused, true)
+    assert.equal(structured.compliance.block, null)
+    assert.equal(structured.compliance.allowed, false)
+    assert.doesNotMatch(JSON.stringify(r), /private-head-marker/)
+    assert.deepEqual(trip.reached, [])
+  } finally { await s.close() }
+})
