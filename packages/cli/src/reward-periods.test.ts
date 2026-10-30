@@ -100,6 +100,19 @@ test("a subgraph that cannot answer leaves the claims, read from the chain, and 
   assert.match(text.out, /Periods: not shown, because the subgraph could not give the periods \(the subgraph answered HTTP 502\)\.$/m)
 })
 
+test("empty indexed periods remain unavailable while CLI preserves verified chain claims", async () => {
+  const json = await history({ subgraph: "empty" }, "--json")
+  assert.equal(json.code, 0, json.err)
+  const h = JSON.parse(json.out)
+  assert.equal(h.periods, null)
+  assert.match(h.periodsReason, /no reward periods/)
+  assert.equal(h.count, 2)
+  assert.equal(h.sumMatchesChain, true)
+  const text = await history({ subgraph: "empty" })
+  assert.match(text.out, /Periods: not shown, because .*no reward periods/)
+  assert.doesNotMatch(text.out, /Every period:/)
+})
+
 test("SUBGRAPH_URL_MAINNET replaces core's endpoint, and its URL is never printed", async () => {
   const url = "https://user:key@subgraph.invalid/query"
   const r = await history({ env: { SUBGRAPH_URL_MAINNET: url } }, "--json")

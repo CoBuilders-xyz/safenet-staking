@@ -109,6 +109,7 @@ export async function readRewardPeriods(ctx: Context, address: Address): Promise
   if (data.rewardPeriods.length >= PAGE || data.rewardClaims.length >= PAGE) {
     throw new Error(`the subgraph holds ${PAGE} or more rows for one query, and this reader does not page`)
   }
+  if (data.rewardPeriods.length === 0) throw new Error("the subgraph returned no reward periods")
 
   const [chainHead, headBlock] = await Promise.all([
     ctx.client.getBlock(),
