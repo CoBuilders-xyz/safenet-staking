@@ -10,6 +10,12 @@ an archive endpoint in `MAINNET_RPC_URL`, on Node.js 22.14.0. Each shows the hum
 separate run of the same command with `--json`, seconds later, so the two can name blocks a few
 apart. Your figures will differ: the chain and SEF's files move on.
 
+These historical samples are preserved from revision `73de947ba1f2f7ab9cd74331ee9900c5114bff77`.
+They predate the ENSIP-10 fix in #71 and WalletConnect support in #73.
+The old wildcard-resolver `unsupported` result below does not describe the current resolver.
+Current code follows ENSIP-10 and tries the IPFS dataset before the repository mirror.
+The option tables below include the current WalletConnect flags.
+
 Some values in the samples are replaced with a label in angle brackets:
 
 - A URL is `<redacted-url>`. An RPC URL can carry a key, and the reward file URLs only repeat
@@ -639,15 +645,22 @@ Every write takes these options:
 |---|---|
 | `--dry-run` | Read, simulate and estimate every transaction, and print what would be sent. Nothing is signed |
 | `--private-key-env <NAME>` | Sign with the private key held in the environment variable NAME |
+| `--walletconnect` | Pair an external wallet through WalletConnect; requires `--wallet-account` |
+| `--wallet-account <address>` | Require this Mainnet account from the paired wallet |
 | `--keystore <path>` | Sign with a version 3 keystore file. The password is asked for without echo |
 | `--password-env <NAME>` | With `--keystore`: read the password from the environment variable NAME |
 | `--from <address>` | With `--dry-run` and no signer option: the address to simulate from |
 
-Without `--dry-run`, a write needs `--private-key-env` or `--keystore`, and exits 2 without one.
+Without `--dry-run`, choose `--private-key-env`, `--keystore`, or `--walletconnect` with `--wallet-account`.
+A write without a signer exits 2. Signer options cannot be combined.
+WalletConnect requires a terminal, `WALLETCONNECT_PROJECT_ID`, and a wallet supporting `eth_signTransaction`.
+Confirm pairing URI display deliberately. Keep the URI out of logs and evidence.
+See [Signing](../README.md#signing) for wallet compatibility and session safeguards.
+With `--dry-run`, WalletConnect obtains the account but signs and broadcasts nothing.
 A key loaded from `--private-key-env` prints this line on stderr, in a live run and in a dry run:
 
 ```text
-warning: the signing key came from an environment variable; a keystore (--keystore) is safer, because the key stays encrypted on disk
+Warning: environment private keys enter this process and can leak through process inspection or diagnostics. Prefer a hardware wallet or a keystore (--keystore), which keeps the key encrypted on disk.
 ```
 
 A live write first checks that the endpoint is on chain 1. It reports each transaction on stderr

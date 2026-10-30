@@ -133,8 +133,9 @@ part of the URL.
 `pnpm test:coverage` runs the same unit tests without `src/smoke/` and `src/fork/`, and fails
 below 80 percent of lines, measured by Node's built-in coverage through
 `tools/run-node-tests.mjs`. That runner fails too when a source file is missing from the report
-because no test loads it; `src/index.ts`, which only runs the program, is named as unmeasured in
-the script. Lines that tsx's source maps leave unmapped, such as a leading comment or an import,
+because no test loads it. `src/index.ts` and `src/sea.ts` only start and stop the program.
+They are named as unmeasured because entry-point tests run them in child processes or bundles.
+`src/entrypoint.test.ts` and `src/sea.test.ts` still run; the latter checks the isolated binary bundle. Lines that tsx's source maps leave unmapped, such as a leading comment or an import,
 count as uncovered, so the figure is a lower bound. CI runs it in the `test` job.
 
 `pnpm test:smoke` runs `src/smoke/`: one test per command, against Mainnet, through the real

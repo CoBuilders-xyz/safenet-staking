@@ -48,7 +48,7 @@
     "build:binary": "node scripts/build-binary.mjs",
     "start": "node --env-file-if-exists=../../.env.local --import tsx src/index.ts",
     "test": "node ../../tools/run-node-tests.mjs src",
-    "test:coverage": "node ../../tools/run-node-tests.mjs --skip=src/smoke --skip=src/fork --unmeasured=src/index.ts --coverage-lines=80 src",
+    "test:coverage": "node ../../tools/run-node-tests.mjs --skip=src/smoke --skip=src/fork --unmeasured=src/index.ts --unmeasured=src/sea.ts --coverage-lines=80 src",
     "test:smoke": "node --env-file-if-exists=../../.env.local ../../tools/run-node-tests.mjs src/smoke",
     "test:fork": "SAFENET_FORK_SUITE=1 node --env-file-if-exists=../../.env.local ../../tools/run-node-tests.mjs src/fork",
     "check": "pnpm lint && tsc --noEmit",

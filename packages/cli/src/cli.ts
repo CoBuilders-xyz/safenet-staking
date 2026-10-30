@@ -70,7 +70,7 @@ export function errorSentence(err: unknown): string {
  * key encrypted.
  */
 export const ENV_KEY_WARNING =
-  "warning: the signing key came from an environment variable; a keystore (--keystore) is safer, because the key stays encrypted on disk"
+  "Warning: environment private keys enter this process and can leak through process inspection or diagnostics. Prefer a hardware wallet or a keystore (--keystore), which keeps the key encrypted on disk."
 
 function commandRuntime(runtime: Runtime): CommandRuntime {
   return {

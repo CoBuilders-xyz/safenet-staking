@@ -118,6 +118,11 @@ start the server through a wrapper that takes the secret from a secret manager a
 
 ## Recorded session
 
+This historical transcript is preserved from revision `73de947ba1f2f7ab9cd74331ee9900c5114bff77`.
+It predates #71's ENSIP-10 fix. Its wildcard-resolver `unsupported` result is historical.
+Current code follows ENSIP-10 and tries the IPFS dataset before the repository mirror.
+The transcript is not evidence of a run of the current revision.
+
 One session with the server over stdio, against Ethereum Mainnet at block 26,286,992 on
 2026-10-27, with Node.js 22.14.0. The server was started as this Claude Desktop config starts it:
 the same command, arguments and environment. The client was a script on the MCP SDK's own client,
