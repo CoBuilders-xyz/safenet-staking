@@ -8,7 +8,7 @@ import { run } from "./cli.js"
 import { localSigner, type Signer } from "./lib/index.js"
 import { walletConnectSigner, type WalletBridge } from "./commands/walletconnect.js"
 import {
-  SANCTIONS_ENDPOINT, STAKER, TEST_MNEMONIC, VALIDATOR_A, fakeRuntime, type FakeOptions,
+  SANCTIONS_ENDPOINT, STAKER, TEST_MNEMONIC, VALIDATOR_A, fakeContext, fakeRuntime, type FakeOptions,
 } from "./test-support.js"
 
 // The compliance gates on every write, against the fake chain and fake lookups in
@@ -183,13 +183,29 @@ test("--sanctions-endpoint passes on 200, and refuses on 403, on any other statu
   const cases: [NonNullable<FakeOptions["sanctionsEndpoint"]>, RegExp][] = [
     [403, /sanctions endpoint: the endpoint refused this client \(HTTP 403\)\.$/],
     [500, /sanctions endpoint: the endpoint answered HTTP 500, so the gate fails closed\.$/],
-    ["unreachable", /sanctions endpoint: the endpoint did not answer \(fetch failed\), so the gate fails closed\.$/],
+    ["unreachable", /sanctions endpoint: the endpoint did not answer, so the gate fails closed\.$/],
   ]
   for (const [answer, expected] of cases) {
     const r = await cli(argv, { sanctionsEndpoint: answer })
     assert.equal(r.code, 1, String(answer))
     assert.match(r.err.trim(), expected)
     assert.doesNotMatch(r.out + r.err, /sanctions\.invalid/, "the endpoint's URL was printed")
+  }
+})
+
+test("endpoint fetch errors never expose credentials in CLI text or JSON", async () => {
+  for (const scheme of ["HTTPS", "HtTpS", "https"]) for (const json of [false, true]) {
+    const endpoint = `${scheme}://user:fixture-password@sanctions.invalid/check?key=fixture-token`
+    const rt = fakeRuntime()
+    // Real fetch rejects URL credentials before making any network request.
+    const ctx = { ...fakeContext({}, rt.sends), fetch: globalThis.fetch }
+    const code = await run(dry(["stake", VALIDATOR_A, "1"], "--sanctions-endpoint", endpoint, ...(json ? ["--json"] : [])),
+      { ...rt, createContext: () => ctx })
+    assert.equal(code, 1)
+    assert.doesNotMatch(rt.stdout() + rt.stderr(), /fixture-password|fixture-token|sanctions\.invalid|user:/)
+    assert.match(rt.stderr(), /the endpoint did not answer, so the gate fails closed/)
+    if (json) assert.equal(gate(JSON.parse(rt.stdout()).compliance, "sanctions endpoint").allowed, false)
+    assert.deepEqual(rt.sends, { prepared: 0, broadcast: 0 })
   }
 })
 

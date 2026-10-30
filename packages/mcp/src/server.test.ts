@@ -421,6 +421,21 @@ test("a tool call cannot set or skip a gate: a gate argument is refused as unkno
   }
 })
 
+test("real endpoint errors expose no credentials through MCP text or structured content", async () => {
+  const endpoint = "HTTPS://user:fixture-password@sanctions.invalid/check?key=fixture-token"
+  const config = readConfig({ SAFENET_MCP_SANCTIONS_ENDPOINT: endpoint })
+  const ctx = { ...fakeContext(), fetch: globalThis.fetch }
+  const fake = fakeLibrary({ ...library, createContext: () => ctx })
+  const s = await connect(config, { fake })
+  try {
+    const r = await s.call("stake", { validator: VALIDATOR_A, amount: "1", from: STAKER })
+    assert.equal(r.isError, true)
+    assert.doesNotMatch(JSON.stringify(r), /fixture-password|fixture-token|sanctions\.invalid|user:/)
+    assert.match(textOf(r), /the endpoint did not answer, so the gate fails closed/)
+    assert.equal((r.structuredContent as { refused: boolean }).refused, true)
+  } finally { await s.close() }
+})
+
 test("a refused gate is a tool error: one sentence, and the report as structured content, with no URL", async () => {
   const report = {
     address: STAKER, block: BLOCK, allowed: false,

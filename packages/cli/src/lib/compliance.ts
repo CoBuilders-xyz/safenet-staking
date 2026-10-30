@@ -99,8 +99,8 @@ async function endpointGate(ctx: Context, url: string | null | undefined): Promi
       return endpoint(false, `the endpoint answered HTTP ${response.status}, so the gate fails closed`)
     }
     return endpoint(true, `the endpoint allowed this client (HTTP ${response.status})`)
-  } catch (err) {
-    return endpoint(false, `the endpoint did not answer (${redactUrls(errorText(err))}), so the gate fails closed`)
+  } catch {
+    return endpoint(false, "the endpoint did not answer, so the gate fails closed")
   }
 }
 
