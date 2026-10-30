@@ -63,9 +63,13 @@ try {
   const rewards = await call("rewards_check", { address: getAddress(claimant) })
   steps.push({ call: `rewards_check {"address": "${claimant}"}`, lines: [rewards.summary] })
 
-  const top = validators[0]!
-  const stake = await call("stake", { validator: top.address, amount: "1", from: getAddress(staker), dryRun: false })
-  steps.push({ call: `stake {"validator": "${top.address}", "amount": "1", "from": "${staker}", "dryRun": false}`, lines: [stake.summary] })
+  const top = validators[0]
+  if (top) {
+    const stake = await call("stake", { validator: top.address, amount: "1", from: getAddress(staker), dryRun: false })
+    steps.push({ call: `stake {"validator": "${top.address}", "amount": "1", "from": "${staker}", "dryRun": false}`, lines: [stake.summary] })
+  } else {
+    steps.push({ call: "stake (skipped)", lines: ["No active validators are available; no stake simulation was requested."] })
+  }
 } finally {
   await server.close()
 }
@@ -74,7 +78,7 @@ const clean: DemoStep[] = steps.map((s) => ({ call: redact(s.call, labels), line
 const svg = renderDemoSvg(clean, {
   title: "safenet-mcp over stdio, Ethereum Mainnet",
   footer: `Recorded ${new Date().toISOString().slice(0, 10)} at block ${block}, Node.js ${process.version}, with the MCP SDK's client. ` +
-    "Writes were off, so the stake is a dry run. Addresses are labels.",
+    "Writes were off; no transaction was signed or sent. Addresses are labels.",
 })
 const out = fileURLToPath(new URL("../docs/demo.svg", import.meta.url))
 writeFileSync(out, svg)
