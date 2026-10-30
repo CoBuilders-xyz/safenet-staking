@@ -67,7 +67,13 @@ function fold(previous: Chronology, events: RoundEvent[], through: bigint, hash:
     delete state.pending[sid]
   }
   for (const [sid, block] of Object.entries(state.counted)) if (BigInt(block) + 1000n < through) delete state.counted[sid]
-  state.rounds = state.rounds.filter(r => r.time >= now - 16 * 86400)
+  // Participation ends at the latest completed attestation day, not wall-clock yesterday.
+  // Preserve its whole window during silent days; today's rounds cannot advance it yet.
+  const today = Math.floor(now / 86400) * 86400
+  const lastCompleteDay = state.rounds.reduce((last, r) => r.time < today
+    ? Math.max(last, Math.floor(r.time / 86400) * 86400) : last, -Infinity)
+  const retainFrom = Math.min(now - 16 * 86400, lastCompleteDay - 13 * 86400)
+  state.rounds = state.rounds.filter(r => r.time >= retainFrom)
   state.cursor = through.toString()
   state.hash = hash
   return state

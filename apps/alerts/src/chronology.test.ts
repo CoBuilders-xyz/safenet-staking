@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { CONTRACTS } from "@cobuilders/safenet-core"
-import { foldChronology, initialChronology, memberCondition, type RoundEvent } from "./chronology.js"
+import { foldArchivedBatch, foldChronology, initialChronology, memberCondition, type Chronology, type RoundEvent } from "./chronology.js"
 
 const signer = CONTRACTS.aegisConsensus.address.toLowerCase()
 const other = CONTRACTS.aegisFrostCoordinator.address.toLowerCase()
@@ -69,3 +69,35 @@ test("a delayed attestation still uses retained winning shares instead of invent
   assert.equal(next.members[signer]!.misses, 0)
   assert.deepEqual(next.rounds[0]!.present, [signer])
 })
+
+for (const archived of [false, true]) {
+  test(`silent days preserve the completed participation window (${archived ? "archive" : "standalone"})`, () => {
+    const day = 86400
+    const today = Date.parse("2027-01-30T00:00:00Z") / 1000
+    const clock = today + day / 2
+    const previous: Chronology = {
+      ...initialChronology(),
+      members: { [signer]: { staker, misses: 1, streakStart: "last" } },
+      rounds: [
+        { sid: "first", time: today - 16 * day, present: [signer] },
+        { sid: "last", time: today - 3 * day, present: [] },
+      ],
+    }
+    const apply = (state: Chronology, events: RoundEvent[], through: bigint, time: number) =>
+      archived ? foldArchivedBatch(state, events, through, "checkpoint", time).state
+        : foldChronology(state, events, through, "checkpoint", time)
+    assert.equal(memberCondition(previous, staker, clock)[0]!.participation, 50)
+    const quiet = apply(previous, [], first, clock)
+    assert.equal(memberCondition(quiet, staker, clock)[0]!.participation, 50)
+    // Continued silence cannot change a closed, attestation-anchored window.
+    const later = apply(quiet, [], first + 1n, clock + 10 * day)
+    assert.equal(memberCondition(later, staker, clock + 10 * day)[0]!.participation, 50)
+    const newRound = round(2, "new", signer).map(e => ({ ...e, time: today + 10 * day }))
+    const open = apply(later, newRound, first + 2n, clock + 10 * day)
+    assert.equal(memberCondition(open, staker, clock + 10 * day)[0]!.participation, 50)
+    // On the next UTC day, the new round advances the window and excludes the old first round.
+    const closed = apply(open, [], first + 3n, clock + 11 * day)
+    assert.equal(memberCondition(closed, staker, clock + 11 * day)[0]!.participation, 50)
+    assert.deepEqual(closed.rounds.map(r => r.sid), ["last", "new"])
+  })
+}
