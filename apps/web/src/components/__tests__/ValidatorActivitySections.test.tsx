@@ -93,10 +93,14 @@ describe("ValidatorActivitySections", () => {
     expect(screen.getByText(/The subgraph reports no current registration/)).toBeInTheDocument()
   })
 
-  it("does not draw a series that disagrees with the subgraph's own count", () => {
+  it("hides the series and event history when replay disagrees with the subgraph's own count", () => {
     renderSections(activity({ ...validator, stakersCurrent: 5 }, false))
     expect(screen.queryByTestId("chart")).not.toBeInTheDocument()
-    expect(screen.getByText("History is unavailable: replayed totals differ from the subgraph counters.")).toBeInTheDocument()
+    expect(screen.getAllByText("History is unavailable: replayed totals differ from the subgraph counters.")).toHaveLength(2)
+    const history = within(screen.getByRole("region", { name: "Event history" }))
+    expect(history.queryByRole("table")).not.toBeInTheDocument()
+    expect(history.queryByRole("button", { name: /Show .* more/ })).not.toBeInTheDocument()
+    expect(history.queryByText("No event is indexed for this validator.")).not.toBeInTheDocument()
   })
 
   it("lists the history newest first with explorer links, 25 at a time", () => {

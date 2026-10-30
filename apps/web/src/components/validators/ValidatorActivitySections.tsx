@@ -158,13 +158,14 @@ function EventHistorySection({ activity }: { activity: Figure<ValidatorActivity>
   const source = a
     ? t("selector.eventsSource", "Mainnet subgraph, block {{block}}: indexed stakes, withdrawals, and latest registration. Block times use UTC.", { block: count(a.block) })
     : t("selector.mainnetSource", "Mainnet subgraph.")
-  const events = a?.history ?? []
+  const events = a?.replayMatches ? a.history : []
 
   return (
     <OverviewSection title={t("selector.eventHistory", "Event history")} source={source}>
       <Pending figure={activity} height="h-48" />
       {a && !a.validator && <p className="text-sm text-muted-foreground">{t("selector.noRecord", "The Mainnet subgraph has no record of this validator.")}</p>}
-      {a?.validator && events.length === 0 && <p className="text-sm text-muted-foreground">{t("selector.noEvents", "No event is indexed for this validator.")}</p>}
+      {a?.validator && !a.replayMatches && <p className="text-sm text-muted-foreground">{t("selector.replayMismatch", "History is unavailable: replayed totals differ from the subgraph counters.")}</p>}
+      {a?.validator && a.replayMatches && events.length === 0 && <p className="text-sm text-muted-foreground">{t("selector.noEvents", "No event is indexed for this validator.")}</p>}
       {events.length > 0 && (
         <>
           <div className="relative max-w-full overflow-x-auto" role="region" tabIndex={0} aria-label={t("selector.eventsNewest", "Event history, newest first")}>
