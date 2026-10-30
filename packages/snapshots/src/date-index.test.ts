@@ -52,6 +52,16 @@ test("an index read back from the branch round-trips", () => {
   assert.deepEqual(parseIndex(serialise(u.index)), u.index)
 })
 
+test("impossible calendar days cannot enter or survive a date index", () => {
+  for (const day of ["2026-02-30", "2026-02-29", "2026-13-45", "2026-00-01", "2026-04-31"]) {
+    assert.throws(() => addDay(emptyIndex(), null, day, entry("a"), { replace: false }), /not a UTC day/)
+    assert.throws(() => parseIndex(serialise({ ...emptyIndex(), days: { [day]: entry("a") } })), /not a valid UTC day/)
+  }
+  const leap = addDay(emptyIndex(), null, "2028-02-29", entry("a"), { replace: false })
+  assert.equal(leap.kind, "added")
+  if (leap.kind === "added") assert.deepEqual(parseIndex(serialise(leap.index)), leap.index)
+})
+
 test("an index of another schema, or with a broken entry, is refused rather than extended", () => {
   assert.throws(() => parseIndex("{"), /not valid JSON/)
   assert.throws(() => parseIndex(JSON.stringify({ schema: "other", previous: null, days: {} })), /has schema "other"/)

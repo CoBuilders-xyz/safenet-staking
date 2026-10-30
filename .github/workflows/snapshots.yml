@@ -6,9 +6,8 @@ name: Snapshots
 # has the schema and how to verify a snapshot.
 #
 # The index lives on the orphan branch `snapshots`, so main's history stays clean. Only a run on
-# main writes it. A pull request that changes the snapshot code runs one real snapshot and writes
-# the preview index on `snapshots-preview` instead, where a day can be replaced, so every push to
-# the pull request proves the whole path: build, pin, gateways, verification and the index commit.
+# main writes it. Pull requests run checks and fixture tests without publication credentials.
+# Scheduled runs and manual dispatches on main then build, pin, verify and commit the live index.
 
 on:
   schedule:
@@ -22,7 +21,7 @@ on:
       - .github/workflows/snapshots.yml
 
 concurrency:
-  group: snapshots-${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && 'main' || 'preview' }}
+  group: snapshots-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -30,11 +29,34 @@ permissions:
 
 env:
   TURBO_TELEMETRY_DISABLED: 1
-  INDEX_BRANCH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && 'snapshots' || 'snapshots-preview' }}
+  INDEX_BRANCH: snapshots
 
 jobs:
   snapshot:
     name: snapshot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Check snapshot code
+        run: pnpm --filter @cobuilders/safenet-snapshots check
+      - name: Test snapshots with local fixtures
+        run: pnpm --filter @cobuilders/safenet-snapshots test
+
+  publish:
+    name: publish
+    needs: snapshot
+    # A PR never starts this runner. Only the exact main commit of a trusted event gets secrets.
+    if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     outputs:
@@ -46,6 +68,7 @@ jobs:
       # Pin actions to full SHA: mutable tags can be moved to malicious code.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -96,10 +119,8 @@ jobs:
           PINATA_GATEWAY: ${{ secrets.PINATA_GATEWAY }}
           DAY_DIR: ${{ steps.build.outputs.dir }}
         run: |
-          replace=()
-          if [ "$INDEX_BRANCH" = snapshots-preview ]; then replace=(--replace); fi
           pnpm --filter @cobuilders/safenet-snapshots snapshot:publish \
-            --dir "$DAY_DIR" --out "$RUNNER_TEMP/publish" --index "$RUNNER_TEMP/index-current" "${replace[@]}"
+            --dir "$DAY_DIR" --out "$RUNNER_TEMP/publish" --index "$RUNNER_TEMP/index-current"
       # The audit anyone can run: fetch every file through a public gateway, pack it here, and
       # compare with the CID. No secret reaches this step.
       - name: Verify the day and the index through a public gateway
@@ -131,8 +152,8 @@ jobs:
 
   index:
     name: index
-    needs: snapshot
-    if: needs.snapshot.outputs.status == 'added' || needs.snapshot.outputs.status == 'replaced'
+    needs: publish
+    if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && (needs.publish.outputs.status == 'added' || needs.publish.outputs.status == 'replaced') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # The only job that can write, and it runs no code from the repository: it downloads the
@@ -143,14 +164,14 @@ jobs:
       - name: Download the index
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: snapshot-${{ needs.snapshot.outputs.day }}-${{ needs.snapshot.outputs.cid }}
+          name: snapshot-${{ needs.publish.outputs.day }}-${{ needs.publish.outputs.cid }}
           path: ${{ runner.temp }}/artifact
       - name: Commit the index to the index branch
         env:
           GH_TOKEN: ${{ github.token }}
-          DAY: ${{ needs.snapshot.outputs.day }}
-          CID: ${{ needs.snapshot.outputs.cid }}
-          INDEX_CID: ${{ needs.snapshot.outputs.index_cid }}
+          DAY: ${{ needs.publish.outputs.day }}
+          CID: ${{ needs.publish.outputs.cid }}
+          INDEX_CID: ${{ needs.publish.outputs.index_cid }}
         run: |
           set -euo pipefail
           new="$(find "$RUNNER_TEMP/artifact" -path '*/publish/index/index.json' | head -1)"
@@ -213,3 +234,14 @@ jobs:
             echo "- Index CID: \`$INDEX_CID\`"
             echo "- Commit: \`$(git rev-parse HEAD)\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  page:
+    name: page
+    needs: [snapshot, publish, index]
+    if: ${{ failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/page-on-red.yml
+    with:
+      needs: ${{ toJSON(needs) }}

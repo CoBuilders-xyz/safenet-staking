@@ -19,9 +19,14 @@ CID of the version before it in `previous`, so the pinned versions form a chain 
 walk back with no access to the branch. A day already in the index is never replaced: a second
 run on the same day pins nothing.
 
-A pull request that changes this package or the workflow runs one real snapshot and writes the
-branch `snapshots-preview` instead, where a day can be replaced. That branch is a test of the
-pipeline, not a publication.
+Pull requests that change this package or the workflow run the `snapshot` check and fixture tests
+without RPC or Pinata credentials. This includes fork contributions. They do not pin a preview or
+write an index branch. A successful PR check does not prove live publication or gateway availability.
+
+Only scheduled runs and manual dispatches on `main` publish the live snapshot and index.
+The publication job checks out the event's exact commit, after the credential-free check passes.
+Dispatches on other branches run checks only. A failed main check, publication or index commit
+uses `page-on-red.yml` to notify the operator. Pull-request failures stay in their checks.
 
 ## Verify a snapshot
 

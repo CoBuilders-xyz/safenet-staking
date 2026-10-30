@@ -7,7 +7,7 @@
  * uploaded as a CAR, so Pinata keeps the CID built here, and each gateway must serve one file of
  * the DAG byte for byte, here `manifest.json`, before the day counts as published. A day already
  * in the index is not pinned again and the index does not change, unless `--replace` is given,
- * which only the preview index of a pull request uses.
+ * for an explicitly chosen replacement index. CI never passes that flag.
  *
  * The new index is written to `<out>/index/index.json`, its CID to `<out>/INDEX_CID` and the
  * day's CID to `<out>/CID`. The workflow commits the first two to the index branch.
@@ -56,12 +56,12 @@ function describe(cid: string, outcomes: readonly Outcome[], probe: string): str
 
 /** Pack, pin, and prove every gateway serves `probe`. Fails the run when any gateway does not. */
 async function publish(credentials: PinataCredentials, dir: string, name: string, probe: string, what: string): Promise<string> {
+  const timeoutMs = Number(process.env.GATEWAY_TIMEOUT_SECONDS ?? 900) * 1000
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) fail(SCRIPT, "GATEWAY_TIMEOUT_SECONDS must be a positive number")
   const packed = await packDirectory(dir)
   console.log(`${SCRIPT}: ${what}: ${packed.files.length} files, ${packed.blocks} blocks, CID ${packed.cid}`)
   await pinCar(credentials, packed.car, packed.cid, { name, fileName: `${basename(dir)}.car` })
   console.log(`${SCRIPT}: ${what}: pinned ${packed.cid}`)
-  const timeoutMs = Number(process.env.GATEWAY_TIMEOUT_SECONDS ?? 900) * 1000
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) fail(SCRIPT, "GATEWAY_TIMEOUT_SECONDS must be a positive number")
   const outcomes = await checkGateways(gatewaysToCheck(credentials), {
     cid: packed.cid,
     probe,
@@ -137,7 +137,7 @@ run(SCRIPT, async () => {
   writeFileSync(join(out, "CID"), `${cid}\n`)
   writeFileSync(join(out, "INDEX_CID"), `${indexCid}\n`)
 
-  const how = update.kind === "replaced" ? `replaced ${update.was} in the preview index` : "added to the index"
+  const how = update.kind === "replaced" ? `replaced ${update.was} in the selected index` : "added to the index"
   console.log(`${SCRIPT}: ${manifest.day} ${cid}, ${how}; index ${indexCid}`)
   summary([
     `### Published ${manifest.day}`,

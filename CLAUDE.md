@@ -163,7 +163,9 @@ because its result depends on SEF's data and the deployed subgraphs, not on the 
 the gateways, verifies both CIDs through a public gateway, and writes both CIDs to the job summary.
 A second job, the only one with write access and running no repository code, commits the index to
 the orphan branch `snapshots`. Only a run on `main` writes that branch; a pull request that
-changes `packages/snapshots` or the workflow runs one real snapshot into `snapshots-preview`.
+changes `packages/snapshots` or the workflow runs credential-free checks and fixture tests only.
+Publication uses the exact event commit and requires a schedule or dispatch on `main`. Failed main
+snapshot, publication or index jobs call `page-on-red.yml`.
 `release.yml` runs on a tag `v*` or by hand: its `build` job receives no secret, builds from
 `apps/web/build.env`, packs `apps/web/release/app.car` and prints the CID; its `pin` job runs only
 from `main` or a `v*` tag, needs `PINATA_JWT` and `PINATA_GATEWAY`, and fails when they are empty.

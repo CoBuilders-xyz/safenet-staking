@@ -4,8 +4,8 @@
  *
  * Each version names the CID of the version before it, so the pinned versions form a chain any
  * reader can walk back without the branch. A day already in the index is never replaced: a
- * snapshot is immutable, and a second run on the same day publishes nothing. The preview index a
- * pull request writes is the exception, so each push to the pull request proves the whole path.
+ * snapshot is immutable, and a second run on the same day publishes nothing. Explicit manual
+ * replacement remains available for a chosen test index. Pull requests never publish an index.
  */
 import { SnapshotError } from "./errors.js"
 
@@ -34,6 +34,11 @@ export interface SnapshotIndex {
 export const emptyIndex = (): SnapshotIndex => ({ schema: INDEX_SCHEMA, previous: null, days: {} })
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/
+const isDay = (day: string): boolean => {
+  if (!DAY.test(day)) return false
+  const time = Date.parse(`${day}T00:00:00Z`)
+  return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === day
+}
 const CID = /^b[a-z2-7]{20,}$/
 
 /** An index read back from the branch, checked before it is extended. */
@@ -51,7 +56,7 @@ export function parseIndex(text: string): SnapshotIndex {
   }
   if (typeof d.days !== "object" || d.days === null) throw new SnapshotError("index.json has no days")
   for (const [day, entry] of Object.entries(d.days)) {
-    if (!DAY.test(day)) throw new SnapshotError(`index.json has a day that is not YYYY-MM-DD: ${day}`)
+    if (!isDay(day)) throw new SnapshotError(`index.json has a day that is not a valid UTC day: ${day}`)
     if (typeof entry?.cid !== "string" || !CID.test(entry.cid)) throw new SnapshotError(`index.json's ${day} has no CID`)
   }
   return d as SnapshotIndex
@@ -64,7 +69,7 @@ export type Update =
 
 /**
  * The index with `day` added. `previousCid` is the CID the current index was pinned under.
- * An existing day stays as it is unless `replace` is set, for the preview index only.
+ * An existing day stays as it is unless `replace` is set explicitly for a chosen test index.
  */
 export function addDay(
   current: SnapshotIndex,
@@ -73,7 +78,7 @@ export function addDay(
   entry: IndexEntry,
   options: { replace: boolean },
 ): Update {
-  if (!DAY.test(day)) throw new SnapshotError(`not a UTC day: ${day}`)
+  if (!isDay(day)) throw new SnapshotError(`not a UTC day: ${day}`)
   if (!CID.test(entry.cid)) throw new SnapshotError(`not a CIDv1: ${entry.cid}`)
   const existing = current.days[day]
   if (existing && !options.replace) return { kind: "already published", cid: existing.cid }

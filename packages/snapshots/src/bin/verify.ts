@@ -72,11 +72,13 @@ run(SCRIPT, async () => {
       console.error(`${SCRIPT}: ${origin} did not serve ${cid}: ${sentence(err)}`)
       continue
     }
+    let verdict: Verdict
     try {
-      report(await verifyDirectory(dir, cid), cid, `${origin}/ipfs/${cid}`)
+      verdict = await verifyDirectory(dir, cid)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+    report(verdict, cid, `${origin}/ipfs/${cid}`)
     return
   }
   fail(SCRIPT, `no gateway served ${cid}: ${errors.join("; ")}`)
