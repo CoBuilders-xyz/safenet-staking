@@ -11,7 +11,8 @@ Writes are off by default. A write tool then simulates the transactions and retu
 sent, and signs nothing. The operator can allow writes when the server starts; a model can never
 turn them on, and no key or password ever goes through a tool.
 
-> A demo video will be linked here.
+See the [recorded MCP session](docs/demo.svg) and [Claude Desktop guide](docs/claude-desktop.md).
+The SVG records a historical SDK-client session; it is not a Claude Desktop screen recording.
 
 ## Tools
 
@@ -68,6 +69,10 @@ then from the repository mirror; `status` and `rewards_check` report which, in t
 the fields the "Reward data" section of the safenet-cli README describes.
 
 ## Claude Desktop
+
+The [Claude Desktop guide](docs/claude-desktop.md) walks through the setup step by step, with the
+exact config, how to check that the tools load, and how to allow writes without a secret in the
+config file. It opens with [a recorded session](docs/demo.svg) against Mainnet.
 
 Add the server to `claude_desktop_config.json`. On macOS it is in
 `~/Library/Application Support/Claude/`; on Windows, in `%APPDATA%\Claude\`. Restart Claude Desktop.

@@ -25,7 +25,8 @@
   "files": [
     "dist/index.js",
     "dist/index.js.map",
-    "README.md"
+    "README.md",
+    "docs/"
   ],
   "publishConfig": {
     "access": "public"
@@ -35,9 +36,10 @@
     "dev": "tsc --noEmit --watch",
     "build": "tsup",
     "start": "node --conditions=source --env-file-if-exists=../../.env.local --import tsx src/index.ts",
-    "test": "NODE_OPTIONS=--conditions=source node ../../tools/run-node-tests.mjs src",
+    "test": "NODE_OPTIONS=--conditions=source node ../../tools/run-node-tests.mjs src scripts",
     "test:smoke": "NODE_OPTIONS=--conditions=source node --env-file-if-exists=../../.env.local ../../tools/run-node-tests.mjs src/smoke",
     "client": "node --conditions=source --env-file-if-exists=../../.env.local --import tsx scripts/client.ts",
+    "demo": "node --conditions=source --env-file-if-exists=../../.env.local --import tsx scripts/demo.ts",
     "check": "pnpm lint && tsc --noEmit",
     "lint": "eslint ."
   },
