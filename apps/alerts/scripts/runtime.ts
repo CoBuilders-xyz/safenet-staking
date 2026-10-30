@@ -129,7 +129,7 @@ try {
   assert.equal(state.cursor, (first + 1n).toString())
   assert.deepEqual(state.rounds[0]!.present, [CONTRACTS.aegisConsensus.address.toLowerCase()])
   assert.equal(state.members[CONTRACTS.aegisConsensus.address.toLowerCase()]!.misses, 0)
-  assert.equal((await db.pg.query("select * from alerts_ceremonies")).rows.length, 0)
+  assert.equal((await db.pg.query("select * from alerts_ceremonies where not ceremony ? 'counted'")).rows.length, 0)
   // Check the artifact never includes test credentials; bindings enter only at runtime.
   assert.ok(!(await readFile(resolve(bundle, "index.js"), "utf8")).includes(env.SUPABASE_SERVICE_KEY))
   console.log("workerd: config, scheduled cooldown, archived attendance, Telegram, encrypted Web Push and deduplication passed (mock providers)")

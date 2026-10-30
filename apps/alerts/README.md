@@ -178,3 +178,7 @@ without a provider-aware redaction mechanism. No upstream response body or excep
 
 Real acceptance remains open until both actual deliveries occur. Mocks, an encrypted request,
 a successful build and a bot API response alone do not satisfy this acceptance gate.
+
+Counted SIDs retain compact durable tombstones after the in-memory deduplication window expires.
+A repeated attestation cannot create a missing-completion blocker or count attendance twice.
+Uncounted ceremonies still retain their shares for a delayed first attestation.

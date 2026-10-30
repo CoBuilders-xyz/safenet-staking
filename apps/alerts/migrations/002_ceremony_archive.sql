@@ -18,6 +18,11 @@ grant all on public.alerts_ceremonies to service_role;
 insert into public.alerts_ceremonies(sid,ceremony)
   select p.key,p.value from public.alerts_state s, lateral jsonb_each(s.value->'pending') p
   where s.key='aegis' and not p.value ? 'at';
+-- Preserve every counted SID still known by the legacy checkpoint, independently of memory pruning.
+insert into public.alerts_ceremonies(sid,ceremony)
+  select p.key,jsonb_build_object('shares','{}'::jsonb,'counted',true)
+  from public.alerts_state s, lateral jsonb_object_keys(s.value->'counted') p(key) where s.key='aegis'
+  on conflict(sid) do update set ceremony=excluded.ceremony;
 update public.alerts_state s set value = s.value || jsonb_build_object(
   'pending', coalesce((select jsonb_object_agg(p.key,p.value) from jsonb_each(s.value->'pending') p where p.value ? 'at'), '{}'::jsonb),
   'archiveVersion',1,'revision',1) where s.key='aegis';

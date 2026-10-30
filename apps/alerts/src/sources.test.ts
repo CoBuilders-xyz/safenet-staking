@@ -276,7 +276,7 @@ for (const scenario of ["archive", "provider", "provider-single-block", "unrelat
         if (scenario === "archive") {
           assert.equal(result.state.rounds.length, 200)
           assert.ok(result.state.rounds.every(round => round.present.length === 1 && round.present[0] === signer))
-          assert.equal((await db.pg.query("select * from alerts_ceremonies")).rows.length, 0)
+          assert.equal((await db.pg.query("select * from alerts_ceremonies where not ceremony ? 'counted'")).rows.length, 0)
         } else assert.equal((await db.pg.query("select * from alerts_ceremonies")).rows.length, 1100)
       }
     } finally { mocked.mock.restore(); await db.pg.close() }

@@ -50,7 +50,7 @@ test("over 10,000 unmatched ceremonies persist across restarts and an old winnin
     assert.deepEqual(state.rounds[0]!.present, [signer])
     assert.equal(memberCondition(state, staker, now)[0]!.misses, 0)
     assert.equal(memberCondition(state, staker, now)[0]!.participation, 100)
-    assert.equal((await db.pg.query("select * from alerts_ceremonies where sid='sid-0'")).rows.length, 0)
+    assert.deepEqual((await db.pg.query<{ ceremony: unknown }>("select ceremony from alerts_ceremonies where sid='sid-0'")).rows[0]!.ceremony, { shares: {}, counted: true })
     assert.deepEqual(await checkpoint(db), state)
   } finally { await db.pg.close() }
 })
@@ -88,6 +88,7 @@ test("migration atomically moves legacy JSON entries and retains blocked rounds 
       pending: Object.fromEntries(Array.from({ length: 10_000 }, (_, i) => [`legacy-${i}`, { shares: { winner: [signer] }, root: "winner" }])) }
     delete legacy.archiveVersion
     delete legacy.revision
+    legacy.counted["old-counted"] = legacy.cursor
     legacy.pending.blocked = { shares: {}, at: { block: first.toString(), index: 0, time: now, members: [signer] } }
     legacy.members[signer] = { staker, misses: 0, streakStart: null }
     await db.rpc("save_state", { state_key: "aegis", state_value: legacy })
@@ -99,10 +100,11 @@ test("migration atomically moves legacy JSON entries and retains blocked rounds 
     assert.deepEqual(migrated.pending, { blocked: legacy.pending.blocked })
     assert.equal(migrated.cursor, legacy.cursor)
     assert.equal(migrated.revision, 1)
-    assert.equal((await db.pg.query<{ count: number }>("select count(*)::int as count from alerts_ceremonies")).rows[0]!.count, 10_000)
+    assert.equal((await db.pg.query<{ count: number }>("select count(*)::int as count from alerts_ceremonies")).rows[0]!.count, 10_001)
     await assert.rejects(db.rpc("load_ceremonies", { holder: oldHolder, expected_revision: 1, sids: ["legacy-0"] }), /lease/)
     await assert.rejects(db.rpc("save_state", { state_key: "aegis", state_value: legacy }), /atomic/)
     const holder = await lease(db)
+    assert.deepEqual(await db.rpc("load_ceremonies", { holder, expected_revision: 1, sids: ["old-counted"] }), { "old-counted": { shares: {}, counted: true } })
     const next = await persistChronologyBatch(db, holder, migrated, [
       event(0, 1, { kind: "completed", sid: "blocked", root: "winner" }),
       event(0, 2, { kind: "attested", sid: "legacy-0" }),
@@ -222,5 +224,39 @@ test("oversized archived ceremonies fail migration without losing legacy JSON", 
     await db.pg.exec("rollback; set role service_role")
     assert.deepEqual(await checkpoint(db), before)
     assert.equal((await db.pg.query<{ name: string | null }>("select to_regclass('public.alerts_ceremonies')::text as name")).rows[0]!.name, null)
+  } finally { await db.pg.close() }
+})
+
+test("counted SID tombstones survive pruning and restart without blocking later or delayed first attestations", async () => {
+  const db = new SqlDatabase(); await db.setup()
+  try {
+    const holder = await lease(db)
+    let state = await persistChronologyBatch(db, holder, initialChronology(), [
+      event(0, 0, { kind: "member", participant: signer, staker }),
+      event(0, 1, { sid: "counted", root: "winner", participant: signer }),
+      event(0, 2, { kind: "completed", sid: "counted", root: "winner" }),
+      event(0, 3, { kind: "attested", sid: "counted" }),
+      event(0, 4, { sid: "delayed", root: "winner", participant: signer }),
+    ], first, "first", now)
+    assert.equal(state.rounds.length, 1)
+    state = await persistChronologyBatch(db, holder, state, [], first + 1001n, "pruned", now)
+    assert.equal(state.counted.counted, undefined)
+    state = await checkpoint(db)
+    state = await persistChronologyBatch(db, holder, state, [
+      event(1002, 0, { kind: "attested", sid: "counted" }),
+      event(1002, 1, { kind: "completed", sid: "delayed", root: "winner" }),
+      event(1002, 2, { kind: "attested", sid: "delayed" }),
+      event(1002, 3, { sid: "later", root: "winner", participant: signer }),
+      event(1002, 4, { kind: "completed", sid: "later", root: "winner" }),
+      event(1002, 5, { kind: "attested", sid: "later" }),
+    ], first + 1002n, "repeated", now)
+    assert.deepEqual(state.rounds.map(r => r.sid), ["counted", "delayed", "later"])
+    assert.ok(state.rounds.every(r => r.present.length === 1 && r.present[0] === signer))
+    assert.deepEqual(state.pending, {})
+    assert.equal(memberCondition(state, staker, now)[0]!.participation, 100)
+    assert.equal(memberCondition(state, staker, now)[0]!.misses, 0)
+    const rows = await db.pg.query<{ ceremony: { counted: boolean } }>("select ceremony from alerts_ceremonies")
+    assert.equal(rows.rows.length, 3)
+    assert.ok(rows.rows.every(row => row.ceremony.counted))
   } finally { await db.pg.close() }
 })

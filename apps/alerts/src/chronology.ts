@@ -12,6 +12,8 @@ export interface RoundEvent {
 }
 export interface Ceremony {
   shares: Record<string, string[]>
+  /** Durable tombstone: this SID already contributed its round. */
+  counted?: true
   root?: string
   at?: { block: string; index: number; time: number; members: string[] }
 }
