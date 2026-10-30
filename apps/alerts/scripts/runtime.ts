@@ -2,10 +2,12 @@ import assert from "node:assert/strict"
 import { resolve } from "node:path"
 import { readFile, readdir } from "node:fs/promises"
 import { Miniflare, convertV4MiniflareOptions, Response as RuntimeResponse } from "miniflare"
-import { CONTRACTS, CHAINS, stakingAbi } from "@cobuilders/safenet-core"
-import { encodeFunctionResult, numberToHex } from "viem"
+import { CONTRACTS, CHAINS, stakingAbi, indexedEvent } from "@cobuilders/safenet-core"
+import { encodeFunctionResult, numberToHex, encodeAbiParameters, encodeEventTopics, decodeFunctionData } from "viem"
 import webPush from "web-push"
 import { SqlDatabase } from "../src/testing/database.js"
+import { persistChronologyBatch } from "../src/archive.js"
+import { initialChronology, type Chronology } from "../src/chronology.js"
 
 // Runs the built production Worker in workerd. All external services are intercepted.
 // This proves runtime compatibility, not live provider or fork delivery.
@@ -15,14 +17,25 @@ const vapid = webPush.generateVAPIDKeys()
 const receiver = webPush.generateVAPIDKeys()
 const env = {
   APP_ORIGIN: "https://app.test", SUPABASE_URL: "https://database.test", SUPABASE_SERVICE_KEY: "runtime-test-only",
-  MAINNET_RPC_URL: "https://rpc.test", TELEGRAM_BOT_TOKEN: "runtime-test-only", TELEGRAM_BOT_NAME: "test_bot",
+  MAINNET_RPC_URL: "https://rpc.test", GNOSIS_RPC_URL: "https://gnosis.test", SUBGRAPH_URL_MAINNET: "https://graph.test", TELEGRAM_BOT_TOKEN: "runtime-test-only", TELEGRAM_BOT_NAME: "test_bot",
   VAPID_PUBLIC_KEY: vapid.publicKey, VAPID_PRIVATE_KEY: vapid.privateKey, VAPID_SUBJECT: "mailto:test@example.test",
 }
 for (const channel of [{ kind: "telegram" }, { kind: "push", endpoint: "https://fcm.googleapis.com/runtime-test", keys: { p256dh: receiver.publicKey, auth: Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url") } }]) {
   const [sub] = await db.rpc<{ id: string }[]>("subscribe", { owner_wallet: CONTRACTS.staking.address.toLowerCase(), signature: "verified-test-signature", link: crypto.randomUUID(),
-    settings: { triggers: ["cooldown"], participation: 75, missed: 3, channel } })
+    settings: { triggers: ["cooldown", "missed"], participation: 75, missed: 3, channel } })
   if (channel.kind === "telegram") await db.request(`alerts_subscriptions?id=eq.${sub!.id}`, "PATCH", { telegram_chat: "123" })
 }
+// Seed a completed, unmatched ceremony. Cron must recover its share inside workerd.
+const first = CONTRACTS.aegisFrostCoordinator.deployBlock
+const sid = numberToHex(1, { size: 32 })
+const holder = crypto.randomUUID()
+await db.rpc("lock_run", { holder })
+await persistChronologyBatch(db, holder, initialChronology(), [
+  { kind: "share", block: first.toString(), index: 0, time: Math.floor(Date.now() / 1000), sid, root: sid,
+    participant: CONTRACTS.aegisConsensus.address, staker: CONTRACTS.staking.address },
+  { kind: "completed", block: first.toString(), index: 1, time: Math.floor(Date.now() / 1000), sid, root: sid },
+], first, numberToHex(2, { size: 32 }), Math.floor(Date.now() / 1000))
+await db.rpc("lock_run", { holder, release: true })
 let telegram = 0, push = 0
 const block = {
   number: numberToHex(100), hash: `0x${"a".repeat(64)}`, parentHash: `0x${"b".repeat(64)}`, timestamp: numberToHex(Math.floor(Date.now() / 1000)),
@@ -43,16 +56,37 @@ const mf = new Miniflare(convertV4MiniflareOptions({
       const value = await db.request(url.pathname.replace("/rest/v1/", "") + url.search, request.method, body)
       return RuntimeResponse.json(value ?? null)
     }
+    if (url.hostname === "graph.test") return RuntimeResponse.json({ data: {
+      _meta: { block: { number: 100, timestamp: Number(BigInt(block.timestamp)) }, hasIndexingErrors: false },
+      delegations: [{ id: "position", validator: { id: CONTRACTS.staking.address, registeredAtBlock: "1" } }],
+    } })
+    if (url.hostname === "gnosis.test") {
+      const body = await request.json() as { id: number; method: string; params: string[] }
+      let result: unknown
+      if (body.method === "eth_chainId") result = numberToHex(CHAINS.gnosis.id)
+      else if (body.method === "eth_getBlockByNumber") result = { ...block,
+        number: body.params[0] === "finalized" ? numberToHex(first + 1n) : body.params[0], hash: numberToHex(2, { size: 32 }),
+      }
+      else if (body.method === "eth_getLogs") {
+        const attested = indexedEvent("aegisConsensus", "TransactionAttested")
+        result = [{ address: CONTRACTS.aegisConsensus.address, blockNumber: numberToHex(first + 1n), blockHash: block.hash,
+          logIndex: "0x0", transactionIndex: "0x0", transactionHash: block.hash, removed: false,
+          topics: encodeEventTopics({ abi: [attested], eventName: "TransactionAttested",
+            args: { safeTxHash: sid, safeId: sid, oracle: CONTRACTS.aegisConsensus.address } }),
+          data: encodeAbiParameters(attested.inputs.filter(input => !("indexed" in input && input.indexed)), [1n, sid, sid, { r: { x: 1n, y: 1n }, z: 1n }]),
+        }]
+      } else throw new Error("Unexpected Gnosis runtime request")
+      return RuntimeResponse.json({ id: body.id, jsonrpc: "2.0", result })
+    }
     if (url.hostname === "rpc.test") {
-      const body = await request.json() as { id: number; method: string; params: { data: string }[] }
+      const body = await request.json() as { id: number; method: string; params: { data: `0x${string}` }[] }
       let result: unknown
       if (body.method === "eth_chainId") result = numberToHex(CHAINS.mainnet.id)
       else if (body.method === "eth_getBlockByNumber") result = block
       else if (body.method === "eth_call") {
-        // Distinguish the two imported ABI functions without duplicating signatures/selectors.
-        const { toFunctionSelector } = await import("viem")
-        const queue = stakingAbi.find(item => item.type === "function" && item.name === "withdrawalQueues")!
-        result = body.params[0]!.data.startsWith(toFunctionSelector(queue))
+        const call = decodeFunctionData({ abi: stakingAbi, data: body.params[0]!.data })
+        if (call.functionName === "stakes") result = encodeFunctionResult({ abi: stakingAbi, functionName: "stakes", result: 1n })
+        else result = call.functionName === "withdrawalQueues"
           ? encodeFunctionResult({ abi: stakingAbi, functionName: "withdrawalQueues", result: [1n, 1n] })
           : encodeFunctionResult({ abi: stakingAbi, functionName: "withdrawalNodes", result: [1n, 1n, 0n, 0n] })
       } else throw new Error(`Unexpected RPC method ${body.method}`)
@@ -91,7 +125,12 @@ try {
   assert.equal((await mf.dispatchFetch("https://alerts.test/health")).status, 200)
   const rows = await db.pg.query<{ status: string }>("select status from alerts_subscriptions")
   assert.ok(rows.rows.every(row => row.status === "unverified"))
+  const state = (await db.request<{ value: Chronology }[]>("alerts_state?key=eq.aegis"))[0]!.value
+  assert.equal(state.cursor, (first + 1n).toString())
+  assert.deepEqual(state.rounds[0]!.present, [CONTRACTS.aegisConsensus.address.toLowerCase()])
+  assert.equal(state.members[CONTRACTS.aegisConsensus.address.toLowerCase()]!.misses, 0)
+  assert.equal((await db.pg.query("select * from alerts_ceremonies")).rows.length, 0)
   // Check the artifact never includes test credentials; bindings enter only at runtime.
   assert.ok(!(await readFile(resolve(bundle, "index.js"), "utf8")).includes(env.SUPABASE_SERVICE_KEY))
-  console.log("workerd: config, scheduled cooldown, Telegram, encrypted Web Push and deduplication passed (mock providers)")
+  console.log("workerd: config, scheduled cooldown, archived attendance, Telegram, encrypted Web Push and deduplication passed (mock providers)")
 } finally { await mf.dispose(); await db.pg.close() }

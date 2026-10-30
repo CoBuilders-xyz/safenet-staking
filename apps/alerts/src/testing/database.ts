@@ -12,9 +12,10 @@ const parameter = (v: unknown) => v !== null && typeof v === "object" ? JSON.str
 export class SqlDatabase extends Database {
   readonly pg = new PGlite()
   constructor() { super({ SUPABASE_URL: "https://unused.test", SUPABASE_SERVICE_KEY: "unused" }) }
-  async setup() {
+  async setup(archive = true) {
     await this.pg.exec("create role anon; create role authenticated; create role service_role bypassrls;")
     await this.pg.exec(await readFile(new URL("../../migrations/001_alerts.sql", import.meta.url), "utf8"))
+    if (archive) await this.pg.exec(await readFile(new URL("../../migrations/002_ceremony_archive.sql", import.meta.url), "utf8"))
     await this.pg.exec("set role service_role")
   }
   override async request<T>(path: string, method = "GET", body?: unknown): Promise<T> {

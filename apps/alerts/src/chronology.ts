@@ -10,12 +10,14 @@ export interface RoundEvent {
   participant?: string
   staker?: string
 }
-interface Ceremony {
+export interface Ceremony {
   shares: Record<string, string[]>
   root?: string
   at?: { block: string; index: number; time: number; members: string[] }
 }
 export interface Chronology {
+  archiveVersion?: 1
+  revision?: number
   cursor: string
   hash: string | null
   members: Record<string, { staker: string | null; misses: number; streakStart: string | null }>
@@ -23,7 +25,7 @@ export interface Chronology {
   counted: Record<string, string>
   rounds: { sid: string; time: number; present: string[] }[]
 }
-export const initialChronology = (): Chronology => ({ cursor: (CONTRACTS.aegisFrostCoordinator.deployBlock - 1n).toString(), hash: null, members: {}, pending: {}, counted: {}, rounds: [] })
+export const initialChronology = (): Chronology => ({ archiveVersion: 1, revision: 0, cursor: (CONTRACTS.aegisFrostCoordinator.deployBlock - 1n).toString(), hash: null, members: {}, pending: {}, counted: {}, rounds: [] })
 const position = (a: { block: string; index: number }, b: { block: string; index: number }) =>
   BigInt(a.block) < BigInt(b.block) ? -1 : BigInt(a.block) > BigInt(b.block) ? 1 : a.index - b.index
 
@@ -31,7 +33,7 @@ const position = (a: { block: string; index: number }, b: { block: string; index
  * Membership begins at the first Aegis event, matching the subgraph's programme membership.
  * A missing completion blocks subsequent rounds; unknown history never becomes a miss.
  */
-export function foldChronology(previous: Chronology, events: RoundEvent[], through: bigint, hash: string, now: number): Chronology {
+function fold(previous: Chronology, events: RoundEvent[], through: bigint, hash: string, now: number): Chronology {
   const state = structuredClone(previous)
   for (const event of [...events].sort(position)) {
     if (BigInt(event.block) <= BigInt(previous.cursor) || BigInt(event.block) > through) throw new Error("Noncontiguous event range")
@@ -62,14 +64,29 @@ export function foldChronology(previous: Chronology, events: RoundEvent[], throu
     state.counted[sid] = through.toString()
     delete state.pending[sid]
   }
-  // Without a verified maximum attestation delay, pruning unmatched shares can invent misses.
-  // Bound memory and fail visibly at capacity, including for long-lived unattested ceremonies.
-  if (Object.keys(state.pending).length > 10_000) throw new Error("Unresolved ceremony capacity reached")
   for (const [sid, block] of Object.entries(state.counted)) if (BigInt(block) + 1000n < through) delete state.counted[sid]
   state.rounds = state.rounds.filter(r => r.time >= now - 16 * 86400)
   state.cursor = through.toString()
   state.hash = hash
   return state
+}
+
+// The standalone fold retains pending ceremonies for callers without durable storage.
+export function foldChronology(previous: Chronology, events: RoundEvent[], through: bigint, hash: string, now: number): Chronology {
+  const state = fold(previous, events, through, hash, now)
+  if (Object.keys(state.pending).length > 10_000) throw new Error("Unresolved ceremony capacity reached")
+  return state
+}
+
+/** Recovery must precede this fold. Unmatched ceremonies leave memory only with an atomic archive commit. */
+export function foldArchivedBatch(previous: Chronology, events: RoundEvent[], through: bigint, hash: string, now: number) {
+  const state = fold(previous, events, through, hash, now)
+  const writes: Record<string, Ceremony> = {}
+  for (const [sid, ceremony] of Object.entries(state.pending)) {
+    if (!ceremony.at) { writes[sid] = ceremony; delete state.pending[sid] }
+  }
+  if (Object.keys(state.pending).length > 10_000) throw new Error("Incomplete attestation capacity reached")
+  return { state, writes }
 }
 
 export function memberCondition(state: Chronology, staker: string, now: number) {

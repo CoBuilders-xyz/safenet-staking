@@ -33,8 +33,12 @@ route is created by this change. No migration or deployment runs automatically.
 ## Provisioning contract
 
 The release owner must select an approved Supabase project and Worker endpoint before deployment.
-Apply `migrations/001_alerts.sql` with the project's migration role. Do not apply it to an unrelated
-project. All tables have RLS enabled and no browser policies. Only the Worker receives the service
+Apply `migrations/001_alerts.sql`, then `002_ceremony_archive.sql`, with the project's migration role.
+Stop the old Worker before migration and start the updated Worker afterward.
+Migration 002 atomically moves existing unmatched JSON entries into the SID archive.
+It retains blocked attestations and membership snapshots, invalidates the old lease, and rejects legacy checkpoint writes.
+A migration failure rolls back all changes; do not start the updated Worker until migration succeeds.
+Do not apply these migrations to an unrelated project. All tables have RLS enabled and no browser policies. Only the Worker receives the service
 role key. Supabase Auth is not used.
 
 Configure Worker bindings using the secret delivery mechanism. Do not put secret values in commands,
@@ -102,14 +106,25 @@ failures mark the run unhealthy but do not discard verified conditions from inde
   signatures cannot reset it. Never infer a streak from cumulative absences. A missing completion
   blocks subsequent rounds until history is complete. Alert once per streak and user threshold.
 
-Gnosis backfill advances at most ten 2,000-block ranges per invocation and persists its checkpoint.
+Gnosis backfill commits at most ten batches per invocation, each spanning at most 2,000 blocks.
+Dense ranges shrink until they contain at most 1,000 logs. Each batch commits its checkpoint atomically.
 No participation or streak alert is sent until it reaches the current finalized head. The previous
 checkpoint hash must match; a finalized history mismatch fails closed for operator investigation.
 No Gnosis schema change is needed. Existing Aegis frontend/subgraph semantics remain unchanged.
-Unresolved rounds are retained; excessive unresolved history fails visibly rather than being skipped.
-The 10,000-ceremony capacity includes unattested sessions. Reaching it stops chronology advancement;
-deployment acceptance must measure headroom. Automatic age pruning needs a verified attestation-delay
-bound or archival recovery first, because dropping old winning shares can manufacture missed rounds.
+Unmatched ceremonies persist in `alerts_ceremonies`, keyed by SID, without age pruning or a total row cap.
+Before folding a batch, the Worker recovers every referenced SID, including its winning shares.
+Recovery returns an explicit entry for each SID; a missing entry or failed read blocks advancement and attendance alerts.
+One transaction saves archive writes, archive deletes, and the checkpoint. Lease ownership and checkpoint
+revision checks reject expired owners and concurrent stale writers. Earlier committed batches survive later failures.
+
+Memory limits apply to each transfer: at most 1,000 SIDs, 64 KiB per archived ceremony, and 8 MiB
+per recovery response, archive write payload, or checkpoint. SQL measures serialized JSON, including spacing,
+so its byte checks can reject a payload slightly below the Worker's compact JSON limit.
+The checkpoint retains at most 10,000 blocked attestations. Their original ordering and membership snapshots remain intact.
+A single block above 1,000 logs, an oversized ceremony/checkpoint, or a blocked-attestation overflow fails closed.
+These limits do not cap the number of unmatched ceremonies stored across batches.
+Database storage grows with unmatched history; monitor storage and archive query latency before release.
+There is no verified maximum attestation delay, so cleanup never deletes unmatched archive rows.
 
 Delivery events have unique subscription/condition keys and a two-minute claim lease. Failures retry
 on later polls. Provider acceptance stops automatic resends. A crash between sending and storing

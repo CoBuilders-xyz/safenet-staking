@@ -40,8 +40,7 @@ export async function poll(env: Env, db = new Database(env), io = adapters) {
             if (!chronology) {
               try {
                 const rows = await db.request<{ value: Chronology }[]>("alerts_state?key=eq.aegis")
-                chronology = await io.advanceChronology(env, rows[0]?.value ?? initialChronology())
-                await db.rpc("save_state", { state_key: "aegis", state_value: chronology.state })
+                chronology = await io.advanceChronology(env, rows[0]?.value ?? initialChronology(), db, holder)
               } catch (error) { chronologyFailed = true; throw error }
             }
             if (!chronology.current) failed++

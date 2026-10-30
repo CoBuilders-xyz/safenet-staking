@@ -2,12 +2,15 @@ import { createPublicClient, decodeEventLog, encodePacked, getAddress, http, kec
 import { CHAINS, CONTRACTS, PUBLIC_RPC_URLS, SUBGRAPH_ENDPOINTS, SUBGRAPH_STALE_AFTER_SECONDS,
   indexedEvent, stakingAbi, merkleDropAbi, rewardProofPath, resolveRewardsSource, readRewardsFile } from "@cobuilders/safenet-core"
 import { mainnetClient } from "./auth.js"
-import { foldChronology, type Chronology, type RoundEvent } from "./chronology.js"
+import type { Chronology, RoundEvent } from "./chronology.js"
 import type { Env, Subscription, Trigger } from "./types.js"
+import { CHRONOLOGY_BATCH_EVENTS, persistChronologyBatch } from "./archive.js"
+import type { Database } from "./db.js"
 
 const abi = [indexedEvent("aegisFrostCoordinator", "SignShared"), indexedEvent("aegisFrostCoordinator", "SignCompleted"),
   indexedEvent("aegisFrostCoordinator", "KeyGenConfirmed"), indexedEvent("aegisConsensus", "ValidatorStakerSet"), indexedEvent("aegisConsensus", "TransactionAttested")]
-export async function advanceChronology(env: Env, previous: Chronology) {
+export async function advanceChronology(env: Env, previous: Chronology, db: Database, holder: string) {
+  if (previous.archiveVersion !== 1) throw new Error("Chronology archive migration required")
   const client = createPublicClient({ chain: CHAINS.gnosis, transport: http(env.GNOSIS_RPC_URL || PUBLIC_RPC_URLS.gnosis[0], { timeout: 10_000, retryCount: 1 }) })
   if (await client.getChainId() !== CHAINS.gnosis.id) throw new Error("Gnosis chain mismatch")
   const head = await client.getBlock({ blockTag: "finalized" })
@@ -17,8 +20,15 @@ export async function advanceChronology(env: Env, previous: Chronology) {
   // Bounded backfill per invocation. Never declare the current streak before reaching the head.
   for (let page = 0; page < 10 && BigInt(state.cursor) < head.number; page++) {
     const fromBlock = BigInt(state.cursor) + 1n
-    const toBlock = fromBlock + 1999n < head.number ? fromBlock + 1999n : head.number
-    const logs = await client.getLogs({ address: [CONTRACTS.aegisFrostCoordinator.address, CONTRACTS.aegisConsensus.address], fromBlock, toBlock })
+    let toBlock = fromBlock + 1999n < head.number ? fromBlock + 1999n : head.number
+    const readLogs = () => client.getLogs({ address: [CONTRACTS.aegisFrostCoordinator.address, CONTRACTS.aegisConsensus.address], fromBlock, toBlock })
+    let logs = await readLogs()
+    // Shrink dense ranges before decoding/hydrating. Commit only complete blocks.
+    while (logs.length > CHRONOLOGY_BATCH_EVENTS) {
+      if (toBlock === fromBlock) throw new Error("Single block exceeds chronology event capacity")
+      toBlock = fromBlock + (toBlock - fromBlock) / 2n
+      logs = await readLogs()
+    }
     const times = new Map<string, number>()
     const events: RoundEvent[] = []
     for (const log of logs) {
@@ -35,7 +45,7 @@ export async function advanceChronology(env: Env, previous: Chronology) {
       else if (eventName === "KeyGenConfirmed") events.push({ ...base, kind: "member", participant: args.participant })
     }
     const through = await client.getBlock({ blockNumber: toBlock })
-    state = foldChronology(state, events, toBlock, through.hash, Number(head.timestamp))
+    state = await persistChronologyBatch(db, holder, state, events, toBlock, through.hash, Number(head.timestamp))
   }
   return { state, current: BigInt(state.cursor) === head.number, time: Number(head.timestamp) }
 }

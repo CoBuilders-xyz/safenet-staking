@@ -1,8 +1,10 @@
 import { test, mock } from "node:test"
 import assert from "node:assert/strict"
-import { decodeFunctionData, encodeFunctionResult, encodePacked, keccak256, numberToHex, type Hex } from "viem"
-import { CHAINS, CONTRACTS, merkleDropAbi, stakingAbi } from "@cobuilders/safenet-core"
-import { walletConditions } from "./sources.js"
+import { decodeFunctionData, encodeFunctionResult, encodePacked, keccak256, numberToHex, encodeAbiParameters, encodeEventTopics, type AbiEvent, type Hex } from "viem"
+import { CHAINS, CONTRACTS, merkleDropAbi, stakingAbi, indexedEvent } from "@cobuilders/safenet-core"
+import { advanceChronology, walletConditions } from "./sources.js"
+import { SqlDatabase } from "./testing/database.js"
+import { initialChronology, type Chronology } from "./chronology.js"
 import type { Env, Subscription } from "./types.js"
 
 const wallet = CONTRACTS.safeToken.address
@@ -130,4 +132,82 @@ test("stale delegation indexing cannot manufacture deregistration or discard ver
     assert.deepEqual(result.validators, [])
     assert.equal(result.failed, 1)
   } finally { mocked.mock.restore() }
+})
+
+
+test("Gnosis source commits dense ranges across polls, recovers an old SID and refuses changed finalized history", async () => {
+  const db = new SqlDatabase(); await db.setup()
+  const first = CONTRACTS.aegisFrostCoordinator.deployBlock
+  const timestamp = Math.floor(Date.now() / 1000)
+  const root = numberToHex(1, { size: 32 })
+  const hash = numberToHex(2, { size: 32 })
+  const shared = indexedEvent("aegisFrostCoordinator", "SignShared")
+  const completed = indexedEvent("aegisFrostCoordinator", "SignCompleted")
+  const attested = indexedEvent("aegisConsensus", "TransactionAttested")
+  const log = (abi: AbiEvent, block: bigint, index: number, topics: ReturnType<typeof encodeEventTopics>, values: readonly unknown[]) => ({
+    address: abi.name === "TransactionAttested" ? CONTRACTS.aegisConsensus.address : CONTRACTS.aegisFrostCoordinator.address,
+    blockNumber: numberToHex(block), blockHash: hash, logIndex: numberToHex(index), transactionIndex: "0x0",
+    transactionHash: hash, removed: false, topics, data: encodeAbiParameters(abi.inputs.filter(input => !input.indexed), values),
+  })
+  let late = false, changedHash = false, saturated = false
+  const ranges: number[] = []
+  const mocked = mock.method(globalThis, "fetch", async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const request = JSON.parse(String(init!.body))
+    let result: unknown
+    if (request.method === "eth_chainId") result = numberToHex(CHAINS.gnosis.id)
+    else if (request.method === "eth_getBlockByNumber") result = {
+      number: request.params[0] === "finalized" ? numberToHex(first + (late ? 100_000n : 10n)) : request.params[0],
+      hash: changedHash ? root : hash, timestamp: numberToHex(timestamp), transactions: [],
+    }
+    else if (request.method === "eth_getLogs") {
+      const from = BigInt(request.params[0].fromBlock), to = BigInt(request.params[0].toBlock)
+      ranges.push(Number(to - from + 1n))
+      const logs = []
+      for (let block = from; block <= to && block <= first + 10n; block++) {
+        for (let i = 0; i < (saturated ? 1001 : 1000); i++) {
+          const sid = numberToHex((block - first) * 1000n + BigInt(i + 1), { size: 32 })
+          logs.push(log(shared, block, i, encodeEventTopics({ abi: [shared], eventName: "SignShared", args: { sid, selectionRoot: root } }),
+            [CONTRACTS.aegisConsensus.address, 1n]))
+        }
+      }
+      if (late && from <= first + 100_000n && to >= first + 100_000n) {
+        logs.push(log(completed, first + 100_000n, 0, encodeEventTopics({ abi: [completed], eventName: "SignCompleted", args: { sid: root, selectionRoot: root } }),
+          [{ r: { x: 1n, y: 1n }, z: 1n }]))
+        logs.push(log(attested, first + 100_000n, 1, encodeEventTopics({ abi: [attested], eventName: "TransactionAttested",
+          args: { safeTxHash: root, safeId: root, oracle: CONTRACTS.aegisConsensus.address } }),
+          [1n, root, root, { r: { x: 1n, y: 1n }, z: 1n }]))
+      }
+      result = logs
+    } else assert.fail("Unexpected Gnosis method")
+    return Response.json({ id: request.id, jsonrpc: "2.0", result })
+  })
+  const saved = async () => (await db.request<{ value: Chronology }[]>("alerts_state?key=eq.aegis"))[0]!.value
+  try {
+    let holder = crypto.randomUUID()
+    await db.rpc("lock_run", { holder })
+    let result = await advanceChronology({ ...env, GNOSIS_RPC_URL: "https://gnosis.test" }, initialChronology(), db, holder)
+    assert.equal(result.current, false)
+    assert.equal(result.state.cursor, (first + 9n).toString())
+    assert.ok(ranges.some(size => size > 1)) // Dense requests shrink to complete-block batches.
+    assert.deepEqual(result.state.pending, {})
+    await db.rpc("lock_run", { holder, release: true })
+    holder = crypto.randomUUID()
+    await db.rpc("lock_run", { holder })
+    result = await advanceChronology({ ...env, GNOSIS_RPC_URL: "https://gnosis.test" }, await saved(), db, holder)
+    assert.equal(result.current, true)
+    assert.equal((await db.pg.query<{ count: number }>("select count(*)::int as count from alerts_ceremonies")).rows[0]!.count, 11_000)
+    late = true
+    // Backfill still obeys ten ranges per invocation across the long attestation delay.
+    for (let i = 0; i < 5; i++) result = await advanceChronology({ ...env, GNOSIS_RPC_URL: "https://gnosis.test" }, await saved(), db, holder)
+    assert.equal(result.current, true)
+    assert.deepEqual(result.state.rounds[0]!.present, [CONTRACTS.aegisConsensus.address.toLowerCase()])
+    assert.equal(result.state.members[CONTRACTS.aegisConsensus.address.toLowerCase()]!.misses, 0)
+    const before = await saved()
+    changedHash = true
+    await assert.rejects(advanceChronology({ ...env, GNOSIS_RPC_URL: "https://gnosis.test" }, before, db, holder), /checkpoint changed/)
+    assert.deepEqual(await saved(), before)
+    changedHash = false; saturated = true; late = false
+    await assert.rejects(advanceChronology({ ...env, GNOSIS_RPC_URL: "https://gnosis.test" }, initialChronology(), db, holder), /Single block/)
+    assert.deepEqual(await saved(), before)
+  } finally { mocked.mock.restore(); await db.pg.close() }
 })
