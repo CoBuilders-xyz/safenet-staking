@@ -10,6 +10,10 @@ The session above was recorded with `pnpm --filter @cobuilders/safenet-mcp demo`
 Mainnet, with the MCP SDK's client making the calls an assistant makes. It shows the server's
 answers, not Claude Desktop's window.
 
+This is the historical recording from October 27, before the current Aegis and WalletConnect
+integration. It does not show today's validators or validate the current build. Addresses are
+labels for readability; the retained public amounts and blocks can still identify their accounts.
+
 ## What you need
 
 - Claude Desktop, on macOS or Windows.
@@ -87,6 +91,8 @@ manager, and point `command` at the wrapper. This one keeps writes off, and load
 #!/bin/sh
 # safenet-mcp-read: starts safenet-mcp with the RPC URL from the secret manager. Writes stay off.
 # Replace <command> with the one that prints the secret.
+export SAFENET_MCP_ALLOW_WRITES=0
+unset SAFENET_MCP_PRIVATE_KEY_ENV SAFENET_MCP_KEYSTORE SAFENET_MCP_PASSWORD_ENV
 export MAINNET_RPC_URL="$(<command that prints your RPC URL>)"
 exec /absolute/path/to/node /absolute/path/to/safenet-staking/packages/mcp/dist/index.js
 ```
@@ -103,7 +109,9 @@ exec /absolute/path/to/node /absolute/path/to/safenet-staking/packages/mcp/dist/
 
 Make it executable with `chmod +x`. On Windows, use the PowerShell form at the end of step 5,
 without the lines that set `SAFENET_SIGNING_KEY`, `SAFENET_MCP_PRIVATE_KEY_ENV` and
-`SAFENET_MCP_ALLOW_WRITES`.
+with `$env:SAFENET_MCP_ALLOW_WRITES = "0"` instead of `"1"`. Remove inherited signer settings
+from that wrapper with `Remove-Item Env:SAFENET_MCP_PRIVATE_KEY_ENV, Env:SAFENET_MCP_KEYSTORE,
+Env:SAFENET_MCP_PASSWORD_ENV -ErrorAction SilentlyContinue`.
 
 ## 3. Restart and check
 
@@ -184,7 +192,7 @@ $env:SAFENET_MCP_ALLOW_WRITES = "1"
   "mcpServers": {
     "safenet": {
       "command": "powershell.exe",
-      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:\\absolute\\path\\to\\safenet-mcp-writes.ps1"]
+      "args": ["-NoProfile", "-File", "C:\\absolute\\path\\to\\safenet-mcp-writes.ps1"]
     }
   }
 }
@@ -195,6 +203,9 @@ A version 3 keystore works too, with `SAFENET_MCP_KEYSTORE=<path>` and
 `SAFENET_MCP_PASSWORD_ENV=<NAME>`. With writes allowed, each write still runs as a dry run first,
 and is sent only when the call passes `dryRun: false`. Claude Desktop asks you before each tool
 call unless you allow it for the conversation.
+
+Use a wrapper permitted by your Windows execution policy. Interactive WalletConnect remains
+CLI-only; the MCP server uses stdin for the protocol and cannot pair a hardware wallet interactively.
 
 ## What was checked
 

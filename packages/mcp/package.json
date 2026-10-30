@@ -25,7 +25,8 @@
   "files": [
     "dist/index.js",
     "dist/index.js.map",
-    "README.md"
+    "README.md",
+    "docs/"
   ],
   "publishConfig": {
     "access": "public"

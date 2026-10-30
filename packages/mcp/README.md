@@ -11,7 +11,8 @@ Writes are off by default. A write tool then simulates the transactions and retu
 sent, and signs nothing. The operator can allow writes when the server starts; a model can never
 turn them on, and no key or password ever goes through a tool.
 
-> A demo video will be linked here.
+See the [recorded MCP session](docs/demo.svg) and [Claude Desktop guide](docs/claude-desktop.md).
+The SVG records a historical SDK-client session; it is not a Claude Desktop screen recording.
 
 ## Tools
 

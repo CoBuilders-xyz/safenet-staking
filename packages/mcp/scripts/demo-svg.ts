@@ -4,7 +4,8 @@
  * only lays it out, so a test can check it without a network.
  *
  * Every address is replaced by a label before it is drawn, every 32-byte value by `<hash>` and
- * every URL by `<redacted-url>`, so the picture carries nothing that identifies a staker.
+ * every URL by `<redacted-url>`. Labels aid readability; public amounts and blocks can still
+ * identify the accounts through chain records. This is not anonymization.
  */
 
 export interface DemoStep {
@@ -32,7 +33,7 @@ const STEP_DELAY = 1.6
 /** Labels for known addresses; any other address becomes `<address>`. */
 export function redact(text: string, labels: ReadonlyMap<string, string>): string {
   return text
-    .replace(/https?:\/\/[^\s"]+/g, "<redacted-url>")
+    .replace(/https?:\/\/[^\s"]+/gi, "<redacted-url>")
     .replace(/0x[0-9a-fA-F]{64}\b/g, "<hash>")
     .replace(/0x[0-9a-fA-F]{40}\b/g, (a) => labels.get(a.toLowerCase()) ?? "<address>")
 }
@@ -68,7 +69,7 @@ export function wrap(text: string, width: number = CHARS): string[] {
   return out.length ? out : [""]
 }
 
-const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
 
 interface Row { readonly text: string; readonly kind: "call" | "answer" | "footer"; readonly at: number }
 

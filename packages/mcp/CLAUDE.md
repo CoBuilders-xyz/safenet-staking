@@ -115,6 +115,6 @@ environment; `pnpm client --list` lists the tools.
 
 `pnpm build` bundles `dist/index.js` with tsup. The CLI's library and core are bundled in from
 their TypeScript through the `source` condition, so the published package depends only on the
-SDK, `viem` and `zod`, which stay external. `files` ships the bundle and the README, and npm
+SDK, `viem` and `zod`, which stay external. `files` ships the bundle, README and integration/demo docs, and npm
 adds the LICENSE by itself; `publishConfig` sets public access. Publishing is a manual step for
 the npm owner, and no workflow publishes.

@@ -22,6 +22,12 @@ test("a validator's label is redacted before it replaces an address, since a rep
   assert.equal(redact(`stake on ${address(9)}`, labels), "stake on <validator Ops <address> <redacted-url> <hash>>")
 })
 
+test("mixed-case credential-bearing URLs stay out of demo text and validator labels", () => {
+  const input = "HTTPS://user:fixture-password@rpc.invalid/?key=fixture-token"
+  assert.equal(redact(input, new Map()), "<redacted-url>")
+  assert.equal(validatorLabel(input), "<validator <redacted-url>>")
+})
+
 test("wrap breaks at spaces within the width, and cuts a word longer than it", () => {
   assert.deepEqual(wrap("one two three four", 9), ["one two", "three", "four"])
   assert.deepEqual(wrap("abcdefghij kl", 4), ["abcd", "efgh", "ij", "kl"])
@@ -34,10 +40,11 @@ test("the SVG draws each call before its answer, escapes the text, and carries n
       { call: "status {}", lines: ["Safenet at block 1 & <more>"] },
       { call: "validators_list {}", lines: ["4 validators"] },
     ],
-    { title: "a <title>", footer: "Recorded here." },
+    { title: 'a <title> "quoted"', footer: "Recorded here." },
   )
   assert.match(svg, /^<svg xmlns=/)
-  assert.match(svg, /<title>a &lt;title&gt;<\/title>/)
+  assert.match(svg, /<title>a &lt;title&gt; &quot;quoted&quot;<\/title>/)
+  assert.match(svg, /aria-label="a &lt;title&gt; &quot;quoted&quot;"/)
   assert.match(svg, /> {2}Safenet at block 1 &amp; &lt;more&gt;<\/text>/)
   const delays = [...svg.matchAll(/style="animation-delay:([\d.]+)s">([^<]*)</g)].map((m) => [Number(m[1]), m[2] ?? ""] as const)
   const at = (text: string) => delays.find(([, t]) => t.includes(text))![0]
