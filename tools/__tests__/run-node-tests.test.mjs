@@ -33,7 +33,7 @@ function run(files, args, env = {}) {
     const { NODE_TEST_CONTEXT: _, ...base } = process.env
     mkdirSync(join(root, "tmp"))
     const r = spawnSync(process.execPath, [SCRIPT, ...args], {
-      cwd: root, env: { ...base, TMPDIR: join(root, "tmp"), ...env }, encoding: "utf8",
+      cwd: root, env: { ...base, TMPDIR: join(root, "tmp"), TEMP: join(root, "tmp"), TMP: join(root, "tmp"), ...env }, encoding: "utf8",
     })
     return { status: r.status, output: r.stdout + r.stderr, leftover: readdirSync(join(root, "tmp")) }
   } finally {
