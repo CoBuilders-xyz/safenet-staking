@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next"
+import { currentLanguage } from "@/i18n"
 import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import type { Address } from "viem"
@@ -189,7 +190,7 @@ export function ValidatorCard({
               {t("selector.delegatorsColon", "Delegators:")}
             </span>
             <span className={`text-xl font-mono leading-none ${valueColor}`}>
-              {delegators === undefined ? "—" : delegators.toLocaleString("en-US")}
+              {delegators === undefined ? "—" : delegators.toLocaleString(currentLanguage())}
             </span>
           </div>
           <div className="w-px bg-border self-stretch" />
@@ -212,7 +213,7 @@ export function ValidatorCard({
             {missedLabel ?? t("selector.missed", "Missed ceremonies")}
           </span>
           <span className={`text-xl font-mono leading-none ${valueColor}`}>
-            {missed === undefined ? "—" : missed.toLocaleString("en-US")}
+            {missed === undefined ? "—" : missed.toLocaleString(currentLanguage())}
           </span>
         </div>
 

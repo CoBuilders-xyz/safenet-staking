@@ -84,6 +84,8 @@ describe("ValidatorActivitySections", () => {
     expect(within(section).getByText("Registered", { selector: "dd" })).toBeInTheDocument()
     // One point per day with an event, and one more carrying the count to the indexed day.
     expect(await within(section).findByTestId("chart")).toHaveTextContent("32")
+    // The accessible table includes the same 32 points, plus its header.
+    expect(within(within(section).getByRole("table")).getAllByRole("row")).toHaveLength(33)
     expect(within(section).getByText(/Mainnet subgraph, block 26,287,212/)).toBeInTheDocument()
   })
 

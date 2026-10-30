@@ -87,7 +87,8 @@ function DelegatorsBody({ activity }: { activity: ValidatorActivity }) {
   // The line holds its last value to the block the subgraph has indexed.
   const indexedDay = Math.floor(activity.indexedAt / DAY) * DAY
   const last = points[points.length - 1]
-  const data = [...points.map((p) => ({ x: p.day, delegators: p.current })), ...(last && last.day < indexedDay ? [{ x: indexedDay, delegators: last.current }] : [])]
+  const displayPoints = [...points, ...(last && last.day < indexedDay ? [{ ...last, day: indexedDay }] : [])]
+  const data = displayPoints.map((p) => ({ x: p.day, delegators: p.current }))
 
   return (
     <div className="space-y-4">
@@ -143,7 +144,7 @@ function DelegatorsBody({ activity }: { activity: ValidatorActivity }) {
           }}
           table={{
             columns: [t("selector.dayUtc", "Day (UTC)"), t("selector.delegators", "Delegators"), t("selector.everStaked", "Ever staked")],
-            rows: [...points].reverse().map((p) => [shortDay(p.day), count(p.current), count(p.ever)]),
+            rows: [...displayPoints].reverse().map((p) => [shortDay(p.day), count(p.current), count(p.ever)]),
           }}
         />
       )}
