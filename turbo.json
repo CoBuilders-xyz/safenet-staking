@@ -28,6 +28,16 @@
         "coverage/**"
       ]
     },
+    "test:coverage": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tools/run-node-tests.mjs"
+      ],
+      "outputs": []
+    },
     "//#test:tools": {
       "inputs": [
         "tools/**"

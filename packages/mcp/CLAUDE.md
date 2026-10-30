@@ -96,10 +96,19 @@ too, and no tool takes one. A new CLI command needs a tool: `src/parity.test.ts`
   an argument is refused without being repeated, and that errors carry no URL.
 - `src/config.test.ts` checks the settings and the signer loader, with the CLI's keystore fixture.
 
+`pnpm test:coverage` runs the same tests without `src/smoke/` and fails below 80 percent of
+lines, as in `packages/cli`. `src/index.ts`, which connects stdio, and `src/library.ts`, which only
+binds the real library, are named as unmeasured: no unit test loads them, and the smoke test runs
+both.
+
 `pnpm test:smoke` runs `src/smoke/`: it starts the server over stdio as a child process and calls
 `status` and `validators_list` against Mainnet. It reads `MAINNET_RPC_URL` from `.env.local` and
 skips, with the reason, without it. Under the root `pnpm test` it always skips; the nightly
 workflow runs it next to the CLI smoke tests.
+
+The README's "Recorded session" is one real stdio session against Mainnet with the built bundle:
+the Claude Desktop config that starts it, and every JSON-RPC message, redacted as the CLI's
+command reference is.
 
 `pnpm client <tool> '<json arguments>'` runs one call through the SDK's client, with this shell's
 environment; `pnpm client --list` lists the tools.

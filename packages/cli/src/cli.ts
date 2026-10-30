@@ -64,6 +64,14 @@ export function errorSentence(err: unknown): string {
   return librarySentence(err, ARCHIVE_ADVICE)
 }
 
+/**
+ * Printed once whenever a write loads its key from --private-key-env. Any process the shell
+ * starts inherits the variable, and it can end up in logs or crash reports; a keystore holds the
+ * key encrypted.
+ */
+export const ENV_KEY_WARNING =
+  "Warning: environment private keys enter this process and can leak through process inspection or diagnostics. Prefer a hardware wallet or a keystore (--keystore), which keeps the key encrypted on disk."
+
 function commandRuntime(runtime: Runtime): CommandRuntime {
   return {
     io: runtime.io,
@@ -93,7 +101,7 @@ function commandRuntime(runtime: Runtime): CommandRuntime {
         return { dryRun: true, from: request.from! }
       }
       if (request.signer.kind === "private-key-env") {
-        runtime.io.err("Warning: environment private keys enter this process and can leak through process inspection or diagnostics. Prefer a hardware wallet.\n")
+        runtime.io.err(`${ENV_KEY_WARNING}\n`)
       }
       const signer = await runtime.loadSigner(request.signer, ctx)
       if (request.from && request.from !== signer.address) {

@@ -1,8 +1,9 @@
 import { test } from "node:test"
+import { fileURLToPath } from "node:url"
 import assert from "node:assert/strict"
 import { bytesToHex, maxUint256 } from "viem"
 import { mnemonicToAccount, toAccount } from "viem/accounts"
-import { run } from "./cli.js"
+import { ENV_KEY_WARNING, run } from "./cli.js"
 import { localSigner, type Signer } from "./lib/index.js"
 import {
   CLAIMABLE, fakeRoot, fakeRuntime, STAKER, TEST_MNEMONIC, TX_HASH, VALIDATOR_A, type FakeOptions,
@@ -15,11 +16,19 @@ const SAFE = 10n ** 18n
 const testAccount = mnemonicToAccount(TEST_MNEMONIC)
 const TEST_KEY = bytesToHex(testAccount.getHdKey().privateKey!)
 const KEY_ENV = { SAFENET_TEST_KEY: TEST_KEY }
+// A file path, not a URL pathname, which keeps %20 for a space and a leading / before a Windows drive.
+const KEYSTORE = fileURLToPath(new URL("./fixtures/keystore-anvil-1.json", import.meta.url))
 
 async function cli(argv: string[], options: FakeOptions = {}) {
   const rt = fakeRuntime(options)
   const code = await run(argv, rt)
   return { code, out: rt.stdout(), err: rt.stderr(), sends: rt.sends }
+}
+
+/** stderr after the --private-key-env warning, which must come first. */
+function afterKeyWarning(err: string): string {
+  assert.ok(err.startsWith(`${ENV_KEY_WARNING}\n`), err)
+  return err.slice(ENV_KEY_WARNING.length + 1)
 }
 
 /**
@@ -163,7 +172,7 @@ test("claim-and-stake refuses --amount above the claimable amount before anythin
     { env: KEY_ENV, proofAccount: testAccount.address },
   )
   assert.equal(live.code, 1)
-  assert.match(live.err.replace(/^Warning:.*\n/, ""), expected)
+  assert.match(afterKeyWarning(live.err), expected)
   assert.deepEqual(live.sends, { prepared: 0, broadcast: 0 })
 })
 
@@ -264,9 +273,37 @@ test("a live write signs with the key from the environment, reports each hash, a
   assert.deepEqual(r.sends, { prepared: 2, broadcast: 2 })
   assert.match(r.out, new RegExp(`from ${testAccount.address}`))
   assert.match(r.out, new RegExp(`sent +${TX_HASH}, block 26,000,001, status success`))
-  assert.match(r.err, new RegExp(`sent SAFE token.approve: ${TX_HASH}, waiting for its receipt\n`))
+  assert.match(r.err, new RegExp(`^sent SAFE token.approve: ${TX_HASH}, waiting for its receipt\n`, "m"))
   assert.match(r.err, /confirmed Staking.stake: .* status success/)
   for (const text of [r.out, r.err]) assert.ok(!text.includes(TEST_KEY.slice(2)))
+})
+
+test("a key from --private-key-env prints one warning on stderr, and --json stdout stays one document", async () => {
+  for (const extra of [[], ["--dry-run"]]) {
+    const human = await cli(["stake", VALIDATOR_A, "1", "--private-key-env", "SAFENET_TEST_KEY", ...extra], { env: KEY_ENV })
+    assert.equal(human.code, 0, human.err)
+    assert.ok(!afterKeyWarning(human.err).includes(ENV_KEY_WARNING), extra.join(" "))
+    assert.ok(!human.out.includes(ENV_KEY_WARNING))
+
+    const json = await cli(["stake", VALIDATOR_A, "1", "--private-key-env", "SAFENET_TEST_KEY", "--json", ...extra], { env: KEY_ENV })
+    assert.equal(json.code, 0, json.err)
+    afterKeyWarning(json.err)
+    assert.equal(JSON.parse(json.out).from, testAccount.address)
+  }
+  // The warning names no variable: the name given could be the key typed in its place.
+  assert.doesNotMatch(ENV_KEY_WARNING, /SAFENET_TEST_KEY/)
+})
+
+test("no warning without --private-key-env: a keystore, or a dry run --from an address", async () => {
+  const keystore = await cli(
+    ["stake", VALIDATOR_A, "1", "--dry-run", "--keystore", KEYSTORE, "--password-env", "PW", "--json"],
+    { env: { PW: "safenet fixture" } },
+  )
+  const from = await cli(["stake", VALIDATOR_A, "1", "--dry-run", "--from", STAKER])
+  for (const r of [keystore, from]) {
+    assert.equal(r.code, 0, r.err)
+    assert.doesNotMatch(r.err, /warning/)
+  }
 })
 
 test("live claim-and-stake reports what arrived before it stakes, and stakes that amount", async () => {
@@ -297,9 +334,8 @@ test("a step that fails after another confirmed names the confirmed one", async 
 })
 
 test("a name given for a secret's variable is never printed back, even when it is the secret", async () => {
-  const path = new URL("./fixtures/keystore-anvil-1.json", import.meta.url).pathname
   for (const argv of [
-    ["stake", VALIDATOR_A, "1", "--keystore", path, "--password-env", "Hunter2_safe"],
+    ["stake", VALIDATOR_A, "1", "--keystore", KEYSTORE, "--password-env", "Hunter2_safe"],
     ["stake", VALIDATOR_A, "1", "--private-key-env", "Hunter2_safe"],
     ["stake", VALIDATOR_A, "1", "--private-key-env", "Hunter2_safe", "--dry-run"],
   ]) {
@@ -332,7 +368,7 @@ test("a secret in a misplaced --flag=value, or typed as an argument, is not echo
 test("a broadcast that fails names the hash of the signed transaction, which may still land", async () => {
   const r = await cli(["unstake", VALIDATOR_A, "0.5", "--private-key-env", "SAFENET_TEST_KEY"], { env: KEY_ENV, broadcastError: true })
   assert.equal(r.code, 1)
-  assert.match(r.err.replace(/^Warning:.*\n/, ""), /^error: The transaction 0x[0-9a-f]{64} was signed, but broadcasting it failed \(HTTP request failed\.\); it may still reach the network, so look the hash up before sending again\.\n$/)
+  assert.match(afterKeyWarning(r.err), /^error: The transaction 0x[0-9a-f]{64} was signed, but broadcasting it failed \(HTTP request failed\.\); it may still reach the network, so look the hash up before sending again\.\n$/)
   assert.ok(!r.err.includes("not-a-real-key"))
 })
 
@@ -343,20 +379,19 @@ test("a sent transaction whose receipt never comes is reported with its hash, no
 })
 
 test("--keystore with --password-env signs as the keystore's account", async () => {
-  const path = new URL("./fixtures/keystore-anvil-1.json", import.meta.url).pathname
   const r = await cli(
-    ["stake", VALIDATOR_A, "1", "--dry-run", "--keystore", path, "--password-env", "PW", "--json"],
+    ["stake", VALIDATOR_A, "1", "--dry-run", "--keystore", KEYSTORE, "--password-env", "PW", "--json"],
     { env: { PW: "safenet fixture" } },
   )
   assert.equal(r.code, 0, r.err)
   assert.equal(JSON.parse(r.out).from, mnemonicToAccount(TEST_MNEMONIC, { addressIndex: 1 }).address)
   const wrong = await cli(
-    ["stake", VALIDATOR_A, "1", "--dry-run", "--keystore", path, "--password-env", "PW"],
+    ["stake", VALIDATOR_A, "1", "--dry-run", "--keystore", KEYSTORE, "--password-env", "PW"],
     { env: { PW: "not it" } },
   )
   assert.equal(wrong.code, 1)
   assert.equal(wrong.err, "error: The keystore password is wrong: the file's MAC does not match.\n")
-  const noTerminal = await cli(["stake", VALIDATOR_A, "1", "--keystore", path])
+  const noTerminal = await cli(["stake", VALIDATOR_A, "1", "--keystore", KEYSTORE])
   assert.equal(noTerminal.code, 2)
   assert.match(noTerminal.err, /--keystore needs its password/)
 })

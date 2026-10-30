@@ -45,6 +45,7 @@ Specific commands, only where they apply:
 
 | Command | Where | What it proves | Today |
 |---|---|---|---|
+| `pnpm test:coverage` | root, `packages/cli`, `packages/mcp` | The unit tests of the CLI and the MCP server, without the smoke and fork suites, cover at least 80 percent of their lines, by Node's built-in coverage. A source file no test loads fails the run unless the package names it as unmeasured | works; in the CI `test` job |
 | `pnpm verify:abis` | `packages/core` | The high-frequency event signatures still match the chain. It scans a recent window and, when an event is quiet there, widens back in doubling steps to a ceiling of about 11.5 days on Gnosis and 14 on Mainnet. It prints how many blocks ago each event was last seen, and fails only when the ceiling holds no log of it: NO MATCH when the contract emitted other logs, NO ACTIVITY when it emitted none. Since 2026-10-23, a contract of a programme that has ended, as `packages/core` records it, is scanned back from that programme's last block instead of the chain head, and matches as `match (programme ended)` | works |
 | `pnpm verify:abis:deep` | `packages/core` | Every signature, including rare events, scanned from each deploy block | needs the archive `MAINNET_RPC_URL` from `pnpm env:pull` |
 | `pnpm metrics` | `packages/core` | The 24 metrics, computed against live chains and compared with SEF's published JSON. Writes `packages/core/.metrics/`, which is git-ignored | needs an archive node. With public RPC only, it stopped on a failed Mainnet log range when this file was written |
@@ -139,7 +140,7 @@ workflow `.github/workflows/subgraphs-deploy.yml`. Its `CLAUDE.md` has the slug 
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs four jobs on every pull request and on every push to `main`:
-`check`, `test`, `e2e` and `verify-abis`. `nightly.yml` runs the deep ABI scan, the unit tests,
+`check`, `test`, `e2e` and `verify-abis`. The `test` job also runs `pnpm test:coverage`. `nightly.yml` runs the deep ABI scan, the unit tests,
 both fork suites and the CLI and MCP smoke tests daily; all but the unit tests need the `MAINNET_RPC_URL`
 secret, and fail without it. Its `web-smoke` job runs `pnpm test:smoke:web` against the
 repository variable `PRODUCTION_URL`, and fails without it; a dispatch with `suite: web-smoke` runs
