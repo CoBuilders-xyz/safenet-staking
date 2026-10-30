@@ -208,3 +208,30 @@ test("all-history pagination reads beyond 500 days at one snapshot", async () =>
   assert.equal(d.points.filter(point => point.ceremonies === "10").length, 600)
   assert.equal(d.points.filter(point => point.attended === "7").length, 600)
 })
+
+test("health never reuses SEF metadata beyond 60 seconds even when list routes prime the cache", async () => {
+  for (const first of ["health", "validators"]) {
+    const entries = new Map<string, Response>()
+    let time = NOW, offline = false
+    const original = upstream()
+    const a = createApp({ ens: async () => null, now: () => time,
+      fetch: (async (url, init) => {
+        if (offline && String(url) === SEF_DATA.validatorInfoCommits) throw new Error("SEF unavailable")
+        return original(url, init)
+      }) as typeof fetch,
+      cache: { match: async key => entries.get(String(key instanceof Request ? key.url : key))?.clone(),
+        put: async (key, response) => { entries.set(String(key instanceof Request ? key.url : key), response) } } })
+    assert.equal((await a.request(`http://api.test/v1/${first}`, {}, ENV)).status, 200)
+    offline = true
+    time = NOW + 59_999
+    assert.equal((await a.request("http://api.test/v1/health", {}, ENV)).status, 200)
+    for (const age of [60_000, 299_000]) {
+      time = NOW + age
+      const r = await a.request("http://api.test/v1/health", {}, ENV)
+      assert.equal(r.status, 503)
+      assert.equal(r.headers.get("Cache-Control"), "no-store")
+      const body = await r.json() as { failures: { dependency: string }[] }
+      assert.ok(body.failures.some(f => f.dependency === "sef"))
+    }
+  }
+})

@@ -46,10 +46,11 @@ export function createApp(dependencies: Dependencies = {}) {
     const cache = dependencies.cache ?? (typeof caches === "undefined" ? undefined : caches.default)
     // A shared metadata snapshot avoids one GitHub/ENS refresh per validator route.
     // Cache API entries remain local to this POP and never outlive publication freshness.
-    const readValidators = async () => {
+    const readValidators = async (maxAge = 300_000) => {
       const sourceKey = new Request(new URL("/__internal/validator-metadata", url.origin))
       const cached = await cache?.match(sourceKey)
-      if (cached && Number(cached.headers.get("X-Data-Expires-At")) > start) {
+      if (cached && Number(cached.headers.get("X-Data-Expires-At")) > start
+        && cached.headers.has("X-Data-Fetched-At") && start - Number(cached.headers.get("X-Data-Fetched-At")) < maxAge) {
         return await cached.json() as Awaited<ReturnType<typeof validators>>
       }
       const fresh = await validators(fetcher, lookup, start)
@@ -58,6 +59,7 @@ export function createApp(dependencies: Dependencies = {}) {
         await cache.put(sourceKey, new Response(JSON.stringify(fresh), { headers: {
           "Content-Type": "application/json", "Cache-Control": `public, max-age=${Math.floor((expiry - now()) / 1000)}`,
           "X-Data-Expires-At": String(expiry),
+          "X-Data-Fetched-At": String(start),
         } })).catch(() => { console.error(JSON.stringify({ event: "cache_write_failed" })) })
       }
       return fresh
@@ -92,7 +94,7 @@ export function createApp(dependencies: Dependencies = {}) {
     }
     let result: Result<unknown>
     if (path === "/v1/health") {
-      const checks = await Promise.allSettled([readValidators(), readStats()])
+      const checks = await Promise.allSettled([readValidators(60_000), readStats()])
       const sources = checks.flatMap(r => r.status === "fulfilled" ? r.value.sources : [])
       const failures = checks.flatMap((r, i) => r.status === "rejected" ? [{ dependency: i === 0 ? "sef" : "subgraphs", code: r.reason instanceof ApiError ? r.reason.code : "upstream_failed" }] : [])
       c.header("Cache-Control", "no-store")
