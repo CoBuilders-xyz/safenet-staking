@@ -112,7 +112,7 @@ export function ValidatorCard({
             {ensName && (
               <span className="text-xs text-faint">
                 <abbr title={t("selector.ensTitle", "Ethereum Name Service primary name")}>{t("selector.ens", "ENS")}</abbr>
-                {metadata && ` · SEF: ${metadata.label}`}
+                {metadata && ` · ${t("selector.sefLabel", "SEF lists it as {{name}}", { name: metadata.label })}`}
               </span>
             )}
             {(metadata || ensName) && (

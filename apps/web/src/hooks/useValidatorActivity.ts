@@ -100,7 +100,7 @@ export function useValidatorActivity(address: string) {
       }
     },
     enabled: url !== undefined,
-    refetchInterval: 60_000,
+    refetchInterval: 5 * 60_000,
     retry: false,
   })
 

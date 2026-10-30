@@ -112,7 +112,7 @@ test.describe("Validators Page: selector", () => {
     await validators.goto()
 
     await expect(page.getByRole("link", { name: "validator-a.eth" })).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText("ENS · SEF: Validator A")).toBeVisible()
+    await expect(page.getByText("ENS · SEF lists it as Validator A")).toBeVisible()
     await expect(page.getByRole("link", { name: "Validator B" })).toBeVisible()
     await expect(page.getByText(/^Names: ENS primary names, verified by reverse resolution/)).toBeVisible()
   })
