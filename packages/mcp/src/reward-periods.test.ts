@@ -47,3 +47,17 @@ test("real reward history preserves claims and redacts invalid subgraph settings
     }
   }
 })
+
+
+test("GraphQL provider errors remain fixed and private in all MCP content", async () => {
+  const fake = fakeLibrary({ ...library, createContext: () => fakeContext({ subgraph: "graphql-error" }) })
+  const s = await connect(readConfig({}), { fake })
+  try {
+    const result = await s.call("rewards_history", { address: STAKER })
+    assert.equal(result.isError, undefined)
+    assert.equal(result.structuredContent?.periods, null)
+    assert.equal(result.structuredContent?.count, 2)
+    assert.match(textOf(result), /the subgraph answered with an error/)
+    assert.doesNotMatch(JSON.stringify(result), /private-provider-marker/)
+  } finally { await s.close() }
+})

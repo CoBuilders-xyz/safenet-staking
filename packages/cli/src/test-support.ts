@@ -71,7 +71,7 @@ export interface FakeOptions {
   /** The status the repository answers for its reward files, when not 200. */
   readonly repositoryStatus?: number
   /** Subgraph failure, mismatch, or two claims tied by block number in reversed event order. */
-  readonly subgraph?: "down" | "differs" | "same-block-reversed" | "empty"
+  readonly subgraph?: "down" | "differs" | "same-block-reversed" | "empty" | "graphql-error"
 }
 
 /** A made-up ENS resolver. */
@@ -290,6 +290,7 @@ function fakeDataset(o: FakeOptions, url: URL): Response {
 function fakeSubgraph(o: FakeOptions, body: string): Response {
   if (o.subgraph === "down") return new Response("bad gateway", { status: 502 })
   if (body.includes("_meta")) return json({ data: { _meta: { block: { number: Number(BLOCK), timestamp: null } } } })
+  if (o.subgraph === "graphql-error") return json({ errors: [{ message: "private-provider-marker" }] })
   if (o.subgraph === "empty") return json({ data: { rewardPeriods: [], rewardClaims: [] } })
   const period = (n: number, block: bigint) => ({
     period: n, root: fakeRoot(0x200 + n), blockNumber: String(block), timestamp: String(BLOCK_TIME - (BLOCK - block) * 12n),

@@ -72,7 +72,7 @@ async function query<T>(ctx: Context, url: string, text: string): Promise<T> {
   })
   if (!response.ok) throw new Error(`the subgraph answered HTTP ${response.status}`)
   const body = (await response.json()) as { data?: T; errors?: { message?: string }[] }
-  if (body.errors?.length) throw new Error(`the subgraph answered with an error: ${body.errors[0]?.message ?? "no message"}`)
+  if (body.errors?.length) throw new Error("the subgraph answered with an error")
   if (!body.data) throw new Error("the subgraph answered with no data")
   return body.data
 }

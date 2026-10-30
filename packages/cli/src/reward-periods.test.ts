@@ -192,3 +192,17 @@ test("period and account queries share the indexed block, while a full page stay
   assert.equal(full.count, 2)
   assert.equal(full.sumMatchesChain, true)
 })
+
+
+test("GraphQL provider errors remain fixed and private in CLI output", async () => {
+  for (const flags of [[], ["--json"]]) {
+    const result = await history({ subgraph: "graphql-error" }, ...flags)
+    assert.equal(result.code, 0)
+    assert.match(result.out, /the subgraph answered with an error/)
+    assert.doesNotMatch(result.out + result.err, /private-provider-marker/)
+    if (flags.length) {
+      assert.equal(JSON.parse(result.out).periods, null)
+      assert.equal(JSON.parse(result.out).count, 2)
+    }
+  }
+})
