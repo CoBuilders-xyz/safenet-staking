@@ -41,6 +41,31 @@ A migration failure rolls back all changes; do not start the updated Worker unti
 Do not apply these migrations to an unrelated project. All tables have RLS enabled and no browser policies. Only the Worker receives the service
 role key. Supabase Auth is not used.
 
+### Existing checkpoints after the participation-window fix
+
+The fix preserves the complete participation window during days without attestations.
+It does not restore rounds removed by the previous wall-clock pruning rule.
+A fresh installation can backfill finalized history with the corrected Worker.
+Existing installations must check their recorded revision and retained window before accepting participation results.
+Do not rerun initial migrations to repair missing rounds.
+
+Do not delete only the `aegis` checkpoint. The SID archive retains `counted` tombstones,
+which prevent those ceremonies from contributing rounds again. Deleting only tombstones is also unsafe.
+Checkpoint and archive must describe the same history.
+
+If inspection confirms missing rounds, prepare a recovery for that installation:
+
+1. Stop its writer. Back up the checkpoint and archive together, including revisions and lease state.
+2. Rebuild both from finalized events in isolated storage. Disable delivery during reconstruction.
+3. Verify the finalized cursor/hash, membership, attendance, participation and consecutive misses.
+   Keep attendance evaluation unavailable until reconstruction reaches the finalized head.
+4. Preserve subscriptions and delivery records so previously accepted messages remain deduplicated.
+5. Review and authorize an atomic replacement of the reconstructed checkpoint and archive.
+   Invalidate old leases before resuming the corrected writer.
+
+This is a recovery plan, not an automated migration or permission to delete production data.
+No affected live installation has been verified. Confirm the actual state before planning an intervention.
+
 Configure Worker bindings using the secret delivery mechanism. Do not put secret values in commands,
 source files, logs or browser variables:
 
