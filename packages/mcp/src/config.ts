@@ -112,7 +112,7 @@ export function readConfig(env: Env): ServerConfig {
     // The CLI warns the same way. It names no variable: the name given could be the key itself.
     if (signer.kind === "private-key-env") {
       notices.push(
-        "writes are allowed with a signing key read from an environment variable; a keystore, " +
+        "Warning: environment private keys enter this process and can leak through process inspection or diagnostics. A keystore, " +
           "SAFENET_MCP_KEYSTORE with SAFENET_MCP_PASSWORD_ENV, is safer, because the key stays encrypted on disk",
       )
     }

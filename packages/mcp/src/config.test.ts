@@ -106,7 +106,7 @@ test("a signer setting that holds a secret instead of a name is refused without 
 test("writes allowed with a key from the environment say once that a keystore is safer, naming no variable", () => {
   const withKey = readConfig({ SAFENET_MCP_ALLOW_WRITES: "1", SAFENET_MCP_PRIVATE_KEY_ENV: "MY_SIGNING_KEY", MY_SIGNING_KEY: TEST_KEY })
   assert.deepEqual(withKey.notices, [
-    "writes are allowed with a signing key read from an environment variable; a keystore, " +
+    "Warning: environment private keys enter this process and can leak through process inspection or diagnostics. A keystore, " +
       "SAFENET_MCP_KEYSTORE with SAFENET_MCP_PASSWORD_ENV, is safer, because the key stays encrypted on disk",
   ])
   assert.doesNotMatch(withKey.notices.join(" "), /MY_SIGNING_KEY/)
