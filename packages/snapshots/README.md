@@ -140,19 +140,17 @@ publish step refuses a directory that does not.
 ### The programme caveat
 
 The Gnosis buckets in `participation.json` come from the Gnosis subgraph in `packages/core`.
-Today that deployment indexes the Beta contracts only, `GNOSIS_INDEXED_PROGRAMME` in
-`packages/core/src/sef.ts`, and Beta has ended, so its buckets no longer grow. SEF's
-`participation_rate_14d` in `validators.json` is computed over the programme running when SEF
-publishes, which is Aegis since SEF moved its data job: see the comment on
-`participation_rate_14d` in the same file. So the buckets and SEF's rate do not describe the
-same ceremonies, and the snapshot does not compare them.
+The current deployment indexes Aegis. `GNOSIS_INDEXED_PROGRAMME` in
+`packages/core/src/sef.ts` supplies that programme when the schema lacks per-row attribution.
+SEF's `participation_rate_14d` in `validators.json` describes the programme running when SEF
+publishes. The snapshot preserves each source's programme and window; it does not assume
+that a bucket collection and SEF's published rate cover the same ceremonies.
 
 Each bucket collection carries its programme in `participation.json`'s `programme` object. When
 the deployment's schema has no `programme` field, the value is `GNOSIS_INDEXED_PROGRAMME` and
-the source says so. Once the subgraph indexing Aegis is deployed, its schema has a `programme`
-field on every bucket, each row carries it as the subgraph answers, and the value there is
-`null` with the source `subgraph: Gnosis <Type>.programme, on each row`. No code change is
-needed for the switch.
+the source says so. When the schema has a `programme` field on every bucket, each row carries
+it as the subgraph answers. The collection-level value is then `null`, with the source
+`subgraph: Gnosis <Type>.programme, on each row`.
 
 ### What is not in a snapshot
 

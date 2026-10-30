@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { SEF_DATA } from "@cobuilders/safenet-core"
-import type { PublicClient } from "viem"
+import { SEF_DATA, ensResolverAbi, ensUniversalResolverAbi, readRewardsEnsState } from "@cobuilders/safenet-core"
+import { encodeFunctionResult, numberToHex, pad, type PublicClient } from "viem"
 import { pinClient, pinFetch, type SefPin } from "./pinned.js"
 import { COMMIT, REWARDS_COMMIT } from "./test-support.js"
 
@@ -54,6 +54,43 @@ test("a log scan must end at or before the pin", async () => {
   await pinned.getLogs({ fromBlock: 1n, toBlock: PIN } as never)
   assert.throws(() => pinned.getLogs({ fromBlock: 1n, toBlock: 101n } as never), /reaches past the pinned block/)
   assert.throws(() => pinned.getLogs({ fromBlock: 1n } as never), /reaches past the pinned block/)
+})
+
+test("raw ENS eth_call reads latest at the snapshot block, preserving the request", async () => {
+  const { client, calls } = recordingClient()
+  const pinned = pinClient(client, PIN)
+  const transaction = { to: "0x0000000000000000000000000000000000000001", data: "0x1234" }
+  await pinned.request({ method: "eth_call", params: [transaction, "latest"] } as never)
+  await pinned.request({ method: "eth_call", params: [transaction] } as never)
+  assert.deepEqual(calls.map((c) => c.args.params), [[transaction, "0x64"], [transaction, "0x64"]])
+})
+
+test("raw eth_call preserves earlier blocks and refuses later or unsupported block selectors", async () => {
+  const { client, calls } = recordingClient()
+  const pinned = pinClient(client, PIN)
+  const transaction = { data: "0x" }
+  await pinned.request({ method: "eth_call", params: [transaction, "0x32"] } as never)
+  assert.deepEqual(calls[0]!.args.params, [transaction, "0x32"])
+  for (const selector of ["0x65", "pending", "finalized", { blockHash: "0x1234" }]) {
+    assert.throws(() => pinned.request({ method: "eth_call", params: [transaction, selector] } as never), /eth_call.*pinned block 100/)
+  }
+  assert.equal(calls.length, 1)
+})
+
+test("the core ENS resolver reads its contenthash at the snapshot block", async () => {
+  const blocks: unknown[] = []
+  const client = {
+    request: async ({ params }: { params: readonly unknown[] }) => {
+      blocks.push(params[1])
+      const answer = encodeFunctionResult({ abi: ensResolverAbi, functionName: "contenthash", result: "0x" })
+      return encodeFunctionResult({
+        abi: ensUniversalResolverAbi, functionName: "resolve",
+        result: [answer, pad(numberToHex(1), { size: 20 })],
+      })
+    },
+  } as unknown as PublicClient
+  assert.deepEqual(await readRewardsEnsState(pinClient(client, PIN)), { status: "empty" })
+  assert.deepEqual(blocks, ["0x64"])
 })
 
 test("a read the snapshot does not pin is refused by name; viem's plumbing stays reachable", async () => {

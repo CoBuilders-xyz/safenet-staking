@@ -14,7 +14,7 @@
  */
 import type { Context } from "@cobuilders/safenet-cli/lib"
 import { SEF_DATA } from "@cobuilders/safenet-core"
-import type { PublicClient } from "viem"
+import { toHex, type PublicClient } from "viem"
 import { SnapshotError } from "./errors.js"
 
 /** One of SEF's files under `assets/`, pinned to the commit that last wrote it. */
@@ -46,8 +46,23 @@ export function pinClient(client: PublicClient, block: bigint): PublicClient {
     get(target, prop, receiver) {
       const value: unknown = Reflect.get(target, prop, receiver)
       if (typeof value !== "function" || typeof prop !== "string") return value
+      if (prop === "request") {
+        return (request: { method: string; params?: readonly unknown[] }, options?: unknown) => {
+          if (request.method !== "eth_call") return value.call(target, request, options)
+          // ENS uses a raw call to avoid automatic CCIP-read. Hold that call at the same pin.
+          const params = request.params ?? []
+          const selector = params[1]
+          const at = selector === undefined || selector === "latest"
+            ? block
+            : typeof selector === "string" && /^0x[0-9a-f]+$/i.test(selector) ? BigInt(selector) : null
+          if (at === null || at > block) {
+            throw new SnapshotError(`eth_call asked for an unsupported or later block; the snapshot uses pinned block ${block}`)
+          }
+          return value.call(target, { ...request, params: [params[0], toHex(at), ...params.slice(2)] }, options)
+        }
+      }
       if (!PINNED_METHODS.has(prop)) {
-        // viem's own plumbing, such as `request` and `extend`, stays reachable for viem; the
+        // viem's other plumbing, such as `extend`, stays reachable for viem; the
         // reads the CLI might grow into are refused by name.
         if (/^(get|read|call|multicall|simulate|estimate)/.test(prop)) {
           return () => {
