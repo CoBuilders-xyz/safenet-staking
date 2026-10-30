@@ -108,6 +108,9 @@ failures mark the run unhealthy but do not discard verified conditions from inde
 
 Gnosis backfill commits at most ten batches per invocation, each spanning at most 2,000 blocks.
 Dense ranges shrink until they contain at most 1,000 logs. Each batch commits its checkpoint atomically.
+Recognized RPC result-size errors and aggregate archive-recovery limits also shrink the complete-block range.
+The archive read returns a null capacity signal above 8 MiB, before changing any state.
+Transport, authentication, lease and commit errors remain failures; the reader does not retry an uncertain commit.
 No participation or streak alert is sent until it reaches the current finalized head. The previous
 checkpoint hash must match; a finalized history mismatch fails closed for operator investigation.
 No Gnosis schema change is needed. Existing Aegis frontend/subgraph semantics remain unchanged.

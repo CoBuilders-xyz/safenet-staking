@@ -7,19 +7,24 @@ const MAX_TRANSFER_BYTES = 8 * 1024 * 1024
 const MAX_CEREMONY_BYTES = 64 * 1024
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength
 
+/** Only pre-commit aggregate limits permit retrying a smaller complete-block range. */
+export class ChronologyRangeCapacity extends Error {}
+
 export async function persistChronologyBatch(db: Database, holder: string, previous: Chronology,
   events: RoundEvent[], through: bigint, hash: string, now: number): Promise<Chronology> {
   if (previous.archiveVersion !== 1) throw new Error("Chronology archive migration required")
   if (events.length > CHRONOLOGY_BATCH_EVENTS) throw new Error("Chronology event batch exceeds capacity")
   const sids = [...new Set(events.flatMap(event => event.sid ? [event.sid] : []))]
-  const recovered = await db.rpc<Record<string, Ceremony | null>>("load_ceremonies", {
+  const recovered = await db.rpc<Record<string, Ceremony | null> | null>("load_ceremonies", {
     holder, expected_revision: previous.revision ?? 0, sids,
   })
+  // SQL returns null for a bounded read that exceeds its transfer budget; it changes no state.
+  if (recovered === null) throw new ChronologyRangeCapacity("Ceremony recovery exceeds capacity")
   // A missing response entry is different from an explicit SQL NULL for a new SID.
   if (!recovered || Object.keys(recovered).length !== sids.length || sids.some(sid => !Object.hasOwn(recovered, sid))) {
     throw new Error("Incomplete ceremony recovery")
   }
-  if (bytes(recovered) > MAX_TRANSFER_BYTES) throw new Error("Ceremony recovery exceeds capacity")
+  if (bytes(recovered) > MAX_TRANSFER_BYTES) throw new ChronologyRangeCapacity("Ceremony recovery exceeds capacity")
   const hydrated = { ...previous, pending: { ...previous.pending } }
   for (const [sid, ceremony] of Object.entries(recovered)) {
     if (ceremony === null) continue
@@ -31,8 +36,10 @@ export async function persistChronologyBatch(db: Database, holder: string, previ
   }
   const { state, writes } = foldArchivedBatch(hydrated, events, through, hash, now)
   state.revision = (previous.revision ?? 0) + 1
-  if (bytes(state) > MAX_TRANSFER_BYTES || bytes(writes) > MAX_TRANSFER_BYTES
-    || Object.values(writes).some(ceremony => bytes(ceremony) > MAX_CEREMONY_BYTES)) throw new Error("Chronology storage capacity reached")
+  if (Object.values(writes).some(ceremony => bytes(ceremony) > MAX_CEREMONY_BYTES)) throw new Error("Chronology ceremony capacity reached")
+  if (bytes(state) > MAX_TRANSFER_BYTES || bytes(writes) > MAX_TRANSFER_BYTES) {
+    throw new ChronologyRangeCapacity("Chronology storage capacity reached")
+  }
   // Delete recovered rows when they move into the ordered pending queue or become counted.
   const deletes = sids.filter(sid => recovered[sid] !== null && !writes[sid])
   const saved = await db.rpc<number>("save_chronology", {

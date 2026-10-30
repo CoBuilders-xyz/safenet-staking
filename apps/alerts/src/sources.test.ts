@@ -211,3 +211,74 @@ test("Gnosis source commits dense ranges across polls, recovers an old SID and r
     assert.deepEqual(await saved(), before)
   } finally { mocked.mock.restore(); await db.pg.close() }
 })
+
+for (const scenario of ["archive", "provider", "provider-single-block", "unrelated-provider"] as const) {
+  test(`chronology range recovery: ${scenario}`, async () => {
+    const db = new SqlDatabase(); await db.setup()
+    const holder = crypto.randomUUID()
+    await db.rpc("lock_run", { holder })
+    const first = CONTRACTS.aegisFrostCoordinator.deployBlock
+    const now = Math.floor(Date.now() / 1000)
+    const root = numberToHex(1, { size: 32 }), hash = numberToHex(2, { size: 32 })
+    const signer = CONTRACTS.aegisConsensus.address.toLowerCase() as Hex
+    const count = scenario === "archive" ? 200 : scenario === "provider-single-block" ? 1 : 11
+    const end = first + BigInt(count - 1)
+    const ranges: number[] = []
+    if (scenario === "archive") {
+      // Each ceremony fits 64 KiB, but recovering all 200 exceeds the SQL 8 MiB bound.
+      const ceremony = { root, shares: { [root]: [signer], losing: Array.from({ length: 1015 }, () => signer) } }
+      assert.ok(JSON.stringify(ceremony).length < 64 * 1024)
+      const rows = Object.fromEntries(Array.from({ length: count }, (_, i) => [numberToHex(i + 1, { size: 32 }), ceremony]))
+      await db.pg.query("insert into alerts_ceremonies select key,value from jsonb_each($1::jsonb)", [JSON.stringify(rows)])
+      assert.equal(await db.rpc("load_ceremonies", { holder, expected_revision: 0, sids: Object.keys(rows) }), null)
+    }
+    const event: AbiEvent = scenario === "archive" ? indexedEvent("aegisConsensus", "TransactionAttested") : indexedEvent("aegisFrostCoordinator", "SignShared")
+    const mocked = mock.method(globalThis, "fetch", async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const request = JSON.parse(String(init!.body))
+      let result: unknown
+      if (request.method === "eth_chainId") result = numberToHex(CHAINS.gnosis.id)
+      else if (request.method === "eth_getBlockByNumber") result = {
+        number: request.params[0] === "finalized" ? numberToHex(end) : request.params[0], hash,
+        timestamp: numberToHex(now), transactions: [],
+      }
+      else if (request.method === "eth_getLogs") {
+        const from = BigInt(request.params[0].fromBlock), to = BigInt(request.params[0].toBlock)
+        ranges.push(Number(to - from + 1n))
+        if (scenario === "unrelated-provider" || scenario === "provider-single-block" || (scenario === "provider" && to - from >= 10n)) {
+          return Response.json({ id: request.id, jsonrpc: "2.0", error: { code: -32005,
+            message: scenario === "unrelated-provider" ? "rate limit exceeded" : "query returned more than 1000 results" } })
+        }
+        const logs = []
+        for (let block = from; block <= to; block++) for (let index = 0; index < (scenario === "archive" ? 1 : 100); index++) {
+          const sid = numberToHex((block - first) * BigInt(scenario === "archive" ? 1 : 100) + BigInt(index + 1), { size: 32 })
+          const topics = scenario === "archive"
+            ? encodeEventTopics({ abi: [event], eventName: "TransactionAttested", args: { safeTxHash: root, safeId: root, oracle: signer } })
+            : encodeEventTopics({ abi: [event], eventName: "SignShared", args: { sid, selectionRoot: root } })
+          const values = scenario === "archive" ? [1n, root, sid, { r: { x: 1n, y: 1n }, z: 1n }] : [signer, 1n]
+          logs.push({ address: signer, blockNumber: numberToHex(block), blockHash: hash, logIndex: numberToHex(index),
+            transactionIndex: "0x0", transactionHash: hash, removed: false, topics,
+            data: encodeAbiParameters(event.inputs.filter(input => !input.indexed), values) })
+        }
+        result = logs
+      } else assert.fail("Unexpected Gnosis request")
+      return Response.json({ id: request.id, jsonrpc: "2.0", result })
+    })
+    try {
+      if (scenario === "provider-single-block" || scenario === "unrelated-provider") {
+        await assert.rejects(advanceChronology(env, initialChronology(), db, holder))
+        assert.ok(ranges.every(size => size === count), "non-capacity failures must not shrink ranges")
+        assert.deepEqual(await db.request("alerts_state?key=eq.aegis"), [])
+      } else {
+        const result = await advanceChronology(env, initialChronology(), db, holder)
+        assert.equal(result.current, true)
+        assert.equal(result.state.cursor, end.toString())
+        assert.ok(ranges.some(size => size < count))
+        if (scenario === "archive") {
+          assert.equal(result.state.rounds.length, 200)
+          assert.ok(result.state.rounds.every(round => round.present.length === 1 && round.present[0] === signer))
+          assert.equal((await db.pg.query("select * from alerts_ceremonies")).rows.length, 0)
+        } else assert.equal((await db.pg.query("select * from alerts_ceremonies")).rows.length, 1100)
+      }
+    } finally { mocked.mock.restore(); await db.pg.close() }
+  })
+}

@@ -4,11 +4,18 @@ import { CHAINS, CONTRACTS, PUBLIC_RPC_URLS, SUBGRAPH_ENDPOINTS, SUBGRAPH_STALE_
 import { mainnetClient } from "./auth.js"
 import type { Chronology, RoundEvent } from "./chronology.js"
 import type { Env, Subscription, Trigger } from "./types.js"
-import { CHRONOLOGY_BATCH_EVENTS, persistChronologyBatch } from "./archive.js"
+import { CHRONOLOGY_BATCH_EVENTS, ChronologyRangeCapacity, persistChronologyBatch } from "./archive.js"
 import type { Database } from "./db.js"
 
 const abi = [indexedEvent("aegisFrostCoordinator", "SignShared"), indexedEvent("aegisFrostCoordinator", "SignCompleted"),
   indexedEvent("aegisFrostCoordinator", "KeyGenConfirmed"), indexedEvent("aegisConsensus", "ValidatorStakerSet"), indexedEvent("aegisConsensus", "TransactionAttested")]
+/** Recognize result-size errors only. Auth, rate limits and transport failures stay failures. */
+function isLogRangeLimit(error: unknown): boolean {
+  for (let depth = 0; depth < 8 && error instanceof Error; depth++, error = error.cause) {
+    if (/query returned more than|too many (?:results|logs)|(?:log response|response|result) size (?:exceeded|too large)|block range[^\n]*(?:exceed|too wide)/i.test(error.message)) return true
+  }
+  return false
+}
 export async function advanceChronology(env: Env, previous: Chronology, db: Database, holder: string) {
   if (previous.archiveVersion !== 1) throw new Error("Chronology archive migration required")
   const client = createPublicClient({ chain: CHAINS.gnosis, transport: http(env.GNOSIS_RPC_URL || PUBLIC_RPC_URLS.gnosis[0], { timeout: 10_000, retryCount: 1 }) })
@@ -21,31 +28,46 @@ export async function advanceChronology(env: Env, previous: Chronology, db: Data
   for (let page = 0; page < 10 && BigInt(state.cursor) < head.number; page++) {
     const fromBlock = BigInt(state.cursor) + 1n
     let toBlock = fromBlock + 1999n < head.number ? fromBlock + 1999n : head.number
-    const readLogs = () => client.getLogs({ address: [CONTRACTS.aegisFrostCoordinator.address, CONTRACTS.aegisConsensus.address], fromBlock, toBlock })
-    let logs = await readLogs()
-    // Shrink dense ranges before decoding/hydrating. Commit only complete blocks.
-    while (logs.length > CHRONOLOGY_BATCH_EVENTS) {
-      if (toBlock === fromBlock) throw new Error("Single block exceeds chronology event capacity")
-      toBlock = fromBlock + (toBlock - fromBlock) / 2n
-      logs = await readLogs()
+    for (;;) {
+      let logs
+      try {
+        logs = await client.getLogs({ address: [CONTRACTS.aegisFrostCoordinator.address, CONTRACTS.aegisConsensus.address], fromBlock, toBlock })
+      } catch (error) {
+        if (!isLogRangeLimit(error) || toBlock === fromBlock) throw error
+        toBlock = fromBlock + (toBlock - fromBlock) / 2n
+        continue
+      }
+      // Shrink dense ranges before decoding/hydrating. Commit only complete blocks.
+      if (logs.length > CHRONOLOGY_BATCH_EVENTS) {
+        if (toBlock === fromBlock) throw new Error("Single block exceeds chronology event capacity")
+        toBlock = fromBlock + (toBlock - fromBlock) / 2n
+        continue
+      }
+      const times = new Map<string, number>()
+      const events: RoundEvent[] = []
+      for (const log of logs) {
+        let decoded
+        try { decoded = decodeEventLog({ abi, data: log.data, topics: log.topics, strict: true }) } catch { continue }
+        const block = log.blockNumber.toString()
+        if (!times.has(block)) times.set(block, Number((await client.getBlock({ blockNumber: log.blockNumber })).timestamp))
+        const base = { block, index: log.logIndex, time: times.get(block)! }
+        const { eventName, args } = decoded
+        if (eventName === "SignShared") events.push({ ...base, kind: "share", sid: args.sid, root: args.selectionRoot, participant: args.participant })
+        else if (eventName === "SignCompleted") events.push({ ...base, kind: "completed", sid: args.sid, root: args.selectionRoot })
+        else if (eventName === "TransactionAttested") events.push({ ...base, kind: "attested", sid: args.signatureId })
+        else if (eventName === "ValidatorStakerSet") events.push({ ...base, kind: "member", participant: args.validator, staker: args.staker })
+        else if (eventName === "KeyGenConfirmed") events.push({ ...base, kind: "member", participant: args.participant })
+      }
+      const through = await client.getBlock({ blockNumber: toBlock })
+      try {
+        state = await persistChronologyBatch(db, holder, state, events, toBlock, through.hash, Number(head.timestamp))
+      } catch (error) {
+        if (!(error instanceof ChronologyRangeCapacity) || toBlock === fromBlock) throw error
+        toBlock = fromBlock + (toBlock - fromBlock) / 2n
+        continue
+      }
+      break
     }
-    const times = new Map<string, number>()
-    const events: RoundEvent[] = []
-    for (const log of logs) {
-      let decoded
-      try { decoded = decodeEventLog({ abi, data: log.data, topics: log.topics, strict: true }) } catch { continue }
-      const block = log.blockNumber.toString()
-      if (!times.has(block)) times.set(block, Number((await client.getBlock({ blockNumber: log.blockNumber })).timestamp))
-      const base = { block, index: log.logIndex, time: times.get(block)! }
-      const { eventName, args } = decoded
-      if (eventName === "SignShared") events.push({ ...base, kind: "share", sid: args.sid, root: args.selectionRoot, participant: args.participant })
-      else if (eventName === "SignCompleted") events.push({ ...base, kind: "completed", sid: args.sid, root: args.selectionRoot })
-      else if (eventName === "TransactionAttested") events.push({ ...base, kind: "attested", sid: args.signatureId })
-      else if (eventName === "ValidatorStakerSet") events.push({ ...base, kind: "member", participant: args.validator, staker: args.staker })
-      else if (eventName === "KeyGenConfirmed") events.push({ ...base, kind: "member", participant: args.participant })
-    }
-    const through = await client.getBlock({ blockNumber: toBlock })
-    state = await persistChronologyBatch(db, holder, state, events, toBlock, through.hash, Number(head.timestamp))
   }
   return { state, current: BigInt(state.cursor) === head.number, time: Number(head.timestamp) }
 }

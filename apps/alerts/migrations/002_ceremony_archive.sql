@@ -52,7 +52,8 @@ begin
   if jsonb_typeof(sids)<>'array' or jsonb_array_length(sids)>1000 then raise exception 'archive batch limit'; end if;
   select coalesce(jsonb_object_agg(s.sid,c.ceremony),'{}'::jsonb) into result
     from jsonb_array_elements_text(sids) s(sid) left join alerts_ceremonies c on c.sid=s.sid;
-  if octet_length(result::text)>8388608 then raise exception 'archive recovery byte limit'; end if;
+  -- A read-only overflow is retryable with fewer complete blocks. No checkpoint was changed.
+  if octet_length(result::text)>8388608 then return null; end if;
   return result;
 end $$;
 
