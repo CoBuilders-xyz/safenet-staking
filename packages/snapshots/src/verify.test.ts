@@ -91,6 +91,24 @@ test("a manifest that lists a path outside the directory is refused", async () =
   await assert.rejects(fetchSnapshot(cid, "https://gw.example", evil), /unsafe path: \.\.\/escape\.json/)
 })
 
+test("unsafe manifest paths are rejected before fetching them on every platform", async () => {
+  for (const path of ["../escape.json", "..\\escape.json", "C:\\escape.json", "C:escape.json", "/escape.json", "nested\\..\\escape.json", "nested/../../escape.json"]) {
+    const requested: string[] = []
+    const evil = (async (input: RequestInfo | URL) => {
+      requested.push(String(input))
+      return String(input).endsWith("/manifest.json")
+        ? Response.json({ files: [path] }) : new Response("x")
+    }) as typeof fetch
+    let fetched: string | undefined
+    try {
+      await assert.rejects(async () => { fetched = await fetchSnapshot(cid, "https://gw.example", evil) }, /unsafe path/)
+      assert.deepEqual(requested, [`https://gw.example/ipfs/${cid}/manifest.json`])
+    } finally {
+      if (fetched) rmSync(fetched, { recursive: true, force: true })
+    }
+  }
+})
+
 test("an index, a directory holding index.json alone, is fetched and verified the same way", async () => {
   const dir = mkdtempSync(join(tmpdir(), "snapshot-verify-test-"))
   try {

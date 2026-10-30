@@ -61,9 +61,16 @@ async function get(fetcher: typeof fetch, url: string, path: string): Promise<Ui
 export async function fetchSnapshot(cid: string, origin: string, fetcher: typeof fetch = fetch): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), "snapshot-verify-"))
   try {
+    const requireSafePath = (path: string) => {
+      // Manifest paths use portable '/' separators. Reject Windows traversal, drive paths
+      // and alternate streams even when verification runs on a POSIX machine.
+      if (path.includes("\\") || path.includes(":") || path.includes("\0")
+        || path.split("/").some(part => part === "" || part === "." || part === "..")) {
+        throw new SnapshotError(`the manifest lists an unsafe path: ${path}`)
+      }
+    }
     const save = (path: string, bytes: Uint8Array) => {
-      // A path from the manifest is relative and stays inside the directory.
-      if (path.startsWith("/") || path.split("/").includes("..")) throw new SnapshotError(`the manifest lists an unsafe path: ${path}`)
+      requireSafePath(path)
       mkdirSync(dirname(join(dir, path)), { recursive: true })
       writeFileSync(join(dir, path), bytes)
     }
@@ -83,6 +90,7 @@ export async function fetchSnapshot(cid: string, origin: string, fetcher: typeof
     }
     if (!Array.isArray(files) || !files.every((f) => typeof f === "string")) throw new SnapshotError("manifest.json lists no files")
     for (const path of files as string[]) {
+      requireSafePath(path)
       const bytes = await get(fetcher, gatewayUrl(origin, cid, path), path)
       if (bytes === null) throw new SnapshotError(`the manifest lists ${path}, and the gateway answered 404 for it`)
       save(path, bytes)
