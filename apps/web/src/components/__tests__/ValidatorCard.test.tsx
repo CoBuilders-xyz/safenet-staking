@@ -145,6 +145,6 @@ describe("ValidatorCard", () => {
 
     expect(screen.getByRole("link", { name: "gnosis.eth" })).toBeInTheDocument()
     expect(screen.getByText("ENS")).toHaveAttribute("title", "Ethereum Name Service primary name")
-    expect(screen.getByText(/SEF: Gnosis/)).toBeInTheDocument()
+    expect(screen.getByText(/SEF lists it as Gnosis/)).toBeInTheDocument()
   })
 })
