@@ -313,8 +313,11 @@ describe("summary", () => {
 describe("availability.ts", () => {
   it("refuses to run without PRODUCTION_URL, and says what is missing", () => {
     const env = { ...process.env, PRODUCTION_URL: "" }
-    const run = spawnSync(process.execPath, ["--import", "tsx", resolve(import.meta.dirname, "../availability.ts")], { env, encoding: "utf8" })
+    // Cold Node/tsx startup competes with other packages in CI. This checks the error contract,
+    // not startup speed. Bound the child too, since spawnSync blocks the test runner's timer.
+    const run = spawnSync(process.execPath, ["--import", "tsx", resolve(import.meta.dirname, "../availability.ts")], { env, encoding: "utf8", timeout: 20_000 })
+    expect(run.error).toBeUndefined()
     expect(run.status).toBe(1)
     expect(run.stderr).toContain("PRODUCTION_URL is not set")
-  })
+  }, 30_000)
 })
