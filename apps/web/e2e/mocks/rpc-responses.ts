@@ -5,7 +5,7 @@
  * Encoding: abi.encode for each return type, padded to 32 bytes.
  */
 
-import { encodeFunctionResult, numberToHex, pad, toFunctionSelector } from "viem"
+import { decodeAbiParameters, encodeAbiParameters, encodeFunctionResult, numberToHex, pad, toFunctionSelector, type Hex } from "viem"
 import { mainnet } from "viem/chains"
 import { ensResolverAbi, ensUniversalResolverAbi, sanctionsOracleAbi } from "@cobuilders/safenet-core"
 import { AMOUNTS, STAKING_CONTRACT, TOKEN_CONTRACT, MERKLE_DROP_CONTRACT, SANCTIONS_ORACLE_CONTRACT, VALIDATORS } from "../fixtures/test-data"
@@ -13,6 +13,19 @@ import type { MockChainState } from "./mock-chain-state"
 
 /** The resolver the mock Universal Resolver reports for SEF's ENS name. Made up. */
 const ENS_RESOLVER = pad(numberToHex(0xe75), { size: 20 })
+
+export const ENS_UNIVERSAL_RESOLVER = mainnet.contracts.ensUniversalResolver.address.toLowerCase()
+
+/**
+ * The answer to viem's getEnsName: the Universal Resolver's reverse lookup takes the address as
+ * bytes, a coin type and the gateways, and returns the name, the resolver and the reverse
+ * resolver. An address with no name answers an empty name, which viem reads as none.
+ */
+export function reverseResolution(state: MockChainState, data: string): Hex {
+  const [address] = decodeAbiParameters([{ type: "bytes" }, { type: "uint256" }, { type: "string[]" }], `0x${data.slice(10)}`)
+  const name = state.ensNames[address.toLowerCase()] ?? ""
+  return encodeAbiParameters([{ type: "string" }, { type: "address" }, { type: "address" }], [name, ENS_RESOLVER, ENS_RESOLVER])
+}
 
 export interface RewardProof {
   cumulativeAmount: string

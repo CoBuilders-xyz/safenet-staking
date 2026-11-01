@@ -1,0 +1,33 @@
+# Read every bucket at one pinned block. Unique id cursors prevent page ties.
+query ValidatorParticipation($validator: String!, $block: Block_height, $daysAfter: ID!, $validatorDaysAfter: ID!, $hoursAfter: ID!, $validatorHoursAfter: ID!) {
+  _meta(block: $block) { ...GnosisFreshness }
+  memberships: consensuses(first: 3, block: $block) {
+    programme
+    validatorCount
+    validators(first: 1000) { id }
+  }
+  consensusDays(first: 1000, block: $block, where: { id_gt: $daysAfter }, orderBy: id) {
+    id
+    programme
+    date
+    attestationCeremonies
+  }
+  validatorDays(first: 1000, block: $block, where: { validator: $validator, id_gt: $validatorDaysAfter }, orderBy: id) {
+    id
+    programme
+    date
+    attended
+  }
+  consensusHours(first: 1000, block: $block, where: { id_gt: $hoursAfter }, orderBy: id) {
+    id
+    programme
+    hour
+    attestationCeremonies
+  }
+  validatorHours(first: 1000, block: $block, where: { validator: $validator, id_gt: $validatorHoursAfter }, orderBy: id) {
+    id
+    programme
+    hour
+    attended
+  }
+}

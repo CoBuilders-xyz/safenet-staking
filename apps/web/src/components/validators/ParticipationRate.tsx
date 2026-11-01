@@ -31,7 +31,7 @@ export function ParticipationRate({ rate, text, className }: ParticipationRatePr
             aria-label={below ? t("validators.belowThreshold", "Below the {{threshold}} reward threshold", { threshold: THRESHOLD_LABEL }) : t("validators.aboveThreshold", "At or above the {{threshold}} reward threshold", { threshold: THRESHOLD_LABEL })}
             className={cn(
               "inline-flex items-center rounded-sm border px-1 font-mono text-[10px] normal-case leading-4 tracking-normal",
-              below ? "border-warning/50 bg-warning/10 text-warning" : "border-border text-faint hover:text-muted-foreground",
+              below ? "border-warning/50 bg-card text-warning" : "border-border text-faint hover:text-muted-foreground",
             )}
           >
             {below ? "<" : "≥"}

@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next"
+import { currentLanguage } from "@/i18n"
 import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import type { Address } from "viem"
@@ -13,6 +14,7 @@ import { copyToClipboard } from "@/lib/clipboard"
 import { useToast } from "@/hooks/useToast"
 import { useWrongNetwork } from "@/hooks/useWrongNetwork"
 import { Term } from "@/components/ui/term"
+import { shortDay } from "@/lib/utcDates"
 import { PublishedParticipationRate } from "./ParticipationRate"
 
 interface ValidatorCardProps {
@@ -24,6 +26,16 @@ interface ValidatorCardProps {
   userStake?: bigint
   loadingUserStake?: boolean
   validators?: ValidatorInfo[]
+  /** The ENS primary name, when one is set. SEF's label shows otherwise. */
+  ensName?: string
+  /** Addresses staking with it now. Undefined while unknown. */
+  delegators?: number
+  /** Unix seconds of its latest registration on the Staking contract. */
+  registeredAt?: number
+  /** Ceremonies missed in the window `missedLabel` names. */
+  missed?: bigint
+  /** The window of `missed`, such as "Missed, Beta's last 14 days". */
+  missedLabel?: string
 }
 
 export function ValidatorCard({
@@ -35,6 +47,11 @@ export function ValidatorCard({
   userStake,
   loadingUserStake,
   validators,
+  ensName,
+  delegators,
+  registeredAt,
+  missed,
+  missedLabel,
 }: ValidatorCardProps) {
   const { t } = useTranslation()
   const { isConnected } = useAccount()
@@ -87,13 +104,19 @@ export function ValidatorCard({
               className={`text-2xl font-normal hover:underline truncate block
                 leading-none ${nameColor}`}
             >
-              {metadata
+              {ensName ?? (metadata
                 ? metadata.label
                 : <span className="font-mono">
                     {truncateAddress(validator)}
-                  </span>}
+                  </span>)}
             </Link>
-            {metadata && (
+            {ensName && (
+              <span className="text-xs text-faint">
+                <abbr title={t("selector.ensTitle", "Ethereum Name Service primary name")}>{t("selector.ens", "ENS")}</abbr>
+                {metadata && ` · ${t("selector.sefLabel", "SEF lists it as {{name}}", { name: metadata.label })}`}
+              </span>
+            )}
+            {(metadata || ensName) && (
               <button
                 className="text-sm font-mono
                   text-faint
@@ -117,7 +140,7 @@ export function ValidatorCard({
                 px-[7px] py-[3px] text-sm font-mono uppercase
                 leading-[18px]
                 text-success
-                bg-success/15
+                bg-success/10
                 border border-success/40"
             >{t("validators.active", "Active")}</span>
           ) : (
@@ -137,7 +160,7 @@ export function ValidatorCard({
         {/* Content: two columns with vertical divider */}
         <div className="flex flex-1 min-h-0">
           {/* Left column — Commission */}
-          <div className="flex-1 flex flex-col gap-1 px-6 py-4">
+          <div className="min-w-0 flex-1 flex flex-col gap-1 px-4 py-4">
             <span className="text-base font-heading text-faint leading-none">
               <Term term="commission">{t("onboarding.commission", "Commission")}</Term>:
             </span>
@@ -148,7 +171,7 @@ export function ValidatorCard({
           {/* Vertical divider */}
           <div className="w-px bg-border self-stretch" />
           {/* Right column — Participation */}
-          <div className="flex-1 flex flex-col gap-1 px-6 py-4">
+          <div className="min-w-0 flex-1 flex flex-col gap-1 px-4 py-4">
             <span className="text-base font-heading text-faint leading-none">{t("validators.participation14d", "Participation (14d):")}</span>
             <span className={`text-xl font-mono leading-none uppercase ${valueColor}`}>
               {metadata ? (
@@ -158,6 +181,40 @@ export function ValidatorCard({
               )}
             </span>
           </div>
+        </div>
+
+        {/* Delegators and registration, from the Mainnet subgraph */}
+        <div className="flex border-t border-border">
+          <div className="min-w-0 flex-1 flex flex-col gap-1 px-4 py-4">
+            <span className="text-base font-heading text-faint leading-none">
+              {t("selector.delegatorsColon", "Delegators:")}
+            </span>
+            <span className={`text-xl font-mono leading-none ${valueColor}`}>
+              {delegators === undefined ? "—" : delegators.toLocaleString(currentLanguage())}
+            </span>
+          </div>
+          <div className="w-px bg-border self-stretch" />
+          <div className="min-w-0 flex-1 flex flex-col gap-1 px-4 py-4">
+            <span className="text-base font-heading text-faint leading-none">
+              {t("selector.registeredColon", "Registered:")}
+            </span>
+            <span className={`text-xl font-mono leading-none ${valueColor}`}>
+              {registeredAt === undefined ? "—" : shortDay(registeredAt)}
+            </span>
+          </div>
+        </div>
+
+        {/* Missed ceremonies, from the Gnosis subgraph */}
+        <div
+          className="flex items-center justify-between gap-3
+            px-6 py-4 border-t border-border"
+        >
+          <span className="text-base font-heading text-faint leading-none">
+            {missedLabel ?? t("selector.missed", "Missed ceremonies")}
+          </span>
+          <span className={`text-xl font-mono leading-none ${valueColor}`}>
+            {missed === undefined ? "—" : missed.toLocaleString(currentLanguage())}
+          </span>
         </div>
 
         {/* Footer: Total SAFE Staked, border-top */}

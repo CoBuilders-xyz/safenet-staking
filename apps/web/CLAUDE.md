@@ -104,9 +104,11 @@ wrapped in `ErrorBoundary`:
   subgraph
 - `/dashboard` → `DashboardPage`: stats, claimable banners, quick actions, the staking section,
   the stake distribution chart
-- `/validators` → `ValidatorsPage`: validator cards with Delegate and Undelegate.
-  `?delegate=<address>` opens the delegate dialog
-- `/validators/:address` → `ValidatorDetailPage`
+- `/validators` → `ValidatorsPage`: validator cards with Delegate and Undelegate, sorted by total
+  SAFE, participation or delegators, all or active only. `?delegate=<address>` opens the delegate
+  dialog
+- `/validators/:address` → `ValidatorDetailPage`: the validator's figures, then participation over
+  7 days, 30 days and all, delegators and registration, and its event history
 - `/withdrawals` → `WithdrawalsPage`: the queue, oldest first, cooldowns, Claim, and Claim All in
   a batching wallet
 - `/rewards` → `RewardsPage`: Your rewards, Claim, Claim & Stake, Programme, and Verifiability,
@@ -170,6 +172,17 @@ transaction.
   `validator-info.json` (`SEF_DATA.validatorInfo` in core), cached five minutes. `findValidator()`
   looks one up by address; an unknown address shows truncated. `participationRate` is null when
   SEF publishes no rate, never 0.
+- **Validator selector** (`src/hooks/useValidatorDirectory.ts`, `useValidatorActivity.ts`,
+  `useValidatorParticipation.ts`, `useEnsNames.ts`): each validator's delegators and registration
+  from the Mainnet subgraph; one validator's stakes and withdrawals, read page by page at one
+  block, replayed into delegators per day (`src/lib/validatorActivity.ts`) and checked against the
+  subgraph's own count; its participation from Gnosis buckets read page by page at one block
+  (`src/lib/participationSeries.ts`). Only verified programme members receive a rate. Aegis uses
+  core's first complete day, including silent days; Beta excludes its first stored bucket.
+  Missing attendance is zero for known members; no ceremonies means an undefined rate.
+  Incomplete pages, membership or stale answers are unavailable. Each bucket names its programme.
+  ENS primary names come from reverse resolution, with SEF's label as the fallback and a source
+  caption. Beta-only windows carry their dates and an ended notice, never current figures.
 - **Withdrawals** (`src/hooks/useWithdrawals.ts`): the connected user's queue, polled every
   15 seconds, and `useNextClaimable` for the banner.
 - **Gas** (`src/hooks/useGasEstimate.ts`): `estimateGas` and `getGasPrice`, debounced 500 ms.
@@ -251,7 +264,10 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
   the amount, and the rest stays in the wallet. A
   `MerkleRootWasUpdated` revert offers to reload the proof and retry. Once nothing is left to
   claim, it opens as "Stake your balance".
-- `src/components/validators/`: `ValidatorList`, `ValidatorCard`, and `ParticipationRate`, which
+- `src/components/validators/`: `ValidatorList`, `ValidatorCard`, `ParticipationHistory`,
+  `ValidatorActivitySections`, and `ChartFigure`, which gives every chart its summary label, a
+  legend for more than one series and a table of every value; `TimeSeriesChart` is the lazy
+  Recharts plot behind it. `ParticipationRate`, in the same directory,
   marks SEF's 75% reward threshold. Screens that show a rate also state the rule as text, because
   a tooltip does not open on touch. `PublishedParticipationRate`, in the same file, takes SEF's
   rate in percent: a null reads "Not published", with no marker, never 0.00%. The validator
@@ -268,6 +284,8 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
 - `src/lib/restriction.ts`: the gates' `Restriction` and the restricted screen's copy.
 - `src/lib/glossary.ts`: what each term means, restating SEF's staking documentation. Figures come
   from core or the staking contract, never from the text.
+- `src/lib/utcDates.ts`: formats unix seconds and spaces time axis ticks.
+- `src/lib/explorer.ts`: explorer links for addresses, transactions and blocks.
 - `src/lib/programme.ts`: copy built on the programme calendar in core: `PARTICIPATION_RULE`,
   `RATE_NOT_PUBLISHED` for a rate SEF lists as null, `belowThreshold`, the dated Beta notice, the withdrawn status for a validator SEF lists as
   inactive.

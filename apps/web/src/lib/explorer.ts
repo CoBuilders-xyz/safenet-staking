@@ -9,3 +9,13 @@ export const explorerName: string | undefined = explorer?.name
 export function explorerAddressUrl(address: string): string | undefined {
   return explorer ? `${explorer.url}/address/${address}` : undefined
 }
+
+/** Explorer page for a transaction on the active chain, or undefined when the chain has none. */
+export function explorerTxUrl(hash: string): string | undefined {
+  return explorer ? `${explorer.url}/tx/${hash}` : undefined
+}
+
+/** Explorer page for a block on the active chain, or undefined when the chain has none. */
+export function explorerBlockUrl(block: bigint | number): string | undefined {
+  return explorer ? `${explorer.url}/block/${block}` : undefined
+}

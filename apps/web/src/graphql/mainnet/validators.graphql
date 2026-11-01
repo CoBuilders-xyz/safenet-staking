@@ -1,0 +1,65 @@
+# Mainnet subgraph queries for the validators list and the validator detail page.
+#
+# Only fields the deployed version serves are selected. The schema in packages/subgraph-mainnet
+# can run ahead of the deployment: firstSeenAtBlock is in the schema and not in the Studio
+# version this app reads, so it is not selected here. That version also files registeredAtBlock
+# and registeredAtTimestamp under the first event that named the validator, not its registration.
+# Checked against the Staking contract's logs at block 26,287,293: for the six validators SEF
+# lists the two are the same block; one address that was only ever deregistered differs.
+
+# Every validator the Staking contract has named, registered or not: a deregistered validator
+# keeps its stake and its delegators until they withdraw.
+query ValidatorDirectory {
+  _meta {
+    ...MainnetFreshness
+  }
+  validators(first: 1000) {
+    id
+    isRegistered
+    totalStaked
+    stakersCurrent
+    stakersEver
+    registeredAtBlock
+    registeredAtTimestamp
+  }
+}
+
+# One validator's record and every stake and withdrawal it received, one page of each. The first
+# page is read at the head; the next pages pass the block that page answered at, so every page
+# describes the same block. Pages follow `id`, the only order with a unique cursor.
+# `id` and `validator` carry the same lowercase address: the schema types the entity id as ID and
+# the filter on a reference as String.
+query ValidatorActivity($id: ID!, $validator: String!, $block: Block_height, $stakesAfter: ID!, $withdrawalsAfter: ID!) {
+  _meta(block: $block) {
+    ...MainnetFreshness
+  }
+  validator(id: $id, block: $block) {
+    id
+    isRegistered
+    totalStaked
+    stakersCurrent
+    stakersEver
+    registeredAtBlock
+    registeredAtTimestamp
+  }
+  stakes(first: 1000, block: $block, where: { validator: $validator, id_gt: $stakesAfter }, orderBy: id) {
+    id
+    staker
+    amount
+    blockNumber
+    timestamp
+    transactionHash
+  }
+  withdrawals(first: 1000, block: $block, where: { validator: $validator, id_gt: $withdrawalsAfter }, orderBy: id) {
+    id
+    staker
+    amount
+    claimed
+    initiatedAtBlock
+    initiatedAtTimestamp
+    initiatedTxHash
+    claimedAtBlock
+    claimedAtTimestamp
+    claimedTxHash
+  }
+}
