@@ -59,6 +59,7 @@ const TIMEOUT_MS = 15_000
 
 interface Meta { _meta: { block: { number: number; timestamp: number | null } } }
 interface Periods {
+  network: { rewardPeriods: number } | null
   rewardPeriods: { period: number; root: Hex; blockNumber: string; timestamp: string; transactionHash: Hash }[]
   rewardClaims: { blockNumber: string; amount: string; cumulativeAmount: string }[]
 }
@@ -101,6 +102,7 @@ export async function readRewardPeriods(ctx: Context, address: Address): Promise
   const head = BigInt(meta._meta.block.number)
   const at = `block: { number: ${head} }`
   const data = await query<Periods>(ctx, url, `{
+    network(id: "1", ${at}) { rewardPeriods }
     rewardPeriods(first: ${PAGE}, orderBy: period, ${at}) { period root blockNumber timestamp transactionHash }
     rewardClaims(first: ${PAGE}, where: { account: "${address.toLowerCase()}" }, orderBy: blockNumber, ${at}) {
       blockNumber amount cumulativeAmount
@@ -110,6 +112,16 @@ export async function readRewardPeriods(ctx: Context, address: Address): Promise
     throw new Error(`the subgraph holds ${PAGE} or more rows for one query, and this reader does not page`)
   }
   if (data.rewardPeriods.length === 0) throw new Error("the subgraph returned no reward periods")
+  if (data.network?.rewardPeriods !== data.rewardPeriods.length
+    || data.rewardPeriods.some((p, i) => p.period !== i + 1)) {
+    throw new Error("the subgraph returned incomplete or inconsistent reward periods")
+  }
+  for (let i = 0; i < data.rewardPeriods.length; i++) {
+    const start = BigInt(data.rewardPeriods[i]!.blockNumber)
+    if (start > head || (i > 0 && start < BigInt(data.rewardPeriods[i - 1]!.blockNumber))) {
+      throw new Error("the subgraph returned inconsistent reward period boundaries")
+    }
+  }
 
   const [chainHead, headBlock] = await Promise.all([
     ctx.client.getBlock(),
@@ -121,6 +133,18 @@ export async function readRewardPeriods(ctx: Context, address: Address): Promise
   const claims = data.rewardClaims.map((c) => ({
     block: BigInt(c.blockNumber), amount: BigInt(c.amount), cumulative: BigInt(c.cumulativeAmount),
   }))
+  // Cumulative totals alone can hide omitted payments. Reconstruct every prefix; cumulative
+  // order resolves same-block query ties without changing the documented block windows.
+  const ordered = [...claims].sort((a, b) => a.block !== b.block ? (a.block < b.block ? -1 : 1)
+    : a.cumulative < b.cumulative ? -1 : a.cumulative > b.cumulative ? 1 : 0)
+  let running = 0n
+  const firstBlock = BigInt(data.rewardPeriods[0]!.blockNumber)
+  for (const claim of ordered) {
+    running += claim.amount
+    if (claim.amount < 0n || claim.block < firstBlock || claim.block > head || claim.cumulative !== running) {
+      throw new Error("the subgraph returned incomplete or inconsistent reward claims")
+    }
+  }
   const rows = data.rewardPeriods.map((p, i) => {
     const start = BigInt(p.blockNumber)
     const next = data.rewardPeriods[i + 1]

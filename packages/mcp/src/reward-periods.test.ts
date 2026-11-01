@@ -21,6 +21,23 @@ test("empty indexed periods remain unavailable in MCP text and structured conten
   }
 })
 
+test("incomplete period history stays unavailable in MCP text and structured content", async () => {
+  for (const subgraph of ["missing-claim", "missing-period", "missing-last-period", "duplicate-period"] as const) {
+    const fake = fakeLibrary({ ...library, createContext: () => fakeContext({ subgraph }) })
+    const s = await connect(readConfig({}), { fake })
+    try {
+      const result = await s.call("rewards_history", { address: STAKER, all: true })
+      assert.equal(result.isError, undefined)
+      assert.equal(result.structuredContent?.periods, null, subgraph)
+      assert.equal(result.structuredContent?.count, 2)
+      assert.equal(result.structuredContent?.totalClaimed, String(10n * 10n ** 18n))
+      assert.equal(result.structuredContent?.sumMatchesChain, true)
+      assert.match(textOf(result), /No periods: .*incomplete or inconsistent/)
+      assert.doesNotMatch(textOf(result), /each matches cumulativeClaimed/)
+    } finally { await s.close() }
+  }
+})
+
 test("real reward history preserves claims and redacts invalid subgraph settings in every MCP result field", async () => {
   for (const url of ["not-a-url-private-marker", "https://user:private-marker@[broken/query", "ftp://subgraph.invalid/private-marker"]) {
     let fetches = 0

@@ -71,7 +71,7 @@ export interface FakeOptions {
   /** The status the repository answers for its reward files, when not 200. */
   readonly repositoryStatus?: number
   /** Subgraph failure, mismatch, or two claims tied by block number in reversed event order. */
-  readonly subgraph?: "down" | "differs" | "same-block-reversed" | "empty" | "graphql-error"
+  readonly subgraph?: "down" | "differs" | "same-block-reversed" | "empty" | "graphql-error" | "missing-claim" | "missing-period" | "missing-last-period" | "duplicate-period"
 }
 
 /** A made-up ENS resolver. */
@@ -114,7 +114,7 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
     totalValidatorStakes: ([a]) => (a === VALIDATOR_A ? 200n * SAFE : 100n * SAFE),
     stakes: () => 1n * SAFE,
     // The two Claimed logs below: 6 SAFE at BLOCK - 5, then 4 SAFE at BLOCK - 4.
-    cumulativeClaimed: (_, b) => (b === undefined || b >= BLOCK - 4n ? 10n * SAFE : b >= BLOCK - 5n && o.subgraph !== "same-block-reversed" ? 6n * SAFE : 0n),
+    cumulativeClaimed: (_, b) => (b === undefined || b >= BLOCK - 4n ? 10n * SAFE : b >= BLOCK - 5n && o.subgraph !== "same-block-reversed" && o.subgraph !== "missing-claim" ? 6n * SAFE : 0n),
     getPendingWithdrawals: () => [
       { amount: 5n * SAFE, claimableAt: BLOCK_TIME - 60n },
       { amount: 2n * SAFE, claimableAt: BLOCK_TIME + 90_000n },
@@ -297,13 +297,17 @@ function fakeSubgraph(o: FakeOptions, body: string): Response {
     transactionHash: fakeRoot(0x300 + n),
   })
   const claims = [
-    { blockNumber: String(o.subgraph === "same-block-reversed" ? BLOCK - 4n : BLOCK - 5n), amount: String(6n * SAFE), cumulativeAmount: String(6n * SAFE) },
-    { blockNumber: String(BLOCK - 4n), amount: String(4n * SAFE), cumulativeAmount: String((o.subgraph === "differs" ? 9n : 10n) * SAFE) },
+    { blockNumber: String(o.subgraph === "same-block-reversed" || o.subgraph === "missing-claim" ? BLOCK - 4n : BLOCK - 5n), amount: String(6n * SAFE), cumulativeAmount: String(6n * SAFE) },
+    { blockNumber: String(BLOCK - 4n), amount: String((o.subgraph === "differs" ? 3n : 4n) * SAFE), cumulativeAmount: String((o.subgraph === "differs" ? 9n : 10n) * SAFE) },
   ]
   return json({
     data: {
-      rewardPeriods: [period(1, BLOCK - 10n), period(2, BLOCK - 4n)],
-      rewardClaims: o.subgraph === "same-block-reversed" ? claims.reverse() : claims,
+      network: { rewardPeriods: 2 },
+      rewardPeriods: o.subgraph === "missing-period" ? [period(2, BLOCK - 4n)]
+        : o.subgraph === "missing-last-period" ? [period(1, BLOCK - 10n)]
+        : o.subgraph === "duplicate-period" ? [period(1, BLOCK - 10n), period(1, BLOCK - 4n)]
+        : [period(1, BLOCK - 10n), period(2, BLOCK - 4n)],
+      rewardClaims: o.subgraph === "missing-claim" ? claims.slice(1) : o.subgraph === "same-block-reversed" ? claims.reverse() : claims,
     },
   })
 }

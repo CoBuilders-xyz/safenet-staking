@@ -113,6 +113,22 @@ test("empty indexed periods remain unavailable while CLI preserves verified chai
   assert.doesNotMatch(text.out, /Every period:/)
 })
 
+test("incomplete claims and missing or duplicate periods never report a verified period history", async () => {
+  for (const subgraph of ["missing-claim", "missing-period", "missing-last-period", "duplicate-period"] as const) {
+    const json = await history({ subgraph }, "--json")
+    assert.equal(json.code, 0, json.err)
+    const h = JSON.parse(json.out)
+    assert.equal(h.periods, null, subgraph)
+    assert.match(h.periodsReason, /incomplete or inconsistent reward (claims|periods)/)
+    assert.equal(h.count, 2)
+    assert.equal(h.totalClaimed, String(10n * SAFE))
+    assert.equal(h.sumMatchesChain, true)
+    const text = await history({ subgraph })
+    assert.match(text.out, /Periods: not shown, because .*incomplete or inconsistent/)
+    assert.doesNotMatch(text.out, /Every period:/)
+  }
+})
+
 test("SUBGRAPH_URL_MAINNET replaces core's endpoint, and its URL is never printed", async () => {
   const url = "https://user:key@subgraph.invalid/query"
   const r = await history({ env: { SUBGRAPH_URL_MAINNET: url } }, "--json")
@@ -185,7 +201,7 @@ test("period and account queries share the indexed block, while a full page stay
     },
   }, STAKER)
   assert.equal(queries.length, 2)
-  assert.equal(queries[1]!.match(new RegExp(`block: \\{ number: ${BLOCK} \\}`, "g"))?.length, 2)
+  assert.equal(queries[1]!.match(new RegExp(`block: \\{ number: ${BLOCK} \\}`, "g"))?.length, 3)
   assert.ok(queries[1]!.includes(`account: "${STAKER.toLowerCase()}"`))
   assert.equal(full.periods, null)
   assert.match(full.periodsReason!, /1000 or more rows/)
