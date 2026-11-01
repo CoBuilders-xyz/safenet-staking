@@ -148,6 +148,14 @@ export async function events(fetcher: Fetcher, env: Endpoints, target: Address, 
       claimedAtBlock: claimed ? uint(v.claimedAtBlock) : null, claimedAtTimestamp: claimed ? uint(v.claimedAtTimestamp) : null,
       claimedTxHash: claimed ? string(v.claimedTxHash) : null }
   })
+  for (const [rows, after] of [[stakes, cursor?.stake ?? ""], [withdrawals, cursor?.withdrawal ?? ""]] as const) {
+    if (rows.length > 100) throw malformed()
+    let previous = after
+    for (const row of rows) {
+      if (row.id <= previous) throw malformed()
+      previous = row.id
+    }
+  }
   const more = stakes.length === 100 || withdrawals.length === 100
   const nextCursor = more ? btoa(JSON.stringify({ address: target.toLowerCase(), hash: r.freshness.blockHash,
     stake: stakes.at(-1)?.id ?? cursor?.stake ?? "", withdrawal: withdrawals.at(-1)?.id ?? cursor?.withdrawal ?? "" })) : null

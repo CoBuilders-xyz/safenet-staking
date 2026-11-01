@@ -95,10 +95,15 @@ export function createApp(dependencies: Dependencies = {}) {
     let result: Result<unknown>
     if (path === "/v1/health") {
       const checks = await Promise.allSettled([readValidators(60_000), readStats()])
+      const checkedAt = now()
       const sources = checks.flatMap(r => r.status === "fulfilled" ? r.value.sources : [])
-      const failures = checks.flatMap((r, i) => r.status === "rejected" ? [{ dependency: i === 0 ? "sef" : "subgraphs", code: r.reason instanceof ApiError ? r.reason.code : "upstream_failed" }] : [])
+      const failures = checks.flatMap((r, i) => {
+        const dependency = i === 0 ? "sef" : "subgraphs"
+        if (r.status === "rejected") return [{ dependency, code: r.reason instanceof ApiError ? r.reason.code : "upstream_failed" }]
+        return r.value.expiresAt <= checkedAt ? [{ dependency, code: "stale_upstream" }] : []
+      })
       c.header("Cache-Control", "no-store")
-      return c.json({ status: failures.length ? "degraded" : "ok", checkedAt: new Date(start).toISOString(), sources, failures }, failures.length ? 503 : 200)
+      return c.json({ status: failures.length ? "degraded" : "ok", checkedAt: new Date(checkedAt).toISOString(), sources, failures }, failures.length ? 503 : 200)
     } else if (path === "/v1/system/stats") {
       result = await readStats()
     } else {

@@ -108,6 +108,24 @@ test("health reports dependency degradation and stays uncached", async () => {
   assert.equal(r.headers.get("Cache-Control"), "no-store")
   assert.match(await r.text(), /degraded/)
 })
+test("health rechecks source expiry at completion, including the exact boundary", async () => {
+  for (const dependency of ["sef", "subgraphs"]) {
+    for (const elapsed of [999, 1000, 2000]) {
+      let time = NOW
+      const a = createApp({ now: () => time, ens: async () => { time = NOW + elapsed; return null },
+        fetch: upstream(dependency === "sef" ? { publication: NOW - SEF_DATA.staleAfterMs + 1000 } : {
+          graph: q => ({ ...graphData(q), _meta: { ...meta, block: { ...meta.block,
+            timestamp: NOW / 1000 - SUBGRAPH_STALE_AFTER_SECONDS + 1 } } }),
+        }) })
+      const r = await a.request("http://api.test/v1/health", {}, ENV)
+      assert.equal(r.status, elapsed < 1000 ? 200 : 503)
+      assert.equal(r.headers.get("Cache-Control"), "no-store")
+      const body = await r.json() as { checkedAt: string; failures: { dependency: string; code: string }[] }
+      assert.equal(body.checkedAt, new Date(time).toISOString())
+      assert.deepEqual(body.failures, elapsed < 1000 ? [] : [{ dependency, code: "stale_upstream" }])
+    }
+  }
+})
 test("health and stats share bounded successful reads, then expose an outage after expiry", async () => {
   for (const first of ["health", "system/stats"]) {
     const entries = new Map<string, Response>()
@@ -163,6 +181,21 @@ test("events page preserves claimed withdrawals and resumes both collections wit
   const second = await next.json() as { nextCursor: string | null; stakes: { id: string }[] }
   assert.equal(second.nextCursor, null)
   assert.equal(second.stakes[0]!.id, "stake-100")
+})
+test("event pages reject duplicate, unordered, oversized and non-advancing collections", async () => {
+  for (const collection of ["stakes", "withdrawals"]) {
+    const row = { staker: OTHER, amount: "10", blockNumber: "1", timestamp: "10", transactionHash: HASH,
+      claimed: false, initiatedAtBlock: "1", initiatedAtTimestamp: "10", initiatedTxHash: HASH }
+    for (const ids of [["b", "b"], ["c", "b"], ["a"], Array.from({ length: 101 }, (_, i) => `b${String(i).padStart(3, "0")}`)]) {
+      const cursor = btoa(JSON.stringify({ address: TARGET.toLowerCase(), hash: HASH, stake: "a", withdrawal: "a" }))
+      const r = await get(`validators/${TARGET}/events?cursor=${encodeURIComponent(cursor)}`, {
+        graph: q => q.includes("query Events") ? { stakes: [], withdrawals: [], [collection]: ids.map(id => ({ ...row, id })) } : graphData(q),
+      })
+      assert.equal(r.status, 502, `${collection}: ${ids.length} rows`)
+      assert.equal(r.headers.get("Cache-Control"), "no-store")
+      assert.match(await r.text(), /invalid_upstream/)
+    }
+  }
 })
 test("GraphQL partial errors and timeout cannot pass health as successful data", async () => {
   const base = upstream()
