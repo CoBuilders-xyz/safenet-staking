@@ -79,6 +79,9 @@ too, and no tool takes one. A new CLI command needs a tool: `src/parity.test.ts`
   server's advice for a refused log scan, then `scrubSecrets()`. No stack, no URL.
 - An RPC URL can carry a key. The server logs where the endpoint comes from, never the URL or its
   host.
+- `rewards_history` also reads the Mainnet subgraph for its periods: `SUBGRAPH_URL_MAINNET`, else
+  core's default, passed to `createContext()` as `subgraphUrl`. Its summary says how many periods
+  came back and whether each matched the chain, or why there are none.
 - RPC: `SAFENET_MCP_RPC_URL`, else `MAINNET_RPC_URL`, else core's public list, through the
   library's `createContext()`. `validators_show` (delegators), `withdrawals_list` without
   `address` and `rewards_history` scan history and need an archive endpoint.

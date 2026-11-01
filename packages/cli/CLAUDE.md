@@ -41,7 +41,7 @@ command's options or output changes its section.
 | `safenet validators show <address>` | the same for one validator, plus its delegators from `StakeIncreased` logs and `stakes()` |
 | `safenet withdrawals list [--address <addr>]` | `totalPendingWithdrawals()` and the withdrawal logs; or `getPendingWithdrawals(staker)` |
 | `safenet rewards check <address>` | SEF's proof file for the address; `cumulativeClaimed()` and `merkleRoot()` on chain |
-| `safenet rewards history <address> [--all]` | `Claimed` logs for the address from the MerkleDrop deploy block, newest 20 unless `--all` |
+| `safenet rewards history <address> [--all]` | `Claimed` logs for the address from the MerkleDrop deploy block, newest 20 unless `--all`; then the periods: the Mainnet subgraph's `RewardPeriod` and `RewardClaim` at one indexed block, and `cumulativeClaimed()` at each period's last block |
 
 The writes send what the web interface sends, in the same order:
 
@@ -107,6 +107,16 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   SEF's `latest.json`, the same rule as `useProgrammeRewards()` in the web app. Otherwise the
   balance still funds the old root, so both are null with a `reason`, and the raw balance shows
   as "SAFE held by MerkleDrop".
+- `rewards history`'s periods come from the Mainnet subgraph, `src/lib/reward-periods.ts`: every
+  query pinned to the block `_meta` gives, and for each period the subgraph's cumulative claimed
+  for the address at the period's last block against `cumulativeClaimed()` on chain at that same
+  block. Claim attribution uses approximate whole-block windows: root-update block through the
+  block before the next update, or the indexed head. Update-block claims enter the new window,
+  including claims before the update. The schema has no root-update log index. Cumulative
+  comparisons stay exact at each window's last block. Period earnings come from SEF's files.
+  When the subgraph cannot answer, `periods` is null
+  with `periodsReason`, and the claims, read from the chain, still print. The endpoint is
+  `SUBGRAPH_URL_MAINNET` when set, else core's `SUBGRAPH_ENDPOINTS.mainnet`, and is never printed.
 - Amounts print exactly, to the last wei. `--json` gives the same fields, with amounts as wei in
   decimal strings.
 - An RPC URL can carry a key. It is never printed: `--verbose` shows the host only, and error
@@ -126,7 +136,9 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
 
 `pnpm test` runs the unit tests in `src/`, against a fake chain and fake SEF files in
 `src/test-support.ts`. No network. `src/writes.test.ts` runs every write with `--dry-run` and a
-signer whose `signTransaction` throws, and fails if it is reached. `src/fork/redaction.test.ts`
+signer whose `signTransaction` throws, and fails if it is reached. `src/reward-periods.test.ts`
+checks the periods against a fake subgraph, the chain read at each period's last block, a
+subgraph that differs, one that is down, and the override. `src/fork/redaction.test.ts`
 also runs here: it makes the fork suite's archive read fail and checks that its error carries no
 part of the URL.
 

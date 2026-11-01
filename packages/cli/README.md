@@ -86,7 +86,7 @@ and what it printed against Mainnet, in the human format and with `--json`.
 | `safenet validators show <address>` | One validator, with its delegators count. A rate SEF does not publish prints as "not published", and as `null` with `--json` | read |
 | `safenet withdrawals list` | Pending withdrawals: the network figure and count, or one staker's queue with `--address <address>` | read |
 | `safenet rewards check <address>` | Claimable, earned, claimed and held amounts, and whether the proof is current | read |
-| `safenet rewards history <address>` | The address's reward claims, newest first. The newest 20, or every claim with `--all` | read |
+| `safenet rewards history <address>` | The address's reward claims, newest first, the newest 20 or every claim with `--all`; then each distribution period from the Mainnet subgraph, with the address's claims in it and its cumulative claimed checked against the chain at the period's last block | read |
 | `safenet stake <validator> <amount>` | Stake SAFE on a validator, approving the staking contract first when the allowance is short. `--approve exact` (the default) or `--approve unlimited` | write |
 | `safenet unstake <validator> <amount>` | Start a withdrawal of SAFE staked on a validator. It becomes claimable after the delay | write |
 | `safenet withdrawals claim [id]` | Claim withdrawals past their delay, up to and including `id`, or every one with `--all`. The contract pays the oldest first | write |
@@ -202,11 +202,19 @@ Keep pairing URIs, keys, passwords, seed words, RPC credentials, and terminal re
 | `MAINNET_RPC_URL` | The Mainnet RPC endpoint, tried before the public endpoints. `--rpc-url` overrides it |
 | `GITHUB_TOKEN` or `GH_TOKEN` | Raises the GitHub API limit for the lookup that dates SEF's participation window. Optional |
 | `IPFS_GATEWAY` | An IPFS gateway, tried before the public gateways for SEF's reward dataset. Only its origin is used: a path such as `/ipfs/` is dropped. Optional |
+| `SUBGRAPH_URL_MAINNET` | The Mainnet subgraph `rewards history` reads its periods from, instead of the Studio deployment in `packages/core`. Never printed. Optional |
 
 An RPC URL can carry a key. It is never printed: `--verbose` shows the host only, and error
 messages have URLs removed.
 
 ## Reward data
+
+`rewards history` assigns claims to approximate whole-block windows, from each root-update block
+through the block before the next update. The current window ends at the indexed head.
+Claims before an update in its block also enter the new window: the schema lacks root-update log indices.
+Cumulative comparisons remain exact at each window's last block. These rows show claims, not period earnings.
+An invalid `SUBGRAPH_URL_MAINNET` leaves periods unavailable, with a fixed error that never repeats the setting.
+The chain claim history remains available.
 
 SEF declares the IPFS dataset behind the ENS name `rewards.safenet-gov.eth` the canonical source of reward data, and keeps the repository `safe-fndn/safenet-data` as a temporary mirror. `status`, `rewards check` and both claims read `latest.json` and the proofs in the order the web interface uses: SEF's dataset through each IPFS gateway, `IPFS_GATEWAY` first and then ipfs.orbitor.dev and ipfs.filebase.io, but only when the name's contenthash is set; then the repository. ipfs.io and dweb.link are not listed: they retired on 2026-09-21 and answer every path with a 429 pointing at https://gatewaychanges.ipfs.io. The paths under the contenthash are assumed to repeat the repository's `assets/rewards` layout until SEF confirms the dataset's. A source that fails, answers 404, serves a file of the wrong shape or does not answer within 10 seconds falls through to the next; the gateways share one 10-second budget, and each in turn gets the time left divided by the gateways left. An address has no proof only when the repository, whose layout is known, answers 404, whatever the gateways did, so a gateway that is down never turns "never earned" into an error; `rewards check` then prints the file that answered 404 and the source that settled it. When no source has the file and the repository did not answer 404, the error names each source. The name is resolved once per run, and by the MCP server once an hour, or after a minute when the chain could not be read. `status --json` reports the source of `latest.json` in `rewardsSource`, and `rewards check --json` the source of the proof in `proofSource`, with the same fields: `kind`, `ens` for the dataset or `repository` for the mirror; the `url` and `gateway` read; `tried`, every source asked in order with its `outcome`, `found`, `not found`, `timeout`, `skipped` or `error`, and a `reason` for an error; and what the name held, as `ens.status` `set`, `empty`, `unsupported` or `unreadable`. A `not found` on every gateway while the repository has the file points at the dataset's layout, not at an outage, and the table says so. On 2026-10-08 the contenthash was empty, so the CLI read the repository; it reads the dataset as soon as SEF populates the name.
 

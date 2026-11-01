@@ -25,6 +25,7 @@ export {
   checkRewards, rewardsHistory, DEFAULT_HISTORY_LIMIT,
   type Claim, type RewardsCheck, type RewardsHistory,
 } from "./rewards.js"
+export { readRewardPeriods, subgraphUrl, type RewardPeriod, type RewardPeriods } from "./reward-periods.js"
 
 // Writes. Each takes a WriteMode: a signer to send with, or an address to simulate from.
 export { localSigner, type Signer, type TransactionToSend } from "./signer.js"

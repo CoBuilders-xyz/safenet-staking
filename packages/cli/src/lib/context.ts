@@ -14,6 +14,8 @@ export interface Context {
   readonly githubToken?: string | undefined
   /** An IPFS gateway to try before the public ones, for SEF's reward dataset. */
   readonly ipfsGateway?: string | undefined
+  /** The Mainnet subgraph to read instead of core's default, SUBGRAPH_URL_MAINNET. Never printed. */
+  readonly subgraphUrl?: string | undefined
   /** Pause before each retry of a refused log range, times the attempt. Tests set 0. */
   readonly retryDelayMs?: number
 }
@@ -23,6 +25,7 @@ export interface ContextOptions {
   readonly rpcUrl?: string | undefined
   readonly githubToken?: string | undefined
   readonly ipfsGateway?: string | undefined
+  readonly subgraphUrl?: string | undefined
 }
 
 /**
@@ -50,5 +53,11 @@ export function createContext(options: ContextOptions = {}): Context {
     transport: fallback(rpcEndpoints(options.rpcUrl).map((url) => http(url, { retryCount: 2 }))),
     batch: { multicall: true },
   }) as PublicClient
-  return { client, fetch: globalThis.fetch, githubToken: options.githubToken, ipfsGateway: options.ipfsGateway }
+  return {
+    client,
+    fetch: globalThis.fetch,
+    githubToken: options.githubToken,
+    ipfsGateway: options.ipfsGateway,
+    subgraphUrl: options.subgraphUrl,
+  }
 }
