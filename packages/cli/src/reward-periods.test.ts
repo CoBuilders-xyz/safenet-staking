@@ -129,6 +129,19 @@ test("incomplete claims and missing or duplicate periods never report a verified
   }
 })
 
+test("same-block root updates cannot produce a verified period ending before it starts", async () => {
+  const json = await history({ subgraph: "same-block-periods" }, "--json")
+  assert.equal(json.code, 0, json.err)
+  const h = JSON.parse(json.out)
+  assert.equal(h.periods, null)
+  assert.match(h.periodsReason, /inconsistent reward period boundaries/)
+  assert.equal(h.count, 2)
+  assert.equal(h.sumMatchesChain, true)
+  const text = await history({ subgraph: "same-block-periods" })
+  assert.match(text.out, /Periods: not shown, because .*inconsistent reward period boundaries/)
+  assert.doesNotMatch(text.out, /Every period:/)
+})
+
 test("SUBGRAPH_URL_MAINNET replaces core's endpoint, and its URL is never printed", async () => {
   const url = "https://user:key@subgraph.invalid/query"
   const r = await history({ env: { SUBGRAPH_URL_MAINNET: url } }, "--json")

@@ -71,7 +71,7 @@ export interface FakeOptions {
   /** The status the repository answers for its reward files, when not 200. */
   readonly repositoryStatus?: number
   /** Subgraph failure, mismatch, or two claims tied by block number in reversed event order. */
-  readonly subgraph?: "down" | "differs" | "same-block-reversed" | "empty" | "graphql-error" | "missing-claim" | "missing-period" | "missing-last-period" | "duplicate-period"
+  readonly subgraph?: "down" | "differs" | "same-block-reversed" | "empty" | "graphql-error" | "missing-claim" | "missing-period" | "missing-last-period" | "duplicate-period" | "same-block-periods"
 }
 
 /** A made-up ENS resolver. */
@@ -306,6 +306,7 @@ function fakeSubgraph(o: FakeOptions, body: string): Response {
       rewardPeriods: o.subgraph === "missing-period" ? [period(2, BLOCK - 4n)]
         : o.subgraph === "missing-last-period" ? [period(1, BLOCK - 10n)]
         : o.subgraph === "duplicate-period" ? [period(1, BLOCK - 10n), period(1, BLOCK - 4n)]
+        : o.subgraph === "same-block-periods" ? [period(1, BLOCK - 10n), period(2, BLOCK - 10n)]
         : [period(1, BLOCK - 10n), period(2, BLOCK - 4n)],
       rewardClaims: o.subgraph === "missing-claim" ? claims.slice(1) : o.subgraph === "same-block-reversed" ? claims.reverse() : claims,
     },

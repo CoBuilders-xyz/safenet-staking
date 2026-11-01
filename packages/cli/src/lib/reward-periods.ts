@@ -118,7 +118,7 @@ export async function readRewardPeriods(ctx: Context, address: Address): Promise
   }
   for (let i = 0; i < data.rewardPeriods.length; i++) {
     const start = BigInt(data.rewardPeriods[i]!.blockNumber)
-    if (start > head || (i > 0 && start < BigInt(data.rewardPeriods[i - 1]!.blockNumber))) {
+    if (start > head || (i > 0 && start <= BigInt(data.rewardPeriods[i - 1]!.blockNumber))) {
       throw new Error("the subgraph returned inconsistent reward period boundaries")
     }
   }

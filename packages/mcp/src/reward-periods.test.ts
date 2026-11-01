@@ -38,6 +38,20 @@ test("incomplete period history stays unavailable in MCP text and structured con
   }
 })
 
+test("same-block root updates keep MCP periods unavailable and chain claims visible", async () => {
+  const fake = fakeLibrary({ ...library, createContext: () => fakeContext({ subgraph: "same-block-periods" }) })
+  const s = await connect(readConfig({}), { fake })
+  try {
+    const result = await s.call("rewards_history", { address: STAKER })
+    assert.equal(result.isError, undefined)
+    assert.equal(result.structuredContent?.periods, null)
+    assert.equal(result.structuredContent?.count, 2)
+    assert.equal(result.structuredContent?.sumMatchesChain, true)
+    assert.match(textOf(result), /No periods: .*inconsistent reward period boundaries/)
+    assert.doesNotMatch(textOf(result), /each matches cumulativeClaimed/)
+  } finally { await s.close() }
+})
+
 test("real reward history preserves claims and redacts invalid subgraph settings in every MCP result field", async () => {
   for (const url of ["not-a-url-private-marker", "https://user:private-marker@[broken/query", "ftp://subgraph.invalid/private-marker"]) {
     let fetches = 0
