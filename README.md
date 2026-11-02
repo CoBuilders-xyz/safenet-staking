@@ -2,7 +2,8 @@
 
 The tools CoBuilders builds for staking on Safenet: the web interface for staking SAFE to Safenet
 validators, two subgraphs that index the Safenet contracts on Ethereum Mainnet and Gnosis Chain,
-the `safenet` command-line interface, and an MCP server that gives an AI client the same reads.
+the `safenet` command-line interface, an MCP server, a validator REST API, a wallet-authenticated
+alerts service, and dated IPFS snapshots.
 They share one package of constants, so every address, start block and ABI is written once.
 
 [![Parity with SEF](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml/badge.svg)](https://github.com/CoBuilders-xyz/safenet-staking/actions/workflows/parity.yml)
@@ -21,6 +22,8 @@ availability workflow opens an issue labelled `ci-red`, or comments on the open 
 
 - [`apps/web`](apps/web): the staking interface, a React app that also runs as a Safe App. Its
   [README](apps/web/README.md) goes from a fresh clone to a running app and its tests.
+- [`apps/api`](apps/api): six validator REST endpoints, freshness checks and HTTP smoke/load tools.
+- [`apps/alerts`](apps/alerts): signed subscriptions, a poller, Telegram and Web Push delivery.
 - [`packages/core`](packages/core): the addresses, start blocks, ABIs and other constants every
   other package reads.
 - [`packages/cli`](packages/cli): `safenet`, the command-line interface, with read commands and
@@ -33,6 +36,11 @@ availability workflow opens an issue labelled `ci-red`, or comments on the open 
   IPFS, indexed by date, and the IPFS path the release shares with it.
 - [`tools`](tools): repository scripts: the edit hook, the task guard, the browser-safety check,
   the metrics report, the Studio deploy, and the runner for their tests.
+
+The API and Alerts Workers require separate deployment and operator configuration. Their presence
+in this tree does not establish that either service is live.
+
+See the [operational runbook](docs/RUNBOOK.md) for monitoring, incident triage, recovery and delivery evidence.
 
 ## Setup
 

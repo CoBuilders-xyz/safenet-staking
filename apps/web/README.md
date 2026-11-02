@@ -19,6 +19,7 @@ Safe Foundation's safenet-staking-ui; see [License](#license).
 | `/validators/:address` | `ValidatorDetailPage` | One validator's figures and actions |
 | `/withdrawals` | `WithdrawalsPage` | The withdrawal queue, oldest first, with cooldowns and Claim |
 | `/rewards` | `RewardsPage` | Your rewards, Claim, Claim & Stake, the programme totals, and the root on chain checked against SEF's published one |
+| `/alerts` | `AlertsPage` | Wallet-signed subscriptions, delivery settings and explicit configuration status |
 | `*` | `NotFoundPage` | 404 |
 
 Terms are explained where they appear: a dotted-underlined word opens its explanation on hover,
@@ -84,6 +85,7 @@ Vite writes every `VITE_` value into the public bundle. Never put a key in one.
 | `VITE_PLAUSIBLE_DOMAIN`, `VITE_PLAUSIBLE_ENDPOINT` | Enables Plausible page views, to that domain and optionally that endpoint | No analytics |
 | `VITE_APP_URL` | Canonical URL for the `og:url`, `og:image` and `twitter:image` tags in `index.html`, absolute, no trailing slash | The tags carry no origin |
 | `VITE_DOCS_URL` | Footer documentation link | Safe Foundation's Safenet documentation, set in `src/components/layout/Footer.tsx` |
+| `VITE_ALERTS_API_URL` | Public Alerts Worker origin; see [Alerts provisioning](../alerts/README.md) | Alerts displays that the service is not configured |
 | `VITE_TERMS_URL`, `VITE_PRIVACY_URL`, `VITE_IMPRINT_URL` | Footer links | Hidden |
 
 `GRAPH_NODE_PORT` from `.env.ports` reaches the app as `VITE_GRAPH_NODE_PORT` through
