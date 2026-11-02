@@ -3,7 +3,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 
 const SCRIPT = resolve(import.meta.dirname, "../run-node-tests.mjs")
@@ -16,8 +16,11 @@ const whole = `export const add = (a: number, b: number): number => a + b\n`
 const testOf = (module, call) =>
   `import { test } from "node:test"\nimport assert from "node:assert/strict"\nimport * as m from "./${module}.ts"\ntest("${module}", () => assert.ok(${call}))\n`
 
-/** Writes `files` into a fresh package directory and runs the runner there with `args`. */
-function run(files, args) {
+/**
+ * Writes `files` into a fresh package directory and runs the runner there with `args`. Its temp
+ * files go to the package's own tmp directory, so a test can see what was left behind.
+ */
+function run(files, args, env = {}) {
   mkdirSync(SCRATCH, { recursive: true })
   const root = mkdtempSync(join(SCRATCH, "run-node-tests-"))
   try {
@@ -27,9 +30,12 @@ function run(files, args) {
     }
     // NODE_TEST_CONTEXT tells a nested runner it is inside this test, and it would then skip
     // its files.
-    const { NODE_TEST_CONTEXT: _, ...env } = process.env
-    const r = spawnSync(process.execPath, [SCRIPT, ...args], { cwd: root, env, encoding: "utf8" })
-    return { status: r.status, output: r.stdout + r.stderr }
+    const { NODE_TEST_CONTEXT: _, ...base } = process.env
+    mkdirSync(join(root, "tmp"))
+    const r = spawnSync(process.execPath, [SCRIPT, ...args], {
+      cwd: root, env: { ...base, TMPDIR: join(root, "tmp"), TEMP: join(root, "tmp"), TMP: join(root, "tmp"), ...env }, encoding: "utf8",
+    })
+    return { status: r.status, output: r.stdout + r.stderr, leftover: readdirSync(join(root, "tmp")) }
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -81,4 +87,31 @@ test("an unknown option is a usage error", () => {
   const { status, output } = run(covered, ["--coverage=80", "src"])
   assert.equal(status, 2)
   assert.match(output, /unknown option --coverage=80/)
+})
+
+test("a run that writes no coverage report fails, and leaves no temp directory", () => {
+  // node:test applies a preload only to each file's child, never to the process that writes the
+  // report. So the child stands in for a run that dies before reporting: it deletes the report
+  // file its parent has opened under the runner's temp directory, then kills that parent.
+  const kill = [
+    `import { readdirSync, rmSync } from "node:fs"`,
+    `import { tmpdir } from "node:os"`,
+    `import { join } from "node:path"`,
+    `if (process.env.NODE_TEST_CONTEXT && process.argv[1]?.endsWith(".test.ts")) {`,
+    `  for (const d of readdirSync(tmpdir()).filter((n) => n.startsWith("coverage-"))) rmSync(join(tmpdir(), d, "lcov.info"), { force: true })`,
+    `  process.kill(process.ppid, "SIGKILL")`,
+    `}`,
+  ].join("\n")
+  const files = { ...covered, "kill-parent.mjs": kill }
+  const { status, leftover, output } = run(files, ["--coverage-lines=80", "src"], { NODE_OPTIONS: "--import=./kill-parent.mjs" })
+  assert.equal(status, 1, output)
+  assert.doesNotMatch(output, /start of coverage report/)
+  assert.deepEqual(leftover.filter((n) => n.startsWith("coverage-")), [])
+})
+
+test("a run that writes its report leaves no temp directory either", () => {
+  const { status, leftover } = run(covered, ["--coverage-lines=80", "src"])
+  assert.equal(status, 0)
+  // tsx keeps its own cache in the temp directory; only the runner's report directory counts.
+  assert.deepEqual(leftover.filter((n) => n.startsWith("coverage-")), [])
 })

@@ -29,7 +29,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+          # Restore outages can consume the job deadline before tests start.
+          package-manager-cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Lint and types
@@ -47,7 +48,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+          # Restore outages can consume the job deadline before tests start.
+          package-manager-cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       # `graph test` downloads the Matchstick binary into graph-cli's own directory when it is
@@ -80,7 +82,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+          # Restore outages can consume the job deadline before tests start.
+          package-manager-cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Install Playwright chromium
@@ -111,7 +114,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+          # Restore outages can consume the job deadline before tests start.
+          package-manager-cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       # Reaches public RPC endpoints, which rate-limit. One retry after a pause absorbs that.

@@ -29,7 +29,7 @@ turn them on, and no key or password ever goes through a tool.
 
 Each tool mirrors the `safenet` command of the same name: `validators_list` is
 `safenet validators list`, `rewards_claim_and_stake` is `safenet rewards claim-and-stake`. The
-[command reference](../cli/docs/commands.md) describes each command, and its `--json` sample is the
+[command reference](https://github.com/CoBuilders-xyz/safenet-staking/blob/main/packages/cli/docs/commands.md) describes each command, and its `--json` sample is the
 structured content the tool returns.
 
 - `dryRun` defaults to `true`, and is forced to `true` unless writes are allowed (see below).
@@ -68,7 +68,9 @@ The server reads these environment variables when it starts.
 | `SAFENET_MCP_PASSWORD_ENV` | The **name** of a variable that holds the keystore's password |
 
 The signer settings take names, never secrets: a value that looks like a key is refused, and no
-message repeats it. While writes are off, the signer is not loaded at all.
+message repeats it. While writes are off, the signer is not loaded at all. With writes allowed
+through `SAFENET_MCP_PRIVATE_KEY_ENV`, the server says at start that a keystore is safer: it keeps
+the key encrypted on disk.
 
 The server logs where the endpoint comes from, never the URL, which can carry a key.
 
@@ -163,7 +165,7 @@ The client initialized the session, listed the tools, and called `status`, then
 shortened: `tools/list` keeps each tool's name and description and leaves out its schemas; each
 tool result's second text block, which repeats the structured content as JSON text, is a
 placeholder; and validator addresses are labels, as in the
-[command reference](../cli/docs/commands.md#how-to-read-the-samples).
+[command reference](https://github.com/CoBuilders-xyz/safenet-staking/blob/main/packages/cli/docs/commands.md#how-to-read-the-samples).
 
 <details>
 <summary>The transcript</summary>
