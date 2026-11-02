@@ -38,7 +38,8 @@ if (existsSync(envPath) && existsSync(distDir)) {
       .map(([, value]) => value),
   )
   // release.ts passes its explicit public gateway key in the inherited environment.
-  if (process.env.VITE_GRAPH_API_KEY?.trim()) published.add(process.env.VITE_GRAPH_API_KEY.trim())
+  // Exempt only GRAPH_API_KEY, not another private credential accidentally reused here.
+  const graphApiKey = process.env.VITE_GRAPH_API_KEY?.trim()
   const secrets = readFileSync(envPath, "utf8")
     .split("\n")
     .map((l) => {
@@ -48,7 +49,8 @@ if (existsSync(envPath) && existsSync(distDir)) {
       const value = rest.join("=").trim().replace(/^["']/, "").replace(/["']$/, "")
       return { key: key.trim(), value }
     })
-    .filter(({ key, value }) => !key.startsWith("VITE_") && value.length > 12 && !published.has(value))
+    .filter(({ key, value }) => !key.startsWith("VITE_") && value.length > 12 &&
+      !published.has(value) && !(key === "GRAPH_API_KEY" && value === graphApiKey))
   // UTF-8, so a value with non-ASCII characters matches the bytes Vite wrote.
   const bundle = readdirSync(distDir, { recursive: true, withFileTypes: true })
     .filter((e) => e.isFile())

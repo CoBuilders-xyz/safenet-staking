@@ -133,3 +133,13 @@ test("the explicit public gateway key is exempt, but unrelated private values st
   assert.match(result.output, /The value of SECRET /)
   assert.doesNotMatch(result.output, /The value of GRAPH_API_KEY |private-value-123456|synthetic-public-graph-key/)
 })
+
+
+test("a private key sharing the explicit public gateway value still fails", () => {
+  const graphApiKey = "synthetic-shared-value-123"
+  const { status, output } = check(`GRAPH_API_KEY=${graphApiKey}\nPRIVATE_RPC_KEY=${graphApiKey}\n`,
+    graphApiKey, { graphApiKey })
+  assert.equal(status, 1)
+  assert.match(output, /The value of PRIVATE_RPC_KEY /)
+  assert.doesNotMatch(output, /The value of GRAPH_API_KEY |synthetic-shared-value-123/)
+})

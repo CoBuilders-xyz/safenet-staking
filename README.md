@@ -102,7 +102,8 @@ any ref other than `main` or a `v*` tag, so a manual run from another branch nev
 The build step receives only the intentionally public Graph gateway key (COB-566).
 Private credentials remain excluded. Configure subgraph restrictions and a USD 20/month spending cap before building.
 The bundle scan runs only when `.env.local` and the built bundle exist. It checks non-`VITE_` values longer than 12 characters,
-excluding public values from `build.env` and the explicit `VITE_GRAPH_API_KEY`. It does not detect every possible secret.
+excluding public values from `build.env`. The `GRAPH_API_KEY` entry is also exempt when it matches the explicit
+`VITE_GRAPH_API_KEY`; other private entries remain checked even if they share that value. It does not detect every possible secret.
 
 The CID depends on the source, lockfile, `build.env` and the public gateway key.
 [`VERIFY.md`](VERIFY.md) explains reproduction; [GRAPH-GATEWAY.md](GRAPH-GATEWAY.md) lists operator settings.
