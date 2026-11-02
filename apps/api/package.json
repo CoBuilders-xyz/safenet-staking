@@ -17,7 +17,7 @@
   "dependencies": {
     "@cobuilders/safenet-core": "workspace:*",
     "hono": "4.13.14",
-    "viem": "2.46.2"
+    "viem": "2.57.13"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "2.0.0-beta.v.8",

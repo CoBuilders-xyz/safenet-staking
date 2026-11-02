@@ -24,9 +24,9 @@
     "@cobuilders/safenet-core": "workspace:*",
     "@ipld/unixfs": "3.0.0",
     "ipfs-car": "3.1.0",
-    "multiformats": "13.4.2",
-    "pinata": "2.5.5",
-    "viem": "2.46.2"
+    "multiformats": "14.0.5",
+    "pinata": "2.5.6",
+    "viem": "2.57.13"
   },
   "devDependencies": {
     "@types/node": "22.19.2",
