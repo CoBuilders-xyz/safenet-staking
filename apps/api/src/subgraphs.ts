@@ -129,7 +129,9 @@ export function decodeCursor(encoded: string | undefined, target: Address): Curs
     const c = object(JSON.parse(atob(encoded)))
     if (c.address !== target.toLowerCase() || typeof c.hash !== "string" || !/^0x[\da-f]{64}$/i.test(c.hash)
       || typeof c.stake !== "string" || typeof c.withdrawal !== "string" || c.stake.length > 200 || c.withdrawal.length > 200) throw new Error()
-    return { address: c.address, hash: c.hash, stake: c.stake, withdrawal: c.withdrawal }
+    const cursor = { address: c.address, hash: c.hash.toLowerCase(), stake: c.stake, withdrawal: c.withdrawal }
+    if (encoded !== btoa(JSON.stringify(cursor))) throw new Error()
+    return cursor
   } catch { throw new ApiError("invalid_cursor", 400, "The events cursor is invalid for this validator.") }
 }
 export async function events(fetcher: Fetcher, env: Endpoints, target: Address, cursor: Cursor | undefined, now: number) {
@@ -157,7 +159,7 @@ export async function events(fetcher: Fetcher, env: Endpoints, target: Address, 
     }
   }
   const more = stakes.length === 100 || withdrawals.length === 100
-  const nextCursor = more ? btoa(JSON.stringify({ address: target.toLowerCase(), hash: r.freshness.blockHash,
+  const nextCursor = more ? btoa(JSON.stringify({ address: target.toLowerCase(), hash: r.freshness.blockHash.toLowerCase(),
     stake: stakes.at(-1)?.id ?? cursor?.stake ?? "", withdrawal: withdrawals.at(-1)?.id ?? cursor?.withdrawal ?? "" })) : null
   return { data: { address: target, stakes, withdrawals, nextCursor, order: "id ascending within each collection" }, sources: [r.freshness], expiresAt: r.expiresAt }
 }

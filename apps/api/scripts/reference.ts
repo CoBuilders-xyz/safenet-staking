@@ -25,7 +25,7 @@ try {
     assert.equal(await link.innerText(), row.label)
     assert.ok((await card.innerText()).includes(`${Math.round(row.commission * 10000) / 100}%`))
     if (row.participation_rate_14d !== null) {
-      const percent = Math.floor(Number((row.participation_rate_14d * 10000).toPrecision(12))) / 100
+      const percent = Math.round(row.participation_rate_14d * 10000) / 100
       assert.ok((await card.innerText()).includes(`${percent}%`))
     }
   }

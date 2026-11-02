@@ -268,3 +268,66 @@ test("health never reuses SEF metadata beyond 60 seconds even when list routes p
     }
   }
 })
+
+test("GitHub secret authenticates only commit metadata and never enters responses or caches", async () => {
+  for (const token of [undefined, "fixture-only-github-credential"]) {
+    for (const route of ["validators", "health"]) {
+      const original = upstream(), seen: string[] = [], cached: string[] = []
+      const a = createApp({ ens: async () => null, now: () => NOW,
+        fetch: (async (input, init) => {
+          const url = String(input)
+          seen.push(url)
+          assert.equal(new Headers(init?.headers).get("Authorization"),
+            url === SEF_DATA.validatorInfoCommits && token ? `Bearer ${token}` : null)
+          return original(input, init)
+        }) as typeof fetch,
+        cache: { match: async () => undefined, put: async (_key, response) => { cached.push(await response.text()) } },
+      })
+      const response = await a.request(`http://api.test/v1/${route}`, {}, { ...ENV, GITHUB_TOKEN: token })
+      assert.equal(response.status, 200)
+      assert.ok(seen.includes(SEF_DATA.validatorInfoCommits))
+      assert.ok(seen.length >= 2)
+      assert.doesNotMatch(await response.text() + JSON.stringify([...response.headers]) + cached.join(""), /fixture-only-github-credential/)
+    }
+  }
+})
+
+test("noncanonical event cursors fail before cache or upstream access", async () => {
+  const cursor = { address: TARGET.toLowerCase(), hash: HASH, stake: "s", withdrawal: "w" }
+  const canonical = btoa(JSON.stringify(cursor))
+  const variants = [
+    btoa(JSON.stringify({ ...cursor, hash: `0x${"A".repeat(64)}` })),
+    btoa(JSON.stringify(cursor, null, 2)),
+    btoa(JSON.stringify({ hash: HASH, address: cursor.address, stake: "s", withdrawal: "w" })),
+    btoa(JSON.stringify({ ...cursor, ignored: true })),
+    `${canonical}\n`,
+  ]
+  if (canonical.endsWith("=")) variants.push(canonical.replace(/=+$/, ""))
+  let accesses = 0
+  const a = createApp({ fetch: async () => { accesses++; throw Error() },
+    cache: { match: async () => { accesses++; return undefined }, put: async () => {} }, now: () => NOW })
+  for (const encoded of variants) {
+    const response = await a.request(`http://api.test/v1/validators/${TARGET}/events?cursor=${encodeURIComponent(encoded)}`, {}, ENV)
+    assert.equal(response.status, 400)
+    assert.equal((await response.json() as { error: { code: string } }).error.code, "invalid_cursor")
+  }
+  assert.equal(accesses, 0)
+})
+
+test("event cursors canonicalize upstream block hash case and resume at that snapshot", async () => {
+  const stakes = Array.from({ length: 100 }, (_, i) => ({ id: `s${String(i).padStart(3, "0")}`, staker: OTHER,
+    amount: "1", blockNumber: "1", timestamp: "1", transactionHash: HASH }))
+  const options: FixtureOptions = { graph: (query, variables) => {
+    if (!query.includes("query Events")) return graphData(query)
+    if (variables.stakeAfter !== "") assert.deepEqual(variables.block, { hash: HASH })
+    return { _meta: { ...meta, block: { ...meta.block, hash: `0x${"A".repeat(64)}` } },
+      stakes: variables.stakeAfter === "" ? stakes : [], withdrawals: [] }
+  } }
+  const first = await get(`validators/${TARGET}/events`, options)
+  assert.equal(first.status, 200)
+  const { nextCursor } = await first.json() as { nextCursor: string }
+  assert.equal((JSON.parse(atob(nextCursor)) as { hash: string }).hash, HASH)
+  const next = await get(`validators/${TARGET}/events?cursor=${encodeURIComponent(nextCursor)}`, options)
+  assert.equal(next.status, 200)
+  assert.equal((await next.json() as { nextCursor: unknown }).nextCursor, null)
+})

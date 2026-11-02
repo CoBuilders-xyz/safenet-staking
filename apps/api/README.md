@@ -86,7 +86,9 @@ successful subgraph stats with `/v1/system/stats` for at most 60 seconds, within
 Dependency readiness can therefore lag a new outage by up to 60 seconds. After expiry, failed
 reads return degraded health; an old success is never served beyond its expiry.
 The Cache API is local to each Cloudflare location; this is not a global quota limiter.
-Unauthenticated GitHub API limits and Studio quotas remain deployment capacity dependencies.
+Set the `GITHUB_TOKEN` Worker secret for authenticated GitHub commit metadata requests.
+Without it, GitHub permits only 60 unauthenticated requests per hour per source IP.
+Authenticated quotas and Studio quotas remain deployment capacity dependencies.
 Before public deployment, configure edge rate limits for health and data routes. Successful-data
 caching does not limit uncached failed requests or concurrent cache misses during an outage.
 No stale-on-error fallback fabricates healthy data.
@@ -128,7 +130,13 @@ Before publication, select the account and public Worker hostname, establish pro
 capacity, and verify Worker upload permissions. Current defaults are rate-limited Studio endpoints.
 Set public endpoint configuration in `cloudflare.config.ts`; keep authenticated endpoints or keys
 in Worker secrets if the selected provider requires them. Never put a credential in a text binding
-or frontend `VITE_` value. No storage bindings are required: the implementation uses the Cache API.
+or frontend `VITE_` value. `GITHUB_TOKEN` is declared with `bindings.secret()` and is sent
+only to GitHub's commits API, never to raw assets, subgraphs or RPC endpoints.
+Augusto must set this secret on the `safenet-api` Worker through its Cloudflare dashboard
+(Settings → Variables and Secrets → Add → Secret), before public deployment. Use a token
+with only the read access needed for the public SEF repository. For local development,
+set it in ignored `apps/api/.dev.vars`; never commit the value. Local fixtures need no token.
+No storage bindings are required: the implementation uses the Cache API.
 
 After approval, build and inspect `cf deploy --dry-run --prebuilt --mode production` from `apps/api`.
 Publish that exact reviewed output with `cf deploy --prebuilt --mode production`. Then run smoke,

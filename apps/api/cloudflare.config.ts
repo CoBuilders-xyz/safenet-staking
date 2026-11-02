@@ -7,6 +7,7 @@ export default defineConfig({
     entrypoint: "./src/index.ts",
     compatibilityDate: "2026-10-29",
     env: {
+      GITHUB_TOKEN: bindings.secret(),
       SUBGRAPH_URL_MAINNET: bindings.text(SUBGRAPH_ENDPOINTS.mainnet),
       SUBGRAPH_URL_GNOSIS: bindings.text(SUBGRAPH_ENDPOINTS.gnosis),
     },

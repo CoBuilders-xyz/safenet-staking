@@ -53,7 +53,7 @@ export function createApp(dependencies: Dependencies = {}) {
         && cached.headers.has("X-Data-Fetched-At") && start - Number(cached.headers.get("X-Data-Fetched-At")) < maxAge) {
         return await cached.json() as Awaited<ReturnType<typeof validators>>
       }
-      const fresh = await validators(fetcher, lookup, start)
+      const fresh = await validators(fetcher, lookup, start, c.env.GITHUB_TOKEN)
       const expiry = Math.min(fresh.expiresAt, start + 300_000)
       if (cache && expiry > now()) {
         await cache.put(sourceKey, new Response(JSON.stringify(fresh), { headers: {

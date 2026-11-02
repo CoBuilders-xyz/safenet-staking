@@ -1,11 +1,12 @@
 import assert from "node:assert/strict"
+import { selectSmokeTarget } from "./smoke-target.js"
 const base = process.env.API_URL
 if (!base) throw new Error("Set API_URL to the Worker origin. This smoke uses real HTTP, without mocks.")
 const first = await fetch(new URL("/v1/validators", base))
 assert.equal(first.status, 200, await first.clone().text())
 const rows = await first.json() as { address: string; label: string; is_active: boolean; commission: number; participation_rate_14d: number | null }[]
 assert.ok(rows.length)
-const target = rows.find(v => v.is_active) ?? rows[0]!
+const target = await selectSmokeTarget(rows, base)
 for (const path of ["/v1/validators", `/v1/validators/${target.address}`, ...["7d", "30d", "all"].map(w => `/v1/validators/${target.address}/history?window=${w}`), `/v1/validators/${target.address}/events`, "/v1/system/stats", "/v1/health"]) {
   const start = performance.now()
   const response: Response = await fetch(new URL(path, base))

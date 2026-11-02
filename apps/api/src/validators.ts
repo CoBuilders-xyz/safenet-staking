@@ -32,8 +32,10 @@ export function validator(value: unknown): SefValidator {
     is_active: boolean(v.is_active), participation_rate_14d: v.participation_rate_14d === null ? null : fraction(v.participation_rate_14d),
   }
 }
-export async function validators(fetcher: Fetcher, lookup: EnsLookup, now: number): Promise<Result<SefValidator[]>> {
-  const commits = array(await json(fetcher, SEF_DATA.validatorInfoCommits, { headers: { "User-Agent": "safenet-api", Accept: "application/vnd.github+json" } }))
+export async function validators(fetcher: Fetcher, lookup: EnsLookup, now: number, githubToken?: string): Promise<Result<SefValidator[]>> {
+  const headers = new Headers({ "User-Agent": "safenet-api", Accept: "application/vnd.github+json" })
+  if (githubToken) headers.set("Authorization", `Bearer ${githubToken}`)
+  const commits = array(await json(fetcher, SEF_DATA.validatorInfoCommits, { headers }))
   const latest = object(commits[0]), sha = string(latest.sha)
   if (!/^[a-f0-9]{40}$/.test(sha)) throw malformed()
   const publishedAt = string(object(object(latest.commit).committer).date)
