@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { basename, join } from "node:path"
 import { after, before, describe, it } from "node:test"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { IPFS_GATEWAYS } from "@cobuilders/safenet-core"
@@ -77,6 +77,49 @@ function invoke(script: "publish" | "verify", args: string[], settings: Record<s
 }
 
 describe("snapshot CLI failure cleanup", () => {
+  for (const alias of [false, true]) {
+    it(`rejects a snapshot inside the output index${alias ? " through a symlinked ancestor" : ""}`, () => {
+      const scratch = mkdtempSync(join(root, "snapshot-overlap-"))
+      const output = join(scratch, "output")
+      const snapshot = join(output, "index", basename(day))
+      cpSync(day, snapshot, { recursive: true })
+      const linked = join(scratch, "alias")
+      if (alias) symlinkSync(output, linked, "junction")
+      const before = Object.fromEntries(listFiles(snapshot).map(path => [path, readFileSync(join(snapshot, path), "utf8")]))
+      const { child, log } = invoke("publish", ["--dir", snapshot, "--out", alias ? linked : output], {
+        PINATA_JWT: "fixture-only-not-a-token", PINATA_GATEWAY: "fixture.invalid", GATEWAY_TIMEOUT_SECONDS: "0", SNAPSHOT_DENY_FETCH: "1",
+      })
+      assert.equal(child.status, 1)
+      assert.match(child.stderr, /--dir must not be inside <out>\/index/)
+      assert.equal(existsSync(log), false)
+      assert.doesNotMatch(child.stdout, /files, .* blocks, CID|pinned/)
+      assert.deepEqual(Object.fromEntries(listFiles(snapshot).map(path => [path, readFileSync(join(snapshot, path), "utf8")])), before)
+    })
+  }
+
+  for (const mismatch of [false, true]) {
+    it(`${mismatch ? "rejects mismatched" : "accepts matching"} index bytes before the already-published shortcut`, async () => {
+      const index = mkdtempSync(join(root, "index-cid-"))
+      const contents = JSON.stringify({ ...emptyIndex(), days: { [basename(day)]: { cid } } })
+      writeFileSync(join(index, "index.json"), contents)
+      const expected = (await packDirectory(index)).cid
+      writeFileSync(join(index, "INDEX_CID"), `${expected}\n`)
+      if (mismatch) writeFileSync(join(index, "index.json"), `${contents}\n`)
+      const output = join(index, "output")
+      const { child, log, temporary } = invoke("publish", ["--dir", day, "--out", output, "--index", index], {
+        SNAPSHOT_DENY_FETCH: "1",
+      })
+      assert.equal(child.status, mismatch ? 1 : 0, child.stderr)
+      if (mismatch) assert.match(child.stderr, /index\.json does not hash to INDEX_CID/)
+      else assert.match(child.stdout, /already published/)
+      assert.equal(existsSync(log), false)
+      assert.equal(existsSync(output), false)
+      assert.deepEqual(readdirSync(temporary).filter(name => name.startsWith("snapshot-index-")), [])
+      assert.equal(readFileSync(join(index, "index.json"), "utf8"), mismatch ? `${contents}\n` : contents)
+      assert.equal(readFileSync(join(index, "INDEX_CID"), "utf8"), `${expected}\n`)
+    })
+  }
+
   for (const target of [".", "index", "index/nested"]) {
     it(`rejects a symlink alias to output/${target} before reading or changing files`, () => {
       const scratch = mkdtempSync(join(root, "symlink-overlap-"))

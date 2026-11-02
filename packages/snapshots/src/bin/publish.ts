@@ -22,7 +22,8 @@
  *   pnpm --filter @cobuilders/safenet-snapshots snapshot:publish --dir <day> --out <dir> \
  *     [--index <dir holding the current index.json and INDEX_CID>] [--replace]
  */
-import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { appendFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { basename, dirname, join, resolve, sep } from "node:path"
 import { parseArgs } from "node:util"
 import { addDay, emptyIndex, parseIndex, type IndexEntry, type SnapshotIndex } from "../date-index.js"
@@ -39,6 +40,17 @@ const SCRIPT = "snapshot-publish"
 function canonicalPath(path: string): string {
   if (lstatSync(path, { throwIfNoEntry: false })) return realpathSync(path)
   return join(canonicalPath(dirname(path)), basename(path))
+}
+
+/** Hash exactly the index bytes used for parsing, with the publication's directory packing settings. */
+async function indexMatchesCid(bytes: Uint8Array, expected: string): Promise<boolean> {
+  const directory = mkdtempSync(join(tmpdir(), "snapshot-index-"))
+  try {
+    writeFileSync(join(directory, "index.json"), bytes)
+    return (await packDirectory(directory)).cid === expected
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 }
 
 interface Manifest {
@@ -96,10 +108,14 @@ run(SCRIPT, async () => {
   const out = resolve(values.out)
   const index = values.index ? resolve(values.index) : undefined
   const indexDir = join(out, "index")
+  const canonicalDir = canonicalPath(dir)
+  const canonicalIndexDir = canonicalPath(indexDir)
+  if (canonicalDir === canonicalIndexDir || canonicalDir.startsWith(`${canonicalIndexDir}${sep}`)) {
+    fail(SCRIPT, "--dir must not be inside <out>/index. Nothing was pinned")
+  }
   if (index) {
     const canonicalIndex = canonicalPath(index)
     const canonicalOut = canonicalPath(out)
-    const canonicalIndexDir = canonicalPath(indexDir)
     if (canonicalIndex === canonicalOut || canonicalIndex === canonicalIndexDir || canonicalIndex.startsWith(`${canonicalIndexDir}${sep}`)) {
       fail(SCRIPT, "--index must not be --out or inside <out>/index. Nothing was pinned")
     }
@@ -116,9 +132,13 @@ run(SCRIPT, async () => {
   if (Boolean(indexFile && existsSync(indexFile)) !== Boolean(cidFile && existsSync(cidFile))) {
     fail(SCRIPT, "index.json and INDEX_CID must both exist, or both be absent for the first publication. Nothing was pinned")
   }
-  const current: SnapshotIndex = indexFile && existsSync(indexFile) ? parseIndex(readFileSync(indexFile, "utf8")) : emptyIndex()
+  const indexBytes = indexFile && existsSync(indexFile) ? readFileSync(indexFile) : undefined
+  const current: SnapshotIndex = indexBytes ? parseIndex(indexBytes.toString("utf8")) : emptyIndex()
   const previous = cidFile && existsSync(cidFile) ? readFileSync(cidFile, "utf8").trim() || null : null
   if (Object.keys(current.days).length > 0 && previous === null) fail(SCRIPT, "the index has days but no INDEX_CID beside it")
+  if (previous !== null && indexBytes && !(await indexMatchesCid(indexBytes, previous))) {
+    fail(SCRIPT, "index.json does not hash to INDEX_CID. Nothing was pinned")
+  }
 
   const existing = current.days[manifest.day]
   if (existing && !values.replace) {
