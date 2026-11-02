@@ -9,7 +9,8 @@
  *    the same title.
  *
  * Every target is checked to the end and printed before the run fails. With GITHUB_STEP_SUMMARY
- * set, the table also goes to the job summary. Exits 1 when any check fails, when PRODUCTION_URL
+ * set, the table also goes to the job summary. An Orbitor HTTP 504 is a warning only when production HTML/JS and every other gateway pass.
+ * Exits 1 for any other failed check, when PRODUCTION_URL
  * is unset, or when `deployments.json` exists and is malformed.
  *
  * Required: PRODUCTION_URL, the URL of the production deployment. It is deployment
@@ -22,6 +23,7 @@ import { resolve } from "node:path"
 import { IPFS_GATEWAYS } from "@cobuilders/safenet-core"
 import {
   annotation,
+  applyAvailabilityPolicy,
   checkGateway,
   checkProduction,
   latestDeployment,
@@ -50,18 +52,19 @@ try {
   fail(error instanceof Error ? error.message : String(error))
 }
 
-const outcomes: Outcome[] = [
+const outcomes: Outcome[] = applyAvailabilityPolicy([
   ...(await checkProduction(fetch, productionUrl, title)),
   ...(release ? await Promise.all(IPFS_GATEWAYS.map((g) => checkGateway(fetch, g, release.cid, title))) : []),
-]
+])
 
 for (const outcome of outcomes) {
   const { target, ok, detail } = outcome
-  console.log(process.env.GITHUB_ACTIONS === "true" ? annotation(outcome) : `${ok ? "OK  " : "FAIL"} ${target}: ${detail}`)
+  console.log(process.env.GITHUB_ACTIONS === "true" ? annotation(outcome) : `${ok ? "OK  " : outcome.advisory ? "WARN" : "FAIL"} ${target}: ${detail}`)
 }
 if (!release) console.log("IPFS: not checked. No release is recorded in deployments.json.")
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary(outcomes, release))
 
-const failed = outcomes.filter((o) => !o.ok).length
+const failed = outcomes.filter((o) => !o.ok && !o.advisory).length
 if (failed) fail(`${failed} of ${outcomes.length} checks failed.`)
-console.log(`availability: ${outcomes.length} checks passed.`)
+const warnings = outcomes.filter(o => o.advisory).length
+console.log(`availability: ${outcomes.length - warnings} checks passed; ${warnings} non-blocking gateway warnings.`)

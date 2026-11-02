@@ -2,6 +2,7 @@
  * The checks behind availability.ts, with fetch passed in, so each branch is unit-tested without
  * the network. Each check returns an outcome; none throws for a target that is down.
  */
+import { IPFS_GATEWAYS, ORBITOR_IPFS_GATEWAY } from "@cobuilders/safenet-core"
 import { CID } from "multiformats/cid"
 import { gatewayUrl } from "@cobuilders/safenet-snapshots/ipfs"
 
@@ -18,6 +19,9 @@ export interface Outcome {
   target: string
   ok: boolean
   detail: string
+  httpStatus?: number
+  /** A known redundant-gateway failure, after the required delivery paths passed. */
+  advisory?: boolean
 }
 
 export type Fetch = (url: string, init?: { signal?: AbortSignal }) => Promise<Response>
@@ -154,23 +158,30 @@ export async function checkGateway(fetchImpl: Fetch, gateway: string, cid: strin
   const target = gateway
   const response = await get(fetchImpl, gatewayUrl(gateway, cid, "index.html"), timeoutMs)
   if (typeof response === "string") return { target, ok: false, detail: response }
-  if (response.status !== 200) return { target, ok: false, detail: `answered ${response.status}` }
+  if (response.status !== 200) return { target, ok: false, httpStatus: response.status, detail: `answered ${response.status}` }
   const served = pageTitle(response.text)
   return served === title
     ? { target, ok: true, detail: `index.html of ${cid} answered 200 with the title` }
     : { target, ok: false, detail: `index.html of ${cid} has the title ${served === undefined ? "missing" : `"${served}"`}` }
 }
 
-/**
- * A GitHub Actions workflow command for one outcome: a notice when it passed, an error when it
- * failed, so each shows as an annotation on the run. `%`, CR and LF are escaped as the runner
- * expects.
- */
-export function annotation({ target, ok, detail }: Outcome): string {
+/** Keep Orbitor's 504 visible, but do not page when production and every other gateway passed. */
+export function applyAvailabilityPolicy(outcomes: readonly Outcome[]): Outcome[] {
+  const production = outcomes.filter(o => o.target === "production")
+  const requiredGateways = IPFS_GATEWAYS.filter(g => g !== ORBITOR_IPFS_GATEWAY)
+  const orbitorTimeout = (o: Outcome) => o.target === ORBITOR_IPFS_GATEWAY && !o.ok && o.httpStatus === 504
+  const healthyAlternatives = production.length === 2 && production.every(o => o.ok)
+    && requiredGateways.length > 0 && requiredGateways.every(g => outcomes.some(o => o.target === g && o.ok))
+    && outcomes.every(o => o.ok || orbitorTimeout(o))
+  return outcomes.map(o => ({ ...o, advisory: healthyAlternatives && orbitorTimeout(o) }))
+}
+
+/** Emit a notice, advisory warning, or blocking error; escape Actions command syntax. */
+export function annotation({ target, ok, detail, advisory }: Outcome): string {
   const escape = (text: string) => text.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A")
   // A property value also ends at `:` or `,`.
   const title = escape(`Availability: ${target}`).replace(/:/g, "%3A").replace(/,/g, "%2C")
-  return `::${ok ? "notice" : "error"} title=${title}::${escape(detail)}`
+  return `::${ok ? "notice" : advisory ? "warning" : "error"} title=${title}::${escape(detail)}`
 }
 
 /**
@@ -185,7 +196,7 @@ export function summary(outcomes: readonly Outcome[], release: Deployment | unde
     "",
     "| Target | Result | Detail |",
     "|---|---|---|",
-    ...outcomes.map((o) => `| ${escape(o.target)} | ${o.ok ? "OK" : "FAIL"} | ${escape(o.detail)} |`),
+    ...outcomes.map((o) => `| ${escape(o.target)} | ${o.ok ? "OK" : o.advisory ? "WARN (non-blocking)" : "FAIL"} | ${escape(o.detail)} |`),
     "",
     release
       ? `IPFS: release \`${release.tag}\`, \`${release.cid}\`, pinned ${release.pinnedAt}, from \`deployments.json\`.`

@@ -54,7 +54,8 @@ export const SEF_REWARDS_ENS_NAME = "rewards.safenet-gov.eth"
  * nftstorage.link, are retired with them. cloudflare-ipfs.com does not resolve in DNS.
  * gateway.pinata.cloud serves JSON but took 3.5 to 8.5 s, slower than a gateway's time slice.
  */
-export const IPFS_GATEWAYS: readonly string[] = ["https://ipfs.orbitor.dev", "https://ipfs.filebase.io"]
+export const ORBITOR_IPFS_GATEWAY = "https://ipfs.orbitor.dev"
+export const IPFS_GATEWAYS: readonly string[] = [ORBITOR_IPFS_GATEWAY, "https://ipfs.filebase.io"]
 
 /** How long one resolution of the ENS name is reused. SEF publishes rewards every two weeks. */
 export const REWARDS_SOURCE_STALE_MS = 60 * 60 * 1000
