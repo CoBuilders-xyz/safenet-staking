@@ -15,11 +15,13 @@ const validators = [
     totalStaked: "1",
     stakersCurrent: 446,
     stakersEver: 463,
+    firstSeenAtBlock: "24741800",
+    firstSeenAtTimestamp: "1774528907",
     registeredAtBlock: "24741826",
     registeredAtTimestamp: "1774529219",
   },
   // Not registered, and no registration indexed: a stake named it first.
-  { id: TEST_ACCOUNTS.validator2, isRegistered: false, totalStaked: "0", stakersCurrent: 0, stakersEver: 0, registeredAtBlock: null, registeredAtTimestamp: null },
+  { id: TEST_ACCOUNTS.validator2, isRegistered: false, totalStaked: "0", stakersCurrent: 0, stakersEver: 0, registeredAtBlock: null, registeredAtTimestamp: null, firstSeenAtBlock: "24741800", firstSeenAtTimestamp: "1774528907" },
 ]
 
 describe("useValidatorDirectory", () => {
@@ -37,9 +39,11 @@ describe("useValidatorDirectory", () => {
       isRegistered: true,
       delegators: 446,
       delegatorsEver: 463,
+      firstSeenAt: { block: 24_741_800n, timestamp: 1_774_528_907 },
       registeredAt: { block: 24_741_826n, timestamp: 1_774_529_219 },
     })
     expect(result.current.entries.value.get(TEST_ACCOUNTS.validator2.toLowerCase())?.registeredAt).toBeUndefined()
+    expect(result.current.entries.value.get(TEST_ACCOUNTS.validator2.toLowerCase())?.firstSeenAt).toEqual({ block: 24_741_800n, timestamp: 1_774_528_907 })
   })
 
   it("is unavailable, with the reason, when the subgraph fails or is stale", async () => {

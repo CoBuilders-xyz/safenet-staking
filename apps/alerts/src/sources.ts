@@ -141,11 +141,11 @@ export async function walletConditions(env: Env, sub: Subscription): Promise<{ e
           method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(10_000),
           body: JSON.stringify({ query: `query($wallet: Bytes!, $cursor: ID!, $block: Block_height) {
             _meta(block: $block) { block { number timestamp } hasIndexingErrors }
-            delegations(first: 100, orderBy: id, orderDirection: asc, block: $block, where: {staker: $wallet, amount_gt: "0", id_gt: $cursor}) { id validator { id registeredAtBlock } }
+            delegations(first: 100, orderBy: id, orderDirection: asc, block: $block, where: {staker: $wallet, amount_gt: "0", id_gt: $cursor}) { id validator { id registeredAtBlock firstSeenAtBlock } }
           }`, variables: { wallet: wallet.toLowerCase(), cursor, block: indexedBlock ? { number: indexedBlock } : { number: Number(block.number) } } }),
         })
         if (!response.ok) throw new Error("Delegation index unavailable")
-        const json = await response.json() as { errors?: unknown; data?: { _meta: { block: { number: number; timestamp: number }; hasIndexingErrors: boolean }; delegations: { id: string; validator: { id: Address; registeredAtBlock: string | null } }[] } }
+        const json = await response.json() as { errors?: unknown; data?: { _meta: { block: { number: number; timestamp: number }; hasIndexingErrors: boolean }; delegations: { id: string; validator: { id: Address; registeredAtBlock: string | null; firstSeenAtBlock: string } }[] } }
         const data = json.data
         if (json.errors || !data || data._meta.hasIndexingErrors || Number(block.timestamp) - data._meta.block.timestamp > SUBGRAPH_STALE_AFTER_SECONDS) throw new Error("Delegation index stale")
         indexedBlock = data._meta.block.number
@@ -156,7 +156,7 @@ export async function walletConditions(env: Env, sub: Subscription): Promise<{ e
           validators.push(validator)
           if (sub.triggers.includes("deregistered")) {
             const registered = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "isValidator", args: [validator], blockNumber: block.number })
-            if (!registered) events.push({ trigger: "deregistered", key: `deregistered:${validator}:${row.validator.registeredAtBlock ?? "unknown"}`, body: `Your validator ${validator} is deregistered. Review your delegation.` })
+            if (!registered) events.push({ trigger: "deregistered", key: `deregistered:${validator}:${row.validator.registeredAtBlock ?? row.validator.firstSeenAtBlock}`, body: `Your validator ${validator} is not registered. Review your delegation.` })
           }
         }
         if (data.delegations.length < 100) break

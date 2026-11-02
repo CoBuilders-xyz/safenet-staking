@@ -15,7 +15,7 @@ const env: Env = { APP_ORIGIN: "https://app.test", SUPABASE_URL: "https://unused
 const sub: Subscription = { id: crypto.randomUUID(), wallet, triggers: ["cooldown", "rewards", "deregistered"], participation: 75, missed: 3,
   channel: { kind: "telegram" }, telegram_chat: null, status: "unverified", last_delivery: null }
 function transport(options: { stale?: boolean; root?: Hex; claimed?: bigint; registered?: boolean; stake?: bigint; wrongChain?: boolean;
-  finalizedAge?: number; registeredAtBlock?: string; lastUpdatedAtBlock?: string;
+  finalizedAge?: number; registeredAtBlock?: string | null; firstSeenAtBlock?: string; lastUpdatedAtBlock?: string;
   unavailable?: "cooldown" | "rewards" | "delegations" } = {}) {
   const timestamp = Math.floor(Date.now() / 1000) - (options.finalizedAge ?? 0)
   return mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -27,10 +27,12 @@ function transport(options: { stale?: boolean; root?: Hex; claimed?: bigint; reg
     if (url.startsWith("https://graph.test")) {
       if (options.unavailable === "delegations") return new Response(null, { status: 503 })
       const body = JSON.parse(String(init!.body))
+      assert.match(body.query, /registeredAtBlock firstSeenAtBlock/)
       assert.equal(body.variables.wallet, wallet.toLowerCase())
       assert.equal(body.variables.block.number, 100)
       return Response.json({ data: { _meta: { block: { number: 100, timestamp: options.stale ? 1 : timestamp }, hasIndexingErrors: false },
-        delegations: [{ id: "position", validator: { id: validator, registeredAtBlock: options.registeredAtBlock ?? "80",
+        delegations: [{ id: "position", validator: { id: validator, registeredAtBlock: options.registeredAtBlock === undefined ? "80" : options.registeredAtBlock,
+          firstSeenAtBlock: options.firstSeenAtBlock ?? "70",
           lastUpdatedAtBlock: options.lastUpdatedAtBlock ?? "90" } }] } })
     }
     assert.equal(new URL(url).origin, "https://rpc.test")
@@ -282,3 +284,24 @@ for (const scenario of ["archive", "provider", "provider-single-block", "unrelat
     } finally { mocked.mock.restore(); await db.pg.close() }
   })
 }
+
+test("missing registration uses the first observation as a stable alert key", async () => {
+  const keys: string[] = []
+  for (const options of [
+    { registeredAtBlock: null, firstSeenAtBlock: "70", lastUpdatedAtBlock: "90" },
+    { registeredAtBlock: null, firstSeenAtBlock: "70", lastUpdatedAtBlock: "95" },
+    { registeredAtBlock: "96", firstSeenAtBlock: "70", lastUpdatedAtBlock: "99" },
+  ]) {
+    const mocked = transport(options)
+    try {
+      const result = await walletConditions(env, sub)
+      assert.equal(result.failed, 0)
+      const event = result.events.find(e => e.trigger === "deregistered")!
+      assert.match(event.body, /is not registered/)
+      keys.push(event.key)
+    } finally { mocked.mock.restore() }
+  }
+  assert.equal(keys[0], `deregistered:${validator}:70`)
+  assert.equal(keys[0], keys[1])
+  assert.equal(keys[2], `deregistered:${validator}:96`)
+})

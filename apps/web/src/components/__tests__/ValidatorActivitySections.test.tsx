@@ -45,6 +45,8 @@ const validator: ValidatorRow = {
   totalStaked: "0",
   stakersCurrent: 3,
   stakersEver: 3,
+  firstSeenAtBlock: "24741800",
+  firstSeenAtTimestamp: "1774528907",
   registeredAtBlock: "24741826",
   registeredAtTimestamp: "1774529219",
 }
@@ -93,6 +95,20 @@ describe("ValidatorActivitySections", () => {
     renderSections(activity({ ...validator, isRegistered: false }))
     expect(screen.getByText("Not registered")).toBeInTheDocument()
     expect(screen.getByText(/The subgraph reports no current registration/)).toBeInTheDocument()
+  })
+
+  it("shows first-seen block and date without inventing a registration", () => {
+    renderSections(activity({ ...validator, isRegistered: false, registeredAtBlock: null, registeredAtTimestamp: null }))
+    const section = within(screen.getByRole("region", { name: "Delegators and registration" }))
+    expect(section.getByText("First seen")).toBeInTheDocument()
+    expect(section.getByText("No registration indexed")).toBeInTheDocument()
+    expect(section.getByRole("link", { name: /^24,741,800\s*Block on / })).toHaveAttribute("href", explorerBlockUrl(24_741_800n))
+    expect(screen.queryByText("Registered")).not.toBeInTheDocument()
+    const history = within(screen.getByRole("region", { name: "Event history" }))
+    fireEvent.click(history.getByRole("button", { name: "Show 8 more" }))
+    const row = history.getAllByRole("row").at(-1)!
+    expect(row).toHaveTextContent("First seen")
+    expect(within(row).getByRole("link", { name: /^Block 24,741,800\s*on / })).toHaveAttribute("href", explorerBlockUrl(24_741_800n))
   })
 
   it("hides the series and event history when replay disagrees with the subgraph's own count", () => {

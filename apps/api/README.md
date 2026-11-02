@@ -3,6 +3,10 @@
 Hono on Cloudflare Workers. The API exposes SEF metadata and the indexed Mainnet/Aegis data.
 All chain constants and default upstream locations come from `packages/core`.
 
+Validator detail keeps `registeredAtTimestamp` null until a registration is indexed.
+`firstSeenAtTimestamp` is always present and describes the first indexed observation.
+Clients can use it as a fallback date labelled "First seen", not "Registered".
+
 ## Run and verify
 
 Use the Node version in `.nvmrc`. The cf CLI requires Node 22.18 or later.

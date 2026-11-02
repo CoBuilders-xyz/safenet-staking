@@ -19,9 +19,10 @@ interface At {
  * comes from the validator's own row, which keeps the block of its latest registration and not
  * the transaction, so it links to the block. The subgraph keeps no row per ValidatorUpdated event,
  * so a deregistration has no entry: the validator's state says it, undated.
+ * Without a registration, the row's first observation appears as "first-seen".
  */
 export type ValidatorEvent =
-  | ({ kind: "registered" } & At)
+  | ({ kind: "registered" | "first-seen" } & At)
   | ({ kind: "stake"; txHash: string; staker: string; amount: bigint } & At)
   | ({ kind: "withdrawal-initiated"; txHash: string; staker: string; amount: bigint; withdrawalId: string } & At)
   | ({ kind: "withdrawal-claimed"; txHash: string; staker: string; amount: bigint; withdrawalId: string } & At)
@@ -33,8 +34,10 @@ export function buildHistory(
   withdrawals: readonly WithdrawalRow[],
 ): ValidatorEvent[] {
   const events: ValidatorEvent[] = []
-  if (validator?.registeredAtBlock && validator.registeredAtTimestamp) {
+  if (validator && validator.registeredAtBlock !== null && validator.registeredAtTimestamp !== null) {
     events.push({ kind: "registered", id: `registered-${validator.registeredAtBlock}`, block: BigInt(validator.registeredAtBlock), timestamp: Number(validator.registeredAtTimestamp) })
+  } else if (validator) {
+    events.push({ kind: "first-seen", id: `first-seen-${validator.firstSeenAtBlock}`, block: BigInt(validator.firstSeenAtBlock), timestamp: Number(validator.firstSeenAtTimestamp) })
   }
   for (const s of stakes) {
     events.push({

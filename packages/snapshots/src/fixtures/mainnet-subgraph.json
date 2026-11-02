@@ -24,7 +24,9 @@
       "stakersEver": 49,
       "registeredAtBlock": "24741826",
       "registeredAtTimestamp": "1774529219",
-      "lastUpdatedAtBlock": "26265698"
+      "lastUpdatedAtBlock": "26265698",
+      "firstSeenAtBlock": "24741826",
+      "firstSeenAtTimestamp": "1774529219"
     },
     {
       "id": "0x00000000000000000000000000000000000000a1",
@@ -35,7 +37,9 @@
       "stakersEver": 31,
       "registeredAtBlock": "24741826",
       "registeredAtTimestamp": "1774529219",
-      "lastUpdatedAtBlock": "26265688"
+      "lastUpdatedAtBlock": "26265688",
+      "firstSeenAtBlock": "24741826",
+      "firstSeenAtTimestamp": "1774529219"
     },
     {
       "id": "0x00000000000000000000000000000000000000a2",
@@ -44,9 +48,11 @@
       "totalStaked": "0",
       "stakersCurrent": 0,
       "stakersEver": 0,
-      "registeredAtBlock": "26255073",
-      "registeredAtTimestamp": "1792755467",
-      "lastUpdatedAtBlock": "26255073"
+      "registeredAtBlock": null,
+      "registeredAtTimestamp": null,
+      "lastUpdatedAtBlock": "26255073",
+      "firstSeenAtBlock": "26255073",
+      "firstSeenAtTimestamp": "1792755467"
     }
   ],
   "delegations": [

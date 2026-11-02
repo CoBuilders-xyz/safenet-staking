@@ -84,9 +84,9 @@ export async function meta(query: Query, hash?: string): Promise<SubgraphMeta> {
 
 /**
  * The names of the fields an entity type has, read by introspection. A deployment can be older
- * or newer than the schema in this repository: the Mainnet deployment in core predates
- * `firstSeenAtBlock`, and the Aegis Gnosis schema adds `programme`. So each read asks only for
- * the fields the deployment has.
+ * or newer than the schema in this repository. Older Mainnet overrides can lack first-seen
+ * fields, and older Gnosis deployments can lack `programme`. Each read asks only for fields
+ * the deployment has.
  */
 export async function fieldsOf(query: Query, type: string): Promise<Set<string>> {
   const data = (await query(`{ __type(name: ${JSON.stringify(type)}) { fields { name } } }`)) as {

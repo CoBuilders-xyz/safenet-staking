@@ -331,3 +331,17 @@ test("event cursors canonicalize upstream block hash case and resume at that sna
   assert.equal(next.status, 200)
   assert.equal((await next.json() as { nextCursor: unknown }).nextCursor, null)
 })
+
+test("detail preserves nullable registration separately from first observation", async () => {
+  for (const registeredAtTimestamp of [null, "1774529219"]) {
+    const response = await get(`validators/${TARGET}`, { graph: q => {
+      assert.match(q, /registeredAtTimestamp firstSeenAtTimestamp/)
+      const data = graphData(q)
+      return { ...data, validator: { ...data.validator as Record<string, unknown>, registeredAtTimestamp } }
+    } })
+    assert.equal(response.status, 200)
+    const data = await response.json() as Record<string, unknown>
+    assert.equal(data.registeredAtTimestamp, registeredAtTimestamp)
+    assert.equal(data.firstSeenAtTimestamp, "1774528907")
+  }
+})

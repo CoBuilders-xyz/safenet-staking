@@ -3,7 +3,7 @@
  * to end in the unit tests without a network.
  *
  * The fixtures under src/fixtures are cut from a real snapshot of 2026-10-27, in the shapes the
- * subgraphs answered and SEF published: three Mainnet validators (one SEF lists and the chain
+ * subgraphs answered and SEF published, with Mainnet registration fields adapted to 1cb0e25: three Mainnet validators (one SEF lists and the chain
  * registers, one SEF lists and the chain does not, one only the subgraph has seen), their rows,
  * and a few Gnosis buckets. Every address and hash in them is replaced by a made-up value, so no
  * file in this package types a real one out. The Mainnet totals are the fixture validators' own

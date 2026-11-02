@@ -132,6 +132,8 @@ function mainnetValidators() {
     totalStaked: staked.toString(),
     stakersCurrent: current,
     stakersEver: ever,
+    firstSeenAtBlock: "24741800",
+    firstSeenAtTimestamp: "1774528907",
     registeredAtBlock: "24741826",
     registeredAtTimestamp: String(REGISTERED_AT),
   })

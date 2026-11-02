@@ -132,6 +132,20 @@ describe("ValidatorCard", () => {
     expect(screen.getByText("1,252")).toBeInTheDocument()
   })
 
+  it("labels the fallback as first seen, without claiming registration", () => {
+    renderCard({ firstSeenAt: 1_774_528_907 })
+    expect(screen.getByText("First seen:")).toBeInTheDocument()
+    expect(screen.getByText("26 Mar 2026")).toBeInTheDocument()
+    expect(screen.queryByText("Registered:")).not.toBeInTheDocument()
+  })
+
+  it("prefers a real registration over an earlier first observation", () => {
+    renderCard({ registeredAt: 1_774_529_219, firstSeenAt: 1_700_000_000 })
+    expect(screen.getByText("Registered:")).toBeInTheDocument()
+    expect(screen.getByText("26 Mar 2026")).toBeInTheDocument()
+    expect(screen.queryByText("First seen:")).not.toBeInTheDocument()
+  })
+
   it("shows a dash for each figure it does not have", () => {
     renderCard()
 

@@ -33,6 +33,8 @@ const validator: ValidatorRow = {
   totalStaked: "0",
   stakersCurrent: 1,
   stakersEver: 2,
+  firstSeenAtBlock: "24741800",
+  firstSeenAtTimestamp: "1774528907",
   registeredAtBlock: "24741826",
   registeredAtTimestamp: "1774529219",
 }
@@ -47,9 +49,15 @@ describe("buildHistory", () => {
     expect("txHash" in registered).toBe(false)
   })
 
-  it("leaves out a claim that has not happened, and a registration the subgraph has not seen", () => {
+  it("uses first-seen without inventing a registration or an unclaimed withdrawal", () => {
     const events = buildHistory({ ...validator, registeredAtBlock: null, registeredAtTimestamp: null }, [], [withdrawal("8", BOB, 1n, D0)])
-    expect(events.map((e) => e.kind)).toEqual(["withdrawal-initiated"])
+    expect(events.map((e) => e.kind)).toEqual(["withdrawal-initiated", "first-seen"])
+    expect(events[1]).toEqual({ kind: "first-seen", id: "first-seen-24741800", block: 24_741_800n, timestamp: 1_774_528_907 })
+  })
+
+  it.each(["registeredAtBlock", "registeredAtTimestamp"] as const)("uses a complete first-seen pair when %s is null", (field) => {
+    const events = buildHistory({ ...validator, [field]: null }, [], [])
+    expect(events).toEqual([{ kind: "first-seen", id: "first-seen-24741800", block: 24_741_800n, timestamp: 1_774_528_907 }])
   })
 
   it("is empty for an address the subgraph has no record of", () => {
