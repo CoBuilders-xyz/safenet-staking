@@ -21,6 +21,7 @@
     "claimableSafe": "SAFE disponibles para reclamar",
     "claimedSafe": "Se reclamaron {{amount}} SAFE",
     "complianceNote": "Algunas recompensas de <address>{{address}}</address> están pendientes de controles de cumplimiento. Contactá a Safe Ecosystem Foundation en <email>legal@safefoundation.org</email>.",
+    "connectSafe": "Conectar Safe",
     "connectToSeeYourStakes": "Conectá tu wallet para ver tus stakes, recompensas y posiciones",
     "followTheProposalHere": "Seguí la propuesta acá",
     "goToRewards": "Ir a recompensas",

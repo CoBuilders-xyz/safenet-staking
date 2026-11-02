@@ -1,11 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { DashboardPage } from "../DashboardPage"
 
-const { mockUseAccount } = vi.hoisted(() => ({ mockUseAccount: vi.fn() }))
+const { mockUseAccount, mockConnect, mockToast, safeApp } = vi.hoisted(() => ({
+  mockUseAccount: vi.fn(),
+  mockConnect: vi.fn(),
+  mockToast: vi.fn(),
+  safeApp: { value: false },
+}))
+const SAFE_CONNECTOR = { id: "safe" }
 
-vi.mock("wagmi", () => ({ useAccount: () => mockUseAccount() }))
+vi.mock("wagmi", () => ({
+  useAccount: () => mockUseAccount(),
+  useConnect: () => ({ connect: mockConnect, connectors: [SAFE_CONNECTOR], isPending: false }),
+}))
+
+vi.mock("@/lib/safe", () => ({
+  get isSafeApp() { return safeApp.value },
+}))
+
+vi.mock("@/hooks/useToast", () => ({ useToast: () => ({ toast: mockToast }) }))
 
 vi.mock("@/components/wallet/ConnectButton", () => ({
   ConnectButton: () => <button>Connect Wallet</button>,
@@ -45,6 +61,9 @@ const renderPage = () => render(<MemoryRouter><DashboardPage /></MemoryRouter>)
 describe("DashboardPage", () => {
   beforeEach(() => {
     mockUseAccount.mockReturnValue({ isConnected: true })
+    mockConnect.mockReset()
+    mockToast.mockReset()
+    safeApp.value = false
   })
 
   it("renders heading and description", () => {
@@ -76,5 +95,19 @@ describe("DashboardPage", () => {
     for (const id of ["stats-overview", "quick-actions", "staking-section", "stake-distribution"]) {
       expect(screen.queryByTestId(id)).not.toBeInTheDocument()
     }
+  })
+
+  it("offers a Safe retry instead of the wallet menu inside a Safe App", async () => {
+    mockUseAccount.mockReturnValue({ isConnected: false })
+    safeApp.value = true
+    renderPage()
+
+    expect(screen.queryByRole("button", { name: "Connect Wallet" })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: "Connect Safe" }))
+    expect(mockConnect).toHaveBeenCalledWith({ connector: SAFE_CONNECTOR }, expect.anything())
+
+    const { onError } = mockConnect.mock.calls[0][1] as { onError: () => void }
+    onError()
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error", title: "Connection failed" }))
   })
 })

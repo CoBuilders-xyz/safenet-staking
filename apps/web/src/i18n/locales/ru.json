@@ -21,6 +21,7 @@
     "claimableSafe": "SAFE к получению",
     "claimedSafe": "Востребовано {{amount}} SAFE",
     "complianceNote": "Часть вознаграждений для <address>{{address}}</address> ожидает проверки соответствия требованиям. Свяжитесь с Safe Ecosystem Foundation: <email>legal@safefoundation.org</email>.",
+    "connectSafe": "Подключить Safe",
     "connectToSeeYourStakes": "Подключите кошелёк, чтобы увидеть свои стейки, награды и позиции",
     "followTheProposalHere": "Следите за предложением здесь",
     "goToRewards": "К вознаграждениям",

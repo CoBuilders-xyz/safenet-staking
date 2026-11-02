@@ -21,6 +21,7 @@
     "claimableSafe": "可领取的 SAFE",
     "claimedSafe": "已领取 {{amount}} SAFE",
     "complianceNote": "<address>{{address}}</address> 的部分奖励正在等待合规审核。请通过 <email>legal@safefoundation.org</email> 联系 Safe Ecosystem Foundation。",
+    "connectSafe": "连接 Safe",
     "connectToSeeYourStakes": "连接钱包以查看您的质押、奖励和持仓",
     "followTheProposalHere": "在此查看提案",
     "goToRewards": "前往奖励页面",

@@ -54,6 +54,7 @@
     "claimableSafe": "Claimable SAFE",
     "claimedSafe": "Claimed {{amount}} SAFE",
     "complianceNote": "Some rewards for <address>{{address}}</address> are pending compliance checks. Please reach out to the Safe Ecosystem Foundation at <email>legal@safefoundation.org</email>.",
+    "connectSafe": "Connect Safe",
     "connectToSeeYourStakes": "Connect your wallet to see your stakes, rewards, and positions",
     "followTheProposalHere": "Follow the proposal here",
     "goToRewards": "Go to Rewards",
