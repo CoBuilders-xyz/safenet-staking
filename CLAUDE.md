@@ -89,7 +89,7 @@ fork suite Anvil 8546, the manual QA fork 8547, 5179 and 5180, and `pnpm dev` us
 
 ## Layout
 
-The target layout has ten packages. **Seven exist on `main`.** The rest are listed so the shape is
+The target layout has ten packages. **Nine exist on `main`.** The rest are listed so the shape is
 known, not to suggest they are there:
 
 ```
@@ -108,21 +108,21 @@ packages/snapshots          EXISTS   the daily snapshot of the validator dataset
                                      index and its verifier; and the CAR, pin and gateway path the
                                      release shares, exported as ./ipfs
 tools/                      EXISTS   edit hook, task guard, browser-safety check, metrics report
-docs/                       EXISTS   the manual QA fork guide and the translation guide
+docs/                       EXISTS   the manual QA fork guide, translations and operational runbook
 scripts/setup.sh            EXISTS   what `pnpm bootstrap` runs
 docker-compose.yml          EXISTS   local graph-node, postgres and ipfs
 graph-node.toml             EXISTS   graph-node config for two chains at once
 .github/workflows/          EXISTS   CI
 
-apps/api                    planned  REST wrapper, Cloudflare Workers
-apps/alerts                 planned  alerts service, Supabase
+apps/api                    EXISTS   validator REST API, Cloudflare Worker; freshness and HTTP probes
+apps/alerts                 EXISTS   signed subscriptions, scheduled poller and delivery, with Supabase
 packages/testing            planned  shared fixtures: anvil, RPC mocks, Playwright helpers
 ```
 
 Do not infer that a planned package exists because this file names it. Check.
 
-`packages/core`, `packages/cli`, `packages/mcp`, `packages/snapshots`, `apps/web` and both subgraph
-packages each own a `CLAUDE.md`.
+`packages/core`, `packages/cli`, `packages/mcp`, `packages/snapshots`, `apps/api`, `apps/web` and both subgraph
+packages each own a `CLAUDE.md`. Alerts configuration and operations are in `apps/alerts/README.md`.
 Read the one for the package you are in, not all of them. Run a package's scripts from the root
 as `pnpm --filter <name> <script>`.
 
