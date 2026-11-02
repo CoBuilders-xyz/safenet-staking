@@ -411,7 +411,7 @@ claim-prefix validation, whole-block attribution and cumulative comparisons. The
 claimed payments. Per-period earnings and exact same-block event ordering remain unknown.
 
 After `pnpm build` at the repository root, run `box-preview start .` there to serve the built app
-on Jarvis through the tailnet. The committed adapter binds only to loopback and expires through
+on an internal preview host through the tailnet. The committed adapter binds only to loopback and expires through
 fleet preview management. It uses the build's real read endpoints; it does not inject a wallet or mocks.
 
 Network gateway setup, exact operator settings and release reproducibility: [GRAPH-GATEWAY.md](../../GRAPH-GATEWAY.md).
