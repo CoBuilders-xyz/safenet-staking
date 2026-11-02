@@ -32,10 +32,10 @@ function report(verdict: Verdict, expected: string | undefined, where: string): 
   if (verdict.manifest !== null) console.log(`${SCRIPT}: manifest ${verdict.manifest}`)
   console.log(`${SCRIPT}: the files hash to ${verdict.derived}`)
   if (verdict.manifest !== null && verdict.manifest !== "lists exactly the files present") {
-    fail(SCRIPT, `the manifest does not match the files: ${verdict.manifest}`)
+    throw new Error(`the manifest does not match the files: ${verdict.manifest}`)
   }
   if (expected === undefined) return
-  if (!verdict.matches) fail(SCRIPT, `MISMATCH: expected ${expected}, the files hash to ${verdict.derived}`)
+  if (!verdict.matches) throw new Error(`MISMATCH: expected ${expected}, the files hash to ${verdict.derived}`)
   console.log(`${SCRIPT}: OK, identical to ${expected}`)
 }
 
@@ -64,22 +64,21 @@ run(SCRIPT, async () => {
   const gateways = values.gateway ? [values.gateway.replace(/\/+$/, "")] : IPFS_GATEWAYS
   const errors: string[] = []
   for (const origin of gateways) {
-    let dir: string
     try {
-      dir = await fetchSnapshot(cid, origin)
+      const dir = await fetchSnapshot(cid, origin)
+      let verdict: Verdict
+      try {
+        verdict = await verifyDirectory(dir, cid)
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+      report(verdict, cid, `${origin}/ipfs/${cid}`)
+      return
     } catch (err) {
       errors.push(`${origin}: ${sentence(err)}`)
       console.error(`${SCRIPT}: ${origin} did not serve ${cid}: ${sentence(err)}`)
       continue
     }
-    let verdict: Verdict
-    try {
-      verdict = await verifyDirectory(dir, cid)
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-    report(verdict, cid, `${origin}/ipfs/${cid}`)
-    return
   }
   fail(SCRIPT, `no gateway served ${cid}: ${errors.join("; ")}`)
 })

@@ -96,8 +96,11 @@ run(SCRIPT, async () => {
 
   // The current index and the CID it was pinned under, from the index branch, when there is one.
   const indexFile = values.index ? join(values.index, "index.json") : undefined
-  const current: SnapshotIndex = indexFile && existsSync(indexFile) ? parseIndex(readFileSync(indexFile, "utf8")) : emptyIndex()
   const cidFile = values.index ? join(values.index, "INDEX_CID") : undefined
+  if (Boolean(indexFile && existsSync(indexFile)) !== Boolean(cidFile && existsSync(cidFile))) {
+    fail(SCRIPT, "index.json and INDEX_CID must both exist, or both be absent for the first publication. Nothing was pinned")
+  }
+  const current: SnapshotIndex = indexFile && existsSync(indexFile) ? parseIndex(readFileSync(indexFile, "utf8")) : emptyIndex()
   const previous = cidFile && existsSync(cidFile) ? readFileSync(cidFile, "utf8").trim() || null : null
   if (Object.keys(current.days).length > 0 && previous === null) fail(SCRIPT, "the index has days but no INDEX_CID beside it")
 

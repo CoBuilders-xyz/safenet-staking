@@ -5,6 +5,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { after, before, describe, it } from "node:test"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { IPFS_GATEWAYS } from "@cobuilders/safenet-core"
+import { emptyIndex } from "./date-index.js"
 import { collect } from "./dataset.js"
 import { listFiles, packDirectory } from "./ipfs/car.js"
 import { fakeSources } from "./test-support.js"
@@ -30,13 +32,14 @@ before(async () => {
 import { appendFileSync, readFileSync } from "node:fs";
 const files = JSON.parse(readFileSync(process.env.SNAPSHOT_FIXTURE, "utf8"));
 globalThis.fetch = async input => {
-  appendFileSync(process.env.SNAPSHOT_FETCH_LOG, "fetch\\n");
-  if (process.env.SNAPSHOT_DENY_FETCH === "1") throw new Error("Unexpected fetch");
   const url = new URL(typeof input === "string" ? input : input.url ?? input.href);
-  if (url.origin !== "https://fixture.invalid") throw new Error("Unexpected origin");
+  appendFileSync(process.env.SNAPSHOT_FETCH_LOG, url.origin + "\\n");
+  if (process.env.SNAPSHOT_DENY_FETCH === "1") throw new Error("Unexpected fetch");
+  const gateways = ${JSON.stringify(IPFS_GATEWAYS)};
+  if (url.origin !== "https://fixture.invalid" && !(process.env.SNAPSHOT_MULTI_GATEWAY === "1" && gateways.includes(url.origin))) throw new Error("Unexpected origin");
   const path = url.pathname.split("/ipfs/" + process.env.SNAPSHOT_CID + "/")[1];
   if (!path || !Object.hasOwn(files, path)) return new Response("not found", { status: 404 });
-  if (process.env.SNAPSHOT_TAMPER === "1" && path === "sef/validator-info.json") return new Response("[]\\n");
+  if ((process.env.SNAPSHOT_TAMPER === "1" || (process.env.SNAPSHOT_TAMPER_FIRST === "1" && url.origin === gateways[0])) && path === "sef/validator-info.json") return new Response("[]\\n");
   return new Response(Buffer.from(files[path], "base64"));
 };
 `)
@@ -74,6 +77,52 @@ function invoke(script: "publish" | "verify", args: string[], settings: Record<s
 }
 
 describe("snapshot CLI failure cleanup", () => {
+  for (const present of ["INDEX_CID", "index.json"]) {
+    it(`rejects an index with only ${present} before packing or pinning`, () => {
+      const index = mkdtempSync(join(root, "incomplete-index-"))
+      writeFileSync(join(index, present), present === "INDEX_CID" ? `${cid}\n` : JSON.stringify(emptyIndex()))
+      const output = join(index, "output")
+      const { child, log } = invoke("publish", ["--dir", day, "--out", output, "--index", index], {
+        PINATA_JWT: "fixture-only-not-a-token", PINATA_GATEWAY: "fixture.invalid", SNAPSHOT_DENY_FETCH: "1",
+      })
+      assert.equal(child.status, 1)
+      assert.match(child.stderr, /index\.json and INDEX_CID must both exist/)
+      assert.doesNotMatch(child.stdout, /files, .* blocks, CID|pinned/)
+      assert.equal(existsSync(log), false)
+      assert.equal(existsSync(output), false)
+    })
+  }
+
+  it("an empty index directory remains a valid first-publication input", () => {
+    const index = mkdtempSync(join(root, "first-index-"))
+    const { child, log } = invoke("publish", ["--dir", day, "--out", join(index, "output"), "--index", index], {
+      PINATA_JWT: "fixture-only-not-a-token", PINATA_GATEWAY: "fixture.invalid", GATEWAY_TIMEOUT_SECONDS: "0", SNAPSHOT_DENY_FETCH: "1",
+    })
+    assert.equal(child.status, 1)
+    assert.match(child.stderr, /GATEWAY_TIMEOUT_SECONDS must be a positive number/)
+    assert.equal(existsSync(log), false)
+  })
+
+  it("tries the next gateway after a CID mismatch and removes both temporary directories", () => {
+    const { child, temporary, log } = invoke("verify", [cid], { SNAPSHOT_MULTI_GATEWAY: "1", SNAPSHOT_TAMPER_FIRST: "1" })
+    assert.equal(child.status, 0, child.stderr)
+    assert.match(child.stderr, /MISMATCH: expected/)
+    assert.match(child.stdout, /OK, identical to/)
+    const origins = new Set(readFileSync(log, "utf8").trim().split("\n"))
+    assert.deepEqual(origins, new Set(IPFS_GATEWAYS.slice(0, 2)))
+    assert.deepEqual(readdirSync(temporary).filter(name => name.startsWith("snapshot-verify-")), [])
+  })
+
+  it("fails after every gateway serves a CID mismatch and removes all temporary directories", () => {
+    const { child, temporary, log } = invoke("verify", [cid], { SNAPSHOT_MULTI_GATEWAY: "1", SNAPSHOT_TAMPER: "1" })
+    assert.equal(child.status, 1)
+    assert.match(child.stderr, /no gateway served/)
+    assert.match(child.stderr, /MISMATCH: expected/)
+    assert.doesNotMatch(child.stdout, /OK, identical to/)
+    assert.deepEqual(new Set(readFileSync(log, "utf8").trim().split("\n")), new Set(IPFS_GATEWAYS))
+    assert.deepEqual(readdirSync(temporary).filter(name => name.startsWith("snapshot-verify-")), [])
+  })
+
   for (const timeout of ["0", "-1", "not-a-number", "Infinity"]) {
     it(`rejects timeout ${timeout} before packing or pinning`, () => {
       const output = join(root, `publish-${timeout}`)
