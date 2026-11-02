@@ -110,4 +110,12 @@ describe("DashboardPage", () => {
     onError()
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error", title: "Connection failed" }))
   })
+
+  it("disables the Safe retry while the automatic connection is still running", () => {
+    mockUseAccount.mockReturnValue({ isConnected: false, isConnecting: true })
+    safeApp.value = true
+    renderPage()
+
+    expect(screen.getByRole("button", { name: "Connect Safe" })).toBeDisabled()
+  })
 })

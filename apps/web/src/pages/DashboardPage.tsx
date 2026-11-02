@@ -63,11 +63,13 @@ function SafeConnectRetry() {
   const { t } = useTranslation()
   const { toast } = useToast()
   const { connect, connectors, isPending } = useConnect()
+  // isConnecting is wagmi's shared status, so it also covers the attempt useAutoConnect started.
+  const { isConnecting } = useAccount()
   const safe = connectors.find((c) => c.id === "safe")
   if (!safe) return null
   return (
     <Button
-      disabled={isPending}
+      disabled={isPending || isConnecting}
       onClick={() => connect({ connector: safe }, {
         onError: () => toast({
           variant: "error",
