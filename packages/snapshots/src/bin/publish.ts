@@ -23,7 +23,7 @@
  *     [--index <dir holding the current index.json and INDEX_CID>] [--replace]
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
-import { basename, join, resolve } from "node:path"
+import { basename, join, resolve, sep } from "node:path"
 import { parseArgs } from "node:util"
 import { addDay, emptyIndex, parseIndex, type IndexEntry, type SnapshotIndex } from "../date-index.js"
 import {
@@ -88,6 +88,11 @@ run(SCRIPT, async () => {
   if (!values.dir || !values.out) fail(SCRIPT, "--dir and --out are required")
   const dir = resolve(values.dir)
   const out = resolve(values.out)
+  const index = values.index ? resolve(values.index) : undefined
+  const indexDir = join(out, "index")
+  if (index && (index === out || index === indexDir || index.startsWith(`${indexDir}${sep}`))) {
+    fail(SCRIPT, "--index must not be --out or inside <out>/index. Nothing was pinned")
+  }
 
   const mismatch = manifestMismatch(dir)
   if (mismatch) fail(SCRIPT, `${dir} is not a complete snapshot: ${mismatch}. Nothing was pinned`)
@@ -95,8 +100,8 @@ run(SCRIPT, async () => {
   if (basename(dir) !== manifest.day) fail(SCRIPT, `${dir} holds the snapshot of ${manifest.day}; the directory must be named after its day`)
 
   // The current index and the CID it was pinned under, from the index branch, when there is one.
-  const indexFile = values.index ? join(values.index, "index.json") : undefined
-  const cidFile = values.index ? join(values.index, "INDEX_CID") : undefined
+  const indexFile = index ? join(index, "index.json") : undefined
+  const cidFile = index ? join(index, "INDEX_CID") : undefined
   if (Boolean(indexFile && existsSync(indexFile)) !== Boolean(cidFile && existsSync(cidFile))) {
     fail(SCRIPT, "index.json and INDEX_CID must both exist, or both be absent for the first publication. Nothing was pinned")
   }
@@ -132,7 +137,6 @@ run(SCRIPT, async () => {
   const update = addDay(current, previous, manifest.day, entry, { replace: values.replace === true })
   if (update.kind === "already published") fail(SCRIPT, `${manifest.day} was published as ${update.cid} while this run pinned`)
 
-  const indexDir = join(out, "index")
   rmSync(indexDir, { recursive: true, force: true })
   mkdirSync(indexDir, { recursive: true })
   writeFileSync(join(indexDir, "index.json"), serialise(update.index))

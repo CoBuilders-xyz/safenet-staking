@@ -77,6 +77,39 @@ function invoke(script: "publish" | "verify", args: string[], settings: Record<s
 }
 
 describe("snapshot CLI failure cleanup", () => {
+  for (const overlap of [".", "index", "index/nested", "index/../index/nested"]) {
+    it(`rejects overlapping index path ${overlap} before reading or changing files`, () => {
+      const output = mkdtempSync(join(root, "overlap-"))
+      const index = join(output, overlap)
+      mkdirSync(index, { recursive: true })
+      // Invalid JSON proves the path guard runs before reading the index.
+      writeFileSync(join(index, "index.json"), "not JSON")
+      writeFileSync(join(index, "INDEX_CID"), `${cid}\n`)
+      const before = Object.fromEntries(listFiles(output).map(path => [path, readFileSync(join(output, path), "utf8")]))
+      const { child, log } = invoke("publish", ["--dir", day, "--out", output, "--index", index], {
+        PINATA_JWT: "fixture-only-not-a-token", PINATA_GATEWAY: "fixture.invalid", SNAPSHOT_DENY_FETCH: "1",
+      })
+      assert.equal(child.status, 1)
+      assert.match(child.stderr, /--index must not be --out or inside <out>\/index/)
+      assert.doesNotMatch(child.stdout, /files, .* blocks, CID|pinned/)
+      assert.equal(existsSync(log), false)
+      assert.deepEqual(Object.fromEntries(listFiles(output).map(path => [path, readFileSync(join(output, path), "utf8")])), before)
+    })
+  }
+
+  it("allows a separate input with the output index directory as a name prefix", () => {
+    const output = mkdtempSync(join(root, "separate-index-"))
+    const index = join(output, "index-current")
+    mkdirSync(index)
+    const { child, log } = invoke("publish", ["--dir", day, "--out", output, "--index", index], {
+      PINATA_JWT: "fixture-only-not-a-token", PINATA_GATEWAY: "fixture.invalid", GATEWAY_TIMEOUT_SECONDS: "0", SNAPSHOT_DENY_FETCH: "1",
+    })
+    assert.equal(child.status, 1)
+    assert.match(child.stderr, /GATEWAY_TIMEOUT_SECONDS must be a positive number/)
+    assert.equal(existsSync(log), false)
+    assert.equal(existsSync(join(output, "index")), false)
+  })
+
   for (const present of ["INDEX_CID", "index.json"]) {
     it(`rejects an index with only ${present} before packing or pinning`, () => {
       const index = mkdtempSync(join(root, "incomplete-index-"))
