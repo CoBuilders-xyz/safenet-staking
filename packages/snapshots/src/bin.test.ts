@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { after, before, describe, it } from "node:test"
@@ -77,6 +77,58 @@ function invoke(script: "publish" | "verify", args: string[], settings: Record<s
 }
 
 describe("snapshot CLI failure cleanup", () => {
+  for (const target of [".", "index", "index/nested"]) {
+    it(`rejects a symlink alias to output/${target} before reading or changing files`, () => {
+      const scratch = mkdtempSync(join(root, "symlink-overlap-"))
+      const output = join(scratch, "output")
+      const input = join(output, target)
+      mkdirSync(input, { recursive: true })
+      writeFileSync(join(input, "index.json"), "not JSON")
+      writeFileSync(join(input, "INDEX_CID"), `${cid}\n`)
+      const alias = join(scratch, "alias")
+      symlinkSync(input, alias, "junction")
+      const before = Object.fromEntries(listFiles(output).map(path => [path, readFileSync(join(output, path), "utf8")]))
+      const { child, log } = invoke("publish", ["--dir", day, "--out", output, "--index", alias], {
+        PINATA_JWT: "fixture-only-not-a-token", PINATA_GATEWAY: "fixture.invalid", SNAPSHOT_DENY_FETCH: "1",
+      })
+      assert.equal(child.status, 1)
+      assert.match(child.stderr, /--index must not be --out or inside <out>\/index/)
+      assert.equal(existsSync(log), false)
+      assert.doesNotMatch(child.stdout, /files, .* blocks, CID|pinned/)
+      assert.deepEqual(Object.fromEntries(listFiles(output).map(path => [path, readFileSync(join(output, path), "utf8")])), before)
+    })
+  }
+
+  it("rejects overlap through a symlinked output ancestor when the output does not exist", () => {
+    const scratch = mkdtempSync(join(root, "ancestor-overlap-"))
+    const actual = join(scratch, "actual")
+    const alias = join(scratch, "alias")
+    mkdirSync(actual)
+    symlinkSync(actual, alias, "junction")
+    const { child, log } = invoke("publish", ["--dir", day, "--out", join(alias, "new"), "--index", join(actual, "new", "index", "nested")], {
+      PINATA_JWT: "fixture-only-not-a-token", PINATA_GATEWAY: "fixture.invalid", GATEWAY_TIMEOUT_SECONDS: "0", SNAPSHOT_DENY_FETCH: "1",
+    })
+    assert.equal(child.status, 1)
+    assert.match(child.stderr, /--index must not be --out or inside <out>\/index/)
+    assert.equal(existsSync(log), false)
+    assert.deepEqual(readdirSync(actual), [])
+  })
+
+  it("allows first publication to separate missing directories through a symlinked ancestor", () => {
+    const scratch = mkdtempSync(join(root, "ancestor-separate-"))
+    const actual = join(scratch, "actual")
+    const alias = join(scratch, "alias")
+    mkdirSync(actual)
+    symlinkSync(actual, alias, "junction")
+    const { child, log } = invoke("publish", ["--dir", day, "--out", join(alias, "publish"), "--index", join(actual, "index-current")], {
+      PINATA_JWT: "fixture-only-not-a-token", PINATA_GATEWAY: "fixture.invalid", GATEWAY_TIMEOUT_SECONDS: "0", SNAPSHOT_DENY_FETCH: "1",
+    })
+    assert.equal(child.status, 1)
+    assert.match(child.stderr, /GATEWAY_TIMEOUT_SECONDS must be a positive number/)
+    assert.equal(existsSync(log), false)
+    assert.deepEqual(readdirSync(actual), [])
+  })
+
   for (const overlap of [".", "index", "index/nested", "index/../index/nested"]) {
     it(`rejects overlapping index path ${overlap} before reading or changing files`, () => {
       const output = mkdtempSync(join(root, "overlap-"))

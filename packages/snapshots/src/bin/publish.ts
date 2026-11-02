@@ -22,8 +22,8 @@
  *   pnpm --filter @cobuilders/safenet-snapshots snapshot:publish --dir <day> --out <dir> \
  *     [--index <dir holding the current index.json and INDEX_CID>] [--replace]
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
-import { basename, join, resolve, sep } from "node:path"
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { basename, dirname, join, resolve, sep } from "node:path"
 import { parseArgs } from "node:util"
 import { addDay, emptyIndex, parseIndex, type IndexEntry, type SnapshotIndex } from "../date-index.js"
 import {
@@ -34,6 +34,12 @@ import { serialise, manifestMismatch } from "../write.js"
 import { fail, output, run } from "./run.js"
 
 const SCRIPT = "snapshot-publish"
+
+/** Resolve existing ancestors without creating first-publication directories. Broken links fail closed. */
+function canonicalPath(path: string): string {
+  if (lstatSync(path, { throwIfNoEntry: false })) return realpathSync(path)
+  return join(canonicalPath(dirname(path)), basename(path))
+}
 
 interface Manifest {
   schema: string
@@ -90,8 +96,13 @@ run(SCRIPT, async () => {
   const out = resolve(values.out)
   const index = values.index ? resolve(values.index) : undefined
   const indexDir = join(out, "index")
-  if (index && (index === out || index === indexDir || index.startsWith(`${indexDir}${sep}`))) {
-    fail(SCRIPT, "--index must not be --out or inside <out>/index. Nothing was pinned")
+  if (index) {
+    const canonicalIndex = canonicalPath(index)
+    const canonicalOut = canonicalPath(out)
+    const canonicalIndexDir = canonicalPath(indexDir)
+    if (canonicalIndex === canonicalOut || canonicalIndex === canonicalIndexDir || canonicalIndex.startsWith(`${canonicalIndexDir}${sep}`)) {
+      fail(SCRIPT, "--index must not be --out or inside <out>/index. Nothing was pinned")
+    }
   }
 
   const mismatch = manifestMismatch(dir)
