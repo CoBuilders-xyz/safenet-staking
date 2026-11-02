@@ -67,7 +67,8 @@ Do not publish a dummy stable version just to reserve a package name.
 ### B. Temporary granular token for the first CI publish only (time-limited)
 
 npm [targets January 2027](https://github.blog/changelog/2026-07-31-restricting-npm-bypass-2fa-granular-access-tokens/)
-for removing direct publishing with granular access tokens. Check the current npm policy before choosing this option.
+for removing direct publishing with granular access tokens configured to **bypass two-factor authentication**.
+This announcement concerns bypass-2FA tokens, not all granular tokens. Check the current npm policy before choosing this option.
 Once that removal takes effect, option B is unavailable: use interactive option A instead.
 This checklist does not introduce a staged-publishing workflow.
 
