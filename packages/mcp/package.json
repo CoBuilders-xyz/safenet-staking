@@ -45,7 +45,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
     "viem": "2.46.2",
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@cobuilders/safenet-cli": "workspace:*",
