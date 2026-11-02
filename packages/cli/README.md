@@ -9,22 +9,7 @@ exactly, to the last wei. `--json` gives the same fields, with amounts as wei in
 
 ## Install
 
-The package is not on npm yet. Until it is, run it from a clone of this repository, without
-building:
-
-```sh
-pnpm install
-pnpm --filter @cobuilders/safenet-cli start status
-```
-
-Or build it and run the binary, which takes the same arguments as `safenet`:
-
-```sh
-pnpm --filter @cobuilders/safenet-cli build
-node packages/cli/dist/index.js --help
-```
-
-After it is published, install it globally:
+Install the published beta globally:
 
 ```sh
 npm install -g @cobuilders/safenet-cli@beta
@@ -51,7 +36,23 @@ The binary carries its own Node.js. The macOS one is signed ad hoc, not by a dev
 certificate, and the Windows one is unsigned, so each system may ask before it runs one
 downloaded from the web.
 
-To build the binary for your own system, use the Node version in `.nvmrc` and the locked dependencies:
+### Optional local development
+
+To work from a clone of this repository, run the CLI without building:
+
+```sh
+pnpm install
+pnpm --filter @cobuilders/safenet-cli start status
+```
+
+Or build it and run the bundle, which takes the same arguments as `safenet`:
+
+```sh
+pnpm --filter @cobuilders/safenet-cli build
+node packages/cli/dist/index.js --help
+```
+
+To build the standalone binary for your system, use the Node version in `.nvmrc` and the locked dependencies:
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
@@ -255,4 +256,7 @@ Failed Network queries retry Studio once. The process warns on stderr once per c
 
 ## Beta publishing
 
-Initial version: `0.1.0-beta.0`, dist-tag `beta`. CI uses npm Trusted Publishing (GitHub OIDC), not a permanent npm token. Package creation needs a one-time bootstrap first. See [NPM-RELEASE.md](https://github.com/CoBuilders-xyz/safenet-staking/blob/main/NPM-RELEASE.md) for the operator checklist.
+The in-repo version is `0.1.0-beta.1`, the first OIDC publish candidate after Augusto manually published `0.1.0-beta.0`.
+CI uses npm Trusted Publishing (GitHub OIDC), with dist-tag `beta` and no permanent npm token.
+Publishing beta.1 moves `beta`; `latest` stays at beta.0 until Augusto removes it from his authenticated session.
+See [NPM-RELEASE.md](https://github.com/CoBuilders-xyz/safenet-staking/blob/main/NPM-RELEASE.md) for the operator checklist.

@@ -193,13 +193,18 @@ unit tests, builds and packs it. Its `check` job installs the tarball outside th
 `tools/check-installed-package.mjs` against Mainnet with `MAINNET_RPC_URL`, or, when the secret is
 empty, as on a pull request from a fork, through the package's own public endpoints. Its `publish` job sends
 that same tarball with `npm publish --provenance --access public --tag <dist-tag>` and GitHub OIDC Trusted Publishing.
-No permanent npm token is used. The publish job pins npm12.2.1; initial package creation requires
-a one-time bootstrap before configuring npm Trusted Publishers (see NPM-RELEASE.md). It refuses version 0.0.0, a tag whose version differs from the package's,
+No permanent npm token is used. The publish job pins npm@12.2.1.
+Augusto manually published beta.0; both npm Trusted Publishers are configured (see NPM-RELEASE.md).
+It refuses version 0.0.0, a tag whose version differs from the package's,
 a dispatch that publishes from a branch other than `main`, and a private repository, from which
 npm does not publish with provenance. A dispatch with `publish` off, and every pull request that
 changes the workflow or the check, stop before the `publish` job.
 The publish step reads the tarball's version: prereleases use their first identifier (`beta`, `alpha`, `rc`), and stable versions use `latest`.
-The first CLI/MCP release is 0.1.0-beta.0. Manual dispatch defaults to publish=false.
+The in-repo CLI/MCP version is `0.1.0-beta.1`, the first OIDC publish candidate after the manual beta.0 bootstrap.
+Publishing beta.1 moves `beta`; `latest` stays at beta.0 until Augusto removes it from his authenticated session.
+The workflow runs no `npm dist-tag` commands; that Trusted Publisher permission remains disabled.
+Use `cli-v0.1.0-beta.1` / `mcp-v0.1.0-beta.1`, or dispatch with `publish=true`, never both for the same version.
+Manual dispatch defaults to `publish=false`.
 
 ## What happens when you edit
 
