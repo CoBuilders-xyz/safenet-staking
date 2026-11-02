@@ -20,6 +20,7 @@ const useQueryMock = reactQuery.useQuery as unknown as Mock
 describe("useGeoblockCheck", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockFetch.mockReset()
     localStorage.clear()
     capturedQueryFn = undefined
   })
@@ -86,6 +87,13 @@ describe("useGeoblockCheck", () => {
 
       const { result } = renderHook(() => useGeoblockCheck())
 
+      expect(result.current.allowed).toBe(false)
+      expect(result.current.restriction).toEqual({ gate: "geoblock", reason: "unavailable" })
+    })
+
+    it.each(["XX", "ZZ", "AA", "ru", "Russia", { code: "RU" }])("fails closed for invalid query data %j", (country) => {
+      useQueryMock.mockReturnValue({ data: country, isLoading: false, isError: false })
+      const { result } = renderHook(() => useGeoblockCheck())
       expect(result.current.allowed).toBe(false)
       expect(result.current.restriction).toEqual({ gate: "geoblock", reason: "unavailable" })
     })
@@ -172,6 +180,48 @@ describe("useGeoblockCheck", () => {
 
       expect(country).toBe("US")
       expect(mockFetch).toHaveBeenCalledTimes(2)
+    })
+
+    it.each(["XX", "ZZ", "AA", "ru", "Russia", 123, { code: "RU" }, null, undefined])(
+      "rejects malformed primary country %j and uses the fallback",
+      async (country) => {
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ country }) })
+        mockFetch.mockResolvedValueOnce({ ok: true, text: async () => "RU" })
+
+        await expect(capturedQueryFn!()).resolves.toBe("RU")
+        expect(mockFetch).toHaveBeenCalledTimes(2)
+      },
+    )
+
+    it("fails closed when a malformed primary response has no working fallback", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ country: { code: "RU" } }) })
+      mockFetch.mockRejectedValueOnce(new Error("Network error"))
+
+      await expect(capturedQueryFn!()).rejects.toThrow()
+      expect(localStorage.getItem("geoblock_check")).toBeNull()
+    })
+
+    it.each([
+      { country: "XX", timestamp: Date.now() },
+      { country: "ZZ", timestamp: Date.now() },
+      { country: "ru", timestamp: Date.now() },
+      { country: { code: "RU" }, timestamp: Date.now() },
+      { country: "US" },
+      { country: "US", timestamp: "not a timestamp" },
+      { country: "US", timestamp: Date.now() + 86_400_000 },
+    ])("ignores malformed cached lookup %j", async (cached) => {
+      localStorage.setItem("geoblock_check", JSON.stringify(cached))
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ country: "RU" }) })
+
+      await expect(capturedQueryFn!()).resolves.toBe("RU")
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+    })
+
+    it.each(["XX", "ZZ", "T1"])("rejects unknown fallback country %s without caching", async (country) => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ country: "XX" }) })
+      mockFetch.mockResolvedValueOnce({ ok: true, text: async () => country })
+      await expect(capturedQueryFn!()).rejects.toThrow("ipapi.co invalid response")
+      expect(localStorage.getItem("geoblock_check")).toBeNull()
     })
 
     it("throws when both providers fail", async () => {

@@ -2,7 +2,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { CONTRACTS } from "./contracts.js"
-import { GEO_LOOKUPS, GEOBLOCKED_COUNTRIES } from "./compliance.js"
+import { GEO_LOOKUPS, GEOBLOCKED_COUNTRIES, isCountryCode } from "./compliance.js"
 import { DEPLOYMENTS } from "./deployments.js"
 
 // The web interface keeps its geo gate in its own hook. The CLI and the MCP server read these
@@ -24,4 +24,14 @@ test("GEO_LOOKUPS are the web's lookups, in the web's order", () => {
 
 test("the sanctions oracle the gates read is the interface's", () => {
   assert.equal(DEPLOYMENTS[1].sanctionsOracle, CONTRACTS.sanctionsList.address)
+})
+
+test("country codes reject unknown and proxy sentinels while accepting assigned territories", () => {
+  for (const code of ["XX", "ZZ", "AA", "EU", "T1", "US ", "us", "", null, {}, 123]) {
+    assert.equal(isCountryCode(code), false)
+  }
+  for (const code of ["US", "DE", "RU", "CN", "GB", "AQ", "AX", "BQ", "CW", "SS", "SX", "XK"]) {
+    assert.equal(isCountryCode(code), true)
+  }
+  for (const code of GEOBLOCKED_COUNTRIES) assert.equal(isCountryCode(code), true)
 })
