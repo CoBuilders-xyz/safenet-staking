@@ -57,7 +57,7 @@ export function localSubgraphUrl(chain: ChainKey, port: number | string = DEFAUL
  * stay deployed, and the local graph-node is reached through the overrides.
  */
 export const SUBGRAPH_ENDPOINTS: Record<ChainKey, string> = {
-  mainnet: "https://api.studio.thegraph.com/query/1762768/safenet-mainnet/0abe5fb",
+  mainnet: "https://api.studio.thegraph.com/query/1762768/safenet-mainnet/1cb0e25",
   gnosis: "https://api.studio.thegraph.com/query/1762768/safenet-gnosis/efeed7c",
 }
 

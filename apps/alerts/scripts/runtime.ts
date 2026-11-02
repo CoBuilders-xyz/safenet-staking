@@ -58,7 +58,7 @@ const mf = new Miniflare(convertV4MiniflareOptions({
     }
     if (url.hostname === "graph.test") return RuntimeResponse.json({ data: {
       _meta: { block: { number: 100, timestamp: Number(BigInt(block.timestamp)) }, hasIndexingErrors: false },
-      delegations: [{ id: "position", validator: { id: CONTRACTS.staking.address, registeredAtBlock: "1" } }],
+      delegations: [{ id: "position", validator: { id: CONTRACTS.staking.address, registeredAtBlock: null, firstSeenAtBlock: "1" } }],
     } })
     if (url.hostname === "gnosis.test") {
       const body = await request.json() as { id: number; method: string; params: string[] }

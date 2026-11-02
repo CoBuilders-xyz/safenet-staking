@@ -187,3 +187,13 @@ test("the same sources give the same bytes", async () => {
   const b = render(await collect(fakeSources()))
   assert.deepEqual([...a.entries()], [...b.entries()])
 })
+
+test("unregistered rows retain null registration and required first-seen provenance", async () => {
+  const validators = file(await collect(fakeSources()), "validators.json").validators as Json[]
+  const registration = validators[2]!.registration as { absentFields: string[]; row: Json }
+  assert.deepEqual(registration.absentFields, [])
+  assert.equal(registration.row.registeredAtBlock, null)
+  assert.equal(registration.row.registeredAtTimestamp, null)
+  assert.equal(registration.row.firstSeenAtBlock, "26255073")
+  assert.equal(registration.row.firstSeenAtTimestamp, "1792755467")
+})

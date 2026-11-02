@@ -18,6 +18,7 @@ const DAY = 86_400
 const HISTORY_PAGE = 25
 
 const eventLabels = (t: TFunction): Record<ValidatorEvent["kind"], string> => ({
+  "first-seen": t("selector.firstSeen", "First seen"),
   registered: t("selector.registered", "Registered"),
   stake: t("selector.stake", "Stake"),
   "withdrawal-initiated": t("selector.unstakeStarted", "Unstake started"),
@@ -82,7 +83,9 @@ function DelegatorsSection({ activity }: { activity: Figure<ValidatorActivity> }
 function DelegatorsBody({ activity }: { activity: ValidatorActivity }) {
   const { t } = useTranslation()
   const v = activity.validator!
-  const registeredBlock = v.registeredAtBlock ? BigInt(v.registeredAtBlock) : undefined
+  const hasRegistration = v.registeredAtBlock !== null && v.registeredAtTimestamp !== null
+  const observedBlock = BigInt(hasRegistration ? v.registeredAtBlock! : v.firstSeenAtBlock)
+  const observedTimestamp = Number(hasRegistration ? v.registeredAtTimestamp : v.firstSeenAtTimestamp)
   const { points } = activity.delegators
   // The line holds its last value to the block the subgraph has indexed.
   const indexedDay = Math.floor(activity.indexedAt / DAY) * DAY
@@ -99,20 +102,15 @@ function DelegatorsBody({ activity }: { activity: ValidatorActivity }) {
           <dd className="text-xs text-muted-foreground">{t("selector.everStakedCount", "{{n}} have ever staked", { n: count(v.stakersEver) })}</dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">{t("selector.registered", "Registered")}</dt>
-          {registeredBlock !== undefined && v.registeredAtTimestamp ? (
-            <>
-              <dd className="text-base">{longDay(Number(v.registeredAtTimestamp))}</dd>
-              <dd className="text-xs text-muted-foreground">
-                {t("selector.block", "Block")}{" "}
-                <ExplorerLink href={explorerBlockUrl(registeredBlock)} what={t("selector.block", "Block")}>
-                  {count(Number(registeredBlock))}
-                </ExplorerLink>
-              </dd>
-            </>
-          ) : (
-            <dd className="text-muted-foreground">{t("selector.noRegistration", "No registration indexed")}</dd>
-          )}
+          <dt className="text-muted-foreground">{hasRegistration ? t("selector.registered", "Registered") : t("selector.firstSeen", "First seen")}</dt>
+          <dd className="text-base">{longDay(observedTimestamp)}</dd>
+          <dd className="text-xs text-muted-foreground">
+            {t("selector.block", "Block")}{" "}
+            <ExplorerLink href={explorerBlockUrl(observedBlock)} what={t("selector.block", "Block")}>
+              {count(Number(observedBlock))}
+            </ExplorerLink>
+          </dd>
+          {!hasRegistration && <dd className="text-muted-foreground">{t("selector.noRegistration", "No registration indexed")}</dd>}
         </div>
         <div>
           <dt className="text-muted-foreground">{t("selector.stakingContract", "Staking contract")}</dt>
@@ -157,7 +155,7 @@ function EventHistorySection({ activity }: { activity: Figure<ValidatorActivity>
   const [shown, setShown] = useState(HISTORY_PAGE)
   const a = activity.state === "ready" ? activity.value : undefined
   const source = a
-    ? t("selector.eventsSource", "Mainnet subgraph, block {{block}}: indexed stakes, withdrawals, and latest registration. Block times use UTC.", { block: count(a.block) })
+    ? t("selector.eventsSource", "Mainnet subgraph, block {{block}}: indexed stakes, withdrawals, and latest registration or first observation. Block times use UTC.", { block: count(a.block) })
     : t("selector.mainnetSource", "Mainnet subgraph.")
   const events = a?.replayMatches ? a.history : []
 

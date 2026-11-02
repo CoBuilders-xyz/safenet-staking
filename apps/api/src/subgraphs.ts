@@ -4,7 +4,7 @@ import { ApiError, META, array, boolean, graph, integer, malformed, object, stri
 
 export type Endpoints = Pick<Env, "SUBGRAPH_URL_MAINNET" | "SUBGRAPH_URL_GNOSIS">
 export const DETAIL = `query Validator($id: ID!) { ${META} validator(id: $id) {
-  address isRegistered totalStaked stakersCurrent stakersEver registeredAtTimestamp
+  address isRegistered totalStaked stakersCurrent stakersEver registeredAtTimestamp firstSeenAtTimestamp
 } }`
 export async function detail(fetcher: Fetcher, env: Endpoints, target: Address, now: number) {
   const result = await graph(fetcher, env.SUBGRAPH_URL_MAINNET, DETAIL, { id: target.toLowerCase() }, now, "mainnet")
@@ -15,6 +15,7 @@ export async function detail(fetcher: Fetcher, env: Endpoints, target: Address, 
     registered: boolean(row.isRegistered), totalStaked: uint(row.totalStaked),
     stakersCurrent: integer(row.stakersCurrent), stakersEver: integer(row.stakersEver),
     registeredAtTimestamp: row.registeredAtTimestamp === null ? null : uint(row.registeredAtTimestamp),
+    firstSeenAtTimestamp: uint(row.firstSeenAtTimestamp),
   }, sources: [result.freshness], expiresAt: result.expiresAt }
 }
 export const STATS_MAINNET = `query SystemMainnet { ${META} network(id: "1") {

@@ -27,7 +27,7 @@ export function upstream(options: FixtureOptions = {}): Fetcher {
 export function graphData(query: string): Record<string, unknown> {
   if (query.includes("query SystemMainnet")) return { network: { totalStaked: "1000000000000000000000000", pendingWithdrawals: "0", rewardsClaimed: "100", activeValidators: 1, stakersCurrent: 1, stakersEver: 2, delegationsCurrent: 1, rewardPeriods: 1 } }
   if (query.includes("query SystemGnosis")) return { consensuses: [{ programme: GNOSIS_INDEXED_PROGRAMME, attestationCeremonies: "100", attestations: "101", proposals: "102", validatorCount: 1 }] }
-  if (query.includes("query Validator(")) return { validator: { address: TARGET, isRegistered: true, totalStaked: "900719925474099300000", stakersCurrent: 1, stakersEver: 2, registeredAtTimestamp: null } }
+  if (query.includes("query Validator(")) return { validator: { address: TARGET, isRegistered: true, totalStaked: "900719925474099300000", stakersCurrent: 1, stakersEver: 2, registeredAtTimestamp: null, firstSeenAtTimestamp: "1774528907" } }
   if (query.includes("query Signers")) return { signingValidator: { id: TARGET.toLowerCase(), staker: OTHER.toLowerCase() }, consensuses: [{ programme: GNOSIS_INDEXED_PROGRAMME, validators: [{ id: TARGET.toLowerCase() }] }] }
   if (query.includes("query History")) {
     const date = Math.floor(NOW / 86400_000) * 86400 - 86400

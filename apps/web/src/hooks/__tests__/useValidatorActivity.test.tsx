@@ -25,6 +25,8 @@ const validator = (current: number, ever: number) => ({
   totalStaked: "0",
   stakersCurrent: current,
   stakersEver: ever,
+  firstSeenAtBlock: "24741800",
+  firstSeenAtTimestamp: "1774528907",
   registeredAtBlock: "24741826",
   registeredAtTimestamp: "1774529219",
 })

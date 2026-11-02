@@ -32,6 +32,8 @@ interface ValidatorCardProps {
   delegators?: number
   /** Unix seconds of its latest registration on the Staking contract. */
   registeredAt?: number
+  /** First observation, used only when no registration is indexed. */
+  firstSeenAt?: number
   /** Ceremonies missed in the window `missedLabel` names. */
   missed?: bigint
   /** The window of `missed`, such as "Missed, Beta's last 14 days". */
@@ -50,6 +52,7 @@ export function ValidatorCard({
   ensName,
   delegators,
   registeredAt,
+  firstSeenAt,
   missed,
   missedLabel,
 }: ValidatorCardProps) {
@@ -196,10 +199,12 @@ export function ValidatorCard({
           <div className="w-px bg-border self-stretch" />
           <div className="min-w-0 flex-1 flex flex-col gap-1 px-4 py-4">
             <span className="text-base font-heading text-faint leading-none">
-              {t("selector.registeredColon", "Registered:")}
+              {registeredAt === undefined && firstSeenAt !== undefined
+                ? t("selector.firstSeenColon", "First seen:")
+                : t("selector.registeredColon", "Registered:")}
             </span>
             <span className={`text-xl font-mono leading-none ${valueColor}`}>
-              {registeredAt === undefined ? "—" : shortDay(registeredAt)}
+              {registeredAt !== undefined ? shortDay(registeredAt) : firstSeenAt !== undefined ? shortDay(firstSeenAt) : "—"}
             </span>
           </div>
         </div>

@@ -41,11 +41,12 @@ vi.mock("@/hooks/useEnsNames", async (importOriginal) => ({
 }))
 
 vi.mock("@/components/validators/ValidatorCard", () => ({
-  ValidatorCard: (p: { validator: string; isActive: boolean; delegators?: number; registeredAt?: number; missed?: bigint; missedLabel?: string; ensName?: string }) => (
+  ValidatorCard: (p: { validator: string; isActive: boolean; delegators?: number; registeredAt?: number; firstSeenAt?: number; missed?: bigint; missedLabel?: string; ensName?: string }) => (
     <div
       data-testid={`validator-card-${p.validator}`}
       data-active={p.isActive}
       data-delegators={p.delegators ?? ""}
+      data-first-seen={p.firstSeenAt ?? ""}
       data-registered={p.registeredAt ?? ""}
       data-missed={p.missed?.toString() ?? ""}
       data-missed-label={p.missedLabel}
@@ -65,6 +66,7 @@ const entry = (delegators: number, timestamp: number): DirectoryEntry => ({
   isRegistered: true,
   delegators,
   delegatorsEver: delegators + 2,
+  firstSeenAt: { block: 24_741_800n, timestamp: 1_774_528_907 },
   registeredAt: { block: 24_741_826n, timestamp },
 })
 
@@ -292,4 +294,13 @@ describe("ValidatorList", () => {
     expect(screen.getByTestId(`validator-card-${TEST_ACCOUNTS.validator2}`).dataset.ens).toBe("")
     expect(screen.getByText(/Names: ENS primary names, verified by reverse resolution/)).toBeInTheDocument()
   })
+})
+
+it("passes first observation separately when registration is absent", () => {
+  allSourcesAnswer()
+  mockDirectory.mockReturnValue({ entries: ready(new Map([[v1, { ...entry(40, 1_774_529_219), registeredAt: undefined }]]), "subgraph") })
+  render(<MemoryRouter><ValidatorList /></MemoryRouter>)
+  const card = screen.getByTestId(`validator-card-${TEST_ACCOUNTS.validator1}`)
+  expect(card).toHaveAttribute("data-registered", "")
+  expect(card).toHaveAttribute("data-first-seen", "1774528907")
 })

@@ -122,6 +122,7 @@ failures mark the run unhealthy but do not discard verified conditions from inde
   cumulative claimed amount. Missing, stale-root or invalid proofs cannot produce an alert.
 * **Deregistered:** notify a delegator whose validator is no longer registered. The subgraph's
   `registeredAtBlock` distinguishes registration episodes without resending after stake activity.
+  When registration is absent, `firstSeenAtBlock` supplies a stable key. It does not prove prior registration.
 * **Participation:** count attendance over up to 14 complete Aegis UTC days, ending at the latest
   complete day with an attested ceremony. Use core's complete-day boundary. Known members with no
   attendance count as zero. Notify below the user's percentage, at most once per complete-day check.

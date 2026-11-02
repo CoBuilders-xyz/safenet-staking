@@ -105,6 +105,7 @@ export function ValidatorList({
         participation: v.participationRate,
         delegators: entry?.delegators,
         registeredAt: entry?.registeredAt?.timestamp,
+        firstSeenAt: entry?.firstSeenAt.timestamp,
         missed: missedFigures?.get(v.address.toLowerCase())?.absences,
       }
     }),
@@ -139,7 +140,7 @@ export function ValidatorList({
         </div>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2">
-          {rows.map(({ info: v, delegators, registeredAt, missed }) => {
+          {rows.map(({ info: v, delegators, registeredAt, firstSeenAt, missed }) => {
             const lookup = ens.get(v.address.toLowerCase())
             return (
               <ValidatorCard
@@ -157,6 +158,7 @@ export function ValidatorList({
                 ensName={lookup?.status === "found" ? lookup.name : undefined}
                 delegators={delegators}
                 registeredAt={registeredAt}
+                firstSeenAt={firstSeenAt}
                 missed={missed}
                 missedLabel={missedLabel}
               />

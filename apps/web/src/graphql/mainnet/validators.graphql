@@ -1,11 +1,7 @@
 # Mainnet subgraph queries for the validators list and the validator detail page.
 #
-# Only fields the deployed version serves are selected. The schema in packages/subgraph-mainnet
-# can run ahead of the deployment: firstSeenAtBlock is in the schema and not in the Studio
-# version this app reads, so it is not selected here. That version also files registeredAtBlock
-# and registeredAtTimestamp under the first event that named the validator, not its registration.
-# Checked against the Staking contract's logs at block 26,287,293: for the six validators SEF
-# lists the two are the same block; one address that was only ever deregistered differs.
+# Registration fields are nullable until a registration is indexed. First-seen fields always
+# identify the event that created the row; they must not be labelled as registration.
 
 # Every validator the Staking contract has named, registered or not: a deregistered validator
 # keeps its stake and its delegators until they withdraw.
@@ -21,6 +17,8 @@ query ValidatorDirectory {
     stakersEver
     registeredAtBlock
     registeredAtTimestamp
+    firstSeenAtBlock
+    firstSeenAtTimestamp
   }
 }
 
@@ -41,6 +39,8 @@ query ValidatorActivity($id: ID!, $validator: String!, $block: Block_height, $st
     stakersEver
     registeredAtBlock
     registeredAtTimestamp
+    firstSeenAtBlock
+    firstSeenAtTimestamp
   }
   stakes(first: 1000, block: $block, where: { validator: $validator, id_gt: $stakesAfter }, orderBy: id) {
     id

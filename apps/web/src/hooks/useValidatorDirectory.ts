@@ -13,6 +13,8 @@ export interface DirectoryEntry {
   delegatorsEver: number
   /** The block and unix seconds of its latest registration. Undefined before one is indexed. */
   registeredAt: { block: bigint; timestamp: number } | undefined
+  /** First indexed observation; it does not prove registration. */
+  firstSeenAt: { block: bigint; timestamp: number }
 }
 
 /**
@@ -38,9 +40,10 @@ export function useValidatorDirectory() {
             delegators: v.stakersCurrent,
             delegatorsEver: v.stakersEver,
             registeredAt:
-              v.registeredAtBlock && v.registeredAtTimestamp
+              v.registeredAtBlock !== null && v.registeredAtTimestamp !== null
                 ? { block: BigInt(v.registeredAtBlock), timestamp: Number(v.registeredAtTimestamp) }
                 : undefined,
+            firstSeenAt: { block: BigInt(v.firstSeenAtBlock), timestamp: Number(v.firstSeenAtTimestamp) },
           },
         ]),
       ),
