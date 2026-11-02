@@ -50,7 +50,7 @@ The parity scripts deliberately query the chosen endpoint directly so gateway fa
    `release:build` accepts only `VITE_GRAPH_API_KEY` in addition to committed `build.env`.
    It ignores other shell VITE values and all .env files. See [VERIFY.md](VERIFY.md).
 
-The jarvis preview origin `https://jarvis-mini.miku-sargas.ts.net:8448` needs no special
+The internal preview origin `<internal-preview-host>` needs no special
 allowlist entry. Billing/auth failures still fall back to Studio. Do not change the key policy automatically.
 
 For local tests, use a synthetic key. For live gateway verification, load the real key
