@@ -12,12 +12,18 @@ interface CachedGeoblock {
   timestamp: number
 }
 
+function isCountryCode(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Z]{2}$/.test(value)
+}
+
 function readCache(): string | null {
   try {
     const raw = localStorage.getItem(CACHE_KEY)
     if (!raw) return null
-    const cached: CachedGeoblock = JSON.parse(raw)
-    if (Date.now() - cached.timestamp > CACHE_TTL_MS) {
+    const cached: Partial<CachedGeoblock> | null = JSON.parse(raw)
+    const now = Date.now()
+    if (!isCountryCode(cached?.country) || typeof cached?.timestamp !== "number" ||
+      !Number.isFinite(cached.timestamp) || cached.timestamp > now || now - cached.timestamp > CACHE_TTL_MS) {
       localStorage.removeItem(CACHE_KEY)
       return null
     }
@@ -36,7 +42,8 @@ function writeCache(country: string): void {
 async function fetchFromCountryIs(): Promise<string> {
   const response = await fetch("https://api.country.is")
   if (!response.ok) throw new Error("country.is lookup failed")
-  const data: { country: string } = await response.json()
+  const data: { country?: unknown } | null = await response.json()
+  if (!isCountryCode(data?.country)) throw new Error("country.is invalid response")
   return data.country
 }
 
@@ -44,7 +51,7 @@ async function fetchFromIpapi(): Promise<string> {
   const response = await fetch("https://ipapi.co/country")
   if (!response.ok) throw new Error("ipapi.co lookup failed")
   const country = (await response.text()).trim()
-  if (!/^[A-Z]{2}$/.test(country)) throw new Error("ipapi.co invalid response")
+  if (!isCountryCode(country)) throw new Error("ipapi.co invalid response")
   return country
 }
 
@@ -104,7 +111,7 @@ export function useGeoblockCheck(): GeoblockResult {
   if (isLoading) return { allowed: true, isLoading: true }
 
   // Fail-closed: block on error or blocked country
-  if (isError || !country) {
+  if (isError || !isCountryCode(country)) {
     return { allowed: false, isLoading: false, restriction: { gate: "geoblock", reason: "unavailable" } }
   }
   if (BLOCKED_COUNTRIES.has(country)) {

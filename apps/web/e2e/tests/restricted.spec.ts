@@ -7,6 +7,18 @@ function restricted(page: Page) {
 }
 
 test.describe("Restricted screen", () => {
+  test("malformed primary location and a failed fallback keep the interface closed", async ({ disconnectedPage: page }) => {
+    await page.route("**/api.country.is**", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ country: { code: "RU" } }) }),
+    )
+    await page.route("**/ipapi.co/**", (route) => route.abort("connectionrefused"))
+    await page.goto("/")
+
+    await expect(page.getByRole("heading", { name: "Access Check Failed" })).toBeVisible({ timeout: 10_000 })
+    await expect(restricted(page)).toContainText("Closed by: Location check")
+    await expect(page.getByRole("link", { name: "Overview" })).toHaveCount(0)
+  })
+
   test("location check: names the country it found and offers no way around it", async ({ disconnectedPage: page }) => {
     await page.route("**/api.country.is**", (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ country: "CU" }) }),
