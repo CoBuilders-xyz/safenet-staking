@@ -344,6 +344,20 @@ describe("availability gateway policy", () => {
     expect(summary(result, undefined)).toContain("WARN (non-blocking)")
   })
 
+  it("warns when the actual gateway probe returns Orbitor HTTP 504", async () => {
+    const gateway = await checkGateway(
+      fakeFetch({ [`${ORBITOR_IPFS_GATEWAY}/ipfs/bafy1/index.html`]: html("", 504) }),
+      ORBITOR_IPFS_GATEWAY, "bafy1", TITLE,
+    )
+    const outcomes = applyAvailabilityPolicy([
+      ...healthy.filter(o => o.target !== ORBITOR_IPFS_GATEWAY), gateway,
+    ])
+    expect(outcomes.find(o => o.target === ORBITOR_IPFS_GATEWAY)).toMatchObject({
+      ok: false, advisory: true, httpStatus: 504,
+    })
+    expect(outcomes.filter(o => !o.ok && !o.advisory)).toEqual([])
+  })
+
   it("blocks every other gateway status and any production or required-gateway failure", () => {
     for (const gateway of IPFS_GATEWAYS) {
       for (const status of [404, 429, 500, 503, 504]) {
