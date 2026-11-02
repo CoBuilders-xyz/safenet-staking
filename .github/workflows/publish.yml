@@ -9,6 +9,7 @@ name: Publish
 #   pull_request changing this workflow    both packages, never published
 #
 # Version 0.0.0 is never published. A dispatch publishes from main only.
+# Prereleases use npm's next tag; stable versions use latest.
 
 on:
   push:
@@ -28,6 +29,7 @@ on:
     paths:
       - .github/workflows/publish.yml
       - tools/check-installed-package.mjs
+      - tools/__tests__/publish-*.test.mjs
 
 concurrency:
   group: publish-${{ github.ref }}
@@ -253,5 +255,12 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           tarball="$(ls "$RUNNER_TEMP"/pack/*.tgz)"
-          pnpm publish "$tarball" --provenance --access public
-          echo "Published $(basename "$tarball" .tgz) with provenance." >> "$GITHUB_STEP_SUMMARY"
+          # Read the checked tarball, so tag pushes and dispatches follow the same version.
+          version="$(tar -xOf "$tarball" package/package.json | node -p "JSON.parse(require('node:fs').readFileSync(0, 'utf8')).version")"
+          # Build metadata can contain hyphens without making a version a prerelease.
+          case "${version%%+*}" in
+            *-*) dist_tag=next ;;
+            *) dist_tag=latest ;;
+          esac
+          pnpm publish "$tarball" --provenance --access public --tag "$dist_tag"
+          echo "Published $(basename "$tarball" .tgz) with provenance under $dist_tag." >> "$GITHUB_STEP_SUMMARY"
