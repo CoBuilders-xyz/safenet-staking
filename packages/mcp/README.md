@@ -89,7 +89,7 @@ Add the server to `claude_desktop_config.json`. On macOS it is in
   "mcpServers": {
     "safenet": {
       "command": "npx",
-      "args": ["-y", "@cobuilders/safenet-mcp"],
+      "args": ["-y", "@cobuilders/safenet-mcp@beta"],
       "env": {
         "MAINNET_RPC_URL": "<your archive RPC endpoint>"
       }
@@ -492,7 +492,7 @@ project:
   "mcpServers": {
     "safenet": {
       "command": "npx",
-      "args": ["-y", "@cobuilders/safenet-mcp"],
+      "args": ["-y", "@cobuilders/safenet-mcp@beta"],
       "env": {
         "MAINNET_RPC_URL": "<your archive RPC endpoint>"
       }
@@ -512,3 +512,7 @@ Node.js 22.14 or later.
 For gateway subgraph restrictions, the USD 20/month cap, fallback behavior and operator setup, see [GRAPH-GATEWAY.md](https://github.com/CoBuilders-xyz/safenet-staking/blob/main/GRAPH-GATEWAY.md). Supply `GRAPH_API_KEY` through the process environment; no command-line key flag is needed.
 
 Failed Network queries retry Studio once. The process warns on stderr once per chain; if both fail, history reports unavailable without leaking URLs.
+
+## Beta publishing
+
+Initial version: `0.1.0-beta.0`, dist-tag `beta`. CI uses npm Trusted Publishing (GitHub OIDC), not a permanent npm token. Package creation needs a one-time bootstrap first. See [NPM-RELEASE.md](../../NPM-RELEASE.md) for the operator checklist.

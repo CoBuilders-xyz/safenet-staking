@@ -58,3 +58,16 @@ for (const pkg of ["cli", "mcp"]) {
     assert.match(result.summary, /nothing is published/)
   })
 }
+
+test("private repositories refuse publishing provenance, but not branch dry runs", () => {
+  const result = plan({ PRIVATE: "true" })
+  assert.equal(result.status, 1)
+  assert.match(result.stdout, /private repository/)
+  assert.equal(result.outputs, "")
+})
+
+test("publishing dispatch remains restricted to main", () => {
+  const result = plan({ EVENT: "workflow_dispatch", REF: "refs/heads/feature", INPUT_PACKAGE: "cli", INPUT_PUBLISH: "true" })
+  assert.equal(result.status, 1)
+  assert.match(result.stdout, /publishes from main only/)
+})

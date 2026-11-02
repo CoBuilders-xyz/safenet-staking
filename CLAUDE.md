@@ -192,12 +192,14 @@ GitHub Release. On a pull request that changes the build, and by hand, it stops 
 unit tests, builds and packs it. Its `check` job installs the tarball outside the monorepo and runs
 `tools/check-installed-package.mjs` against Mainnet with `MAINNET_RPC_URL`, or, when the secret is
 empty, as on a pull request from a fork, through the package's own public endpoints. Its `publish` job sends
-that same tarball with `pnpm publish --provenance --access public --tag <dist-tag>` and `NPM_TOKEN`, and fails
-when the token is empty. It refuses version 0.0.0, a tag whose version differs from the package's,
+that same tarball with `npm publish --provenance --access public --tag <dist-tag>` and GitHub OIDC Trusted Publishing.
+No permanent npm token is used. The publish job pins npm12.2.1; initial package creation requires
+a one-time bootstrap before configuring npm Trusted Publishers (see NPM-RELEASE.md). It refuses version 0.0.0, a tag whose version differs from the package's,
 a dispatch that publishes from a branch other than `main`, and a private repository, from which
 npm does not publish with provenance. A dispatch with `publish` off, and every pull request that
 changes the workflow or the check, stop before the `publish` job.
-The publish step reads the tarball's version: prereleases use `next`, and stable versions use `latest`.
+The publish step reads the tarball's version: prereleases use their first identifier (`beta`, `alpha`, `rc`), and stable versions use `latest`.
+The first CLI/MCP release is 0.1.0-beta.0. Manual dispatch defaults to publish=false.
 
 ## What happens when you edit
 

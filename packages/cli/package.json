@@ -1,6 +1,6 @@
 {
   "name": "@cobuilders/safenet-cli",
-  "version": "0.0.0",
+  "version": "0.1.0-beta.0",
   "type": "module",
   "description": "safenet, a command-line interface for Safenet: reads, and stake, unstake and claims with --dry-run.",
   "license": "MIT",

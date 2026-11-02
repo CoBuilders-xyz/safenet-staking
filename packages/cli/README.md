@@ -27,14 +27,14 @@ node packages/cli/dist/index.js --help
 After it is published, install it globally:
 
 ```sh
-npm install -g @cobuilders/safenet-cli
+npm install -g @cobuilders/safenet-cli@beta
 safenet --help
 ```
 
 Or run it once, without installing:
 
 ```sh
-npx @cobuilders/safenet-cli status
+npx @cobuilders/safenet-cli@beta status
 ```
 
 Or, without Node.js, download the standalone binary for your system from the release of a
@@ -252,3 +252,7 @@ Node.js 22.14 or later.
 For gateway subgraph restrictions, the USD 20/month cap, fallback behavior and operator setup, see [GRAPH-GATEWAY.md](https://github.com/CoBuilders-xyz/safenet-staking/blob/main/GRAPH-GATEWAY.md). Supply `GRAPH_API_KEY` through the process environment; no command-line key flag is needed.
 
 Failed Network queries retry Studio once. The process warns on stderr once per chain; if both fail, history reports unavailable without leaking URLs.
+
+## Beta publishing
+
+Initial version: `0.1.0-beta.0`, dist-tag `beta`. CI uses npm Trusted Publishing (GitHub OIDC), not a permanent npm token. Package creation needs a one-time bootstrap first. See [NPM-RELEASE.md](../../NPM-RELEASE.md) for the operator checklist.
