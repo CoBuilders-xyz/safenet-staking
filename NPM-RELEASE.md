@@ -64,9 +64,14 @@ those triggers would attempt to publish the same version again. Finish a reviewe
 such as `0.1.0-beta.1` and its dry-run checks before configuring trust for the first OIDC run.
 Do not publish a dummy stable version just to reserve a package name.
 
-### B. Temporary granular token for the first CI publish only
+### B. Temporary granular token for the first CI publish only (time-limited)
 
-If Augusto chooses CI for bootstrap, create a narrowly scoped, short-lived granular
+npm [targets January 2027](https://github.blog/changelog/2026-07-31-restricting-npm-bypass-2fa-granular-access-tokens/)
+for removing direct publishing with granular access tokens. Check the current npm policy before choosing this option.
+Once that removal takes effect, option B is unavailable: use interactive option A instead.
+This checklist does not introduce a staged-publishing workflow.
+
+If Augusto chooses CI for bootstrap while supported, create a narrowly scoped, short-lived granular
 npm publish token with the required organization/package permissions. Under npm's default publishing policy,
 non-interactive token publishing requires **Bypass two-factor authentication** on that temporary token;
 otherwise npm can request an OTP that CI cannot provide. This bypass authorizes publishing without interactive 2FA.
@@ -128,7 +133,7 @@ In each package's **Settings → Trusted Publisher**, select **GitHub Actions**:
 | GitHub repository | `safenet-staking` |
 | Workflow filename | `publish.yml` (not its `.github/workflows/` path) |
 | Environment | Leave unset: the publish job does not select a GitHub environment |
-| Allowed operation | Enable only `npm publish`; leave dist-tag management disabled |
+| Allowed actions | Enable direct `npm publish`; leave `npm dist-tag` disabled. `npm stage publish` is always allowed by npm |
 
 Save for both `@cobuilders/safenet-cli` and `@cobuilders/safenet-mcp`.
 `npm publish --tag beta` uses publishing permission, not separate `npm dist-tag` permission.
