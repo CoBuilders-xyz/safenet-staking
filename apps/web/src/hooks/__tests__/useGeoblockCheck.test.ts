@@ -20,6 +20,7 @@ const useQueryMock = reactQuery.useQuery as unknown as Mock
 describe("useGeoblockCheck", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockFetch.mockReset()
     localStorage.clear()
     capturedQueryFn = undefined
   })
