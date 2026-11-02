@@ -3,12 +3,15 @@ import { spawnSync } from "node:child_process"
 import { createServer } from "node:http"
 import type { AddressInfo } from "node:net"
 import { resolve } from "node:path"
+import { IPFS_GATEWAYS, ORBITOR_IPFS_GATEWAY } from "@cobuilders/safenet-core"
 import { CID } from "multiformats/cid"
 import * as raw from "multiformats/codecs/raw"
 import { sha256 } from "multiformats/hashes/sha2"
 import { describe, it, expect } from "vitest"
 import {
   annotation,
+  applyAvailabilityPolicy,
+  type Outcome,
   checkGateway,
   checkProduction,
   entryAsset,
@@ -320,4 +323,63 @@ describe("availability.ts", () => {
     expect(run.status).toBe(1)
     expect(run.stderr).toContain("PRODUCTION_URL is not set")
   }, 30_000)
+})
+
+
+describe("availability gateway policy", () => {
+  const healthy: Outcome[] = [
+    { target: "production", ok: true, detail: "HTML 200" },
+    { target: "production", ok: true, detail: "JavaScript 200" },
+    ...IPFS_GATEWAYS.map(target => ({ target, ok: true, detail: "index 200" })),
+  ]
+  const failure = (target: string, httpStatus: number) => healthy.map(o => o.target === target
+    ? { ...o, ok: false, httpStatus, detail: `answered ${httpStatus}` } : o)
+
+  it("warns for Orbitor 504 only after every required path passed", () => {
+    const result = applyAvailabilityPolicy(failure(ORBITOR_IPFS_GATEWAY, 504))
+    const warning = result.find(o => o.target === ORBITOR_IPFS_GATEWAY)!
+    expect(warning).toMatchObject({ ok: false, advisory: true, httpStatus: 504 })
+    expect(result.filter(o => !o.ok && !o.advisory)).toEqual([])
+    expect(annotation(warning)).toMatch(/^::warning /)
+    expect(summary(result, undefined)).toContain("WARN (non-blocking)")
+  })
+
+  it("warns when the actual gateway probe returns Orbitor HTTP 504", async () => {
+    const gateway = await checkGateway(
+      fakeFetch({ [`${ORBITOR_IPFS_GATEWAY}/ipfs/bafy1/index.html`]: html("", 504) }),
+      ORBITOR_IPFS_GATEWAY, "bafy1", TITLE,
+    )
+    const outcomes = applyAvailabilityPolicy([
+      ...healthy.filter(o => o.target !== ORBITOR_IPFS_GATEWAY), gateway,
+    ])
+    expect(outcomes.find(o => o.target === ORBITOR_IPFS_GATEWAY)).toMatchObject({
+      ok: false, advisory: true, httpStatus: 504,
+    })
+    expect(outcomes.filter(o => !o.ok && !o.advisory)).toEqual([])
+  })
+
+  it("blocks every other gateway status and any production or required-gateway failure", () => {
+    for (const gateway of IPFS_GATEWAYS) {
+      for (const status of [404, 429, 500, 503, 504]) {
+        if (gateway === ORBITOR_IPFS_GATEWAY && status === 504) continue
+        expect(applyAvailabilityPolicy(failure(gateway, status)).some(o => !o.ok && !o.advisory)).toBe(true)
+      }
+    }
+    for (const i of [0, 1, ...healthy.map((o, i) => o.target !== "production" && o.target !== ORBITOR_IPFS_GATEWAY ? i : -1).filter(i => i >= 0)]) {
+      const both = failure(ORBITOR_IPFS_GATEWAY, 504)
+      both[i] = { ...both[i]!, ok: false, detail: "unavailable" }
+      expect(applyAvailabilityPolicy(both).filter(o => o.advisory)).toEqual([])
+    }
+  })
+
+  it("does not relax missing checks, transport errors, or title mismatches", () => {
+    const timedOut = failure(ORBITOR_IPFS_GATEWAY, 504)
+    for (const i of [0, 1, ...timedOut.map((o, i) => o.target !== ORBITOR_IPFS_GATEWAY ? i : -1).filter(i => i >= 0)]) {
+      expect(applyAvailabilityPolicy(timedOut.filter((_, j) => i !== j)).some(o => o.advisory)).toBe(false)
+    }
+    for (const detail of ["no answer in 60 s", "wrong title", "answered 504"]) {
+      const result = healthy.map(o => o.target === ORBITOR_IPFS_GATEWAY ? { ...o, ok: false, detail } : o)
+      expect(applyAvailabilityPolicy(result).some(o => o.advisory)).toBe(false)
+    }
+  })
 })

@@ -2,7 +2,8 @@ name: Availability
 
 # Every six hours: the production deployment answers with the interface's title and serves the
 # entry script of its build, and, once deployments.json at the repository root records a release,
-# each public IPFS gateway in packages/core serves that release's index.html. The table goes to
+# each public IPFS gateway in packages/core serves that release's index.html. Orbitor HTTP 504
+# is a warning only when production HTML/JS and all other gateways pass. The table goes to
 # the job summary, and the badge in README.md shows the last result.
 #
 # On a pull request only when the check or the release record changes, so either runs once
