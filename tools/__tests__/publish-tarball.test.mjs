@@ -5,7 +5,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, w
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
-// Run the workflow's actual shell with a local tarball and a fake pnpm. No registry is contacted.
+// Run the workflow's actual shell with a local tarball and a fake npm. No registry is contacted.
 const workflow = readFileSync(resolve(import.meta.dirname, "../../.github/workflows/publish.yml"), "utf8")
 function step(name) {
   const block = workflow.split(`      - name: ${name}\n`)[1]?.match(/ {8}run: \|\n((?: {10}.*\n|\n)+)/)?.[1]
@@ -20,9 +20,9 @@ function fixture(version, run) {
     writeFileSync(join(dir, "package/package.json"), JSON.stringify({ name: "@example/fixture", version }))
     mkdirSync(join(dir, "bin"))
     symlinkSync(process.execPath, join(dir, "bin/node"))
-    const pnpm = join(dir, "bin/pnpm")
-    writeFileSync(pnpm, '#!/bin/sh\nprintf "%s\\n" "$@" > "$RUNNER_TEMP/publish-args"\n')
-    chmodSync(pnpm, 0o755)
+    const npm = join(dir, "bin/npm")
+    writeFileSync(npm, '#!/bin/sh\nprintf "%s\\n" "$@" > "$RUNNER_TEMP/publish-args"\n')
+    chmodSync(npm, 0o755)
     const env = {
       PATH: `${join(dir, "bin")}:/usr/bin:/bin`, RUNNER_TEMP: dir,
       GITHUB_STEP_SUMMARY: join(dir, "summary"), PACKAGE: "cli", PUBLISH: "true", TAG_VERSION: "",
@@ -39,13 +39,16 @@ function fixture(version, run) {
 for (const [version, tag] of [
   ["1.2.3", "latest"],
   ["1.2.3+build-with-dashes", "latest"],
-  ["1.2.3-alpha.1", "next"],
-  ["1.2.3-beta.2", "next"],
-  ["1.2.3-rc.1", "next"],
-  ["1.2.3-0", "next"],
-  ["1.2.3-rc.1+build", "next"],
+  ["1.2.3-alpha.1", "alpha"],
+  ["1.2.3-beta.2", "beta"],
+  ["1.2.3-rc.1", "rc"],
+  ["1.2.3-0", "0"],
+  ["1.2.3-rc.1+build", "rc"],
+  ["0.1.0-beta.0", "beta"],
+  ["1.0.0-alpha.1", "alpha"],
+  ["1.2.3-beta.0+build-with-dashes", "beta"],
 ]) {
-  test(`publishes the checked ${version} tarball under ${tag}`, () => fixture(version, ({ dir, shell }) => {
+  test(`passes the checked ${version} tarball with derived tag ${tag}`, () => fixture(version, ({ dir, shell }) => {
     mkdirSync(join(dir, "pack"))
     const tarball = join(dir, "pack/fixture.tgz")
     const pack = spawnSync("tar", ["-czf", tarball, "package"], { cwd: dir, encoding: "utf8" })
@@ -71,3 +74,14 @@ for (const [version, publish, tagVersion, status] of [
     assert.equal(result.status, status, result.stdout + result.stderr)
   }))
 }
+
+test("normal publish auth is OIDC only with a supported pinned npm", () => {
+  const publishJob = workflow.split("\n  publish:\n")[1]
+  assert.ok(publishJob)
+  assert.match(publishJob, /id-token: write/)
+  assert.doesNotMatch(publishJob, /NODE_AUTH_TOKEN|secrets\.NPM_TOKEN|registry-url:/)
+  const version = publishJob.match(/npm install --global npm@(\d+)\.(\d+)\.(\d+)/)
+  assert.ok(version, "pin the npm client that performs the OIDC exchange")
+  const [, major, minor, patch] = version.map(Number)
+  assert.ok(major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1))))
+})

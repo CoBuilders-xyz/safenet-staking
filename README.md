@@ -86,6 +86,13 @@ unless the operator allows writes when the server starts.
   and how to add the server to Claude Desktop and Cursor.
 - [packages/mcp/CLAUDE.md](packages/mcp/CLAUDE.md): how it is built and tested.
 
+## npm CLI and MCP beta
+
+The initial npm version is `0.1.0-beta.0`, installed with `@beta`.
+Publishing uses GitHub Actions OIDC Trusted Publishing, with no permanent npm token.
+Missing npm packages need one bootstrap publish before their trusted publisher can be configured.
+See [NPM-RELEASE.md](NPM-RELEASE.md) for dry-run checks, bootstrap, exact npm settings and release tags.
+
 ## Release
 
 Production is IPFS. Vercel serves previews only.
