@@ -77,6 +77,45 @@ function invoke(script: "publish" | "verify", args: string[], settings: Record<s
 }
 
 describe("snapshot CLI failure cleanup", () => {
+  for (const guard of ["output in snapshot", "snapshot in output index", "index equals output", "index in output index"]) {
+    it(`honors filesystem case sensitivity for ${guard}`, () => {
+      const scratch = mkdtempSync(join(root, "case-overlap-"))
+      const original = join(scratch, "Days")
+      const variant = join(scratch, "days")
+      mkdirSync(original)
+      const insensitive = existsSync(variant)
+      let snapshot = day
+      let output = variant
+      let index: string | undefined
+      let message: RegExp
+      if (guard === "output in snapshot") {
+        snapshot = join(original, basename(day))
+        cpSync(day, snapshot, { recursive: true })
+        output = join(variant, basename(day), "publication")
+        message = /--out must not be --dir or inside it/
+      } else if (guard === "snapshot in output index") {
+        snapshot = join(original, "index", basename(day))
+        cpSync(day, snapshot, { recursive: true })
+        message = /--dir must not be inside <out>\/index/
+      } else {
+        index = guard === "index equals output" ? original : join(original, "INDEX", "nested")
+        mkdirSync(index, { recursive: true })
+        message = /--index must not be --out or inside <out>\/index/
+      }
+      const before = Object.fromEntries(listFiles(scratch).map(path => [path, readFileSync(join(scratch, path), "utf8")]))
+      const entries = readdirSync(scratch, { recursive: true })
+      const { child, log } = invoke("publish", ["--dir", snapshot, "--out", output, ...(index ? ["--index", index] : [])], {
+        PINATA_JWT: "fixture-only-not-a-token", PINATA_GATEWAY: "fixture.invalid", GATEWAY_TIMEOUT_SECONDS: "0", SNAPSHOT_DENY_FETCH: "1",
+      })
+      assert.equal(child.status, 1)
+      assert.match(child.stderr, insensitive ? message : /GATEWAY_TIMEOUT_SECONDS must be a positive number/)
+      assert.equal(existsSync(log), false)
+      assert.doesNotMatch(child.stdout, /files, .* blocks, CID|pinned/)
+      assert.deepEqual(readdirSync(scratch, { recursive: true }), entries)
+      assert.deepEqual(Object.fromEntries(listFiles(scratch).map(path => [path, readFileSync(join(scratch, path), "utf8")])), before)
+    })
+  }
+
   for (const alias of [false, true]) {
     for (const nested of [false, true]) {
       it(`rejects output ${nested ? "inside" : "equal to"} the snapshot${alias ? " through a symlink alias" : ""}`, () => {

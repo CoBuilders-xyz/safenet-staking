@@ -22,9 +22,9 @@
  *   pnpm --filter @cobuilders/safenet-snapshots snapshot:publish --dir <day> --out <dir> \
  *     [--index <dir holding the current index.json and INDEX_CID>] [--replace]
  */
-import { appendFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { basename, dirname, join, resolve, sep } from "node:path"
+import { basename, join, resolve } from "node:path"
 import { parseArgs } from "node:util"
 import { addDay, emptyIndex, parseIndex, type IndexEntry, type SnapshotIndex } from "../date-index.js"
 import {
@@ -32,15 +32,10 @@ import {
   type Outcome, type PinataCredentials,
 } from "../ipfs/index.js"
 import { serialise, manifestMismatch } from "../write.js"
+import { pathRelation } from "../path-containment.js"
 import { fail, output, run } from "./run.js"
 
 const SCRIPT = "snapshot-publish"
-
-/** Resolve existing ancestors without creating first-publication directories. Broken links fail closed. */
-function canonicalPath(path: string): string {
-  if (lstatSync(path, { throwIfNoEntry: false })) return realpathSync(path)
-  return join(canonicalPath(dirname(path)), basename(path))
-}
 
 /** Hash exactly the index bytes used for parsing, with the publication's directory packing settings. */
 async function indexMatchesCid(bytes: Uint8Array, expected: string): Promise<boolean> {
@@ -108,20 +103,14 @@ run(SCRIPT, async () => {
   const out = resolve(values.out)
   const index = values.index ? resolve(values.index) : undefined
   const indexDir = join(out, "index")
-  const canonicalDir = canonicalPath(dir)
-  const canonicalIndexDir = canonicalPath(indexDir)
-  if (canonicalDir === canonicalIndexDir || canonicalDir.startsWith(`${canonicalIndexDir}${sep}`)) {
+  if (pathRelation(dir, indexDir) !== "outside") {
     fail(SCRIPT, "--dir must not be inside <out>/index. Nothing was pinned")
   }
-  const canonicalOut = canonicalPath(out)
-  if (canonicalOut === canonicalDir || canonicalOut.startsWith(`${canonicalDir}${sep}`)) {
+  if (pathRelation(out, dir) !== "outside") {
     fail(SCRIPT, "--out must not be --dir or inside it. Nothing was pinned")
   }
-  if (index) {
-    const canonicalIndex = canonicalPath(index)
-    if (canonicalIndex === canonicalOut || canonicalIndex === canonicalIndexDir || canonicalIndex.startsWith(`${canonicalIndexDir}${sep}`)) {
-      fail(SCRIPT, "--index must not be --out or inside <out>/index. Nothing was pinned")
-    }
+  if (index && (pathRelation(index, out) === "equal" || pathRelation(index, indexDir) !== "outside")) {
+    fail(SCRIPT, "--index must not be --out or inside <out>/index. Nothing was pinned")
   }
 
   const mismatch = manifestMismatch(dir)
