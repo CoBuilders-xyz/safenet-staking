@@ -55,11 +55,11 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@walletconnect/core": "2.23.6",
-    "@walletconnect/sign-client": "2.23.6",
+    "@walletconnect/core": "2.26.0",
+    "@walletconnect/sign-client": "2.26.0",
     "commander": "15.0.0",
-    "viem": "2.46.2",
-    "zod": "4.6.5"
+    "viem": "2.57.13",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@cobuilders/safenet-core": "workspace:*",
