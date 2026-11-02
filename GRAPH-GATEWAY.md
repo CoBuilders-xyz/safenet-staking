@@ -21,7 +21,8 @@ timeouts and network failures. A warning appears once per chain per browser sess
 or CLI/MCP process (console/stderr), without keys or provider error text.
 If Studio also fails, existing unavailable/error states apply. Cancellation never retries.
 Custom non-gateway URL overrides retain their own error behavior. Full URLs to our
-Network IDs also receive Studio fallback. Each retry preserves the query and block selector.
+Network IDs also receive Studio fallback. Single-query retries preserve the query and block selector. CLI/MCP period reads retry
+the complete metadata-and-period operation, using Studio’s own indexed block after fallback.
 The parity scripts deliberately query the chosen endpoint directly so gateway failures remain visible.
 
 ## Operator settings (values are not set by this PR)

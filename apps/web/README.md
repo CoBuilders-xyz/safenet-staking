@@ -371,8 +371,8 @@ pnpm --filter @cobuilders/safenet-web release:build
 pnpm --filter @cobuilders/safenet-web release:pin
 ```
 
-- `release:build` (`scripts/release.ts`) reads [`build.env`](build.env) and nothing else: every
-  `.env` file and every `VITE_` variable in the shell is ignored. That file is committed and
+- `release:build` (`scripts/release.ts`) reads [`build.env`](build.env) plus the explicit public
+  `VITE_GRAPH_API_KEY`. Every `.env` file and every other shell `VITE_` variable is ignored. That file is committed and
   public, holds only `VITE_` keys, and never a secret. The script builds in production mode,
   runs the browser-safety check over `dist/`, packs `dist/` into `release/app.car` and writes the
   root CID to `release/CID`. The packing, the Pinata upload and the gateway checks live in
@@ -385,8 +385,8 @@ pnpm --filter @cobuilders/safenet-web release:pin
   `.env.local`, and fails when either is missing. `RELEASE_NAME` and `GATEWAY_TIMEOUT_SECONDS`
   are optional.
 
-`.github/workflows/release.yml` runs both on a `v*` tag or by hand. Its build job receives no
-secret. Its pin job takes the two Pinata secrets and runs only from `main` or a `v*` tag.
+`.github/workflows/release.yml` runs both on a `v*` tag or by hand. Its build step receives only the public browser key, mapped from `GRAPH_API_KEY` to
+`VITE_GRAPH_API_KEY`; it receives no private credentials. Its pin job takes the two Pinata secrets and runs only from `main` or a `v*` tag.
 
 ### Safe App
 

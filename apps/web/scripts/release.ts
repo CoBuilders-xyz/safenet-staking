@@ -61,7 +61,8 @@ console.log(`release: building with ${Object.keys(publicEnv).join(", ") || "no V
 await build({ root: APP, mode: "production", envDir: false, logLevel: "warn" })
 if (!existsSync(join(DIST, "index.html"))) fail("the build wrote no dist/index.html")
 
-// --- 3. No secret in the bundle ---
+// --- 3. Check known private values against the bundle ---
+// The child inherits publicEnv, including VITE_GRAPH_API_KEY, for its public-value exemption.
 try {
   execFileSync(process.execPath, [join(REPO, "tools/check-browser-safety.mjs")], { stdio: "inherit" })
 } catch {

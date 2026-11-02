@@ -1,6 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { run } from "./cli.js"
+import { subgraphEndpoints } from "@cobuilders/safenet-core"
 import { rewardsHistory } from "./lib/rewards.js"
 import { BLOCK, STAKER, fakeContext, fakeRuntime, type FakeOptions } from "./test-support.js"
 
@@ -263,4 +264,33 @@ test("CLI history recovers from gateway failure and reports unavailable if Studi
     }
     assert.doesNotMatch(rt.stdout() + rt.stderr(), /test-only-private-marker/)
   }
+})
+
+
+test("period-query fallback reads Studio metadata and pins periods to Studio's own head", async () => {
+  const ctx = fakeContext()
+  const gateway = subgraphEndpoints({ graphApiKey: "synthetic-test-key" }).mainnet
+  const queries: { gateway: boolean; query: string }[] = []
+  const result = await rewardsHistory({
+    ...ctx,
+    subgraphUrl: gateway,
+    fetch: async (input, init) => {
+      const query = (JSON.parse(String(init?.body)) as { query: string }).query
+      const isGateway = String(input) === gateway
+      queries.push({ gateway: isGateway, query })
+      if (isGateway) {
+        if (query.includes("_meta")) return Response.json({ data: { _meta: { block: { number: Number(BLOCK + 100n), timestamp: null } } } })
+        return new Response("unavailable", { status: 503 })
+      }
+      if (!query.includes("_meta")) {
+        assert.ok(query.includes(`block: { number: ${BLOCK} }`))
+        assert.ok(!query.includes(String(BLOCK + 100n)))
+      }
+      return ctx.fetch(input, init)
+    },
+  }, STAKER)
+  assert.deepEqual(queries.map(({ gateway, query }) => [gateway, query.includes("_meta")]),
+    [[true, true], [true, false], [false, true], [false, false]])
+  assert.equal(result.periods?.subgraph.block, BLOCK)
+  assert.equal(result.periods?.allMatch, true)
 })

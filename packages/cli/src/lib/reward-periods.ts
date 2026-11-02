@@ -66,19 +66,17 @@ interface Periods {
 }
 
 async function query<T>(ctx: Context, url: string, text: string): Promise<T> {
-  return withSubgraphFallback(url, async (endpoint) => {
-    const response = await ctx.fetch(endpoint, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ query: text }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    })
-    if (!response.ok) throw new Error(`the subgraph answered HTTP ${response.status}`)
-    const body = (await response.json()) as { data?: T; errors?: { message?: string }[] }
-    if (body.errors?.length) throw new Error("the subgraph answered with an error")
-    if (!body.data) throw new Error("the subgraph answered with no data")
-    return body.data
+  const response = await ctx.fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ query: text }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   })
+  if (!response.ok) throw new Error(`the subgraph answered HTTP ${response.status}`)
+  const body = (await response.json()) as { data?: T; errors?: { message?: string }[] }
+  if (body.errors?.length) throw new Error("the subgraph answered with an error")
+  if (!body.data) throw new Error("the subgraph answered with no data")
+  return body.data
 }
 
 /** Parse the endpoint before fetch can repeat a malformed setting in an error. */
@@ -101,16 +99,19 @@ export function subgraphUrl(ctx: Context): string {
  */
 export async function readRewardPeriods(ctx: Context, address: Address): Promise<RewardPeriods> {
   const url = subgraphUrl(ctx)
-  const meta = await query<Meta>(ctx, url, "{ _meta { block { number timestamp } } }")
-  const head = BigInt(meta._meta.block.number)
-  const at = `block: { number: ${head} }`
-  const data = await query<Periods>(ctx, url, `{
-    network(id: "1", ${at}) { rewardPeriods }
-    rewardPeriods(first: ${PAGE}, orderBy: period, ${at}) { period root blockNumber timestamp transactionHash }
-    rewardClaims(first: ${PAGE}, where: { account: "${address.toLowerCase()}" }, orderBy: blockNumber, ${at}) {
-      blockNumber amount cumulativeAmount
-    }
-  }`)
+  const { head, data } = await withSubgraphFallback(url, async (endpoint) => {
+    const meta = await query<Meta>(ctx, endpoint, "{ _meta { block { number timestamp } } }")
+    const head = BigInt(meta._meta.block.number)
+    const at = `block: { number: ${head} }`
+    const data = await query<Periods>(ctx, endpoint, `{
+      network(id: "1", ${at}) { rewardPeriods }
+      rewardPeriods(first: ${PAGE}, orderBy: period, ${at}) { period root blockNumber timestamp transactionHash }
+      rewardClaims(first: ${PAGE}, where: { account: "${address.toLowerCase()}" }, orderBy: blockNumber, ${at}) {
+        blockNumber amount cumulativeAmount
+      }
+    }`)
+    return { head, data }
+  })
   if (data.rewardPeriods.length >= PAGE || data.rewardClaims.length >= PAGE) {
     throw new Error(`the subgraph holds ${PAGE} or more rows for one query, and this reader does not page`)
   }

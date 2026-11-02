@@ -37,6 +37,8 @@ if (existsSync(envPath) && existsSync(distDir)) {
       .filter(([key]) => key.startsWith("VITE_"))
       .map(([, value]) => value),
   )
+  // release.ts passes its explicit public gateway key in the inherited environment.
+  if (process.env.VITE_GRAPH_API_KEY?.trim()) published.add(process.env.VITE_GRAPH_API_KEY.trim())
   const secrets = readFileSync(envPath, "utf8")
     .split("\n")
     .map((l) => {

@@ -13,7 +13,7 @@ const SCRIPT = resolve(import.meta.dirname, "../check-browser-safety.mjs")
  * Writes .env.local and one bundle file into a fresh tree, runs the check there. `file` is the
  * bundle file's path under dist; `buildEnv`, when given, is written to apps/web/build.env.
  */
-function check(envLocal, bundle, { file = "assets/index.js", buildEnv } = {}) {
+function check(envLocal, bundle, { file = "assets/index.js", buildEnv, graphApiKey = "" } = {}) {
   const root = mkdtempSync(join(tmpdir(), "browser-safety-"))
   try {
     mkdirSync(join(root, "apps/web/src"), { recursive: true })
@@ -22,7 +22,7 @@ function check(envLocal, bundle, { file = "assets/index.js", buildEnv } = {}) {
     writeFileSync(join(root, "apps/web/dist", file), bundle)
     if (buildEnv !== undefined) writeFileSync(join(root, "apps/web/build.env"), buildEnv)
     const run = spawnSync(process.execPath, [SCRIPT], {
-      env: { ...process.env, BROWSER_SAFETY_ROOT: root },
+      env: { ...process.env, BROWSER_SAFETY_ROOT: root, VITE_GRAPH_API_KEY: graphApiKey },
       encoding: "utf8",
     })
     return { status: run.status, output: run.stdout + run.stderr }
@@ -120,4 +120,16 @@ test("a value build.env holds under a key without VITE_ earns no exemption", () 
   })
   assert.equal(status, 1)
   assert.match(output, /The value of PROJECT_ID /)
+})
+
+
+test("the explicit public gateway key is exempt, but unrelated private values still fail", () => {
+  const graphApiKey = "synthetic-public-graph-key"
+  assert.equal(check(`GRAPH_API_KEY=${graphApiKey}\n`, graphApiKey, { graphApiKey }).status, 0)
+  assert.equal(check(`GRAPH_API_KEY=${graphApiKey}\n`, graphApiKey).status, 1)
+  const result = check(`GRAPH_API_KEY=${graphApiKey}\nSECRET=private-value-123456\n`,
+    `${graphApiKey} private-value-123456`, { graphApiKey })
+  assert.equal(result.status, 1)
+  assert.match(result.output, /The value of SECRET /)
+  assert.doesNotMatch(result.output, /The value of GRAPH_API_KEY |private-value-123456|synthetic-public-graph-key/)
 })
