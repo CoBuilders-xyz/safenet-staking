@@ -14,8 +14,10 @@ validator's Gnosis participation rate as the identical double.
 
 Every six hours, the production deployment is checked: it answers with the interface's title and
 serves the entry script of its build. Once a release is recorded in `deployments.json`, each
-public IPFS gateway in `packages/core` must also serve it. A red run of the nightly, parity or
-availability workflow opens an issue labelled `ci-red`, or comments on the open one.
+public IPFS gateway in `packages/core` is checked too. An isolated Orbitor HTTP 504 is a visible
+warning only when production HTML, production JavaScript and every other gateway pass. All other
+failures block. Release pin verification remains strict. A red nightly, parity or availability
+run opens an issue labelled `ci-red`, or comments on the open one.
 
 ## Layout
 
