@@ -22,7 +22,7 @@ availability workflow opens an issue labelled `ci-red`, or comments on the open 
 
 - [`apps/web`](apps/web): the staking interface, a React app that also runs as a Safe App. Its
   [README](apps/web/README.md) goes from a fresh clone to a running app and its tests.
-- [`apps/api`](apps/api): six validator REST endpoints, freshness checks and HTTP smoke/load tools.
+- [`apps/api`](apps/api): six REST endpoints: four validator routes, health and system stats; HTTP smoke/load tools.
 - [`apps/alerts`](apps/alerts): signed subscriptions, a poller, Telegram and Web Push delivery.
 - [`packages/core`](packages/core): the addresses, start blocks, ABIs and other constants every
   other package reads.
