@@ -284,3 +284,14 @@ test("status-only endpoint and failed geo responses cancel their bodies", async 
   assert.equal(cancelled, 3)
   assert.deepEqual(rt.sends, { prepared: 0, broadcast: 0 })
 })
+
+test("unknown geographic codes refuse every write before transaction preparation", async () => {
+  for (const country of ["XX", "ZZ", "AA"]) for (const argv of WRITES) {
+    const r = await cli(dry(argv, "--geo-check", "--json"), { country })
+    assert.equal(r.code, 1, r.err)
+    const doc = JSON.parse(r.out)
+    assert.equal(doc.refused, true)
+    assert.equal(gate(doc.compliance, "geo check").allowed, false)
+    assert.deepEqual(r.sends, { prepared: 0, broadcast: 0 })
+  }
+})

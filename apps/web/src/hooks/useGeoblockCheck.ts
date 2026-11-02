@@ -1,3 +1,4 @@
+import { isCountryCode } from "@cobuilders/safenet-core"
 import { useQuery } from "@tanstack/react-query"
 import type { Restriction } from "@/lib/restriction"
 
@@ -10,10 +11,6 @@ const CACHE_TTL_MS = cacheDays * 24 * 60 * 60 * 1000
 interface CachedGeoblock {
   country: string
   timestamp: number
-}
-
-function isCountryCode(value: unknown): value is string {
-  return typeof value === "string" && /^[A-Z]{2}$/.test(value)
 }
 
 function readCache(): string | null {

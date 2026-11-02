@@ -91,7 +91,7 @@ describe("useGeoblockCheck", () => {
       expect(result.current.restriction).toEqual({ gate: "geoblock", reason: "unavailable" })
     })
 
-    it.each(["ru", "Russia", { code: "RU" }])("fails closed for invalid query data %j", (country) => {
+    it.each(["XX", "ZZ", "AA", "ru", "Russia", { code: "RU" }])("fails closed for invalid query data %j", (country) => {
       useQueryMock.mockReturnValue({ data: country, isLoading: false, isError: false })
       const { result } = renderHook(() => useGeoblockCheck())
       expect(result.current.allowed).toBe(false)
@@ -182,7 +182,7 @@ describe("useGeoblockCheck", () => {
       expect(mockFetch).toHaveBeenCalledTimes(2)
     })
 
-    it.each(["ru", "Russia", 123, { code: "RU" }, null, undefined])(
+    it.each(["XX", "ZZ", "AA", "ru", "Russia", 123, { code: "RU" }, null, undefined])(
       "rejects malformed primary country %j and uses the fallback",
       async (country) => {
         mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ country }) })
@@ -202,6 +202,8 @@ describe("useGeoblockCheck", () => {
     })
 
     it.each([
+      { country: "XX", timestamp: Date.now() },
+      { country: "ZZ", timestamp: Date.now() },
       { country: "ru", timestamp: Date.now() },
       { country: { code: "RU" }, timestamp: Date.now() },
       { country: "US" },
@@ -213,6 +215,13 @@ describe("useGeoblockCheck", () => {
 
       await expect(capturedQueryFn!()).resolves.toBe("RU")
       expect(mockFetch).toHaveBeenCalledTimes(1)
+    })
+
+    it.each(["XX", "ZZ", "T1"])("rejects unknown fallback country %s without caching", async (country) => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ country: "XX" }) })
+      mockFetch.mockResolvedValueOnce({ ok: true, text: async () => country })
+      await expect(capturedQueryFn!()).rejects.toThrow("ipapi.co invalid response")
+      expect(localStorage.getItem("geoblock_check")).toBeNull()
     })
 
     it("throws when both providers fail", async () => {

@@ -15,7 +15,7 @@
  */
 import type { Address } from "viem"
 import {
-  CONTRACTS, GEO_LOOKUPS, GEOBLOCKED_COUNTRIES, SANCTIONS_ENDPOINT_REFUSED_STATUS, sanctionsOracleAbi, type GeoLookup,
+  CONTRACTS, isCountryCode, GEO_LOOKUPS, GEOBLOCKED_COUNTRIES, SANCTIONS_ENDPOINT_REFUSED_STATUS, sanctionsOracleAbi, type GeoLookup,
 } from "@cobuilders/safenet-core"
 import type { Context } from "./context.js"
 import { SafenetError } from "./errors.js"
@@ -115,7 +115,7 @@ async function lookUpCountry(ctx: Context, lookup: GeoLookup): Promise<string> {
   const country = lookup.format === "json"
     ? ((await response.json()) as { country?: unknown }).country
     : (await response.text()).trim()
-  if (typeof country !== "string" || !/^[A-Z]{2}$/.test(country)) throw new Error("no two-letter country code")
+  if (!isCountryCode(country)) throw new Error("no recognized country code")
   return country
 }
 
