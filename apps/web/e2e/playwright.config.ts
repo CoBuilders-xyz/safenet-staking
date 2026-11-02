@@ -29,6 +29,7 @@ const mocked: Pick<PlaywrightTestConfig, "projects" | "webServer"> = {
     reuseExistingServer: !process.env.CI,
     env: {
       VITE_RPC_URL: "https://mock-rpc.test",
+      VITE_ALERTS_API_URL: "https://mock-alerts.test",
       VITE_STAKING_DEPLOY_BLOCK: "5000000",
       VITE_VALIDATOR_INFO_URL: "https://mock-validators.test/validators.json",
       VITE_TERMS_URL: "https://terms.test",

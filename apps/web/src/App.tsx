@@ -29,6 +29,7 @@ const ValidatorsPage = lazy(pageImports.Validators)
 const ValidatorDetailPage = lazy(pageImports.ValidatorDetail)
 const WithdrawalsPage = lazy(pageImports.Withdrawals)
 const RewardsPage = lazy(pageImports.Rewards)
+const AlertsPage = lazy(pageImports.Alerts)
 const NotFoundPage = lazy(pageImports.NotFound)
 
 /** Preload all route chunks so IPFS-hosted builds are warm. */
@@ -171,6 +172,7 @@ function App() {
             <Route path="/validators/:address" element={<ErrorBoundary><ValidatorDetailPage /></ErrorBoundary>} />
             <Route path="/withdrawals" element={<ErrorBoundary><WithdrawalsPage /></ErrorBoundary>} />
             <Route path="/rewards" element={<ErrorBoundary><RewardsPage /></ErrorBoundary>} />
+            <Route path="/alerts" element={<ErrorBoundary><AlertsPage /></ErrorBoundary>} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>

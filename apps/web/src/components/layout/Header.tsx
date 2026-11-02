@@ -21,6 +21,7 @@ export function Header() {
     { label: t("header.nav.validators", "Validators"), path: "/validators" },
     { label: t("header.nav.withdrawals", "Withdrawals"), path: "/withdrawals" },
     { label: t("header.nav.rewards", "Rewards"), path: "/rewards" },
+    { label: t("alerts.title", "Alerts"), path: "/alerts" },
   ]
   const { isDark, toggle } = useDarkMode()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)

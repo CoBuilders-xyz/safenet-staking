@@ -1,0 +1,112 @@
+import { CONTRACTS, GNOSIS_AEGIS_FIRST_COMPLETE_DAY, utcDayMs } from "@cobuilders/safenet-core"
+
+export interface RoundEvent {
+  kind: "member" | "share" | "completed" | "attested"
+  block: string
+  index: number
+  time: number
+  sid?: string
+  root?: string
+  participant?: string
+  staker?: string
+}
+export interface Ceremony {
+  shares: Record<string, string[]>
+  /** Durable tombstone: this SID already contributed its round. */
+  counted?: true
+  root?: string
+  at?: { block: string; index: number; time: number; members: string[] }
+}
+export interface Chronology {
+  archiveVersion?: 1
+  revision?: number
+  cursor: string
+  hash: string | null
+  members: Record<string, { staker: string | null; misses: number; streakStart: string | null }>
+  pending: Record<string, Ceremony>
+  counted: Record<string, string>
+  rounds: { sid: string; time: number; present: string[] }[]
+}
+export const initialChronology = (): Chronology => ({ archiveVersion: 1, revision: 0, cursor: (CONTRACTS.aegisFrostCoordinator.deployBlock - 1n).toString(), hash: null, members: {}, pending: {}, counted: {}, rounds: [] })
+const position = (a: { block: string; index: number }, b: { block: string; index: number }) =>
+  BigInt(a.block) < BigInt(b.block) ? -1 : BigInt(a.block) > BigInt(b.block) ? 1 : a.index - b.index
+
+/** Fold a contiguous, finalized range, never totals. Only attested winning-root ceremonies count.
+ * Membership begins at the first Aegis event, matching the subgraph's programme membership.
+ * A missing completion blocks subsequent rounds; unknown history never becomes a miss.
+ */
+function fold(previous: Chronology, events: RoundEvent[], through: bigint, hash: string, now: number): Chronology {
+  const state = structuredClone(previous)
+  for (const event of [...events].sort(position)) {
+    if (BigInt(event.block) <= BigInt(previous.cursor) || BigInt(event.block) > through) throw new Error("Noncontiguous event range")
+    if (event.participant) {
+      const who = event.participant.toLowerCase()
+      state.members[who] ??= { staker: null, misses: 0, streakStart: null }
+      if (event.staker) state.members[who]!.staker = event.staker.toLowerCase()
+    }
+    if (!event.sid || state.counted[event.sid]) continue
+    const ceremony = state.pending[event.sid] ??= { shares: {} }
+    if (event.kind === "share" && !ceremony.root) {
+      const participants = ceremony.shares[event.root!] ??= []
+      if (!participants.includes(event.participant!.toLowerCase())) participants.push(event.participant!.toLowerCase())
+    }
+    if (event.kind === "completed") ceremony.root ??= event.root!
+    if (event.kind === "attested") ceremony.at ??= { block: event.block, index: event.index, time: event.time, members: Object.keys(state.members) }
+  }
+  const ordered = Object.entries(state.pending).filter(([, c]) => c.at).sort(([, a], [, b]) => position(a.at!, b.at!))
+  for (const [sid, c] of ordered) {
+    if (!c.root) break
+    const present = c.shares[c.root] ?? []
+    for (const who of c.at!.members) {
+      const member = state.members[who]!
+      if (present.includes(who)) { member.misses = 0; member.streakStart = null }
+      else { member.misses++; member.streakStart ??= sid }
+    }
+    state.rounds.push({ sid, time: c.at!.time, present })
+    state.counted[sid] = through.toString()
+    delete state.pending[sid]
+  }
+  for (const [sid, block] of Object.entries(state.counted)) if (BigInt(block) + 1000n < through) delete state.counted[sid]
+  // Participation ends at the latest completed attestation day, not wall-clock yesterday.
+  // Preserve its whole window during silent days; today's rounds cannot advance it yet.
+  const today = Math.floor(now / 86400) * 86400
+  const lastCompleteDay = state.rounds.reduce((last, r) => r.time < today
+    ? Math.max(last, Math.floor(r.time / 86400) * 86400) : last, -Infinity)
+  const retainFrom = Math.min(now - 16 * 86400, lastCompleteDay - 13 * 86400)
+  state.rounds = state.rounds.filter(r => r.time >= retainFrom)
+  state.cursor = through.toString()
+  state.hash = hash
+  return state
+}
+
+// The standalone fold retains pending ceremonies for callers without durable storage.
+export function foldChronology(previous: Chronology, events: RoundEvent[], through: bigint, hash: string, now: number): Chronology {
+  const state = fold(previous, events, through, hash, now)
+  if (Object.keys(state.pending).length > 10_000) throw new Error("Unresolved ceremony capacity reached")
+  return state
+}
+
+/** Recovery must precede this fold. Unmatched ceremonies leave memory only with an atomic archive commit. */
+export function foldArchivedBatch(previous: Chronology, events: RoundEvent[], through: bigint, hash: string, now: number) {
+  const state = fold(previous, events, through, hash, now)
+  const writes: Record<string, Ceremony> = {}
+  for (const [sid, ceremony] of Object.entries(state.pending)) {
+    if (!ceremony.at) { writes[sid] = ceremony; delete state.pending[sid] }
+  }
+  if (Object.keys(state.pending).length > 10_000) throw new Error("Incomplete attestation capacity reached")
+  return { state, writes }
+}
+
+export function memberCondition(state: Chronology, staker: string, now: number) {
+  if (Object.values(state.pending).some(c => c.at)) throw new Error("Attestation chronology incomplete")
+  const today = Math.floor(now / 86400) * 86400
+  const complete = state.rounds.filter(r => r.time < today)
+  const last = complete.length ? Math.floor(Math.max(...complete.map(r => r.time)) / 86400) * 86400 : null
+  const first = last === null ? null : Math.max(last - 13 * 86400, utcDayMs(GNOSIS_AEGIS_FIRST_COMPLETE_DAY) / 1000)
+  const window = first === null ? [] : complete.filter(r => r.time >= first)
+  const members = Object.entries(state.members).filter(([, m]) => m.staker === staker.toLowerCase())
+  return members.map(([signer, member]) => ({
+    signer, misses: member.misses, streakStart: member.streakStart,
+    participation: window.length ? window.filter(r => r.present.includes(signer)).length * 100 / window.length : null,
+  }))
+}
