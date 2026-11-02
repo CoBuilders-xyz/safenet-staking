@@ -1,8 +1,10 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { parseUnits } from "viem"
-import { DEFAULT_HISTORY_LIMIT, ScanError, type WriteMode } from "@cobuilders/safenet-cli/lib"
+import { ComplianceRefusal, DEFAULT_HISTORY_LIMIT, ScanError, type WriteMode } from "@cobuilders/safenet-cli/lib"
 import { readConfig } from "./config.js"
+import { library } from "./library.js"
+import { fakeContext, VALIDATOR_A } from "../../cli/src/test-support.js"
 import {
   BLOCK, connect, fakeLibrary, KEY_LIKE_VALUE, PASSWORD_VALUE, SIGNER_ADDRESS, STAKER, textOf, tripwire, VALIDATOR,
   WRITES_OFF, WRITES_ON,
@@ -112,9 +114,9 @@ test("each write tool calls its library function with the parsed input", async (
     assert.equal(libCalls[0]!.fn, fn, name)
     assert.equal(ctx, fake.context)
     assert.deepEqual(mode, { dryRun: true, from: STAKER }, name)
-    // The write options come last: none for a dry run.
+    // The write options come last: for a dry run, the gates only, none of them asked for.
     assert.deepEqual(rest.slice(0, -1), expected, `${name} ${JSON.stringify(args)}`)
-    assert.deepEqual(rest.at(-1), {}, name)
+    assert.deepEqual(rest.at(-1), { compliance: { sanctionsEndpoint: null, geoCheck: false } }, name)
     await s.close()
   }
 })
@@ -333,4 +335,146 @@ test("the rewards_history summary says how many periods the subgraph gave, and w
   assert.match(textOf(await d.call("rewards_history", { address: STAKER })),
     / No periods: the subgraph could not give the periods \(the subgraph answered HTTP 502\)\.$/m)
   await d.close()
+})
+
+// --- compliance gates --------------------------------------------------------------------
+
+test("real library refuses sanctioned addresses through every MCP write before signing", async () => {
+  for (const config of [WRITES_OFF, WRITES_ON]) for (const [name, args] of WRITES) {
+    const address = config.writes.allowed ? SIGNER_ADDRESS : STAKER
+    const sends = { prepared: 0, broadcast: 0 }
+    const ctx = fakeContext({ sanctioned: [address] }, sends)
+    const fake = fakeLibrary({ ...library, createContext: () => ctx })
+    const trip = tripwire(address)
+    const s = await connect(config, { fake, trip })
+    try {
+      const r = await s.call(name, { ...args, ...(args.validator ? { validator: VALIDATOR_A } : {}), from: address, dryRun: false })
+      assert.equal(r.isError, true, name)
+      assert.match(textOf(r), /sanctions oracle: the address is on the sanctions list/)
+      assert.equal((r.structuredContent as { refused: boolean }).refused, true)
+      assert.deepEqual(trip.reached, [], name)
+      assert.deepEqual(sends, { prepared: 0, broadcast: 0 }, name)
+    } finally { await s.close() }
+  }
+})
+
+test("MCP checks the oracle again when a dry run passes but the live run becomes sanctioned", async () => {
+  for (const [name, args] of WRITES) {
+    const sends = { prepared: 0, broadcast: 0 }
+    const ctx = fakeContext({}, sends)
+    const read = ctx.client.readContract
+    let oracleReads = 0
+    ctx.client.readContract = ((params) => params.functionName === "isSanctioned"
+      ? Promise.resolve(++oracleReads > 1)
+      : read(params)) as typeof read
+    const fake = fakeLibrary({ ...library, createContext: () => ctx })
+    const trip = tripwire(STAKER)
+    const s = await connect(WRITES_ON, { fake, trip })
+    try {
+      const r = await s.call(name, { ...args, ...(args.validator ? { validator: VALIDATOR_A } : {}), dryRun: false })
+      assert.equal(r.isError, true, `${name}: ${textOf(r)}`)
+      assert.match(textOf(r), /sanctions oracle: the address is on the sanctions list/)
+      assert.equal(oracleReads, 2, name)
+      assert.deepEqual(trip.reached, [], name)
+      assert.deepEqual(sends, { prepared: 0, broadcast: 0 }, name)
+    } finally { await s.close() }
+  }
+})
+
+/** WRITES_ON's settings, plus both opt-in gates. */
+const GATES_ON = readConfig({
+  SAFENET_MCP_ALLOW_WRITES: "1",
+  SAFENET_MCP_PRIVATE_KEY_ENV: "SAFENET_TEST_KEY",
+  SAFENET_TEST_KEY: "set",
+  SAFENET_MCP_SANCTIONS_ENDPOINT: "https://sanctions.invalid/check",
+  SAFENET_MCP_GEO_CHECK: "1",
+})
+
+test("the operator's gate settings reach the library's write options, for the dry run and the live run", async () => {
+  for (const [name, args] of WRITES) {
+    const fake = fakeLibrary()
+    const trip = tripwire()
+    const s = await connect(GATES_ON, { fake, trip })
+    // The tripwire signer refuses the live send, after the library was called with its options.
+    const r = await s.call(name, { ...args, dryRun: false })
+    assert.equal(textOf(r), "the signer was reached.", name)
+    const writes = fake.calls.filter((c) => c.fn !== "createContext")
+    assert.equal(writes.length, 2, name)
+    for (const call of writes) {
+      const options = call.args.at(-1) as { compliance: unknown }
+      assert.deepEqual(options.compliance, { sanctionsEndpoint: "https://sanctions.invalid/check", geoCheck: true }, name)
+    }
+    await s.close()
+  }
+})
+
+test("a tool call cannot set or skip a gate: a gate argument is refused as unknown, and not repeated", async () => {
+  for (const extra of [{ sanctionsEndpoint: "https://user:key@internal.invalid/" }, { geoCheck: false }]) {
+    const fake = fakeLibrary()
+    const s = await connect(WRITES_OFF, { fake })
+    const r = await s.call("stake", { validator: VALIDATOR, amount: "1", from: STAKER, ...extra })
+    assert.equal(r.isError, true)
+    assert.match(textOf(r), /^stake got 1 argument it does not take; it takes validator, amount, approve, dryRun, from/)
+    assert.doesNotMatch(textOf(r), /internal\.invalid|user:key|sanctionsEndpoint|geoCheck/)
+    assert.deepEqual(fake.calls.filter((c) => c.fn !== "createContext"), [], "the library was called")
+    await s.close()
+  }
+})
+
+test("real endpoint errors expose no credentials through MCP text or structured content", async () => {
+  const endpoint = "HTTPS://user:fixture-password@sanctions.invalid/check?key=fixture-token"
+  const config = readConfig({ SAFENET_MCP_SANCTIONS_ENDPOINT: endpoint })
+  const ctx = { ...fakeContext(), fetch: globalThis.fetch }
+  const fake = fakeLibrary({ ...library, createContext: () => ctx })
+  const s = await connect(config, { fake })
+  try {
+    const r = await s.call("stake", { validator: VALIDATOR_A, amount: "1", from: STAKER })
+    assert.equal(r.isError, true)
+    assert.doesNotMatch(JSON.stringify(r), /fixture-password|fixture-token|sanctions\.invalid|user:/)
+    assert.match(textOf(r), /the endpoint did not answer, so the gate fails closed/)
+    assert.equal((r.structuredContent as { refused: boolean }).refused, true)
+  } finally { await s.close() }
+})
+
+test("a refused gate is a tool error: one sentence, and the report as structured content, with no URL", async () => {
+  const report = {
+    address: STAKER, block: BLOCK, allowed: false,
+    gates: [{ gate: "sanctions oracle", checked: true, allowed: false, reason: "the address is on the sanctions list", source: "chain: SanctionsList.isSanctioned(address)" }],
+  } as const
+  const refuse = async () => {
+    throw new ComplianceRefusal(report as never)
+  }
+  const config = readConfig({ SAFENET_MCP_SANCTIONS_ENDPOINT: "https://user:key@sanctions.invalid/check" })
+  for (const [name, args] of WRITES) {
+    const fake = fakeLibrary({ stake: refuse, unstake: refuse, claimWithdrawals: refuse, claimRewards: refuse, claimAndStake: refuse })
+    const s = await connect(config, { fake })
+    const r = await s.call(name, { ...args, from: STAKER })
+    assert.equal(r.isError, true, name)
+    assert.equal(textOf(r),
+      `A compliance gate refused ${STAKER}, so nothing was signed or sent: sanctions oracle: the address is on the sanctions list.`)
+    const structured = r.structuredContent as { refused: boolean; compliance: { block: string; allowed: boolean } }
+    assert.equal(structured.refused, true)
+    assert.equal(structured.compliance.allowed, false)
+    assert.equal(structured.compliance.block, String(BLOCK))
+    assert.doesNotMatch(JSON.stringify(r), /sanctions\.invalid|user:key/)
+    await s.close()
+  }
+})
+
+test("unreadable chain head returns structured compliance refusal without signing in MCP", async () => {
+  const ctx = fakeContext()
+  ctx.client.getBlockNumber = async () => { throw new Error("private-head-marker") }
+  const fake = fakeLibrary({ ...library, createContext: () => ctx })
+  const trip = tripwire(STAKER)
+  const s = await connect(WRITES_ON, { fake, trip })
+  try {
+    const r = await s.call("stake", { validator: VALIDATOR_A, amount: "1", dryRun: false })
+    assert.equal(r.isError, true)
+    const structured = r.structuredContent as { refused: boolean; compliance: { block: null; allowed: boolean } }
+    assert.equal(structured.refused, true)
+    assert.equal(structured.compliance.block, null)
+    assert.equal(structured.compliance.allowed, false)
+    assert.doesNotMatch(JSON.stringify(r), /private-head-marker/)
+    assert.deepEqual(trip.reached, [])
+  } finally { await s.close() }
 })

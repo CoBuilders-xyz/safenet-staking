@@ -190,7 +190,7 @@ export function registerRewards(program: Command, rt: CommandRuntime): void {
     const request = parseOptions(writeSchema, options)
     const ctx = rt.context(globals)
     const mode = await rt.writeMode(request, ctx)
-    rt.emit(globals, await claimRewards(ctx, mode, { onProgress: rt.progress(renderProgress) }), renderRewardsClaim)
+    rt.emit(globals, await claimRewards(ctx, mode, { onProgress: rt.progress(renderProgress), compliance: request.compliance }), renderRewardsClaim)
   })
 
   addWriteOptions(
@@ -212,7 +212,7 @@ export function registerRewards(program: Command, rt: CommandRuntime): void {
     const mode = await rt.writeMode(request, ctx)
     rt.emit(
       globals,
-      await claimAndStake(ctx, mode, input, { onProgress: rt.progress(renderProgress) }),
+      await claimAndStake(ctx, mode, input, { onProgress: rt.progress(renderProgress), compliance: request.compliance }),
       renderClaimAndStake,
     )
   })

@@ -41,7 +41,8 @@ none is typed here.
 
 The CLI's global options are settings here, not arguments: the RPC endpoint is an environment
 variable, and every result is already the `--json` document. The CLI's signer options are settings
-too, and no tool takes one. A new CLI command needs a tool: `src/parity.test.ts` fails otherwise.
+too, and so are its compliance flags: no tool takes one. A new CLI command needs a tool:
+`src/parity.test.ts` fails otherwise.
 
 ## The write gate
 
@@ -55,6 +56,14 @@ too, and no tool takes one. A new CLI command needs a tool: `src/parity.test.ts`
 - A write always runs as a dry run first. With `dryRun: false` and writes on, the live run follows,
   and the result holds both: `{ writesAllowed, dryRunForced, dryRun, execution }`. Each section is
   what the CLI prints with `--json`, with and without `--dry-run`.
+- The CLI's compliance flags are settings here: `SAFENET_MCP_SANCTIONS_ENDPOINT=<url>` and
+  `SAFENET_MCP_GEO_CHECK=1`, read once at start as `config.compliance`, and no tool takes them. A
+  model must not skip a gate, put a keyed URL in a tool call, or aim the server's GET at a host of
+  its choosing. The server passes them to the library with the dry run and again with the live
+  run, so the gates are read again at the moment of sending; the library reads the sanctions
+  oracle always. A `ComplianceRefusal` becomes a tool error: the sentence, and
+  `{ refused: true, compliance }` as structured content. The start log names the gates in force,
+  never the endpoint's URL.
 - Live writes run one at a time, so two calls never race for a nonce. Each transaction's hash goes
   to stderr as it is sent and when it confirms.
 - Signing works as in the CLI: a private key from the variable the operator named, or a version 3

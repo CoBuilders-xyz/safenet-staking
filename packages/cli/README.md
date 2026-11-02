@@ -189,10 +189,30 @@ An unsupported method is an acceptance blocker; record the device, firmware, app
 6. Read the receipts, allowance, and stake from the fork. Confirm the stake increased by exactly one SAFE.
 7. Repeat and reject on the device. Test terminal cancellation, disconnect, account change, chain change, and timeout.
 8. Confirm no broadcast after each refusal. If approval already confirmed, record that partial result accurately.
-9. After compliance integration, use a sanctioned fixture and confirm refusal before any device signature request.
+9. Use a sanctioned fixture and confirm refusal before any device signature request.
 10. Record public transaction hashes, receipt status, stake differences, device/app versions, and elapsed time in Linear.
 
 Keep pairing URIs, keys, passwords, seed words, RPC credentials, and terminal recordings out of acceptance evidence.
+
+## Compliance gates
+
+Every write checks these before it signs anything, dry runs included. They are the gates of the
+web interface.
+
+| Gate | When | Refuses when |
+|---|---|---|
+| Sanctions oracle | Always | The oracle on chain lists the address that would sign, or `--from`. It also refuses when the oracle cannot be read |
+| `--sanctions-endpoint <url>` | When given | A GET to the URL answers 403, any other error, or nothing. The endpoint judges the client making the request, so no address is sent |
+| `--geo-check` | When given | This machine's IP address is in a country the web interface blocks, or no lookup names a country |
+
+Each gate fails closed: an answer that is not a clear yes refuses. A refusal exits 1 with one
+sentence that names each gate that refused and why. With `--json`, stdout also holds the report,
+`{ "refused": true, "compliance": { ... } }`. A write that passes prints the gates it passed, and
+its `--json` result carries the same report as `compliance`. The endpoint's URL is never printed:
+it may carry a key.
+
+These gates do not provide full five-list sanctions screening. That work remains separate.
+The web visitor endpoint remains unset; CLI operators can still supply their own endpoint.
 
 ## Settings
 

@@ -4,7 +4,7 @@
  */
 import { maxUint256 } from "viem"
 import type { Command } from "commander"
-import type { Approval, Figure, Progress, Step, WriteResultBase } from "../lib/index.js"
+import type { Approval, ComplianceReport, Figure, Progress, Step, WriteResultBase } from "../lib/index.js"
 import { formatCount, formatSafe, renderTable } from "./format.js"
 
 export function addWriteOptions(command: Command): Command {
@@ -16,16 +16,31 @@ export function addWriteOptions(command: Command): Command {
     .option("--keystore <path>", "sign with a version 3 keystore file; asks for its password")
     .option("--password-env <NAME>", "with --keystore: read the password from the environment variable NAME")
     .option("--from <address>", "with --dry-run and no signer option: the address to simulate from")
+    .option("--sanctions-endpoint <url>", "also GET this URL before signing, and refuse when it answers 403 or fails")
+    .option("--geo-check", "also refuse when this machine's IP is in a country the web interface blocks")
 }
 
-/** The two lines every write starts with: what it does, and whether anything was sent. */
+/**
+ * The lines every write starts with: what it does, whether anything was sent, and the compliance
+ * gates it passed.
+ */
 export function writeHead(r: WriteResultBase, title: string): string[] {
   return [
     `${title}, from ${r.from}`,
     r.dryRun
       ? `Dry run against Ethereum Mainnet block ${formatCount(r.block)}: simulated and estimated, nothing signed or sent.`
       : `Sent on Ethereum Mainnet. The figures before it were read at block ${formatCount(r.block)}.`,
+    renderCompliance(r.compliance),
   ]
+}
+
+/** One line per gate: passed, refused, or not asked for, with what it found and from where. */
+export function renderCompliance(c: ComplianceReport): string {
+  const lines = c.gates.map((g) => {
+    const state = !g.checked ? "not asked for" : g.allowed ? "passed" : "REFUSED"
+    return g.checked ? `  ${g.gate}: ${state}, ${g.reason} (${g.source})` : `  ${g.gate}: ${state}`
+  })
+  return [`Compliance gates for ${c.address}, block ${c.block === null ? "unavailable" : formatCount(c.block)}:`, ...lines].join("\n")
 }
 
 export type FigureRow = readonly [string, string, string]

@@ -14,6 +14,7 @@
  */
 import { isAddressEqual, parseEventLogs, type Address, type Hex, type Log } from "viem"
 import { CONTRACTS, merkleDropAbi, safeTokenEventsAbi } from "@cobuilders/safenet-core"
+import { checkCompliance } from "./compliance.js"
 import type { Context } from "./context.js"
 import { SafenetError } from "./errors.js"
 import { figure, sameHex, type Figure } from "./figure.js"
@@ -133,6 +134,8 @@ export async function claimRewards(
   options: WriteOptions = {},
 ): Promise<RewardsClaimResult> {
   const from = actor(mode)
+  // Before anything else is read, so a refused address learns nothing more and signs nothing.
+  const compliance = await checkCompliance(ctx, from, options.compliance)
   const block = await ctx.client.getBlockNumber()
   const prepared = await prepareClaim(ctx, from, block)
   const runner = await createRunner(ctx, mode, options)
@@ -141,6 +144,7 @@ export async function claimRewards(
     operation: "rewards claim",
     dryRun: mode.dryRun,
     from,
+    compliance,
     block,
     claim: {
       ...prepared.figures,
@@ -181,6 +185,8 @@ export async function claimAndStake(
   options: WriteOptions = {},
 ): Promise<ClaimAndStakeResult> {
   const from = actor(mode)
+  // Before anything else is read, so a refused address learns nothing more and signs nothing.
+  const compliance = await checkCompliance(ctx, from, options.compliance)
   const block = await ctx.client.getBlockNumber()
   // Before the claim, so a validator that cannot be staked on is refused before anything is sent.
   await requireValidator(ctx, input.validator, block)
@@ -224,6 +230,7 @@ export async function claimAndStake(
     operation: "rewards claim-and-stake",
     dryRun: mode.dryRun,
     from,
+    compliance,
     block,
     validator: input.validator,
     claim: {

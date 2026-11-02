@@ -5,6 +5,7 @@
  */
 import { maxUint256, parseEventLogs, type Address } from "viem"
 import { CONTRACTS, erc20Abi, indexedEvent, stakingAbi } from "@cobuilders/safenet-core"
+import { checkCompliance } from "./compliance.js"
 import type { Context } from "./context.js"
 import { SafenetError } from "./errors.js"
 import { figure, type Figure } from "./figure.js"
@@ -82,6 +83,8 @@ export async function stake(
   options: WriteOptions = {},
 ): Promise<StakeResult> {
   const from = actor(mode)
+  // Before anything else is read, so a refused address learns nothing more and signs nothing.
+  const compliance = await checkCompliance(ctx, from, options.compliance)
   const block = await ctx.client.getBlockNumber()
   await requireValidator(ctx, input.validator, block)
   const [balance, stakeBefore] = await Promise.all([
@@ -99,6 +102,7 @@ export async function stake(
     operation: "stake",
     dryRun: mode.dryRun,
     from,
+    compliance,
     block,
     validator: input.validator,
     amount: amount(input.amount),
@@ -131,6 +135,8 @@ export async function unstake(
   options: WriteOptions = {},
 ): Promise<UnstakeResult> {
   const from = actor(mode)
+  // Before anything else is read, so a refused address learns nothing more and signs nothing.
+  const compliance = await checkCompliance(ctx, from, options.compliance)
   const latest = await ctx.client.getBlock()
   const block = latest.number
   const [stakeBefore, delay] = await Promise.all([
@@ -176,6 +182,7 @@ export async function unstake(
     operation: "unstake",
     dryRun: mode.dryRun,
     from,
+    compliance,
     block,
     validator: input.validator,
     amount: amount(input.amount),

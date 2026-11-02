@@ -45,13 +45,17 @@ async function writeResult(mode: WriteMode, extra: Record<string, unknown>): Pro
     gas: figure(21_000n),
     transaction,
   })
-  if (mode.dryRun) return { ...extra, dryRun: true, from: mode.from, block: BLOCK, steps: [step(null)] } as WriteResultBase
+  const compliance = (address: Address) => ({ address, block: BLOCK, allowed: true, gates: [] })
+  if (mode.dryRun) {
+    return { ...extra, dryRun: true, from: mode.from, block: BLOCK, compliance: compliance(mode.from), steps: [step(null)] } as WriteResultBase
+  }
   const hash = await mode.signer.send({ to: VALIDATOR, data: "0x", gas: 21_000n })
   return {
     ...extra,
     dryRun: false,
     from: mode.signer.address,
     block: BLOCK,
+    compliance: compliance(mode.signer.address),
     steps: [step({ hash, status: "success", block: BLOCK + 1n, gasUsed: 21_000n })],
   } as WriteResultBase
 }

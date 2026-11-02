@@ -26,6 +26,12 @@ export interface ServerConfig {
   readonly ipfsGateway: string | undefined
   /** SUBGRAPH_URL_MAINNET: the Mainnet subgraph rewards_history reads, instead of core's default. */
   readonly subgraphUrl: string | undefined
+  /**
+   * The opt-in compliance gates, for every write: SAFENET_MCP_SANCTIONS_ENDPOINT and
+   * SAFENET_MCP_GEO_CHECK. Settings, not tool arguments: a model must not choose to skip a gate,
+   * put a keyed URL in a tool call, or point the server's GET at a host of its choosing.
+   */
+  readonly compliance: { readonly sanctionsEndpoint: string | null; readonly geoCheck: boolean }
   readonly writes: Writes
   /** Lines for stderr at start: settings that have no effect, said once. */
   readonly notices: readonly string[]
@@ -71,6 +77,20 @@ export function readConfig(env: Env): ServerConfig {
   if (rpcUrl !== undefined && !/^https?:\/\/[^\s]+$/.test(rpcUrl)) {
     throw new ConfigError("SAFENET_MCP_RPC_URL must be an http or https URL")
   }
+  const sanctionsEndpoint = set(env.SAFENET_MCP_SANCTIONS_ENDPOINT) ? env.SAFENET_MCP_SANCTIONS_ENDPOINT : null
+  if (sanctionsEndpoint !== null) {
+    try {
+      const url = new URL(sanctionsEndpoint)
+      if (!url.hostname || !["http:", "https:"].includes(url.protocol)) throw new Error()
+    } catch {
+      // URL errors can carry the input, including credentials. Never forward them.
+      throw new ConfigError("SAFENET_MCP_SANCTIONS_ENDPOINT must be an http or https URL")
+    }
+  }
+  const geo = env.SAFENET_MCP_GEO_CHECK
+  if (set(geo) && geo !== "1" && geo !== "0") {
+    throw new ConfigError("SAFENET_MCP_GEO_CHECK takes 1 to refuse writes from a blocked country, or 0 or nothing to skip the check")
+  }
   const allow = env.SAFENET_MCP_ALLOW_WRITES
   if (set(allow) && allow !== "1" && allow !== "0") {
     throw new ConfigError("SAFENET_MCP_ALLOW_WRITES takes 1 to allow writes, or 0 or nothing to keep every write a dry run")
@@ -102,6 +122,7 @@ export function readConfig(env: Env): ServerConfig {
     githubToken: set(env.GITHUB_TOKEN) ? env.GITHUB_TOKEN : set(env.GH_TOKEN) ? env.GH_TOKEN : undefined,
     ipfsGateway: set(env.IPFS_GATEWAY) ? env.IPFS_GATEWAY : undefined,
     subgraphUrl: set(env.SUBGRAPH_URL_MAINNET) ? env.SUBGRAPH_URL_MAINNET : undefined,
+    compliance: { sanctionsEndpoint, geoCheck: geo === "1" },
     writes,
     notices,
   }

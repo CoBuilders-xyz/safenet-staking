@@ -10,8 +10,11 @@ type Command = ReturnType<typeof buildProgram>
 // values as strings. A command added to the CLI without a tool, or an option renamed on one
 // side only, fails here.
 
-/** Options that configure the signer. The server takes them at start, never in a tool call. */
-const SIGNER_OPTIONS = ["privateKeyEnv", "keystore", "passwordEnv", "walletconnect", "walletAccount"]
+/**
+ * Options the server takes as settings at start, never in a tool call: the signer, and the
+ * compliance gates, which a model must not be able to skip or point elsewhere.
+ */
+const SETTING_OPTIONS = ["privateKeyEnv", "keystore", "passwordEnv", "walletconnect", "walletAccount", "sanctionsEndpoint", "geoCheck"]
 
 const unused = () => {
   throw new Error("the parity test only reads the command definitions")
@@ -38,7 +41,7 @@ function cliShape(command: Command): Record<string, Shape> {
   const shape: Record<string, Shape> = {}
   for (const a of command.registeredArguments) shape[a.name()] = { type: "string", required: a.required }
   for (const o of command.options) {
-    if (SIGNER_OPTIONS.includes(o.attributeName())) continue
+    if (SETTING_OPTIONS.includes(o.attributeName())) continue
     shape[o.attributeName()] = { type: o.isBoolean() ? "boolean" : "string", required: false }
   }
   return shape
@@ -84,8 +87,8 @@ test("the write tools are the commands with --dry-run and the signer options, an
     const names = command.options.map((o) => o.attributeName())
     const writes = names.includes("dryRun")
     assert.equal(tool.kind, writes ? "write" : "read", tool.name)
-    if (writes) for (const option of SIGNER_OPTIONS) assert.ok(names.includes(option), `${path.join(" ")} lacks ${option}`)
-    for (const option of SIGNER_OPTIONS) assert.ok(!(option in toolShape(tool.name)), `${tool.name} takes ${option}`)
+    if (writes) for (const option of SETTING_OPTIONS) assert.ok(names.includes(option), `${path.join(" ")} lacks ${option}`)
+    for (const option of SETTING_OPTIONS) assert.ok(!(option in toolShape(tool.name)), `${tool.name} takes ${option}`)
   }
 })
 

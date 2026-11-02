@@ -35,6 +35,12 @@ structured content the tool returns.
 - `dryRun` defaults to `true`, and is forced to `true` unless writes are allowed (see below).
 - `from` is the address a dry run simulates from. It is required while writes are off. While
   they are on, the signer's address is used, and a different `from` is refused.
+- Every write passes the compliance gates of `safenet` before anything is signed, dry runs
+  included: the sanctions oracle on chain always, and the sanctions endpoint and the geo check
+  when the operator sets them (see Settings). They are settings, not tool arguments, so a model
+  cannot skip a gate or point the server at a URL of its choosing. A refused gate is a tool error
+  with one sentence, and the report as structured content, `{ refused: true, compliance }`. The
+  safenet-cli README's "Compliance gates" section describes each gate.
 - `validators_show` (its delegators count), `withdrawals_list` without `address`, and
   `rewards_history` scan the chain's history and need an archive RPC endpoint.
 
@@ -54,6 +60,8 @@ The server reads these environment variables when it starts.
 | `GITHUB_TOKEN` or `GH_TOKEN` | Raises the GitHub API limit for the lookup that dates SEF's participation window. Optional |
 | `IPFS_GATEWAY` | An IPFS gateway, tried before the public gateways for SEF's reward dataset. Only its origin is used. Optional |
 | `SUBGRAPH_URL_MAINNET` | The Mainnet subgraph `rewards_history` reads its periods from, instead of the default Studio deployment. Optional |
+| `SAFENET_MCP_SANCTIONS_ENDPOINT` | A URL every write GETs first, refusing on 403 or any failure. Never printed. Optional |
+| `SAFENET_MCP_GEO_CHECK` | `1` refuses every write while this machine's IP is in a country the web interface blocks. Optional |
 | `SAFENET_MCP_ALLOW_WRITES` | `1` allows writes when a signer is also set. Anything else but `0` or nothing stops the server |
 | `SAFENET_MCP_PRIVATE_KEY_ENV` | The **name** of a variable that holds the private key |
 | `SAFENET_MCP_KEYSTORE` | The path of a version 3 keystore file, instead of a key |

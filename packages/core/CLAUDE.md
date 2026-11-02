@@ -68,6 +68,10 @@ because it will never log that programme's events again and a scan from the head
   confirms it, so a 404 from a gateway proves nothing. The gateway comment records how each
   gateway was checked, and why ipfs.io and dweb.link are not listed: both retired.
 - `src/deployments.ts` — what the interface needs per chain, derived from `src/contracts.ts`.
+- `src/compliance.ts` — the gates a front end applies before it signs: the sanctions oracle on
+  chain, always; a sanctions endpoint and a geo check, opt in. The geo lookups and the blocked
+  countries live here for the CLI and the MCP server; `compliance.test.ts` reads the web's
+  `useGeoblockCheck` and fails when its lookups or its list differ.
 - `src/parity/` — the comparison behind `pnpm test:parity`, which both subgraph packages share.
   `compare.ts` holds the rules as pure functions: exact and declared-precision comparison, the
   stale rule, the publish instant, the staked total rewound through its movements, and SEF's

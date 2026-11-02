@@ -10,7 +10,7 @@ import {
 } from "viem"
 import { mainnet } from "viem/chains"
 import {
-  ANVIL_TEST_MNEMONIC, CONTRACTS, REWARDS_LATEST_PATH, SUBGRAPH_ENDPOINTS, SEF_DATA, ensResolverAbi, ensUniversalResolverAbi, rewardProofPath,
+  ANVIL_TEST_MNEMONIC, CONTRACTS, GEO_LOOKUPS, REWARDS_LATEST_PATH, SUBGRAPH_ENDPOINTS, SEF_DATA, ensResolverAbi, ensUniversalResolverAbi, rewardProofPath,
   rewardProofUrl, safeTokenEventsAbi,
 } from "@cobuilders/safenet-core"
 import type { Context, Signer } from "./lib/index.js"
@@ -72,7 +72,20 @@ export interface FakeOptions {
   readonly repositoryStatus?: number
   /** Subgraph failure, mismatch, or two claims tied by block number in reversed event order. */
   readonly subgraph?: "down" | "differs" | "same-block-reversed" | "empty" | "graphql-error" | "missing-claim" | "missing-period" | "missing-last-period" | "duplicate-period" | "same-block-periods"
+  /** Addresses the sanctions oracle lists. */
+  readonly sanctioned?: readonly Hex[]
+  /** The sanctions oracle cannot be read. */
+  readonly oracleError?: boolean
+  /** What SANCTIONS_ENDPOINT answers: an HTTP status, 200 by default, or "unreachable". */
+  readonly sanctionsEndpoint?: number | "unreachable"
+  /** The country the geo lookups name, "US" by default. */
+  readonly country?: string
+  /** Which geo lookups fail, by position in core's GEO_LOOKUPS. */
+  readonly geoFailing?: readonly number[]
 }
+
+/** A made-up sanctions endpoint, on a reserved name that resolves nowhere. */
+export const SANCTIONS_ENDPOINT = "https://sanctions.invalid/check"
 
 /** A made-up ENS resolver. */
 export const ENS_RESOLVER = fakeAddress(0xe75)
@@ -125,6 +138,10 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
     withdrawalQueues: () => [1n, 2n],
     withdrawalNodes: ([, id]) =>
       id === 1n ? [5n * SAFE, BLOCK_TIME - 60n, 0n, 2n] : [2n * SAFE, BLOCK_TIME + 90_000n, 1n, 0n],
+    isSanctioned: ([a]) => {
+      if (o.oracleError) throw new HttpRequestError({ url: "https://rpc.invalid/key", details: "oracle down" })
+      return (o.sanctioned ?? []).map((x) => x.toLowerCase()).includes(String(a).toLowerCase())
+    },
   }
   let lastSent: { to: Hex; account: { address: Hex } } | undefined
   const receiptFor = () => ({
@@ -318,6 +335,16 @@ function fakeFetch(o: FakeOptions): typeof fetch {
     const url = String(input)
     const parsed = new URL(url)
     if (url === SUBGRAPH_ENDPOINTS.mainnet) return fakeSubgraph(o, String(init?.body ?? ""))
+    if (url === SANCTIONS_ENDPOINT) {
+      if (o.sanctionsEndpoint === "unreachable") throw new TypeError("fetch failed")
+      return new Response("", { status: o.sanctionsEndpoint ?? 200 })
+    }
+    const geo = GEO_LOOKUPS.findIndex((l) => l.url === url)
+    if (geo >= 0) {
+      if (o.geoFailing?.includes(geo)) return new Response("unavailable", { status: 503 })
+      const country = o.country ?? "US"
+      return GEO_LOOKUPS[geo]!.format === "json" ? json({ country }) : new Response(`${country}\n`)
+    }
     if (/^\/ip[fn]s\//.test(parsed.pathname)) return fakeDataset(o, parsed)
     if (o.repositoryStatus && url.startsWith(SEF_DATA.rewardsProofBase)) {
       return new Response("repository unavailable", { status: o.repositoryStatus })

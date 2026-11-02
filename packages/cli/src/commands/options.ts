@@ -78,6 +78,21 @@ const envName = (flag: string) =>
     error: `${flag} takes the name of an environment variable that holds the secret, never the secret itself`,
   })
 
+/**
+ * The URL of a sanctions endpoint. It is never repeated in a message: it may carry a key, the way
+ * an RPC URL can.
+ */
+export const sanctionsEndpointSchema = z.string().refine(
+  (s) => {
+    try {
+      return ["http:", "https:"].includes(new URL(s).protocol)
+    } catch {
+      return false
+    }
+  },
+  { error: "--sanctions-endpoint takes an http or https URL" },
+)
+
 export const writeSchema = z
   .object({
     dryRun: z.boolean().default(false),
@@ -87,6 +102,8 @@ export const writeSchema = z
     keystore: z.string().min(1).optional(),
     passwordEnv: envName("--password-env").optional(),
     from: addressSchema.optional(),
+    sanctionsEndpoint: sanctionsEndpointSchema.optional(),
+    geoCheck: z.boolean().default(false),
   })
   .refine((o) => !(o.privateKeyEnv && o.keystore), { error: "--private-key-env and --keystore cannot be used together" })
   .refine((o) => !o.walletconnect || !(o.privateKeyEnv || o.keystore), { error: "Choose only one signer mode" })
@@ -111,6 +128,7 @@ export const writeSchema = z
         : o.walletconnect
           ? ({ kind: "walletconnect", address: o.walletAccount! } as const)
           : null,
+    compliance: { sanctionsEndpoint: o.sanctionsEndpoint ?? null, geoCheck: o.geoCheck },
   }))
 export type WriteRequest = z.output<typeof writeSchema>
 

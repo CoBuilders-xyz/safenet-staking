@@ -8,7 +8,7 @@ import { basename, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 import { decodeFunctionData, encodeFunctionResult, multicall3Abi, numberToHex, type Hex } from "viem"
-import { stakingAbi } from "@cobuilders/safenet-core"
+import { sanctionsOracleAbi, stakingAbi } from "@cobuilders/safenet-core"
 import { BLOCK, BLOCK_TIME, STAKER, VALIDATOR_A, fakeContext } from "../src/test-support.js"
 import pkg from "../package.json" with { type: "json" }
 
@@ -19,11 +19,15 @@ export async function smokeBinary(binary: string, node?: string): Promise<void> 
   const copy = join(alone, basename(binary))
   const seen: string[] = []
   const unexpected: string[] = []
+  let sanctioned = false
   const ctx = fakeContext()
   // Use the package's existing fake chain and core's ABI. Only the wire adapter is new.
   async function contract(data: Hex): Promise<Hex> {
-    const { functionName, args } = decodeFunctionData({ abi: [...stakingAbi, ...multicall3Abi], data })
+    const { functionName, args } = decodeFunctionData({ abi: [...stakingAbi, ...multicall3Abi, ...sanctionsOracleAbi], data })
     seen.push(functionName)
+    if (functionName === "isSanctioned") {
+      return encodeFunctionResult({ abi: sanctionsOracleAbi, functionName, result: sanctioned })
+    }
     if (functionName === "aggregate3") {
       const calls = args[0]
       const result = await Promise.all(calls.map(async (call) => ({ success: true, returnData: await contract(call.callData) })))
@@ -92,6 +96,17 @@ export async function smokeBinary(binary: string, node?: string): Promise<void> 
     assert.equal(dry.steps[0].transaction, null)
     assert.match(dry.steps[0].function, /^initiateWithdrawal\(/)
     assert.equal(dry.steps[0].gas.value, "50000")
+    // The packaged CLI must enforce the oracle too, before it simulates a sanctioned write.
+    const simulated = seen.filter((method) => method === "initiateWithdrawal").length
+    sanctioned = true
+    await assert.rejects(run("unstake", VALIDATOR_A, "1", "--dry-run", "--from", STAKER, "--rpc-url", endpoint, "--json"), (error: unknown) => {
+      const failure = error as { stderr: string }
+      assert.match(failure.stderr, /A compliance gate refused/)
+      assert.match(failure.stderr, /the address is on the sanctions list/)
+      return true
+    })
+    assert.equal(seen.filter((method) => method === "initiateWithdrawal").length, simulated)
+    assert.ok(seen.includes("isSanctioned"))
     // WalletConnect cannot silently become a headless signer in a compiled binary.
     await assert.rejects(run("unstake", VALIDATOR_A, "1", "--walletconnect", "--wallet-account", STAKER), (error: unknown) => {
       const failure = error as { code: number; stderr: string }
