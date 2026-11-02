@@ -67,8 +67,11 @@ Do not publish a dummy stable version just to reserve a package name.
 ### B. Temporary granular token for the first CI publish only
 
 If Augusto chooses CI for bootstrap, create a narrowly scoped, short-lived granular
-npm publish token with the required organization/package permissions. A new package
-may require organization-wide creation permission before it exists.
+npm publish token with the required organization/package permissions. Under npm's default publishing policy,
+non-interactive token publishing requires **Bypass two-factor authentication** on that temporary token;
+otherwise npm can request an OTP that CI cannot provide. This bypass authorizes publishing without interactive 2FA.
+If the package disallows token publishing, this bootstrap option cannot work. Use interactive option A;
+do not weaken the package policy to enable it. A new package may require organization-wide creation permission before it exists.
 Temporarily configure a reviewed bootstrap-only workflow change that supplies it
 as `NODE_AUTH_TOKEN` from GitHub Actions secret `NPM_TOKEN` and sets the npm registry
 configuration for token auth. The normal workflow in this PR deliberately has no
@@ -125,9 +128,12 @@ In each package's **Settings → Trusted Publisher**, select **GitHub Actions**:
 | GitHub repository | `safenet-staking` |
 | Workflow filename | `publish.yml` (not its `.github/workflows/` path) |
 | Environment | Leave unset: the publish job does not select a GitHub environment |
-| Allowed operation | Allow `npm publish`; permit dist-tag changes if the npm UI requests that scope |
+| Allowed operation | Enable only `npm publish`; leave dist-tag management disabled |
 
 Save for both `@cobuilders/safenet-cli` and `@cobuilders/safenet-mcp`.
+`npm publish --tag beta` uses publishing permission, not separate `npm dist-tag` permission.
+The workflow runs no `npm dist-tag` commands. Grant that separate permission only if a future reviewed workflow adds them.
+Bootstrap tag cleanup above uses Augusto's authenticated operator session, not this OIDC publisher.
 This is the **GitHub** organization identity; the npm organization is `@cobuilders`.
 After validating OIDC, use npm's token restrictions to disallow token publishing
 where available. No permanent `NPM_TOKEN` or `NODE_AUTH_TOKEN` belongs in GitHub.
