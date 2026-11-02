@@ -30,6 +30,9 @@ const { mockUseAccount, mockUseRewards, mockUseProgramme, mockWrongNetwork, mock
 
 vi.mock("wagmi", () => ({ useAccount: () => mockUseAccount() }))
 vi.mock("@/hooks/useRewards", () => ({ useRewards: () => mockUseRewards() }))
+vi.mock("@/hooks/useRewardHistory", () => ({
+  useRewardHistory: () => ({ state: { status: "disconnected" }, refetch: vi.fn() }),
+}))
 vi.mock("@/hooks/useProgrammeRewards", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks/useProgrammeRewards")>()),
   useProgrammeRewards: () => mockUseProgramme(),

@@ -350,6 +350,24 @@
     "withdrawn": "Withdrawn",
     "withdrawnStatus": "Withdrawn, Aegis participation unconfirmed"
   },
+  "rewardHistory": {
+    "amount": "Claimed (SAFE)",
+    "asOf": "Through indexed block {{block}}. Showing distributions {{from}}–{{to}} of {{total}}.",
+    "blocks": "Block window",
+    "claims": "Claims",
+    "connect": "Connect a wallet to view its claim history.",
+    "date": "Root set (UTC)",
+    "incomplete": "History is incomplete or inconsistent. Amounts are unknown; no totals are shown.",
+    "limits": "Latest {{periods}} distributions only, up to {{claims}} claims in that range. Older history is excluded. A full page is incomplete.",
+    "meaning": "These are payments you claimed during each root's lifetime, not rewards earned in that period. Per-period earnings are unknown.",
+    "order": "Windows use whole blocks. Claims before a root update in the same block enter the new window. Exact event-order attribution is unavailable.",
+    "period": "Distribution",
+    "source": "Source: Mainnet subgraph claims, checked against your cumulative claims on Ethereum at each window boundary.",
+    "stale": "The index is stale or unhealthy. History is unavailable.",
+    "title": "Your claims by distribution period",
+    "transaction": "Distribution {{period}} transaction",
+    "unavailable": "History is unavailable. The subgraph or historical Ethereum reads could not be verified."
+  },
   "rewards": {
     "actions": "Actions",
     "allocatedToDate": "Allocated to date",

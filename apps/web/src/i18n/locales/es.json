@@ -326,6 +326,24 @@
     "withdrawn": "Retirado",
     "withdrawnStatus": "Retirado, participación en Aegis sin confirmar"
   },
+  "rewardHistory": {
+    "title": "Tus cobros por período de distribución",
+    "source": "Fuente: cobros del subgrafo de Mainnet, contrastados con tus cobros acumulados en Ethereum en cada límite de ventana.",
+    "meaning": "Son pagos que cobraste durante la vigencia de cada raíz, no recompensas ganadas en ese período. Las ganancias por período se desconocen.",
+    "limits": "Solo las últimas {{periods}} distribuciones, hasta {{claims}} cobros en ese intervalo. Se excluye el historial anterior. Una página llena está incompleta.",
+    "order": "Las ventanas usan bloques completos. Los cobros anteriores a un cambio de raíz en el mismo bloque entran en la nueva ventana. No se conoce la atribución exacta por orden de eventos.",
+    "connect": "Conecta una billetera para ver su historial de cobros.",
+    "incomplete": "El historial está incompleto o es incoherente. Los importes se desconocen; no se muestran totales.",
+    "stale": "El índice está desactualizado o tiene errores. El historial no está disponible.",
+    "unavailable": "El historial no está disponible. No se pudo verificar el subgrafo o las lecturas históricas de Ethereum.",
+    "asOf": "Hasta el bloque indexado {{block}}. Se muestran las distribuciones {{from}}–{{to}} de {{total}}.",
+    "period": "Distribución",
+    "date": "Raíz establecida (UTC)",
+    "blocks": "Ventana de bloques",
+    "claims": "Cobros",
+    "amount": "Cobrado (SAFE)",
+    "transaction": "Transacción de la distribución {{period}}"
+  },
   "rewards": {
     "actions": "Acciones",
     "allocatedToDate": "Asignado hasta la fecha",

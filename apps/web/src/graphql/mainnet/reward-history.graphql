@@ -1,0 +1,29 @@
+# Bounded distribution history. Subsequent requests use this response's indexed block.
+query RewardHistoryPeriods($limit: Int!) {
+  _meta {
+    ...MainnetFreshness
+  }
+  network(id: "1") {
+    rewardPeriods
+  }
+  rewardPeriods(first: $limit, orderBy: period, orderDirection: desc) {
+    period
+    root
+    blockNumber
+    timestamp
+    transactionHash
+  }
+}
+
+query RewardHistoryClaims($account: Bytes!, $from: BigInt!, $block: Block_height!, $limit: Int!) {
+  _meta(block: $block) {
+    ...MainnetFreshness
+  }
+  rewardClaims(first: $limit, block: $block, where: { account: $account, blockNumber_gte: $from }, orderBy: blockNumber) {
+    id
+    account
+    blockNumber
+    amount
+    cumulativeAmount
+  }
+}
