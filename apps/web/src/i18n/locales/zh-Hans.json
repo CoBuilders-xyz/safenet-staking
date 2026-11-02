@@ -308,6 +308,24 @@
     "withdrawn": "已提取",
     "withdrawnStatus": "已退出，Aegis 参与情况未确认"
   },
+  "rewardHistory": {
+    "title": "按分配期查看你的领取记录",
+    "source": "来源：Mainnet 子图中的领取记录，在每个窗口边界与以太坊上的累计领取额核对。",
+    "meaning": "这些是在每个根有效期间领取的款项，并非该期间赚取的奖励。每期收益未知。",
+    "limits": "仅显示最近 {{periods}} 次分配，此范围内最多 {{claims}} 次领取。更早的历史记录不包括在内。满页表示数据不完整。",
+    "order": "窗口以整个区块划分。同一区块中根更新之前的领取归入新窗口。无法按事件顺序精确归属。",
+    "connect": "连接钱包以查看其领取历史记录。",
+    "incomplete": "历史记录不完整或不一致。金额未知；不显示总额。",
+    "stale": "索引已过期或存在错误。历史记录不可用。",
+    "unavailable": "历史记录不可用。无法验证子图或以太坊历史读取结果。",
+    "asOf": "截至已索引区块 {{block}}。显示第 {{from}}–{{to}} 次分配，共 {{total}} 次。",
+    "period": "分配",
+    "date": "根设置时间（UTC）",
+    "blocks": "区块窗口",
+    "claims": "领取次数",
+    "amount": "已领取（SAFE）",
+    "transaction": "第 {{period}} 次分配的交易"
+  },
   "rewards": {
     "actions": "操作",
     "allocatedToDate": "截至目前已分配",

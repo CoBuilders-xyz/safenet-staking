@@ -326,6 +326,24 @@
     "withdrawn": "Sacado",
     "withdrawnStatus": "Retirado, participação no Aegis não confirmada"
   },
+  "rewardHistory": {
+    "title": "Seus resgates por período de distribuição",
+    "source": "Fonte: resgates do subgrafo Mainnet, conferidos com seus resgates acumulados no Ethereum em cada limite da janela.",
+    "meaning": "São pagamentos resgatados durante a validade de cada raiz, não recompensas ganhas naquele período. Os ganhos por período são desconhecidos.",
+    "limits": "Apenas as últimas {{periods}} distribuições, até {{claims}} resgates nesse intervalo. O histórico anterior é excluído. Uma página cheia está incompleta.",
+    "order": "As janelas usam blocos inteiros. Resgates anteriores a uma mudança de raiz no mesmo bloco entram na nova janela. A atribuição exata por ordem dos eventos não está disponível.",
+    "connect": "Conecte uma carteira para ver seu histórico de resgates.",
+    "incomplete": "O histórico está incompleto ou inconsistente. Os valores são desconhecidos; nenhum total é exibido.",
+    "stale": "O índice está desatualizado ou apresenta erros. O histórico está indisponível.",
+    "unavailable": "O histórico está indisponível. Não foi possível verificar o subgrafo ou as leituras históricas do Ethereum.",
+    "asOf": "Até o bloco indexado {{block}}. Exibindo distribuições {{from}}–{{to}} de {{total}}.",
+    "period": "Distribuição",
+    "date": "Raiz definida (UTC)",
+    "blocks": "Janela de blocos",
+    "claims": "Resgates",
+    "amount": "Resgatado (SAFE)",
+    "transaction": "Transação da distribuição {{period}}"
+  },
   "rewards": {
     "actions": "Ações",
     "allocatedToDate": "Alocado até o momento",

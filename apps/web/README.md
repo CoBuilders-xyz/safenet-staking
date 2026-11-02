@@ -18,7 +18,7 @@ Safe Foundation's safenet-staking-ui; see [License](#license).
 | `/validators` | `ValidatorsPage` | Validator cards with Delegate and Undelegate. `?delegate=<address>` opens the delegate dialog for that validator |
 | `/validators/:address` | `ValidatorDetailPage` | One validator's figures and actions |
 | `/withdrawals` | `WithdrawalsPage` | The withdrawal queue, oldest first, with cooldowns and Claim |
-| `/rewards` | `RewardsPage` | Your rewards, Claim, Claim & Stake, the programme totals, and the root on chain checked against SEF's published one |
+| `/rewards` | `RewardsPage` | Your rewards, Claim, Claim & Stake, bounded per-account claim history, programme totals, and the root on chain checked against SEF's published one |
 | `/alerts` | `AlertsPage` | Wallet-signed subscriptions, delivery settings and explicit configuration status |
 | `*` | `NotFoundPage` | 404 |
 
@@ -29,6 +29,15 @@ participation, something going wrong, and lower rewards.
 
 The router is `HashRouter` (`src/App.tsx`), so every path is served from one `index.html`
 under `#/`, which a static host and an IPFS gateway can both serve.
+
+Reward history covers the latest 12 distributions and up to 999 claims within that range.
+It shows payments claimed during each root's lifetime, not rewards earned in that period.
+Older history is excluded. Per-period earnings remain unknown.
+Each window uses whole blocks, so a claim before a root update in the same block enters the new window.
+Exact event-order attribution is unavailable.
+The reader checks cumulative claims against Ethereum at every window boundary.
+A full claim page, missing records, or a chain mismatch makes the history incomplete and hides all amounts.
+Stale indexes or failed historical reads make history unavailable. Neither state implies zero rewards.
 
 ## Quick start
 
@@ -391,3 +400,14 @@ a custom Safe App and open it from the Safe; the Safe connector connects by itse
 
 MIT, see [LICENSE](LICENSE). The app derives from Safe Foundation's safenet-staking-ui, also
 MIT; its copyright notice stays in that file.
+
+### Shared reward history and local preview
+
+COB-661: web and CLI/MCP use `packages/core/src/reward-periods.ts` for period boundaries,
+claim-prefix validation, whole-block attribution and cumulative comparisons. The web keeps its
+12-distribution limit, archive baseline, root check and explicit failure states. These rows show
+claimed payments. Per-period earnings and exact same-block event ordering remain unknown.
+
+After `pnpm build` at the repository root, run `box-preview start .` there to serve the built app
+on Jarvis through the tailnet. The committed adapter binds only to loopback and expires through
+fleet preview management. It uses the build's real read endpoints; it does not inject a wallet or mocks.

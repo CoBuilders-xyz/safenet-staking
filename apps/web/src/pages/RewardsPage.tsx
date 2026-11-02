@@ -9,6 +9,7 @@ import { YourRewardsSection } from "@/components/rewards/YourRewardsSection"
 import { RewardActionsSection } from "@/components/rewards/RewardActionsSection"
 import { ProgrammeSection } from "@/components/rewards/ProgrammeSection"
 import { VerifiabilitySection } from "@/components/rewards/VerifiabilitySection"
+import { RewardHistorySection } from "@/components/rewards/RewardHistorySection"
 import { useRewards } from "@/hooks/useRewards"
 import { useProgrammeRewards } from "@/hooks/useProgrammeRewards"
 import { useTokenBalance } from "@/hooks/useTokenBalance"
@@ -47,6 +48,7 @@ export function RewardsPage() {
         <ProgrammeSection programme={programme} />
         <VerifiabilitySection programme={programme} />
       </div>
+      <RewardHistorySection />
       {/* Always mounted, so a claim still confirming after the dialog closes still reports. */}
       <ClaimRewardsDialog open={claimOpen} onOpenChange={setClaimOpen} />
       <ClaimAndStakeDialog

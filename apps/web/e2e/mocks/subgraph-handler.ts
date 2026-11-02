@@ -55,6 +55,10 @@ function mainnet(operation: string, mode: SubgraphMode, variables: Record<string
   const _meta = meta(SUBGRAPH_FIGURES.mainnetBlock, mode)
   const today = Math.floor(Date.now() / 1000 / DAY) * DAY
   switch (operation) {
+    case "RewardHistoryPeriods":
+      // General fixtures have no indexed distributions. The dedicated history suite supplies
+      // complete periods and chain comparisons; other Rewards tests exercise degradation.
+      return { _meta, network: null, rewardPeriods: [] }
     case "NetworkTotals":
       return {
         _meta,

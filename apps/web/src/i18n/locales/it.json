@@ -326,6 +326,24 @@
     "withdrawn": "Prelevato",
     "withdrawnStatus": "Ritirato, partecipazione ad Aegis non confermata"
   },
+  "rewardHistory": {
+    "title": "I tuoi riscatti per periodo di distribuzione",
+    "source": "Fonte: riscatti del subgraph Mainnet, confrontati con i tuoi riscatti cumulativi su Ethereum a ogni limite della finestra.",
+    "meaning": "Sono pagamenti riscattati durante la validità di ogni radice, non ricompense guadagnate in quel periodo. I guadagni per periodo sono sconosciuti.",
+    "limits": "Solo le ultime {{periods}} distribuzioni, fino a {{claims}} riscatti in questo intervallo. Lo storico precedente è escluso. Una pagina piena è incompleta.",
+    "order": "Le finestre usano blocchi interi. I riscatti precedenti a un cambio di radice nello stesso blocco rientrano nella nuova finestra. L’attribuzione esatta per ordine degli eventi non è disponibile.",
+    "connect": "Collega un wallet per vedere il suo storico dei riscatti.",
+    "incomplete": "Lo storico è incompleto o incoerente. Gli importi sono sconosciuti; non vengono mostrati totali.",
+    "stale": "L’indice è obsoleto o presenta errori. Lo storico non è disponibile.",
+    "unavailable": "Lo storico non è disponibile. Non è stato possibile verificare il subgraph o le letture storiche di Ethereum.",
+    "asOf": "Fino al blocco indicizzato {{block}}. Distribuzioni {{from}}–{{to}} di {{total}}.",
+    "period": "Distribuzione",
+    "date": "Radice impostata (UTC)",
+    "blocks": "Finestra di blocchi",
+    "claims": "Riscatti",
+    "amount": "Riscattato (SAFE)",
+    "transaction": "Transazione della distribuzione {{period}}"
+  },
   "rewards": {
     "actions": "Azioni",
     "allocatedToDate": "Allocato finora",

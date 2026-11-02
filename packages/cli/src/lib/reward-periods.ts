@@ -15,7 +15,8 @@
  * paid out to stakers is not on chain: SEF's files hold it. So a row shows claims, not earnings.
  */
 import type { Address, Hash, Hex } from "viem"
-import { CONTRACTS, SUBGRAPH_ENDPOINTS, SUBGRAPH_STALE_AFTER_SECONDS, merkleDropAbi } from "@cobuilders/safenet-core"
+import { CONTRACTS, SUBGRAPH_ENDPOINTS, SUBGRAPH_STALE_AFTER_SECONDS, merkleDropAbi,
+  rewardPeriodWindows, attributeRewardClaims, compareRewardPeriodEnds } from "@cobuilders/safenet-core"
 import type { Context } from "./context.js"
 import { redactUrls } from "./redact.js"
 
@@ -111,17 +112,7 @@ export async function readRewardPeriods(ctx: Context, address: Address): Promise
   if (data.rewardPeriods.length >= PAGE || data.rewardClaims.length >= PAGE) {
     throw new Error(`the subgraph holds ${PAGE} or more rows for one query, and this reader does not page`)
   }
-  if (data.rewardPeriods.length === 0) throw new Error("the subgraph returned no reward periods")
-  if (data.network?.rewardPeriods !== data.rewardPeriods.length
-    || data.rewardPeriods.some((p, i) => p.period !== i + 1)) {
-    throw new Error("the subgraph returned incomplete or inconsistent reward periods")
-  }
-  for (let i = 0; i < data.rewardPeriods.length; i++) {
-    const start = BigInt(data.rewardPeriods[i]!.blockNumber)
-    if (start > head || (i > 0 && start <= BigInt(data.rewardPeriods[i - 1]!.blockNumber))) {
-      throw new Error("the subgraph returned inconsistent reward period boundaries")
-    }
-  }
+  const windows = rewardPeriodWindows(data.rewardPeriods, head, data.network?.rewardPeriods)
 
   const [chainHead, headBlock] = await Promise.all([
     ctx.client.getBlock(),
@@ -130,40 +121,7 @@ export async function readRewardPeriods(ctx: Context, address: Address): Promise
   const headTime = new Date(Number(headBlock.timestamp) * 1000)
   const stale = Number(chainHead.timestamp - headBlock.timestamp) > SUBGRAPH_STALE_AFTER_SECONDS
 
-  const claims = data.rewardClaims.map((c) => ({
-    block: BigInt(c.blockNumber), amount: BigInt(c.amount), cumulative: BigInt(c.cumulativeAmount),
-  }))
-  // Cumulative totals alone can hide omitted payments. Reconstruct every prefix; cumulative
-  // order resolves same-block query ties without changing the documented block windows.
-  const ordered = [...claims].sort((a, b) => a.block !== b.block ? (a.block < b.block ? -1 : 1)
-    : a.cumulative < b.cumulative ? -1 : a.cumulative > b.cumulative ? 1 : 0)
-  let running = 0n
-  const firstBlock = BigInt(data.rewardPeriods[0]!.blockNumber)
-  for (const claim of ordered) {
-    running += claim.amount
-    if (claim.amount < 0n || claim.block < firstBlock || claim.block > head || claim.cumulative !== running) {
-      throw new Error("the subgraph returned incomplete or inconsistent reward claims")
-    }
-  }
-  const rows = data.rewardPeriods.map((p, i) => {
-    const start = BigInt(p.blockNumber)
-    const next = data.rewardPeriods[i + 1]
-    const endBlock = next ? BigInt(next.blockNumber) - 1n : head
-    const inPeriod = claims.filter((c) => c.block >= start && c.block <= endBlock)
-    const before = claims.filter((c) => c.block <= endBlock)
-    return {
-      period: p.period,
-      root: p.root,
-      setAt: { block: start, time: new Date(Number(p.timestamp) * 1000), transaction: p.transactionHash },
-      endBlock,
-      current: !next,
-      claims: inPeriod.length,
-      claimed: inPeriod.reduce((a, c) => a + c.amount, 0n),
-      // handleClaimed adds each uint256 payment to the account's running total. It never
-      // decreases, so the maximum is the end-block value even when block-number ties reverse.
-      subgraph: before.reduce((max, c) => c.cumulative > max ? c.cumulative : max, 0n),
-    }
-  })
+  const rows = attributeRewardClaims(windows, data.rewardClaims)
 
   // The chain at each period's last block: an archive read, a few at a time.
   const chain: bigint[] = []
@@ -175,9 +133,17 @@ export async function readRewardPeriods(ctx: Context, address: Address): Promise
       })))))
   }
 
-  const periods: RewardPeriod[] = rows.map(({ subgraph, ...r }, i) => ({
-    ...r,
-    cumulativeAtEnd: { subgraph, chain: chain[i]!, match: subgraph === chain[i] },
+  const comparisons = compareRewardPeriodEnds(rows, chain)
+  const periods: RewardPeriod[] = rows.map((r, i) => ({
+    period: r.distribution.period,
+    root: r.distribution.root,
+    setAt: { block: r.startBlock, time: new Date(Number(r.distribution.timestamp) * 1000),
+      transaction: r.distribution.transactionHash },
+    endBlock: r.endBlock,
+    current: r.current,
+    claims: r.claims,
+    claimed: r.claimed,
+    cumulativeAtEnd: comparisons[i]!,
   }))
   return {
     subgraph: {

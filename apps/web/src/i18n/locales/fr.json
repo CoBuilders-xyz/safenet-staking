@@ -326,6 +326,24 @@
     "withdrawn": "Retiré",
     "withdrawnStatus": "Retiré, participation à Aegis non confirmée"
   },
+  "rewardHistory": {
+    "title": "Vos réclamations par période de distribution",
+    "source": "Source : paiements réclamés du sous-graphe Mainnet, comparés à vos réclamations cumulées sur Ethereum à chaque limite de fenêtre.",
+    "meaning": "Ce sont les paiements réclamés pendant la validité de chaque racine, pas les récompenses gagnées durant cette période. Les gains par période sont inconnus.",
+    "limits": "Uniquement les {{periods}} dernières distributions, jusqu’à {{claims}} réclamations dans cet intervalle. L’historique antérieur est exclu. Une page pleine est incomplète.",
+    "order": "Les fenêtres utilisent des blocs entiers. Les réclamations avant un changement de racine dans le même bloc entrent dans la nouvelle fenêtre. L’attribution exacte selon l’ordre des événements est indisponible.",
+    "connect": "Connectez un portefeuille pour voir son historique de réclamations.",
+    "incomplete": "L’historique est incomplet ou incohérent. Les montants sont inconnus ; aucun total n’est affiché.",
+    "stale": "L’index est obsolète ou présente des erreurs. L’historique est indisponible.",
+    "unavailable": "L’historique est indisponible. Le sous-graphe ou les lectures historiques d’Ethereum n’ont pas pu être vérifiés.",
+    "asOf": "Jusqu’au bloc indexé {{block}}. Affichage des distributions {{from}}–{{to}} sur {{total}}.",
+    "period": "Distribution",
+    "date": "Racine définie (UTC)",
+    "blocks": "Fenêtre de blocs",
+    "claims": "Réclamations",
+    "amount": "Réclamé (SAFE)",
+    "transaction": "Transaction de la distribution {{period}}"
+  },
   "rewards": {
     "actions": "Actions",
     "allocatedToDate": "Alloué à ce jour",

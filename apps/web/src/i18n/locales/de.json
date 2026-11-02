@@ -317,6 +317,24 @@
     "withdrawn": "Ausgezahlt",
     "withdrawnStatus": "Ausgeschieden, Teilnahme an Aegis unbestätigt"
   },
+  "rewardHistory": {
+    "title": "Deine Abrufe nach Verteilungszeitraum",
+    "source": "Quelle: Abrufe aus dem Mainnet-Subgraphen, an jeder Fenstergrenze mit deinen kumulierten Abrufen auf Ethereum abgeglichen.",
+    "meaning": "Dies sind während der Gültigkeit jeder Wurzel abgerufene Zahlungen, keine in diesem Zeitraum verdienten Belohnungen. Erträge pro Zeitraum sind unbekannt.",
+    "limits": "Nur die letzten {{periods}} Verteilungen, bis zu {{claims}} Abrufe in diesem Bereich. Ältere Daten sind ausgeschlossen. Eine volle Seite ist unvollständig.",
+    "order": "Fenster verwenden ganze Blöcke. Abrufe vor einem Wurzelwechsel im selben Block zählen zum neuen Fenster. Die genaue Zuordnung nach Ereignisreihenfolge ist nicht verfügbar.",
+    "connect": "Verbinde eine Wallet, um ihren Abrufverlauf zu sehen.",
+    "incomplete": "Der Verlauf ist unvollständig oder widersprüchlich. Beträge sind unbekannt; Summen werden nicht angezeigt.",
+    "stale": "Der Index ist veraltet oder fehlerhaft. Der Verlauf ist nicht verfügbar.",
+    "unavailable": "Der Verlauf ist nicht verfügbar. Der Subgraph oder historische Ethereum-Abfragen konnten nicht überprüft werden.",
+    "asOf": "Bis zum indexierten Block {{block}}. Verteilungen {{from}}–{{to}} von {{total}} werden angezeigt.",
+    "period": "Verteilung",
+    "date": "Wurzel gesetzt (UTC)",
+    "blocks": "Blockfenster",
+    "claims": "Abrufe",
+    "amount": "Abgerufen (SAFE)",
+    "transaction": "Transaktion der Verteilung {{period}}"
+  },
   "rewards": {
     "actions": "Aktionen",
     "allocatedToDate": "Bisher zugeteilt",
