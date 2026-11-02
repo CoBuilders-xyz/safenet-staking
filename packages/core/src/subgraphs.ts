@@ -57,8 +57,14 @@ export function localSubgraphUrl(chain: ChainKey, port: number | string = DEFAUL
  * stay deployed, and the local graph-node is reached through the overrides.
  */
 export const SUBGRAPH_ENDPOINTS: Record<ChainKey, string> = {
-  mainnet: "https://api.studio.thegraph.com/query/1762768/safenet-mainnet/1cb0e25",
-  gnosis: "https://api.studio.thegraph.com/query/1762768/safenet-gnosis/efeed7c",
+  mainnet: "https://api.studio.thegraph.com/query/1763864/safenet-mainnet/e66567d",
+  gnosis: "https://api.studio.thegraph.com/query/1763864/safenet-gnosis/e66567d",
+}
+
+/** Published Network IDs. API keys are supplied by callers, never stored here. */
+export const NETWORK_SUBGRAPH_IDS: Record<ChainKey, string> = {
+  mainnet: "K1gHS5P5vZU3LApqchuuQxkmZGDDAUavkQUdGDV7Vxs",
+  gnosis: "9ZnBWftc6QB4tLn2CeYKTCqZkUrwjUNtH4DXvXHahG8q",
 }
 
 /** True for a URL on this machine, whatever its port and path. */
@@ -70,15 +76,17 @@ export function isLocalSubgraphUrl(url: string): boolean {
  * Resolve the endpoint per chain, in this order:
  *
  *   an override, when set and not empty
+ *   the Network gateway, when graphApiKey is non-blank
  *   the default in SUBGRAPH_ENDPOINTS, when it is a deployed URL
  *   the default, when it is the local graph-node and `allowLocal` is true, moved to `graphNodePort`
  *   undefined: no endpoint
  *
  * A production browser build passes `allowLocal: false`, so it never sends visitors' browsers to
- * their own 127.0.0.1. An override must never carry an API key, for the same reason as a default.
+ * their own 127.0.0.1. COB-566 permits a public browser gateway key, restricted to our two subgraphs and USD 20/month.
  */
 export function subgraphEndpoints(options: {
   graphNodePort?: number | string
+  graphApiKey?: string | undefined
   overrides?: Partial<Record<ChainKey, string | undefined>>
   allowLocal?: boolean
 } = {}): Record<ChainKey, string | undefined> {
@@ -86,6 +94,8 @@ export function subgraphEndpoints(options: {
   const pick = (chain: ChainKey): string | undefined => {
     const o = overrides?.[chain]
     if (o && o.length > 0) return o
+    const key = options.graphApiKey?.trim()
+    if (key) return `https://gateway.thegraph.com/api/${encodeURIComponent(key)}/subgraphs/id/${NETWORK_SUBGRAPH_IDS[chain]}`
     const d = SUBGRAPH_ENDPOINTS[chain]
     if (!isLocalSubgraphUrl(d)) return d
     return allowLocal ? localSubgraphUrl(chain, graphNodePort) : undefined
@@ -103,3 +113,41 @@ export function subgraphEndpoints(options: {
  * or a reorg, and still catches a subgraph that has stopped or is resyncing.
  */
 export const SUBGRAPH_STALE_AFTER_SECONDS = 15 * 60
+
+const fallbackWarnings = new Set<ChainKey>()
+
+/** Match only our Network URLs; custom URL overrides retain their own error behavior. */
+function gatewayChain(endpoint: string): ChainKey | undefined {
+  try {
+    const url = new URL(endpoint)
+    if (url.origin !== "https://gateway.thegraph.com") return undefined
+    return (["mainnet", "gnosis"] as const).find((chain) =>
+      new RegExp(`^/api/[^/]+/subgraphs/id/${NETWORK_SUBGRAPH_IDS[chain]}/?$`).test(url.pathname))
+  } catch { return undefined }
+}
+
+/**
+ * Retry a failed Network query once against the matching Studio deployment.
+ * The callback must reject HTTP/GraphQL/invalid-data failures. Caller cancellation never retries.
+ * Warn once per chain and process without URLs or provider errors; a failed fallback is explicit.
+ */
+export async function withSubgraphFallback<T>(
+  endpoint: string,
+  query: (url: string) => Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
+  signal?.throwIfAborted()
+  try { return await query(endpoint) } catch (error) {
+    signal?.throwIfAborted()
+    const chain = gatewayChain(endpoint)
+    if (!chain) throw error
+    if (!fallbackWarnings.has(chain)) {
+      fallbackWarnings.add(chain)
+      console.warn(`The Graph ${chain} gateway failed; trying Studio fallback. Check GRAPH_API_KEY, subgraph assignments and billing.`)
+    }
+    try { return await query(SUBGRAPH_ENDPOINTS[chain]) } catch {
+      signal?.throwIfAborted()
+      throw new Error(`The ${chain} gateway and Studio fallback both failed`)
+    }
+  }
+}

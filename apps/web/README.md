@@ -74,7 +74,8 @@ Vite reads env from the repository root, not from this directory: the root `.env
 `.env.local` that `pnpm env:pull` writes. Every variable is optional. To set one by hand, copy
 it from [`.env.example`](.env.example) into the root `.env`.
 
-Vite writes every `VITE_` value into the public bundle. Never put a key in one.
+Vite writes used `VITE_` values into the public bundle. Never put private credentials in them.
+COB-566 explicitly permits `VITE_GRAPH_API_KEY` as a public, subgraph-restricted, USD 20/month-capped browser key.
 `pnpm check:browser`, part of `pnpm check`, fails when a value from `.env.local` that is not a
 `VITE_` value turns up in a build.
 
@@ -88,7 +89,8 @@ Vite writes every `VITE_` value into the public bundle. Never put a key in one.
 | `VITE_VALIDATOR_INFO_URL` | Validator metadata JSON | SEF's published file, `SEF_DATA.validatorInfo` in `packages/core` |
 | `VITE_REWARDS_BASE_URL` | Base for `latest.json` and the proof files. Replaces every other source | SEF's IPFS dataset, then the repository; see [Where reward data comes from](#where-reward-data-comes-from) |
 | `VITE_IPFS_GATEWAY` | A gateway tried before the public ones for SEF's dataset. Only its origin is used | Only the gateways in `packages/core` |
-| `VITE_SUBGRAPH_URL_MAINNET`, `VITE_SUBGRAPH_URL_GNOSIS` | Subgraph query URLs. Public in the bundle: never a URL with a key | The Studio deployments in `packages/core/src/subgraphs.ts`, in development and production builds alike. That is Studio's development endpoint, rate-limited and not a production read path |
+| `VITE_GRAPH_API_KEY` | Public browser gateway key (COB-566); inject at build time, restrict subgraphs and spending | Unset: Studio fallback |
+| `VITE_SUBGRAPH_URL_MAINNET`, `VITE_SUBGRAPH_URL_GNOSIS` | Explicit subgraph query URLs; override the gateway per chain. Public in the bundle | Network gateway when `VITE_GRAPH_API_KEY` is set; otherwise Studio account 1763864 (rate-limited development endpoints) |
 | `VITE_SANCTIONS_API_URL` | Fetched on load; an HTTP 403 blocks the app, and so does a failed request | No IP sanctions check |
 | `VITE_GEOBLOCK_CACHE_DAYS` | Days the country lookup is cached in `localStorage` | 7 |
 | `VITE_PLAUSIBLE_DOMAIN`, `VITE_PLAUSIBLE_ENDPOINT` | Enables Plausible page views, to that domain and optionally that endpoint | No analytics |
@@ -102,7 +104,7 @@ Vite writes every `VITE_` value into the public bundle. Never put a key in one.
 graph-node; both defaults are Studio deployments today, so to read the local node from
 `pnpm graph:up`, set the two `VITE_SUBGRAPH_URL_` variables to its URLs.
 
-The release build reads none of this. It reads [`build.env`](build.env) only; see
+The release build ignores the other shell settings and .env files. It reads [`build.env`](build.env) plus the explicit `VITE_GRAPH_API_KEY` environment input; see
 [Deployment](#deployment).
 
 ## Scripts
@@ -369,8 +371,8 @@ pnpm --filter @cobuilders/safenet-web release:build
 pnpm --filter @cobuilders/safenet-web release:pin
 ```
 
-- `release:build` (`scripts/release.ts`) reads [`build.env`](build.env) and nothing else: every
-  `.env` file and every `VITE_` variable in the shell is ignored. That file is committed and
+- `release:build` (`scripts/release.ts`) reads [`build.env`](build.env) plus the explicit public
+  `VITE_GRAPH_API_KEY`. Every `.env` file and every other shell `VITE_` variable is ignored. That file is committed and
   public, holds only `VITE_` keys, and never a secret. The script builds in production mode,
   runs the browser-safety check over `dist/`, packs `dist/` into `release/app.car` and writes the
   root CID to `release/CID`. The packing, the Pinata upload and the gateway checks live in
@@ -383,8 +385,8 @@ pnpm --filter @cobuilders/safenet-web release:pin
   `.env.local`, and fails when either is missing. `RELEASE_NAME` and `GATEWAY_TIMEOUT_SECONDS`
   are optional.
 
-`.github/workflows/release.yml` runs both on a `v*` tag or by hand. Its build job receives no
-secret. Its pin job takes the two Pinata secrets and runs only from `main` or a `v*` tag.
+`.github/workflows/release.yml` runs both on a `v*` tag or by hand. Its build step receives only the public browser key, mapped from `GRAPH_API_KEY` to
+`VITE_GRAPH_API_KEY`; it receives no private credentials. Its pin job takes the two Pinata secrets and runs only from `main` or a `v*` tag.
 
 ### Safe App
 
@@ -411,3 +413,5 @@ claimed payments. Per-period earnings and exact same-block event ordering remain
 After `pnpm build` at the repository root, run `box-preview start .` there to serve the built app
 on Jarvis through the tailnet. The committed adapter binds only to loopback and expires through
 fleet preview management. It uses the build's real read endpoints; it does not inject a wallet or mocks.
+
+Network gateway setup, exact operator settings and release reproducibility: [GRAPH-GATEWAY.md](../../GRAPH-GATEWAY.md).

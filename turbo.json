@@ -78,7 +78,8 @@
         "GITHUB_TOKEN",
         "GH_TOKEN",
         "GITHUB_STEP_SUMMARY",
-        "PARITY_STATE_DIR"
+        "PARITY_STATE_DIR",
+        "GRAPH_API_KEY"
       ]
     },
     "lint": {},
@@ -104,6 +105,11 @@
       ],
       "outputs": [
         "dist/**"
+      ],
+      "env": [
+        "VITE_GRAPH_API_KEY",
+        "VITE_SUBGRAPH_URL_MAINNET",
+        "VITE_SUBGRAPH_URL_GNOSIS"
       ]
     },
     "@cobuilders/safenet-core#build": {

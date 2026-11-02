@@ -15,7 +15,7 @@
  * paid out to stakers is not on chain: SEF's files hold it. So a row shows claims, not earnings.
  */
 import type { Address, Hash, Hex } from "viem"
-import { CONTRACTS, SUBGRAPH_ENDPOINTS, SUBGRAPH_STALE_AFTER_SECONDS, merkleDropAbi,
+import { CONTRACTS, withSubgraphFallback, SUBGRAPH_ENDPOINTS, SUBGRAPH_STALE_AFTER_SECONDS, merkleDropAbi,
   rewardPeriodWindows, attributeRewardClaims, compareRewardPeriodEnds } from "@cobuilders/safenet-core"
 import type { Context } from "./context.js"
 import { redactUrls } from "./redact.js"
@@ -99,16 +99,19 @@ export function subgraphUrl(ctx: Context): string {
  */
 export async function readRewardPeriods(ctx: Context, address: Address): Promise<RewardPeriods> {
   const url = subgraphUrl(ctx)
-  const meta = await query<Meta>(ctx, url, "{ _meta { block { number timestamp } } }")
-  const head = BigInt(meta._meta.block.number)
-  const at = `block: { number: ${head} }`
-  const data = await query<Periods>(ctx, url, `{
-    network(id: "1", ${at}) { rewardPeriods }
-    rewardPeriods(first: ${PAGE}, orderBy: period, ${at}) { period root blockNumber timestamp transactionHash }
-    rewardClaims(first: ${PAGE}, where: { account: "${address.toLowerCase()}" }, orderBy: blockNumber, ${at}) {
-      blockNumber amount cumulativeAmount
-    }
-  }`)
+  const { head, data } = await withSubgraphFallback(url, async (endpoint) => {
+    const meta = await query<Meta>(ctx, endpoint, "{ _meta { block { number timestamp } } }")
+    const head = BigInt(meta._meta.block.number)
+    const at = `block: { number: ${head} }`
+    const data = await query<Periods>(ctx, endpoint, `{
+      network(id: "1", ${at}) { rewardPeriods }
+      rewardPeriods(first: ${PAGE}, orderBy: period, ${at}) { period root blockNumber timestamp transactionHash }
+      rewardClaims(first: ${PAGE}, where: { account: "${address.toLowerCase()}" }, orderBy: blockNumber, ${at}) {
+        blockNumber amount cumulativeAmount
+      }
+    }`)
+    return { head, data }
+  })
   if (data.rewardPeriods.length >= PAGE || data.rewardClaims.length >= PAGE) {
     throw new Error(`the subgraph holds ${PAGE} or more rows for one query, and this reader does not page`)
   }

@@ -8,6 +8,7 @@
  * a value, a keystore path or the name given for a variable, any of which could be the secret
  * typed in its place.
  */
+import { subgraphEndpoints } from "@cobuilders/safenet-core"
 import { existsSync } from "node:fs"
 
 export type SignerRequest =
@@ -128,7 +129,7 @@ export function readConfig(env: Env): ServerConfig {
     rpcUrl,
     githubToken: set(env.GITHUB_TOKEN) ? env.GITHUB_TOKEN : set(env.GH_TOKEN) ? env.GH_TOKEN : undefined,
     ipfsGateway: set(env.IPFS_GATEWAY) ? env.IPFS_GATEWAY : undefined,
-    subgraphUrl: set(env.SUBGRAPH_URL_MAINNET) ? env.SUBGRAPH_URL_MAINNET : undefined,
+    subgraphUrl: subgraphEndpoints({ graphApiKey: env.GRAPH_API_KEY, overrides: { mainnet: env.SUBGRAPH_URL_MAINNET } }).mainnet,
     compliance: { sanctionsEndpoint, geoCheck: geo === "1" },
     writes,
     notices,

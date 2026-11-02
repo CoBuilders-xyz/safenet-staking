@@ -3,6 +3,7 @@
 // the build knows.
 //
 //   VITE_SUBGRAPH_URL_MAINNET / VITE_SUBGRAPH_URL_GNOSIS   win when set
+//   VITE_GRAPH_API_KEY                                  Network gateway when set
 //   a deployed default in core                             used everywhere
 //   the local graph-node default in core                   development only, on the port in .env.ports
 //
@@ -19,6 +20,7 @@ import { subgraphEndpoints, type ChainKey } from "@cobuilders/safenet-core"
 const nonEmpty = (v: string | undefined): string | undefined => (v && v.length > 0 ? v : undefined)
 
 export const SUBGRAPH_URLS: Record<ChainKey, string | undefined> = subgraphEndpoints({
+  graphApiKey: import.meta.env.VITE_GRAPH_API_KEY,
   graphNodePort: nonEmpty(import.meta.env.VITE_GRAPH_NODE_PORT),
   overrides: {
     mainnet: nonEmpty(import.meta.env.VITE_SUBGRAPH_URL_MAINNET),

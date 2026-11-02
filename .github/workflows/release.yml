@@ -1,6 +1,6 @@
 name: Release
 
-# Production is IPFS. This workflow builds the interface from build.env alone, packs it into a
+# Production is IPFS. This workflow builds the interface from build.env plus the public Graph browser key, packs it into a
 # CAR whose CID anyone can rebuild (VERIFY.md), and pins that CAR. Vercel serves previews only.
 # The ENS contenthash is not touched here.
 
@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 20
     outputs:
       cid: ${{ steps.cid.outputs.cid }}
-    # No secret reaches this job, so none can reach the bundle it builds.
+    # Only the COB-566 public browser key reaches the build step. Private credentials stay out.
     steps:
       # Pin actions to full SHA: mutable tags can be moved to malicious code.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,11 +48,10 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Lint and types
         run: pnpm check
-      # Builds with build.env only, runs the browser-safety check over dist, then writes
-      # apps/web/release/app.car and apps/web/release/CID. CI has no root .env.local, so the
-      # check's bundle half finds nothing to compare here. The real guarantee is that this job
-      # references no secrets.* at all.
+      # The subgraph-restricted, spending-capped browser key intentionally becomes public in the CAR.
       - name: Release build, CAR and CID
+        env:
+          VITE_GRAPH_API_KEY: ${{ secrets.GRAPH_API_KEY }}
         run: pnpm --filter @cobuilders/safenet-web release:build
       - name: Record the CID
         id: cid

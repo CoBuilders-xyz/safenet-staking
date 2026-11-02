@@ -125,7 +125,7 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   comparisons stay exact at each window's last block. Period earnings come from SEF's files.
   When the subgraph cannot answer, `periods` is null
   with `periodsReason`, and the claims, read from the chain, still print. The endpoint is
-  `SUBGRAPH_URL_MAINNET` when set, else core's `SUBGRAPH_ENDPOINTS.mainnet`, and is never printed.
+  `SUBGRAPH_URL_MAINNET` when set, else the gateway for `GRAPH_API_KEY`, else core's `SUBGRAPH_ENDPOINTS.mainnet`, and is never printed.
 - Amounts print exactly, to the last wei. `--json` gives the same fields, with amounts as wei in
   decimal strings.
 - An RPC URL can carry a key. It is never printed: `--verbose` shows the host only, and error
@@ -209,3 +209,5 @@ Mainnet. The root `CLAUDE.md` describes the workflow.
 Period boundaries, cumulative-prefix validation, whole-block attribution and end-block comparisons
 come from `packages/core/src/reward-periods.ts`, shared with the web (COB-661). The CLI keeps
 its all-period query limit, chain-log fallback, stale flag and explicit mismatch rows.
+
+- Gateway selection: explicit subgraph URL overrides win, then `VITE_GRAPH_API_KEY` (web) or `GRAPH_API_KEY` (CLI/MCP), then Studio account 1763864. See GRAPH-GATEWAY.md at the repository root. Never commit a key.

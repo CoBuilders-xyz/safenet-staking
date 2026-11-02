@@ -89,7 +89,7 @@ too, and so are its compliance flags: no tool takes one. A new CLI command needs
   server's advice for a refused log scan, then `scrubSecrets()`. No stack, no URL.
 - An RPC URL can carry a key. The server logs where the endpoint comes from, never the URL or its
   host.
-- `rewards_history` also reads the Mainnet subgraph for its periods: `SUBGRAPH_URL_MAINNET`, else
+- `rewards_history` also reads the Mainnet subgraph for its periods: `SUBGRAPH_URL_MAINNET`, else the gateway for `GRAPH_API_KEY`, else
   core's default, passed to `createContext()` as `subgraphUrl`. Its summary says how many periods
   came back and whether each matched the chain, or why there are none.
 - RPC: `SAFENET_MCP_RPC_URL`, else `MAINNET_RPC_URL`, else core's public list, through the
@@ -135,3 +135,5 @@ adds the LICENSE by itself; `publishConfig` sets public access. `.github/workflo
 publishes it on a tag `mcp-v<version>`, after the packed tarball, installed outside the monorepo,
 starts over stdio and answers `status` against Mainnet. The root `CLAUDE.md` describes the
 workflow.
+
+- Gateway selection: explicit subgraph URL overrides win, then `VITE_GRAPH_API_KEY` (web) or `GRAPH_API_KEY` (CLI/MCP), then Studio account 1763864. See GRAPH-GATEWAY.md at the repository root. Never commit a key.

@@ -71,3 +71,10 @@ test("a local URL in the variable points the run at that graph-node as written",
   const local = localSubgraphUrl("mainnet", 8160)
   withEnv({ SUBGRAPH_URL_MAINNET: local }, () => assert.equal(subgraphEndpoint("mainnet"), local))
 })
+
+test("parity uses GRAPH_API_KEY unless a chain has a full URL override", () => {
+  withEnv({ GRAPH_API_KEY: "test-only-key", SUBGRAPH_URL_MAINNET: "https://override.test/query", SUBGRAPH_URL_GNOSIS: undefined }, () => {
+    assert.equal(subgraphEndpoint("mainnet"), "https://override.test/query")
+    assert.equal(subgraphEndpoint("gnosis"), "https://gateway.thegraph.com/api/test-only-key/subgraphs/id/9ZnBWftc6QB4tLn2CeYKTCqZkUrwjUNtH4DXvXHahG8q")
+  })
+})

@@ -10,7 +10,7 @@ import { join } from "node:path"
 import { createPublicClient, fallback, http } from "viem"
 import { CHAINS, rpcUrls, type ChainKey } from "../chains.js"
 import { CONTRACTS, SEF_DATA } from "../contracts.js"
-import { DEFAULT_GRAPH_NODE_PORT, SUBGRAPH_ENDPOINTS, isLocalSubgraphUrl, localSubgraphUrl } from "../subgraphs.js"
+import { DEFAULT_GRAPH_NODE_PORT, subgraphEndpoints } from "../subgraphs.js"
 import { blockAtTimestamp } from "./blocks.js"
 import { parseLastCommit, type ParityState, type SefCommit } from "./compare.js"
 
@@ -101,17 +101,17 @@ export async function sefAsset<T>(chain: ChainKey, sha: string, file: string): P
 
 /**
  * The subgraph a run reads: `SUBGRAPH_URL_MAINNET` or `SUBGRAPH_URL_GNOSIS` when set and not
- * empty, else the default in SUBGRAPH_ENDPOINTS, the Studio deployment of each chain. A chain
+ * empty, else GRAPH_API_KEY selects the Network gateway, else Studio for each chain. A chain
  * whose default is the local graph-node is read on GRAPH_NODE_PORT, the port `pnpm graph:up`
  * used. The same rule as subgraphEndpoints, over the environment instead of the build. One
  * variable per chain, because `pnpm test:parity` runs both packages from one environment.
  */
 export function subgraphEndpoint(chain: ChainKey): string {
-  const set = chain === "mainnet" ? process.env.SUBGRAPH_URL_MAINNET : process.env.SUBGRAPH_URL_GNOSIS
-  if (set) return set
-  const preset = SUBGRAPH_ENDPOINTS[chain]
-  if (!isLocalSubgraphUrl(preset)) return preset
-  return localSubgraphUrl(chain, process.env.GRAPH_NODE_PORT || DEFAULT_GRAPH_NODE_PORT)
+  return subgraphEndpoints({
+    graphApiKey: process.env.GRAPH_API_KEY,
+    graphNodePort: process.env.GRAPH_NODE_PORT || DEFAULT_GRAPH_NODE_PORT,
+    overrides: { mainnet: process.env.SUBGRAPH_URL_MAINNET, gnosis: process.env.SUBGRAPH_URL_GNOSIS },
+  })[chain]!
 }
 
 /**

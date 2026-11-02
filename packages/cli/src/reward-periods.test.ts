@@ -1,6 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { run } from "./cli.js"
+import { subgraphEndpoints } from "@cobuilders/safenet-core"
 import { rewardsHistory } from "./lib/rewards.js"
 import { BLOCK, STAKER, fakeContext, fakeRuntime, type FakeOptions } from "./test-support.js"
 
@@ -234,4 +235,62 @@ test("GraphQL provider errors remain fixed and private in CLI output", async () 
       assert.equal(JSON.parse(result.out).count, 2)
     }
   }
+})
+
+test("GRAPH_API_KEY reaches the gateway without leaking into history output; URL override wins", async () => {
+  for (const override of [undefined, "https://override.test/query"]) {
+    const rt = fakeRuntime({ env: { GRAPH_API_KEY: "test-only-private-marker", ...(override ? { SUBGRAPH_URL_MAINNET: override } : {}) } })
+    const create = rt.createContext
+    let endpoint: string | undefined
+    assert.equal(await run(["rewards", "history", STAKER, "--json"], {
+      ...rt, createContext: (options) => { endpoint = options.subgraphUrl; return create(options) },
+    }), 0)
+    assert.equal(endpoint, override ?? "https://gateway.thegraph.com/api/test-only-private-marker/subgraphs/id/K1gHS5P5vZU3LApqchuuQxkmZGDDAUavkQUdGDV7Vxs")
+    assert.doesNotMatch(rt.stdout() + rt.stderr(), /test-only-private-marker|gateway\.thegraph/)
+  }
+})
+
+test("CLI history recovers from gateway failure and reports unavailable if Studio also fails", async () => {
+  for (const bothFail of [false, true]) {
+    const rt = fakeRuntime({ env: { GRAPH_API_KEY: "test-only-private-marker" }, ...(bothFail ? { subgraph: "down" as const } : {}) })
+    const code = await run(["rewards", "history", STAKER, "--json"], rt)
+    assert.equal(code, 0)
+    const result = JSON.parse(rt.stdout())
+    if (bothFail) {
+      assert.equal(result.periods, null)
+      assert.match(result.periodsReason, /gateway and Studio fallback both failed/)
+    } else {
+      assert.equal(result.periods.allMatch, true)
+    }
+    assert.doesNotMatch(rt.stdout() + rt.stderr(), /test-only-private-marker/)
+  }
+})
+
+
+test("period-query fallback reads Studio metadata and pins periods to Studio's own head", async () => {
+  const ctx = fakeContext()
+  const gateway = subgraphEndpoints({ graphApiKey: "synthetic-test-key" }).mainnet
+  const queries: { gateway: boolean; query: string }[] = []
+  const result = await rewardsHistory({
+    ...ctx,
+    subgraphUrl: gateway,
+    fetch: async (input, init) => {
+      const query = (JSON.parse(String(init?.body)) as { query: string }).query
+      const isGateway = String(input) === gateway
+      queries.push({ gateway: isGateway, query })
+      if (isGateway) {
+        if (query.includes("_meta")) return Response.json({ data: { _meta: { block: { number: Number(BLOCK + 100n), timestamp: null } } } })
+        return new Response("unavailable", { status: 503 })
+      }
+      if (!query.includes("_meta")) {
+        assert.ok(query.includes(`block: { number: ${BLOCK} }`))
+        assert.ok(!query.includes(String(BLOCK + 100n)))
+      }
+      return ctx.fetch(input, init)
+    },
+  }, STAKER)
+  assert.deepEqual(queries.map(({ gateway, query }) => [gateway, query.includes("_meta")]),
+    [[true, true], [true, false], [false, true], [false, false]])
+  assert.equal(result.periods?.subgraph.block, BLOCK)
+  assert.equal(result.periods?.allMatch, true)
 })
