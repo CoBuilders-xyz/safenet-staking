@@ -255,4 +255,7 @@ Failed Network queries retry Studio once. The process warns on stderr once per c
 
 ## Beta publishing
 
-Initial version: `0.1.0-beta.0`, dist-tag `beta`. CI uses npm Trusted Publishing (GitHub OIDC), not a permanent npm token. Package creation needs a one-time bootstrap first. See [NPM-RELEASE.md](https://github.com/CoBuilders-xyz/safenet-staking/blob/main/NPM-RELEASE.md) for the operator checklist.
+The in-repo version is `0.1.0-beta.1`, the first OIDC publish candidate after Augusto manually published `0.1.0-beta.0`.
+CI uses npm Trusted Publishing (GitHub OIDC), with dist-tag `beta` and no permanent npm token.
+Publishing beta.1 moves `beta`; `latest` stays at beta.0 until Augusto removes it from his authenticated session.
+See [NPM-RELEASE.md](https://github.com/CoBuilders-xyz/safenet-staking/blob/main/NPM-RELEASE.md) for the operator checklist.
