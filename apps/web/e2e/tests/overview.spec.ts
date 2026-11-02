@@ -149,10 +149,10 @@ test.describe("Network Overview", () => {
   })
 })
 
-test.describe("Dashboard route", () => {
-  test("the staking dashboard lives at /dashboard, one click from the overview", async ({ connectedPage: page }) => {
+test.describe("My stake route", () => {
+  test("My stake lives at /dashboard, one click from the overview", async ({ connectedPage: page }) => {
     await page.goto("/")
-    await page.getByRole("link", { name: "Open the staking dashboard" }).click()
+    await page.getByRole("link", { name: "Manage my stake" }).click()
     await expect(page).toHaveURL("/#/dashboard")
     await expect(page.getByRole("heading", { name: "Stake your SAFE" })).toBeVisible()
     await expect(page.getByText("Your Staked SAFE")).toBeVisible({ timeout: 10_000 })

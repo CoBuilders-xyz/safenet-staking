@@ -14,12 +14,14 @@
   "dashboard": {
     "action": "Aktion",
     "activeValidators": "Aktive Validatoren",
+    "browseValidators": "Validatoren ansehen",
     "claimFailed": "Beanspruchung fehlgeschlagen",
     "claimRewards": "Belohnungen beanspruchen",
     "claimYourAccumulatedSafeStakingRewards": "Beanspruchen Sie Ihre angesammelten SAFE-Staking-Belohnungen.",
     "claimableSafe": "Beanspruchbare SAFE",
     "claimedSafe": "{{amount}} SAFE beansprucht",
     "complianceNote": "Einige Belohnungen für <address>{{address}}</address> warten auf Compliance-Prüfungen. Kontaktieren Sie die Safe Ecosystem Foundation unter <email>legal@safefoundation.org</email>.",
+    "connectToSeeYourStakes": "Verbinden Sie Ihre Wallet, um Ihre Stakes, Belohnungen und Positionen zu sehen",
     "followTheProposalHere": "Vorschlag hier verfolgen",
     "goToRewards": "Zu den Belohnungen",
     "kycMayBeRequiredToClaimRewards": "Für die Beanspruchung kann KYC erforderlich sein.",
@@ -70,7 +72,7 @@
     "language": "Sprache",
     "lightMode": "Zum hellen Modus wechseln",
     "nav": {
-      "dashboard": "Dashboard",
+      "dashboard": "Mein Stake",
       "overview": "Übersicht",
       "rewards": "Belohnungen",
       "validators": "Validatoren",
@@ -220,7 +222,7 @@
       "withdrawnDetail": "Ausgeschieden: Teilnahme an Aegis unbestätigt."
     },
     "hero": {
-      "openDashboard": "Staking-Dashboard öffnen",
+      "openDashboard": "Meinen Stake verwalten",
       "title": "Netzwerkübersicht"
     },
     "reason": {

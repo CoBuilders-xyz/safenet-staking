@@ -14,12 +14,14 @@
   "dashboard": {
     "action": "Действие",
     "activeValidators": "Активные валидаторы",
+    "browseValidators": "Посмотреть валидаторов",
     "claimFailed": "Не удалось востребовать",
     "claimRewards": "Востребовать вознаграждения",
     "claimYourAccumulatedSafeStakingRewards": "Востребуйте накопленные вознаграждения за стейкинг SAFE.",
     "claimableSafe": "SAFE к получению",
     "claimedSafe": "Востребовано {{amount}} SAFE",
     "complianceNote": "Часть вознаграждений для <address>{{address}}</address> ожидает проверки соответствия требованиям. Свяжитесь с Safe Ecosystem Foundation: <email>legal@safefoundation.org</email>.",
+    "connectToSeeYourStakes": "Подключите кошелёк, чтобы увидеть свои стейки, награды и позиции",
     "followTheProposalHere": "Следите за предложением здесь",
     "goToRewards": "К вознаграждениям",
     "kycMayBeRequiredToClaimRewards": "Для получения вознаграждений может потребоваться KYC.",
@@ -70,7 +72,7 @@
     "language": "Язык",
     "lightMode": "Включить светлую тему",
     "nav": {
-      "dashboard": "Панель",
+      "dashboard": "Мой стейк",
       "overview": "Обзор",
       "rewards": "Вознаграждения",
       "validators": "Валидаторы",
@@ -230,7 +232,7 @@
       "withdrawnDetail": "Выбыл: участие в Aegis не подтверждено."
     },
     "hero": {
-      "openDashboard": "Открыть панель стейкинга",
+      "openDashboard": "Управлять моим стейком",
       "title": "Обзор сети"
     },
     "reason": {

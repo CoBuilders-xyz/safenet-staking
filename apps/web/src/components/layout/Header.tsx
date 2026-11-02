@@ -17,7 +17,7 @@ export function Header() {
   const { pathname } = useLocation()
   const navItems = [
     { label: t("header.nav.overview", "Overview"), path: "/" },
-    { label: t("header.nav.dashboard", "Dashboard"), path: "/dashboard" },
+    { label: t("header.nav.dashboard", "My stake"), path: "/dashboard" },
     { label: t("header.nav.validators", "Validators"), path: "/validators" },
     { label: t("header.nav.withdrawals", "Withdrawals"), path: "/withdrawals" },
     { label: t("header.nav.rewards", "Rewards"), path: "/rewards" },

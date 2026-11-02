@@ -11,7 +11,7 @@ speakers.** They use the terminology listed below. Until
 a native speaker reviews a language, treat its text as a draft. Corrections are welcome; see
 [Contributing a translation](#contributing-a-translation).
 
-The catalogues cover the shell, Overview, Dashboard, validator list and details, Rewards,
+The catalogues cover the shell, Overview, My stake, validator list and details, Rewards,
 Withdrawals, wallet controls, and the claim, approval, staking and withdrawal dialogs.
 The staking review, contextual term explanations, access restrictions and wrong-network notices
 also follow the selected language. Country names and waiting-period units use the browser's

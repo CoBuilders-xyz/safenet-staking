@@ -14,12 +14,14 @@
   "dashboard": {
     "action": "Action",
     "activeValidators": "Validateurs actifs",
+    "browseValidators": "Parcourir les validateurs",
     "claimFailed": "Échec de la réclamation",
     "claimRewards": "Réclamer les récompenses",
     "claimYourAccumulatedSafeStakingRewards": "Réclamez vos récompenses de staking SAFE accumulées.",
     "claimableSafe": "SAFE à réclamer",
     "claimedSafe": "{{amount}} SAFE réclamés",
     "complianceNote": "Certaines récompenses de <address>{{address}}</address> attendent des contrôles de conformité. Contactez la Safe Ecosystem Foundation à <email>legal@safefoundation.org</email>.",
+    "connectToSeeYourStakes": "Connectez votre portefeuille pour voir vos stakes, récompenses et positions",
     "followTheProposalHere": "Suivez la proposition ici",
     "goToRewards": "Voir les récompenses",
     "kycMayBeRequiredToClaimRewards": "Une vérification KYC peut être requise pour réclamer des récompenses.",
@@ -70,7 +72,7 @@
     "language": "Langue",
     "lightMode": "Passer en mode clair",
     "nav": {
-      "dashboard": "Tableau de bord",
+      "dashboard": "Mon stake",
       "overview": "Aperçu",
       "rewards": "Récompenses",
       "validators": "Validateurs",
@@ -225,7 +227,7 @@
       "withdrawnDetail": "Retiré : participation à Aegis non confirmée."
     },
     "hero": {
-      "openDashboard": "Ouvrir le tableau de bord de staking",
+      "openDashboard": "Gérer mon stake",
       "title": "Aperçu du réseau"
     },
     "reason": {

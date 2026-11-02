@@ -102,8 +102,9 @@ wrapped in `ErrorBoundary`:
 - `/` → `OverviewPage`: Network Overview, no wallet needed. Headline figures, stake distribution,
   rewards with the root check, the validator table, the last 30 days, and a freshness line per
   subgraph
-- `/dashboard` → `DashboardPage`: stats, claimable banners, quick actions, the staking section,
-  the stake distribution chart
+- `/dashboard` → `DashboardPage`, "My stake" in the navigation. With a wallet: stats, claimable
+  banners, quick actions, the staking section, the stake distribution chart. Without one: a connect
+  prompt and a link to Validators; the network figures are on the Overview
 - `/validators` → `ValidatorsPage`: validator cards with Delegate and Undelegate, sorted by total
   SAFE, participation or delegators, all or active only. `?delegate=<address>` opens the delegate
   dialog
