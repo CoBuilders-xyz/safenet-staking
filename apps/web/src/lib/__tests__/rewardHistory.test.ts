@@ -1,3 +1,4 @@
+import { readRewardPeriods } from "../../../../../packages/cli/src/lib/reward-periods"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { TEST_ACCOUNTS, MOCK_TX_HASH } from "@/__tests__/test-data"
 import { answerOperations, meta, mockRequest, STALE_AGE } from "@/__tests__/subgraph-mocks"
@@ -148,5 +149,84 @@ describe("bounded per-user reward history", () => {
     controller.abort()
     await expect(readRewardHistory("https://subgraph.test", address, chain, controller.signal)).rejects.toThrow()
     expect(chain.cumulativeClaimed).not.toHaveBeenCalled()
+  })
+})
+
+// Exercise the actual CLI/MCP library reader and web adapter against the same source data.
+// This catches wiring differences beyond the pure core regression suite.
+async function readCli(allPeriods = [...periods].reverse(), allClaims = claims) {
+  return readRewardPeriods({
+    client: {
+      getBlock: async () => ({ timestamp: BigInt(timestamp) }),
+      readContract: async ({ blockNumber }: { blockNumber: bigint }) => chain.cumulativeClaimed(blockNumber),
+    } as unknown as Parameters<typeof readRewardPeriods>[0]["client"],
+    fetch: async (_input, init) => {
+      const { query } = JSON.parse(String(init?.body))
+      return Response.json({ data: query.includes("_meta")
+        ? { _meta: { block: { number: head, timestamp } } }
+        : { network: { rewardPeriods: total }, rewardPeriods: allPeriods, rewardClaims: allClaims } })
+    },
+  }, address)
+}
+
+const projectCli = (result: Awaited<ReturnType<typeof readRewardPeriods>>) => result.periods.map((r) => ({
+  period: r.period, startBlock: r.setAt.block, endBlock: r.endBlock, timestamp: r.setAt.time.getTime() / 1000,
+  transaction: r.setAt.transaction, claims: r.claims, claimed: r.claimed,
+})).reverse()
+
+describe("CLI/MCP and web shared-data regression parity", () => {
+  it.each(["ordinary", "same-block reversed", "empty"])("attributes %s claims identically", async (kind) => {
+    if (kind === "same-block reversed") {
+      claims = [claim("b", 200, 20, 30), claim("a", 200, 10, 10)]
+      chain.cumulativeClaimed = vi.fn(async (block) => block < 200n ? 0n : 30n)
+    } else if (kind === "empty") {
+      claims = []
+      chain.cumulativeClaimed = vi.fn(async () => 0n)
+    }
+    serve()
+    const [cli, web] = await Promise.all([readCli(), read()])
+    expect(web.rows).toEqual(projectCli(cli))
+    expect(cli.allMatch).toBe(true)
+  })
+
+  it("matches the last twelve CLI periods after verifying the omitted history baseline", async () => {
+    total = 20
+    const allPeriods = Array.from({ length: total }, (_, i) => period(i + 1, (i + 1) * 10))
+    const allClaims = allPeriods.map((p) => claim(String(p.period), Number(p.blockNumber), p.period, p.period * (p.period + 1) / 2))
+    periods = allPeriods.slice(-12).reverse()
+    claims = allClaims.slice(-12)
+    chain.cumulativeClaimed = vi.fn(async (block) => {
+      const n = Math.min(total, Math.floor(Number(block) / 10))
+      return BigInt(n * (n + 1) / 2)
+    })
+    serve()
+    const [cli, web] = await Promise.all([readCli(allPeriods, allClaims), read()])
+    expect(web.rows).toEqual(projectCli(cli).slice(0, 12))
+    expect(web.rows.at(-1)!.period).toBe(9)
+    expect(web.rows.reduce((sum, r) => sum + r.claimed, 0n)).toBe(174n)
+    expect(cli.allMatch).toBe(true)
+  })
+
+  it("rejects missing prefixes in both adapters", async () => {
+    claims = [claims[1]!]
+    serve()
+    await expect(readCli()).rejects.toThrow("incomplete or inconsistent reward claims")
+    await expect(read()).rejects.toMatchObject({ reason: "incomplete" })
+  })
+
+  it("retains CLI mismatch evidence while the web suppresses unverified amounts", async () => {
+    claims = [claims[0]!]
+    serve()
+    const cli = await readCli()
+    expect(cli.allMatch).toBe(false)
+    expect(cli.periods[1]!.cumulativeAtEnd).toEqual({ subgraph: 10n, chain: 30n, match: false })
+    await expect(read()).rejects.toMatchObject({ reason: "incomplete" })
+  })
+
+  it("never treats a full page as a successful partial history", async () => {
+    claims = Array.from({ length: REWARD_HISTORY_CLAIM_LIMIT }, () => claims[0]!)
+    serve()
+    await expect(readCli()).rejects.toThrow("1000 or more rows")
+    await expect(read()).rejects.toMatchObject({ reason: "incomplete" })
   })
 })

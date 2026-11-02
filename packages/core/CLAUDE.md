@@ -67,6 +67,9 @@ because it will never log that programme's events again and a scan from the head
   layout under the contenthash is assumed to repeat the repository's `assets/rewards` until SEF
   confirms it, so a 404 from a gateway proves nothing. The gateway comment records how each
   gateway was checked, and why ipfs.io and dweb.link are not listed: both retired.
+- `src/reward-periods.ts` — browser-safe period boundaries, cumulative-prefix validation,
+  whole-block claim attribution and end-block comparisons shared by CLI/MCP and web (COB-661).
+  Callers keep transport, limits, freshness and mismatch presentation. No earnings are inferred.
 - `src/deployments.ts` — what the interface needs per chain, derived from `src/contracts.ts`.
 - `src/compliance.ts` — the gates a front end applies before it signs: the sanctions oracle on
   chain, always; a sanctions endpoint and a geo check, opt in. The geo lookups and the blocked
@@ -104,7 +107,8 @@ because it will never log that programme's events again and a scan from the head
    back. The exceptions are `src/parity/`, behind its own export: both subgraph packages need
    the same comparison, and it imports nothing from them; and `src/rewards-source.ts`, because
    the interface and the CLI must try SEF's reward sources in the same order. It reads the chain
-   and fetches only through what its caller passes in.
+   and fetches only through what its caller passes in. `src/reward-periods.ts` is also shared
+   business logic, explicitly required by COB-661: pure functions with no I/O or environment reads.
 
 The metrics oracle accepts `--beta-window --days 14` for the historical Beta window ending
 at the end of `BETA_END_DAY`. Its JSON records the programme and exact timestamp/block bounds.

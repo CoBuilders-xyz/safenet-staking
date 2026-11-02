@@ -205,3 +205,7 @@ Physical wallet acceptance and a rerun against the final integrated CLI remain r
 `.github/workflows/publish.yml` publishes the package on a tag `cli-v<version>`, after the packed
 tarball, installed outside the monorepo, runs `safenet --help` and `safenet status --json` against
 Mainnet. The root `CLAUDE.md` describes the workflow.
+
+Period boundaries, cumulative-prefix validation, whole-block attribution and end-block comparisons
+come from `packages/core/src/reward-periods.ts`, shared with the web (COB-661). The CLI keeps
+its all-period query limit, chain-log fallback, stale flag and explicit mismatch rows.

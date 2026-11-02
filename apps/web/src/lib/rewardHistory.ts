@@ -1,4 +1,5 @@
 import type { Address, Hash } from "viem"
+import { rewardPeriodWindows, attributeRewardClaims, compareRewardPeriodEnds, RewardPeriodDataError } from "@cobuilders/safenet-core"
 import { RewardHistoryClaimsDocument, RewardHistoryPeriodsDocument } from "@/graphql/mainnet/generated"
 import { assessFreshness, fetchSubgraph, type Freshness } from "@/lib/subgraph"
 
@@ -48,7 +49,7 @@ function checkFreshness(freshness: Freshness) {
  * Check every cumulative prefix and each window end against the archive chain. A missing
  * payment, truncated page, malformed boundary or mismatch produces no numeric history.
  */
-export async function readRewardHistory(
+async function readHistory(
   url: string, address: Address, chain: RewardHistoryChain, signal?: AbortSignal,
 ): Promise<RewardHistory> {
   const first = await fetchSubgraph(url, RewardHistoryPeriodsDocument, { limit: REWARD_HISTORY_PERIOD_LIMIT }, signal)
@@ -56,17 +57,8 @@ export async function readRewardHistory(
   const head = BigInt(first.freshness.block)
   const periods = [...first.data.rewardPeriods].reverse()
   const totalPeriods = first.data.network?.rewardPeriods
-  if (!Number.isSafeInteger(totalPeriods) || !totalPeriods || totalPeriods < 0
-    || periods.length !== Math.min(totalPeriods, REWARD_HISTORY_PERIOD_LIMIT)) incomplete()
-  for (let i = 0; i < periods.length; i++) {
-    const p = periods[i]!
-    const start = BigInt(p.blockNumber)
-    if (p.period !== totalPeriods! - periods.length + i + 1 || start <= 0n || start > head
-      || (i > 0 && start <= BigInt(periods[i - 1]!.blockNumber))
-      || !Number.isSafeInteger(Number(p.timestamp)) || Number(p.timestamp) < 0
-      || Number.isNaN(new Date(Number(p.timestamp) * 1000).getTime())) incomplete()
-  }
-  const from = BigInt(periods[0]!.blockNumber)
+  const windows = rewardPeriodWindows(periods, head, totalPeriods, REWARD_HISTORY_PERIOD_LIMIT)
+  const from = windows[0]!.startBlock
   const claims = await fetchSubgraph(url, RewardHistoryClaimsDocument, {
     account: address.toLowerCase(), from: from.toString(),
     block: { number: first.freshness.block }, limit: REWARD_HISTORY_CLAIM_LIMIT,
@@ -77,42 +69,33 @@ export async function readRewardHistory(
   if (claims.freshness.block !== first.freshness.block
     || (claims.freshness.blockTimestamp !== null && claims.freshness.blockTimestamp !== first.freshness.blockTimestamp)
     || claims.data.rewardClaims.length >= REWARD_HISTORY_CLAIM_LIMIT) incomplete()
-  const seen = new Set<string>()
-  const ordered = claims.data.rewardClaims.map((c) => {
-    if (seen.has(c.id) || c.account.toLowerCase() !== address.toLowerCase()) incomplete()
-    seen.add(c.id)
-    return { block: BigInt(c.blockNumber), amount: BigInt(c.amount), cumulative: BigInt(c.cumulativeAmount) }
-  }).sort((a, b) => a.block !== b.block ? (a.block < b.block ? -1 : 1)
-    : a.cumulative < b.cumulative ? -1 : a.cumulative > b.cumulative ? 1 : 0)
-
   signal?.throwIfAborted()
   const [baseline, root] = await Promise.all([chain.cumulativeClaimed(from - 1n), chain.merkleRoot(head)])
-  if (baseline < 0n || root.toLowerCase() !== periods.at(-1)!.root.toLowerCase()) incomplete()
-  let cumulative = baseline
-  for (const c of ordered) {
-    cumulative += c.amount
-    if (c.block < from || c.block > head || c.amount < 0n || c.cumulative !== cumulative) incomplete()
-  }
-  const rows = periods.map((p, i): RewardHistoryRow => {
-    const startBlock = BigInt(p.blockNumber)
-    const endBlock = i + 1 < periods.length ? BigInt(periods[i + 1]!.blockNumber) - 1n : head
-    const window = ordered.filter((c) => c.block >= startBlock && c.block <= endBlock)
-    return {
-      period: p.period, startBlock, endBlock, timestamp: Number(p.timestamp),
-      transaction: p.transactionHash as Hash, claims: window.length,
-      claimed: window.reduce((sum, c) => sum + c.amount, 0n),
-    }
-  })
+  if (root.toLowerCase() !== periods.at(-1)!.root.toLowerCase()) incomplete()
+  const attributed = attributeRewardClaims(windows, claims.data.rewardClaims, baseline, address)
+  const rows: RewardHistoryRow[] = attributed.map((r) => ({
+    period: r.distribution.period, startBlock: r.startBlock, endBlock: r.endBlock,
+    timestamp: Number(r.distribution.timestamp), transaction: r.distribution.transactionHash as Hash,
+    claims: r.claims, claimed: r.claimed,
+  }))
   // Four concurrent archive calls at most; the entire request has a caller-owned deadline.
   const ends: bigint[] = []
   for (let i = 0; i < rows.length; i += 4) {
     signal?.throwIfAborted()
     ends.push(...await Promise.all(rows.slice(i, i + 4).map((r) => chain.cumulativeClaimed(r.endBlock))))
   }
-  cumulative = baseline
-  for (let i = 0; i < rows.length; i++) {
-    cumulative += rows[i]!.claimed
-    if (cumulative !== ends[i]) incomplete()
-  }
+  if (compareRewardPeriodEnds(attributed, ends).some((comparison) => !comparison.match)) incomplete()
   return { rows: rows.reverse(), freshness: first.freshness, totalPeriods: totalPeriods! }
+}
+
+/** Map shared data validation failures to the web's explicit incomplete state. */
+export async function readRewardHistory(
+  url: string, address: Address, chain: RewardHistoryChain, signal?: AbortSignal,
+): Promise<RewardHistory> {
+  try {
+    return await readHistory(url, address, chain, signal)
+  } catch (error) {
+    if (error instanceof RewardPeriodDataError) incomplete()
+    throw error
+  }
 }

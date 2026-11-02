@@ -400,3 +400,14 @@ a custom Safe App and open it from the Safe; the Safe connector connects by itse
 
 MIT, see [LICENSE](LICENSE). The app derives from Safe Foundation's safenet-staking-ui, also
 MIT; its copyright notice stays in that file.
+
+### Shared reward history and local preview
+
+COB-661: web and CLI/MCP use `packages/core/src/reward-periods.ts` for period boundaries,
+claim-prefix validation, whole-block attribution and cumulative comparisons. The web keeps its
+12-distribution limit, archive baseline, root check and explicit failure states. These rows show
+claimed payments. Per-period earnings and exact same-block event ordering remain unknown.
+
+After `pnpm build` at the repository root, run `box-preview start .` there to serve the built app
+on Jarvis through the tailnet. The committed adapter binds only to loopback and expires through
+fleet preview management. It uses the build's real read endpoints; it does not inject a wallet or mocks.

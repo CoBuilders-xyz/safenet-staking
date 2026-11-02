@@ -224,7 +224,8 @@ SEF's `latest.json` carries exactly `epoch`, `merkleRoot`, `rewardsUntil`, `toke
 `useRewards` disables Claim when the proof's root differs from the MerkleDrop's root.
 
 The Rewards page also shows per-account claim history through `useRewardHistory` and
-`src/lib/rewardHistory.ts`. It reads the latest 12 distributions and at most 999 claims in
+`src/lib/rewardHistory.ts`. Attribution and data validation use the same browser-safe
+`packages/core/src/reward-periods.ts` functions as CLI/MCP (COB-661). It reads the latest 12 distributions and at most 999 claims in
 their whole-block windows. A full 1,000-row response is incomplete. The claims query uses the
 first response's indexed block. Archive reads check the cumulative baseline before the window,
 every distribution's end, and the current root. Missing claims, inconsistent boundaries or
