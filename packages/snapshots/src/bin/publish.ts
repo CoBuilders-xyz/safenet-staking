@@ -113,9 +113,12 @@ run(SCRIPT, async () => {
   if (canonicalDir === canonicalIndexDir || canonicalDir.startsWith(`${canonicalIndexDir}${sep}`)) {
     fail(SCRIPT, "--dir must not be inside <out>/index. Nothing was pinned")
   }
+  const canonicalOut = canonicalPath(out)
+  if (canonicalOut === canonicalDir || canonicalOut.startsWith(`${canonicalDir}${sep}`)) {
+    fail(SCRIPT, "--out must not be --dir or inside it. Nothing was pinned")
+  }
   if (index) {
     const canonicalIndex = canonicalPath(index)
-    const canonicalOut = canonicalPath(out)
     if (canonicalIndex === canonicalOut || canonicalIndex === canonicalIndexDir || canonicalIndex.startsWith(`${canonicalIndexDir}${sep}`)) {
       fail(SCRIPT, "--index must not be --out or inside <out>/index. Nothing was pinned")
     }

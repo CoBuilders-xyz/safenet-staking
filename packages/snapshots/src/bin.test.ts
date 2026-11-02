@@ -78,6 +78,30 @@ function invoke(script: "publish" | "verify", args: string[], settings: Record<s
 
 describe("snapshot CLI failure cleanup", () => {
   for (const alias of [false, true]) {
+    for (const nested of [false, true]) {
+      it(`rejects output ${nested ? "inside" : "equal to"} the snapshot${alias ? " through a symlink alias" : ""}`, () => {
+        const scratch = mkdtempSync(join(root, "output-overlap-"))
+        const snapshot = join(scratch, basename(day))
+        cpSync(day, snapshot, { recursive: true })
+        const linked = join(scratch, "alias")
+        if (alias) symlinkSync(snapshot, linked, "junction")
+        const output = join(alias ? linked : snapshot, nested ? "publication" : ".")
+        const before = Object.fromEntries(listFiles(snapshot).map(path => [path, readFileSync(join(snapshot, path), "utf8")]))
+        const entries = readdirSync(snapshot, { recursive: true })
+        const { child, log } = invoke("publish", ["--dir", snapshot, "--out", output], {
+          PINATA_JWT: "fixture-only-not-a-token", PINATA_GATEWAY: "fixture.invalid", GATEWAY_TIMEOUT_SECONDS: "0", SNAPSHOT_DENY_FETCH: "1",
+        })
+        assert.equal(child.status, 1)
+        assert.match(child.stderr, /--out must not be --dir or inside it\. Nothing was pinned/)
+        assert.equal(existsSync(log), false)
+        assert.doesNotMatch(child.stdout, /files, .* blocks, CID|pinned/)
+        assert.deepEqual(readdirSync(snapshot, { recursive: true }), entries)
+        assert.deepEqual(Object.fromEntries(listFiles(snapshot).map(path => [path, readFileSync(join(snapshot, path), "utf8")])), before)
+      })
+    }
+  }
+
+  for (const alias of [false, true]) {
     it(`rejects a snapshot inside the output index${alias ? " through a symlinked ancestor" : ""}`, () => {
       const scratch = mkdtempSync(join(root, "snapshot-overlap-"))
       const output = join(scratch, "output")
