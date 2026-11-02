@@ -1,0 +1,320 @@
+{
+  "consensuses": [
+    {
+      "id": "1",
+      "attestationCeremonies": "69535",
+      "nonAttestationCeremonies": "198",
+      "attestations": "69535",
+      "proposals": "74189",
+      "latencySamples": "69531",
+      "epochRollovers": 198,
+      "currentEpoch": "33761",
+      "validatorCount": 6,
+      "openCeremonies": 688
+    }
+  ],
+  "signingValidators": [
+    {
+      "id": "0x00000000000000000000000000000000000000ed",
+      "address": "0x00000000000000000000000000000000000000ed",
+      "staker": null,
+      "attended": "67877",
+      "firstSeenBlock": "48330809",
+      "lastSeenBlock": "48615463"
+    },
+    {
+      "id": "0x00000000000000000000000000000000000000ee",
+      "address": "0x00000000000000000000000000000000000000ee",
+      "staker": null,
+      "attended": "68831",
+      "firstSeenBlock": "48330767",
+      "lastSeenBlock": "48615463"
+    }
+  ],
+  "consensusDays": [
+    {
+      "id": "1789776000",
+      "date": 1789776000,
+      "attestations": "1542",
+      "attestationCeremonies": "1542",
+      "latencyBuckets": [
+        "0",
+        "0",
+        "13",
+        "64",
+        "785",
+        "334",
+        "175",
+        "28",
+        "6",
+        "0",
+        "1",
+        "7",
+        "49",
+        "45",
+        "22",
+        "6",
+        "5",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "latencyOverflow": "0",
+      "latencySamples": "1540"
+    },
+    {
+      "id": "1789862400",
+      "date": 1789862400,
+      "attestations": "3405",
+      "attestationCeremonies": "3405",
+      "latencyBuckets": [
+        "0",
+        "0",
+        "20",
+        "97",
+        "1753",
+        "856",
+        "470",
+        "116",
+        "28",
+        "12",
+        "2",
+        "3",
+        "10",
+        "3",
+        "13",
+        "0",
+        "13",
+        "4",
+        "0",
+        "3",
+        "1",
+        "1",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "latencyOverflow": "0",
+      "latencySamples": "3405"
+    }
+  ],
+  "validatorDays": [
+    {
+      "id": "0x00000000000000000000000000000000000000ed-1789776000",
+      "validator": {
+        "id": "0x00000000000000000000000000000000000000ed"
+      },
+      "date": 1789776000,
+      "attended": "1408"
+    },
+    {
+      "id": "0x00000000000000000000000000000000000000ed-1789862400",
+      "validator": {
+        "id": "0x00000000000000000000000000000000000000ed"
+      },
+      "date": 1789862400,
+      "attended": "3370"
+    },
+    {
+      "id": "0x00000000000000000000000000000000000000ed-1789948800",
+      "validator": {
+        "id": "0x00000000000000000000000000000000000000ed"
+      },
+      "date": 1789948800,
+      "attended": "5161"
+    },
+    {
+      "id": "0x00000000000000000000000000000000000000ed-1790035200",
+      "validator": {
+        "id": "0x00000000000000000000000000000000000000ed"
+      },
+      "date": 1790035200,
+      "attended": "5207"
+    }
+  ],
+  "consensusHours": [
+    {
+      "id": "1789822800",
+      "hour": 1789822800,
+      "attestationCeremonies": 113,
+      "attestationCeremoniesOnTheHour": 0
+    },
+    {
+      "id": "1789826400",
+      "hour": 1789826400,
+      "attestationCeremonies": 196,
+      "attestationCeremoniesOnTheHour": 0
+    },
+    {
+      "id": "1789830000",
+      "hour": 1789830000,
+      "attestationCeremonies": 176,
+      "attestationCeremoniesOnTheHour": 0
+    }
+  ],
+  "validatorHours": [
+    {
+      "id": "0x00000000000000000000000000000000000000ed-1789822800",
+      "validator": {
+        "id": "0x00000000000000000000000000000000000000ed"
+      },
+      "hour": 1789822800,
+      "ceremonies": 104,
+      "attended": 104,
+      "missed": 0,
+      "ceremoniesOnTheHour": 0,
+      "attendedOnTheHour": 0,
+      "missedOnTheHour": 0
+    },
+    {
+      "id": "0x00000000000000000000000000000000000000ed-1789826400",
+      "validator": {
+        "id": "0x00000000000000000000000000000000000000ed"
+      },
+      "hour": 1789826400,
+      "ceremonies": 196,
+      "attended": 196,
+      "missed": 0,
+      "ceremoniesOnTheHour": 0,
+      "attendedOnTheHour": 0,
+      "missedOnTheHour": 0
+    },
+    {
+      "id": "0x00000000000000000000000000000000000000ed-1789830000",
+      "validator": {
+        "id": "0x00000000000000000000000000000000000000ed"
+      },
+      "hour": 1789830000,
+      "ceremonies": 176,
+      "attended": 128,
+      "missed": 48,
+      "ceremoniesOnTheHour": 0,
+      "attendedOnTheHour": 0,
+      "missedOnTheHour": 0
+    },
+    {
+      "id": "0x00000000000000000000000000000000000000ed-1789833600",
+      "validator": {
+        "id": "0x00000000000000000000000000000000000000ed"
+      },
+      "hour": 1789833600,
+      "ceremonies": 144,
+      "attended": 144,
+      "missed": 0,
+      "ceremoniesOnTheHour": 0,
+      "attendedOnTheHour": 0,
+      "missedOnTheHour": 0
+    },
+    {
+      "id": "0x00000000000000000000000000000000000000ed-1789837200",
+      "validator": {
+        "id": "0x00000000000000000000000000000000000000ed"
+      },
+      "hour": 1789837200,
+      "ceremonies": 143,
+      "attended": 143,
+      "missed": 0,
+      "ceremoniesOnTheHour": 1,
+      "attendedOnTheHour": 1,
+      "missedOnTheHour": 0
+    },
+    {
+      "id": "0x00000000000000000000000000000000000000ed-1789840800",
+      "validator": {
+        "id": "0x00000000000000000000000000000000000000ed"
+      },
+      "hour": 1789840800,
+      "ceremonies": 162,
+      "attended": 112,
+      "missed": 50,
+      "ceremoniesOnTheHour": 0,
+      "attendedOnTheHour": 0,
+      "missedOnTheHour": 0
+    }
+  ]
+}

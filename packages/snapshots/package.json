@@ -1,0 +1,36 @@
+{
+  "name": "@cobuilders/safenet-snapshots",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "The daily snapshot of the Safenet validator dataset, packed into a CAR, pinned to IPFS and indexed by date.",
+  "exports": {
+    "./ipfs": "./src/ipfs/index.ts"
+  },
+  "scripts": {
+    "bootstrap": "echo '@cobuilders/safenet-snapshots: nothing to prepare'",
+    "dev": "tsc --noEmit --watch",
+    "build": "tsc --noEmit",
+    "test": "NODE_OPTIONS=--conditions=source node ../../tools/run-node-tests.mjs src",
+    "check": "pnpm lint && tsc --noEmit",
+    "lint": "eslint .",
+    "snapshot:build": "node --conditions=source --env-file-if-exists=../../.env.local --import tsx src/bin/build.ts",
+    "snapshot:publish": "node --conditions=source --env-file-if-exists=../../.env.local --import tsx src/bin/publish.ts",
+    "snapshot:verify": "node --conditions=source --import tsx src/bin/verify.ts"
+  },
+  "dependencies": {
+    "@cobuilders/safenet-cli": "workspace:*",
+    "@cobuilders/safenet-core": "workspace:*",
+    "@ipld/unixfs": "3.0.0",
+    "ipfs-car": "3.1.0",
+    "multiformats": "13.4.2",
+    "pinata": "2.5.5",
+    "viem": "2.46.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.2",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

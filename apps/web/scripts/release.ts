@@ -13,6 +13,7 @@
  *   3b. scripts/check-budget.ts: the bundle within performance-budget.json, or the release fails.
  *   4. Pack dist/ into release/app.car and write the root CID to release/CID.
  *
+ * The packing is packDirectory in packages/snapshots, which the daily snapshots also use. Its
  * CID settings are ipfs-car 3.1.0's defaults, which are also the web3.storage defaults:
  * CIDv1, raw leaves, 1 MiB fixed-size chunks, balanced layout 1024 links wide, UnixFS
  * directories sharded only above 1000 entries, no mtime and no mode. The CAR is what gets
@@ -22,15 +23,10 @@
  * Usage: pnpm --filter @cobuilders/safenet-web release:build
  */
 import { execFileSync } from "node:child_process"
-import { createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
-import { join, relative, resolve, sep } from "node:path"
-import { Readable } from "node:stream"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { join, resolve } from "node:path"
 import { parseEnv } from "node:util"
-import * as UnixFS from "@ipld/unixfs"
-import { withMaxChunkSize } from "@ipld/unixfs/file/chunker/fixed"
-import { withWidth } from "@ipld/unixfs/file/layout/balanced"
-import { CAREncoderStream, createDirectoryEncoderStream, type Block, type FileLike } from "ipfs-car"
-import * as raw from "multiformats/codecs/raw"
+import { packDirectory, PackError, type Packed } from "@cobuilders/safenet-snapshots/ipfs"
 import { build } from "vite"
 
 const APP = resolve(import.meta.dirname, "..")
@@ -85,51 +81,18 @@ try {
 }
 
 // --- 4. CAR and CID ---
-function listFiles(dir: string): string[] {
-  return readdirSync(dir, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => relative(DIST, join(entry.parentPath, entry.name)).split(sep).join("/"))
+let packed: Packed
+try {
+  packed = await packDirectory(DIST)
+} catch (err) {
+  // A dot-file, which ipfs-car's CLI skips by default: refuse it rather than ship a DAG it would not rebuild.
+  if (err instanceof PackError) fail(`dist/ holds ${err.message}`)
+  throw err
 }
 
-// Byte order, not locale order, so every machine walks the files the same way.
-const paths = listFiles(DIST).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
-// ipfs-car's CLI skips dot-files by default. Refuse them rather than ship a DAG it would not rebuild.
-const hidden = paths.filter((p) => p.split("/").some((part) => part.startsWith(".")))
-if (hidden.length) fail(`dist/ holds dot-files, which the CID check would not cover: ${hidden.join(", ")}`)
-
-const files: FileLike[] = paths.map((name) => ({
-  name,
-  stream: () => Readable.toWeb(createReadStream(join(DIST, name))) as ReadableStream,
-}))
-
-// Collect the blocks first: the root is the last block, and the CAR header names the root.
-const blocks: Block[] = []
-// ipfs-car 3.1.0's defaults, written out so an ipfs-car upgrade cannot change the CID silently.
-const settings = UnixFS.configure({
-  fileChunkEncoder: raw,
-  smallFileEncoder: raw,
-  chunker: withMaxChunkSize(1024 * 1024),
-  fileLayout: withWidth(1024),
-})
-await createDirectoryEncoderStream(files, settings).pipeTo(
-  new WritableStream<Block>({ write: (block) => void blocks.push(block) }),
-)
-const root = blocks.at(-1)?.cid
-if (!root) fail("packing dist/ produced no block")
-
-const chunks: Uint8Array[] = []
-await new ReadableStream<Block>({
-  start(controller) {
-    for (const block of blocks) controller.enqueue(block)
-    controller.close()
-  },
-})
-  .pipeThrough(new CAREncoderStream([root]))
-  .pipeTo(new WritableStream<Uint8Array>({ write: (chunk) => void chunks.push(chunk) }))
-
 mkdirSync(RELEASE, { recursive: true })
-writeFileSync(join(RELEASE, "app.car"), Buffer.concat(chunks))
-writeFileSync(join(RELEASE, "CID"), `${root.toString()}\n`)
+writeFileSync(join(RELEASE, "app.car"), packed.car)
+writeFileSync(join(RELEASE, "CID"), `${packed.cid}\n`)
 
-console.log(`release: ${paths.length} files, ${blocks.length} blocks`)
-console.log(`release: CID ${root.toString()}`)
+console.log(`release: ${packed.files.length} files, ${packed.blocks} blocks`)
+console.log(`release: CID ${packed.cid}`)

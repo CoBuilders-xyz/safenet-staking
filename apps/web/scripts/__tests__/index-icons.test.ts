@@ -28,4 +28,12 @@ describe("the icons the page and the manifest name", () => {
   it.each(manifest.icons)("manifest icon $src is a file in public/", ({ src }) => {
     expect(existsSync(join(app, "public", src))).toBe(true)
   })
+
+  it.each(manifest.icons)("manifest icon $src remains inside an IPFS gateway path", ({ src }) => {
+    const manifestUrl = "https://gateway.invalid/ipfs/example-cid/manifest.json"
+    const resolved = new URL(src, manifestUrl)
+    expect(resolved.origin).toBe("https://gateway.invalid")
+    expect(resolved.pathname).toBe(`/ipfs/example-cid/${src}`)
+    expect(resolved.pathname.startsWith("/ipfs/example-cid/")).toBe(true)
+  })
 })

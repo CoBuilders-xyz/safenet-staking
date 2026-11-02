@@ -171,6 +171,11 @@ export const SEF_DATA = {
   validatorInfoCommits: `${SEF_API}/commits?path=assets/validator-info.json&per_page=1`,
   /** The last commit that wrote network-info.json. The same cron writes it, in the same commit. */
   networkInfoCommits: `${SEF_API}/commits?path=assets/network-info.json&per_page=1`,
+  /**
+   * The last commit that wrote rewards/latest.json, through a fortnightly pull request rather
+   * than the cron. The daily snapshot reads the file at that commit.
+   */
+  rewardsLatestCommits: `${SEF_API}/commits?path=assets/rewards/latest.json&per_page=1`,
   /** A file under `assets/` at one commit, so the rates and their window come from one write. */
   assetsAtCommit: (sha: string) => `${SEF_RAW}/${sha}/assets`,
   /** Their cron runs every 3 hours. Three missed runs is our staleness threshold. */

@@ -29,6 +29,8 @@ availability workflow opens an issue labelled `ci-red`, or comments on the open 
 - [`packages/subgraph-mainnet`](packages/subgraph-mainnet): staking, withdrawals and rewards on
   Ethereum Mainnet.
 - [`packages/subgraph-gnosis`](packages/subgraph-gnosis): consensus and signing on Gnosis Chain.
+- [`packages/snapshots`](packages/snapshots): the daily snapshot of the full validator dataset on
+  IPFS, indexed by date, and the IPFS path the release shares with it.
 - [`tools`](tools): repository scripts: the edit hook, the task guard, the browser-safety check,
   the metrics report, the Studio deploy, and the runner for their tests.
 
@@ -127,6 +129,14 @@ it checks no gateway and says so in its summary.
 
 The record names no ENS name. The interface's ENS name is recorded here only once its
 contenthash points at a recorded CID on chain.
+
+## Daily snapshots
+
+Each day, `.github/workflows/snapshots.yml` pins a snapshot of the full validator dataset to IPFS:
+state, history and events, every figure read at one Mainnet block, one Gnosis block and SEF's
+latest commits. The index of CIDs by date is `index.json` on the orphan branch `snapshots`.
+Anyone can re-derive a snapshot's CID from its files with `pnpm snapshot:verify <CID>`.
+[`packages/snapshots/README.md`](packages/snapshots/README.md) has the schema and the caveats.
 
 ## License
 

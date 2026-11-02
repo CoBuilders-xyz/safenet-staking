@@ -1,0 +1,247 @@
+name: Snapshots
+
+# Once a day, an immutable snapshot of the full validator dataset on IPFS: every figure read at one
+# Mainnet block, one Gnosis block and SEF's latest commits, packed into a CAR, pinned to Pinata
+# through the release's path, and added to a date index that is pinned too. packages/snapshots
+# has the schema and how to verify a snapshot.
+#
+# The index lives on the orphan branch `snapshots`, so main's history stays clean. Only a run on
+# main writes it. Pull requests run checks and fixture tests without publication credentials.
+# Scheduled runs and manual dispatches on main then build, pin, verify and commit the live index.
+
+on:
+  schedule:
+    # 00:37 UTC: just after the day starts, after SEF's 00:00 write has had time to commit, and
+    # away from the top of the hour, when scheduled runs queue longest.
+    - cron: "37 0 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - packages/snapshots/**
+      - .github/workflows/snapshots.yml
+
+concurrency:
+  group: snapshots-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+  INDEX_BRANCH: snapshots
+
+jobs:
+  snapshot:
+    name: snapshot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Check snapshot code
+        run: pnpm --filter @cobuilders/safenet-snapshots check
+      - name: Test snapshots with local fixtures
+        run: pnpm --filter @cobuilders/safenet-snapshots test
+
+  publish:
+    name: publish
+    needs: snapshot
+    # A PR never starts this runner. Only the exact main commit of a trusted event gets secrets.
+    if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    outputs:
+      status: ${{ steps.publish.outputs.status }}
+      day: ${{ steps.build.outputs.day }}
+      cid: ${{ steps.publish.outputs.cid }}
+      index_cid: ${{ steps.publish.outputs.index_cid }}
+    steps:
+      # Pin actions to full SHA: mutable tags can be moved to malicious code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          # No dependency cache: a cache written by another workflow could feed the code that
+          # writes what gets pinned. A fresh install from the lockfile costs a minute.
+          package-manager-cache: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      # The index and the CID it was pinned under, from the index branch. A branch that does not
+      # exist yet is the first run; any other answer than 200 or 404 fails the run, so an outage
+      # cannot start a new index over an existing one.
+      - name: Read the current index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/index-current"
+          mkdir -p "$dir"
+          api="https://api.github.com/repos/$GITHUB_REPOSITORY"
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" "$api/branches/$INDEX_BRANCH")
+          case "$code" in
+            200)
+              for f in index.json INDEX_CID; do
+                curl -sSf -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw" \
+                  "$api/contents/$f?ref=$INDEX_BRANCH" -o "$dir/$f"
+              done
+              echo "Read the index on $INDEX_BRANCH: $(cat "$dir/INDEX_CID")"
+              ;;
+            404) echo "$INDEX_BRANCH does not exist yet: this run starts the index." ;;
+            *) echo "::error title=Index unreadable::The GitHub API answered HTTP $code for $INDEX_BRANCH."; exit 1 ;;
+          esac
+      # Fails with one sentence when a figure cannot be read or two sources disagree. Then no
+      # directory is written, and nothing after this step runs: a partial day is never pinned.
+      - name: Build the day
+        id: build
+        env:
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm --filter @cobuilders/safenet-snapshots snapshot:build --out "$RUNNER_TEMP/snapshot"
+      # Pins the day and the new index, and checks the dedicated gateway and both public gateways
+      # in packages/core serve each. Writes both CIDs to the job summary.
+      - name: Pin the day and the index
+        id: publish
+        env:
+          PINATA_JWT: ${{ secrets.PINATA_JWT }}
+          PINATA_GATEWAY: ${{ secrets.PINATA_GATEWAY }}
+          DAY_DIR: ${{ steps.build.outputs.dir }}
+        run: |
+          pnpm --filter @cobuilders/safenet-snapshots snapshot:publish \
+            --dir "$DAY_DIR" --out "$RUNNER_TEMP/publish" --index "$RUNNER_TEMP/index-current"
+      # The audit anyone can run: fetch every file through a public gateway, pack it here, and
+      # compare with the CID. No secret reaches this step.
+      - name: Verify the day and the index through a public gateway
+        if: steps.publish.outputs.status != 'already published'
+        env:
+          CID: ${{ steps.publish.outputs.cid }}
+          INDEX_CID: ${{ steps.publish.outputs.index_cid }}
+        run: |
+          set -euo pipefail
+          pnpm --silent --filter @cobuilders/safenet-snapshots snapshot:verify "$CID" | tee "$RUNNER_TEMP/verify.txt"
+          pnpm --silent --filter @cobuilders/safenet-snapshots snapshot:verify "$INDEX_CID" | tee -a "$RUNNER_TEMP/verify.txt"
+          {
+            echo "### Verification through a public gateway"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/verify.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the day and the index
+        if: steps.publish.outputs.status != 'already published'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: snapshot-${{ steps.build.outputs.day }}-${{ steps.publish.outputs.cid }}
+          path: |
+            ${{ runner.temp }}/snapshot/${{ steps.build.outputs.day }}
+            ${{ runner.temp }}/publish
+          if-no-files-found: error
+          retention-days: 90
+
+  index:
+    name: index
+    needs: publish
+    if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && (needs.publish.outputs.status == 'added' || needs.publish.outputs.status == 'replaced') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # The only job that can write, and it runs no code from the repository: it downloads the
+    # index the snapshot job pinned and commits it with git.
+    permissions:
+      contents: write
+    steps:
+      - name: Download the index
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: snapshot-${{ needs.publish.outputs.day }}-${{ needs.publish.outputs.cid }}
+          path: ${{ runner.temp }}/artifact
+      - name: Commit the index to the index branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DAY: ${{ needs.publish.outputs.day }}
+          CID: ${{ needs.publish.outputs.cid }}
+          INDEX_CID: ${{ needs.publish.outputs.index_cid }}
+        run: |
+          set -euo pipefail
+          new="$(find "$RUNNER_TEMP/artifact" -path '*/publish/index/index.json' | head -1)"
+          [ -n "$new" ] || { echo "::error::The artifact holds no index.json."; exit 1; }
+          pinned="$(tr -d '\n' < "$(dirname "$(dirname "$new")")/INDEX_CID")"
+          [ "$pinned" = "$INDEX_CID" ] || { echo "::error::The artifact's INDEX_CID differs from the job output."; exit 1; }
+
+          work="$RUNNER_TEMP/index-branch"
+          git init -q "$work"
+          cd "$work"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config http.https://github.com/.extraheader "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+
+          # Exit 2 is "no such branch"; any other failure is an outage and stops the run.
+          set +e
+          git ls-remote --exit-code --heads origin "$INDEX_BRANCH" > /dev/null
+          found=$?
+          set -e
+          if [ "$found" = 0 ]; then
+            git fetch -q --depth 1 origin "$INDEX_BRANCH"
+            git checkout -q -b "$INDEX_BRANCH" FETCH_HEAD
+            current="$(tr -d '\n' < INDEX_CID)"
+          elif [ "$found" = 2 ]; then
+            git checkout -q --orphan "$INDEX_BRANCH"
+            current=null
+          else
+            echo "::error::Could not list the branches of the repository."
+            exit 1
+          fi
+
+          # The new index must extend the one on the branch now. Otherwise the branch moved since
+          # the snapshot job read it, and committing would drop a day.
+          previous="$(jq -r '.previous // "null"' "$new")"
+          if [ "$previous" != "$current" ]; then
+            echo "::error title=Index moved::The new index extends $previous, but $INDEX_BRANCH holds $current. Run again."
+            exit 1
+          fi
+
+          cp "$new" index.json
+          printf '%s\n' "$INDEX_CID" > INDEX_CID
+          {
+            echo "# Safenet daily snapshots: the index"
+            echo
+            echo "\`index.json\` maps each UTC day to the CID of that day's snapshot of the Safenet validator"
+            echo "dataset. \`INDEX_CID\` is the CID this \`index.json\` is pinned under. Each index names the"
+            echo "CID of the one before it in \`previous\`, so the pinned versions form a chain."
+            echo
+            echo "The snapshots workflow writes this branch. The schema, and how to verify a snapshot"
+            echo "without our infrastructure, are in \`packages/snapshots/README.md\` on \`main\`."
+          } > README.md
+          git add index.json INDEX_CID README.md
+          git commit -q -m "Snapshot $DAY: $CID" -m "Index $INDEX_CID"
+          git push -q origin "HEAD:refs/heads/$INDEX_BRANCH"
+          {
+            echo "### Index committed to \`$INDEX_BRANCH\`"
+            echo
+            echo "- $DAY: \`$CID\`"
+            echo "- Index CID: \`$INDEX_CID\`"
+            echo "- Commit: \`$(git rev-parse HEAD)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  page:
+    name: page
+    needs: [snapshot, publish, index]
+    if: ${{ failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/page-on-red.yml
+    with:
+      needs: ${{ toJSON(needs) }}

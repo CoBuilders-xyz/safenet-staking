@@ -1,0 +1,16 @@
+[
+	{
+		"address": "0x00000000000000000000000000000000000000a0",
+		"commission": 0.05,
+		"is_active": false,
+		"label": "RockawayX",
+		"participation_rate_14d": 0.11181434599156118
+	},
+	{
+		"address": "0x00000000000000000000000000000000000000a1",
+		"commission": 0.05,
+		"is_active": false,
+		"label": "Blockchain Capital",
+		"participation_rate_14d": 0
+	}
+]

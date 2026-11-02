@@ -77,3 +77,16 @@ public values; a value there ships to every visitor.
    per worktree. If you changed the script, check that neither reaches Vite.
 6. Compare the files: `ls -lR apps/web/dist` on both sides, then `diff` the first file that
    differs. A difference there is a reproducibility bug. Please open an issue with it.
+
+## Verify a daily snapshot
+
+The daily snapshots of the validator dataset are packed with the same settings. Their CIDs are in
+`index.json` on the branch `snapshots`. To re-derive one from its files through any gateway:
+
+```sh
+pnpm snapshot:verify <CID>
+```
+
+Or download the directory, then pack it with the `ipfs-car` command line, which must print the
+same CID: `npx ipfs-car@3.1.0 pack <directory> --output /tmp/check.car`.
+[`packages/snapshots/README.md`](packages/snapshots/README.md) has the details.

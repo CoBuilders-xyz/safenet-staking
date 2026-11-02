@@ -66,6 +66,7 @@ test("every SEF URL is built on the one repository name", () => {
     SEF_DATA.rewardsProofBase,
     SEF_DATA.validatorInfoCommits,
     SEF_DATA.networkInfoCommits,
+    SEF_DATA.rewardsLatestCommits,
     SEF_DATA.assetsAtCommit("abc1234"),
   ]
   for (const url of urls) assert.ok(url.includes(`/${SEF_DATA_REPO}/`), url)

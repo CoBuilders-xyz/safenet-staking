@@ -23,6 +23,8 @@
     "test:fork": "turbo run test:fork",
     "test:parity": "turbo run test:parity --continue",
     "check:browser": "node tools/check-browser-safety.mjs",
+    "snapshot:build": "node tools/require-task.mjs snapshot:build \"packages/snapshots\" && pnpm --filter @cobuilders/safenet-snapshots snapshot:build",
+    "snapshot:verify": "node tools/require-task.mjs snapshot:verify \"packages/snapshots\" && pnpm --silent --filter @cobuilders/safenet-snapshots snapshot:verify",
     "metrics": "pnpm --filter @cobuilders/safenet-core metrics",
     "test:smoke": "pnpm --filter @cobuilders/safenet-cli --filter @cobuilders/safenet-mcp test:smoke",
     "test:smoke:web": "node tools/require-task.mjs test:smoke:web \"apps/web\" && turbo run test:smoke:web",

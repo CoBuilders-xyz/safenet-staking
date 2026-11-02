@@ -4,7 +4,8 @@
  *
  * Run `pnpm --filter @cobuilders/safenet-web release:build` first. This script uploads the
  * CAR as a CAR, so Pinata stores the DAG that build produced and keeps its root CID. It fails
- * if Pinata reports any other CID.
+ * if Pinata reports any other CID. The upload and the gateway checks are the ones the daily
+ * snapshots use, from `@cobuilders/safenet-snapshots/ipfs`.
  *
  * Then it checks the dedicated Pinata gateway and each public gateway in IPFS_GATEWAYS from
  * packages/core. On each it waits for `/ipfs/<cid>/index.html` to answer 200, then fetches one
@@ -42,9 +43,9 @@ import { execFileSync } from "node:child_process"
 import { appendFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative, resolve, sep } from "node:path"
-import { IPFS_GATEWAYS } from "@cobuilders/safenet-core"
-import { PinataSDK } from "pinata"
-import { gatewayHost, gatewayUrl, probeAsset, servesRelease } from "./release-gateways"
+import {
+  checkGateways, DEDICATED_GATEWAY_LABEL, gatewaysToCheck, gatewayUrl, pinataCredentials, pinCar, probeAsset,
+} from "@cobuilders/safenet-snapshots/ipfs"
 
 const RELEASE = resolve(import.meta.dirname, "../release")
 
@@ -54,28 +55,13 @@ function fail(message: string): never {
 }
 
 // --- Inputs ---
-const jwt = process.env.PINATA_JWT?.trim()
-const rawGateway = process.env.PINATA_GATEWAY?.trim()
-if (!jwt || !rawGateway) {
-  const missing = [!jwt && "PINATA_JWT", !rawGateway && "PINATA_GATEWAY"].filter(Boolean)
+const credentials = pinataCredentials()
+if (typeof credentials === "string") {
   fail(
-    `${missing.join(" and ")} ${missing.length > 1 ? "are" : "is"} empty. The release is NOT pinned. ` +
+    `${credentials}. The release is NOT pinned. ` +
       "In CI, add the repository secrets PINATA_JWT and PINATA_GATEWAY, or run the workflow with pin=false " +
       "to build and verify without publishing.",
   )
-}
-const gateway = gatewayHost(rawGateway)
-if (!gateway) fail("PINATA_GATEWAY holds no host. Set it to the dedicated gateway's host. The release is NOT pinned.")
-
-/** An error message with the JWT and the gateway host taken out, so neither reaches the log. */
-function redact(err: unknown): string {
-  // undici's "fetch failed" carries the real reason, a DNS or TLS error, in `cause`.
-  const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : undefined
-  const message = err instanceof Error ? err.message : String(err)
-  return (cause && cause !== message ? `${message} (${cause})` : message)
-    .replaceAll(jwt!, "<jwt>")
-    .replaceAll(rawGateway!, "<gateway>")
-    .replaceAll(gateway!, "<gateway>")
 }
 
 const carPath = join(RELEASE, "app.car")
@@ -122,77 +108,27 @@ if (unpackError) fail(`release/app.car could not be unpacked: ${unpackError}. Ru
 if (!probe || !expected) fail("the CAR holds no .js file under assets/ to compare the gateways against.")
 
 // --- Pin ---
-const pinata = new PinataSDK({ pinataJwt: jwt, pinataGateway: gateway })
 console.log(`release-pin: pinning ${cid} to Pinata`)
-let upload: { cid: string }
 try {
-  upload = await pinata.upload.public
-    .file(new File([readFileSync(carPath)], "app.car"))
-    .car()
-    .name(process.env.RELEASE_NAME?.trim() || `safenet-staking ${cid}`)
+  await pinCar(credentials, readFileSync(carPath), cid, {
+    name: process.env.RELEASE_NAME?.trim() || `safenet-staking ${cid}`,
+    fileName: "app.car",
+  })
 } catch (err) {
-  fail(`Pinata did not take the upload: ${redact(err)}. The release is NOT pinned.`)
-}
-if (upload.cid !== cid) {
-  fail(`Pinata stored ${upload.cid}, not ${cid}. The pinned DAG is not the one built here.`)
+  fail(`${err instanceof Error ? err.message : String(err)}. The release is NOT pinned.`)
 }
 console.log(`release-pin: pinned ${cid}`)
 
 // --- Gateways ---
-const pinataLabel = "the dedicated Pinata gateway"
-const gateways = [
-  { label: pinataLabel, origin: `https://${gateway}` },
-  ...IPFS_GATEWAYS.map((origin) => ({ label: origin, origin })),
-]
-
-type Outcome = { label: string; ok: boolean; detail: string }
-
-/** One fetch, bounded, whose body is dropped unread. A body that errors is not an answer error. */
-async function status(url: string): Promise<number> {
-  const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(60_000) })
-  await res.body?.cancel().catch(() => {})
-  return res.status
-}
-
-async function check({ label, origin }: { label: string; origin: string }): Promise<Outcome> {
-  const indexUrl = gatewayUrl(origin, cid, "index.html")
-  const probeUrl = gatewayUrl(origin, cid, probe!)
-  const deadline = Date.now() + timeoutMs
-  let last = "no answer"
-  for (let attempt = 1; ; attempt++) {
-    try {
-      const indexStatus = await status(indexUrl)
-      if (indexStatus !== 200) {
-        last = `index.html: HTTP ${indexStatus}`
-      } else {
-        const res = await fetch(probeUrl, { redirect: "follow", signal: AbortSignal.timeout(60_000) })
-        if (res.status === 200) {
-          // The path is immutable: a 200 with other bytes will not get better with retries.
-          if (!servesRelease(new Uint8Array(await res.arrayBuffer()), expected!)) {
-            return { label, ok: false, detail: `answered 200 for ${probe} with bytes that are not the release's` }
-          }
-          return { label, ok: true, detail: `index.html 200, ${probe} identical to the release (attempt ${attempt})` }
-        }
-        await res.body?.cancel().catch(() => {})
-        last = `${probe}: HTTP ${res.status}`
-      }
-    } catch (err) {
-      last = redact(err)
-    }
-    if (Date.now() + 15_000 > deadline) {
-      return { label, ok: false, detail: `not served within ${timeoutMs / 1000} s. Last: ${last}` }
-    }
-    console.log(`release-pin: ${label}: ${last}, retrying in 15 s`)
-    await new Promise((r) => setTimeout(r, 15_000))
-  }
-}
-
-const settled = await Promise.allSettled(gateways.map(check))
-const outcomes: Outcome[] = settled.map((result, i) =>
-  result.status === "fulfilled"
-    ? result.value
-    : { label: gateways[i].label, ok: false, detail: `check crashed: ${redact(result.reason)}` },
-)
+const outcomes = await checkGateways(gatewaysToCheck(credentials), {
+  cid,
+  ready: "index.html",
+  probe: probe!,
+  expected: expected!,
+  timeoutMs,
+  redact: credentials.redact,
+  log: (line) => console.log(`release-pin: ${line}`),
+})
 for (const { label, ok, detail } of outcomes) {
   const line = `release-pin: ${ok ? "OK" : "FAILED"} ${label}: ${detail}`
   if (ok) console.log(line)
@@ -206,7 +142,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
       `### Pinned \`${cid}\``,
       "",
       ...outcomes.map(({ label, ok, detail }) =>
-        label === pinataLabel
+        label === DEDICATED_GATEWAY_LABEL
           ? `- ${ok ? "OK" : "FAILED"}: \`/ipfs/${cid}/index.html\` on the dedicated Pinata gateway. ${detail}`
           : `- ${ok ? "OK" : "FAILED"}: ${gatewayUrl(label, cid, "index.html")}. ${detail}`,
       ),
