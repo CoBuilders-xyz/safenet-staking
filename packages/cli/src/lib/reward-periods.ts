@@ -15,7 +15,7 @@
  * paid out to stakers is not on chain: SEF's files hold it. So a row shows claims, not earnings.
  */
 import type { Address, Hash, Hex } from "viem"
-import { CONTRACTS, SUBGRAPH_ENDPOINTS, SUBGRAPH_STALE_AFTER_SECONDS, merkleDropAbi,
+import { CONTRACTS, withSubgraphFallback, SUBGRAPH_ENDPOINTS, SUBGRAPH_STALE_AFTER_SECONDS, merkleDropAbi,
   rewardPeriodWindows, attributeRewardClaims, compareRewardPeriodEnds } from "@cobuilders/safenet-core"
 import type { Context } from "./context.js"
 import { redactUrls } from "./redact.js"
@@ -66,17 +66,19 @@ interface Periods {
 }
 
 async function query<T>(ctx: Context, url: string, text: string): Promise<T> {
-  const response = await ctx.fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query: text }),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+  return withSubgraphFallback(url, async (endpoint) => {
+    const response = await ctx.fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query: text }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    })
+    if (!response.ok) throw new Error(`the subgraph answered HTTP ${response.status}`)
+    const body = (await response.json()) as { data?: T; errors?: { message?: string }[] }
+    if (body.errors?.length) throw new Error("the subgraph answered with an error")
+    if (!body.data) throw new Error("the subgraph answered with no data")
+    return body.data
   })
-  if (!response.ok) throw new Error(`the subgraph answered HTTP ${response.status}`)
-  const body = (await response.json()) as { data?: T; errors?: { message?: string }[] }
-  if (body.errors?.length) throw new Error("the subgraph answered with an error")
-  if (!body.data) throw new Error("the subgraph answered with no data")
-  return body.data
 }
 
 /** Parse the endpoint before fetch can repeat a malformed setting in an error. */

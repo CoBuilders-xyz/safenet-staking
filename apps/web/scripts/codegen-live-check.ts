@@ -21,6 +21,7 @@ const portsFile = resolve(ROOT, "../../.env.ports")
 const ports = existsSync(portsFile) ? parseEnv(readFileSync(portsFile, "utf8")) : {}
 const endpoints = subgraphEndpoints({
   graphNodePort: process.env.GRAPH_NODE_PORT ?? ports.GRAPH_NODE_PORT,
+  graphApiKey: process.env.VITE_GRAPH_API_KEY,
   overrides: { mainnet: process.env.VITE_SUBGRAPH_URL_MAINNET, gnosis: process.env.VITE_SUBGRAPH_URL_GNOSIS },
 })
 

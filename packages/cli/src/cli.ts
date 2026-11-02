@@ -5,6 +5,7 @@
  *   1  the operation failed; one plain sentence on stderr
  *   2  usage error: unknown command or option, missing argument, invalid value
  */
+import { subgraphEndpoints } from "@cobuilders/safenet-core"
 import { Command, CommanderError } from "commander"
 import pkg from "../package.json" with { type: "json" }
 import {
@@ -90,7 +91,7 @@ function commandRuntime(runtime: Runtime): CommandRuntime {
         rpcUrl: globals.rpcUrl,
         githubToken: runtime.env.GITHUB_TOKEN || runtime.env.GH_TOKEN || undefined,
         ipfsGateway: runtime.env.IPFS_GATEWAY || undefined,
-        subgraphUrl: runtime.env.SUBGRAPH_URL_MAINNET || undefined,
+        subgraphUrl: subgraphEndpoints({ graphApiKey: runtime.env.GRAPH_API_KEY, overrides: { mainnet: runtime.env.SUBGRAPH_URL_MAINNET } }).mainnet,
       })
     },
     emit(globals, data, render) {

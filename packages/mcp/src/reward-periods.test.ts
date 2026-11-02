@@ -92,3 +92,23 @@ test("GraphQL provider errors remain fixed and private in all MCP content", asyn
     assert.doesNotMatch(JSON.stringify(result), /private-provider-marker/)
   } finally { await s.close() }
 })
+
+test("MCP reward history falls back to Studio and surfaces double failure", async () => {
+  for (const bothFail of [false, true]) {
+    const fake = fakeLibrary({ ...library, createContext: (options) => ({
+      ...fakeContext(bothFail ? { subgraph: "down" } : {}), subgraphUrl: options?.subgraphUrl,
+    }) })
+    const s = await connect(readConfig({ GRAPH_API_KEY: "test-only-private-marker" }), { fake })
+    try {
+      const result = await s.call("rewards_history", { address: STAKER })
+      if (bothFail) {
+        assert.equal(result.structuredContent?.periods, null)
+        assert.match(textOf(result), /gateway and Studio fallback both failed/)
+      } else {
+        assert.notEqual(result.structuredContent?.periods, null)
+        assert.match(textOf(result), /each matches cumulativeClaimed/)
+      }
+      assert.doesNotMatch(JSON.stringify(result) + s.logs.join("\n"), /test-only-private-marker/)
+    } finally { await s.close() }
+  }
+})

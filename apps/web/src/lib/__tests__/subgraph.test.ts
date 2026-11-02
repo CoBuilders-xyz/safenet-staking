@@ -126,3 +126,25 @@ describe("fetchSubgraph", () => {
     await expect(fetchSubgraph("https://subgraph.test", NetworkTotalsDocument, undefined)).rejects.toThrow("_meta")
   })
 })
+
+describe("Network gateway fallback", () => {
+  const gateway = "https://gateway.thegraph.com/api/test-only-key/subgraphs/id/K1gHS5P5vZU3LApqchuuQxkmZGDDAUavkQUdGDV7Vxs"
+  const studio = "https://api.studio.thegraph.com/query/1763864/safenet-mainnet/e66567d"
+  const data = { _meta: { block: { number: 9, timestamp: 1_791_000_000 }, hasIndexingErrors: false }, network: null }
+  beforeEach(() => { mockRequest.mockReset() })
+  it("uses successful gateway data without a Studio request", async () => {
+    mockRequest.mockResolvedValue(data)
+    expect((await fetchSubgraph(gateway, NetworkTotalsDocument, undefined)).data).toEqual(data)
+    expect(mockRequest).toHaveBeenCalledTimes(1)
+  })
+  it.each(["401 auth", "402 billing", "429 rate", "503 upstream", "network", "GraphQL auth error at HTTP200"])("retries Studio after %s", async (failure) => {
+    mockRequest.mockRejectedValueOnce(new Error(failure)).mockResolvedValueOnce(data)
+    expect((await fetchSubgraph(gateway, NetworkTotalsDocument, undefined)).data).toEqual(data)
+    expect(mockRequest.mock.calls.map(([o]) => (o as { url: string }).url)).toEqual([gateway, studio])
+  })
+  it("surfaces an error when both providers fail, without provider text or key", async () => {
+    mockRequest.mockRejectedValue(new Error("test-only-key"))
+    await expect(fetchSubgraph(gateway, NetworkTotalsDocument, undefined)).rejects.toThrow("gateway and Studio fallback both failed")
+    expect(mockRequest).toHaveBeenCalledTimes(2)
+  })
+})

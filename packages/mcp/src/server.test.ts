@@ -478,3 +478,17 @@ test("unreadable chain head returns structured compliance refusal without signin
     assert.deepEqual(trip.reached, [])
   } finally { await s.close() }
 })
+
+test("GRAPH_API_KEY is passed to context, never server output, with full URL precedence", async () => {
+  for (const override of [undefined, "https://override.test/query"]) {
+    const fake = fakeLibrary()
+    const s = await connect(readConfig({ GRAPH_API_KEY: "test-only-private-marker", SUBGRAPH_URL_MAINNET: override }), { fake })
+    try {
+      const result = await s.call("status")
+      const made = fake.calls.find((c) => c.fn === "createContext")!
+      assert.equal((made.args[0] as { subgraphUrl: string }).subgraphUrl,
+        override ?? "https://gateway.thegraph.com/api/test-only-private-marker/subgraphs/id/K1gHS5P5vZU3LApqchuuQxkmZGDDAUavkQUdGDV7Vxs")
+      assert.doesNotMatch(JSON.stringify(result) + s.logs.join("\n"), /test-only-private-marker/)
+    } finally { await s.close() }
+  }
+})

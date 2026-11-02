@@ -12,7 +12,10 @@ CID you build matches the CID being served, the interface you load is the source
 - pnpm **10.28.2**, the version in the `packageManager` field of `package.json`.
   `corepack enable` selects it for you.
 
-Nothing else. No account, no secret, no network access after the install.
+For a gateway-enabled release, also supply its public browser key as `VITE_GRAPH_API_KEY`.
+Obtain that value from the released JavaScript (the `/api/<KEY>/subgraphs/id/` URL),
+or from the operator. Do not commit or print it. It is already public in that release.
+A no-key build uses Studio and will have a different CID. No account sign-in is needed.
 
 ## Rebuild and compare
 
@@ -54,10 +57,10 @@ It prints the root CID. It must equal `apps/web/release/CID`.
 |---|---|
 | The source at the commit | `apps/web`, `packages/core` |
 | Every dependency, at an exact version | `pnpm-lock.yaml` |
-| The public build-time values | `apps/web/build.env` |
+| The public build-time values | `apps/web/build.env` plus `VITE_GRAPH_API_KEY` from the environment |
 | The CID settings | `ipfs-car` 3.1.0 defaults: CIDv1, raw leaves, 1 MiB fixed-size chunks, balanced layout 1024 links wide, no mtime, no mode |
 
-Nothing else. The release build ignores every `.env` file, every `VITE_` variable in your
+Nothing else. The release build ignores every `.env` file, every other `VITE_` variable in your
 shell and the graph-node port in `.env.ports`, and the bundle holds no timestamp. Text files
 are checked out with LF line endings on every platform, by `.gitattributes`. `apps/web/build.env` is committed and holds only
 public values; a value there ships to every visitor.
@@ -75,7 +78,8 @@ public values; a value there ships to every visitor.
 5. The release build sets `GRAPH_NODE_PORT` to an empty string. `vite.config.ts` inlines that
    port into the bundle, from your shell or from the `.env.ports` that `pnpm bootstrap` writes
    per worktree. If you changed the script, check that neither reaches Vite.
-6. Compare the files: `ls -lR apps/web/dist` on both sides, then `diff` the first file that
+6. Confirm the public gateway key matches the released build. A missing or rotated key changes the CID.
+7. Compare the files: `ls -lR apps/web/dist` on both sides, then `diff` the first file that
    differs. A difference there is a reproducibility bug. Please open an issue with it.
 
 ## Verify a daily snapshot

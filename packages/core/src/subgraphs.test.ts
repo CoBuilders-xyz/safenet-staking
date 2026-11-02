@@ -79,3 +79,48 @@ test("the Gnosis snapshot carries its run date and a consistent window", () => {
     assert.ok(p.rate >= 0 && p.rate <= 1)
   }
 })
+
+test("gateway key selects both Network IDs; explicit per-chain URLs still win", () => {
+  const got = subgraphEndpoints({ graphApiKey: " test-only-key " })
+  assert.equal(got.mainnet, "https://gateway.thegraph.com/api/test-only-key/subgraphs/id/K1gHS5P5vZU3LApqchuuQxkmZGDDAUavkQUdGDV7Vxs")
+  assert.equal(got.gnosis, "https://gateway.thegraph.com/api/test-only-key/subgraphs/id/9ZnBWftc6QB4tLn2CeYKTCqZkUrwjUNtH4DXvXHahG8q")
+  const override = "https://graph.test/mainnet"
+  assert.deepEqual(subgraphEndpoints({ graphApiKey: "test-only-key", overrides: { mainnet: override, gnosis: "" } }), { mainnet: override, gnosis: got.gnosis })
+  assert.deepEqual(subgraphEndpoints({ graphApiKey: "  " }), SUBGRAPH_ENDPOINTS)
+})
+
+test("key is encoded as a single path segment, and fallbacks use the current Studio account", () => {
+  assert.ok(subgraphEndpoints({ graphApiKey: "test/key?#" }).mainnet?.includes("/test%2Fkey%3F%23/subgraphs/id/"))
+  for (const chain of CHAINS) assert.equal(SUBGRAPH_ENDPOINTS[chain], `https://api.studio.thegraph.com/query/1763864/safenet-${chain}/e66567d`)
+})
+
+test("Network query success, recovery and double failure do not leak provider credentials", async () => {
+  const { withSubgraphFallback } = await import("./subgraphs.js")
+  for (const chain of CHAINS) {
+    const gateway = subgraphEndpoints({ graphApiKey: "test-only-private-marker" })[chain]!
+    const calls: string[] = []
+    assert.equal(await withSubgraphFallback(gateway, async (url) => { calls.push(url); return "gateway" }), "gateway")
+    assert.deepEqual(calls, [gateway])
+    calls.length = 0
+    assert.equal(await withSubgraphFallback(gateway, async (url) => {
+      calls.push(url)
+      if (url === gateway) throw new Error("402 private-marker")
+      return "studio"
+    }), "studio")
+    assert.deepEqual(calls, [gateway, SUBGRAPH_ENDPOINTS[chain]])
+    await assert.rejects(withSubgraphFallback(gateway, async () => { throw new Error("private-marker") }),
+      (error: Error) => /gateway and Studio fallback both failed/.test(error.message) && !error.message.includes("private-marker"))
+  }
+})
+
+test("custom overrides and cancelled queries never switch providers", async () => {
+  const { withSubgraphFallback } = await import("./subgraphs.js")
+  let calls = 0
+  await assert.rejects(withSubgraphFallback("https://custom.test/query", async () => { calls++; throw new Error("custom failure") }), /custom failure/)
+  assert.equal(calls, 1)
+  const controller = new AbortController()
+  await assert.rejects(withSubgraphFallback(subgraphEndpoints({ graphApiKey: "test" }).mainnet!, async () => {
+    calls++; controller.abort(); throw new Error("cancelled")
+  }, controller.signal))
+  assert.equal(calls, 2)
+})

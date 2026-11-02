@@ -222,6 +222,7 @@ The web visitor endpoint remains unset; CLI operators can still supply their own
 | `MAINNET_RPC_URL` | The Mainnet RPC endpoint, tried before the public endpoints. `--rpc-url` overrides it |
 | `GITHUB_TOKEN` or `GH_TOKEN` | Raises the GitHub API limit for the lookup that dates SEF's participation window. Optional |
 | `IPFS_GATEWAY` | An IPFS gateway, tried before the public gateways for SEF's reward dataset. Only its origin is used: a path such as `/ipfs/` is dropped. Optional |
+| `GRAPH_API_KEY` | Optional runtime Graph Network key. Full `SUBGRAPH_URL_MAINNET` wins; without either, use new-account Studio. Never printed. |
 | `SUBGRAPH_URL_MAINNET` | The Mainnet subgraph `rewards history` reads its periods from, instead of the Studio deployment in `packages/core`. Never printed. Optional |
 
 An RPC URL can carry a key. It is never printed: `--verbose` shows the host only, and error
@@ -247,3 +248,7 @@ which need only `viem`, `zod` and `commander`, the package's own dependencies.
 ## Requirements
 
 Node.js 22.14 or later.
+
+For gateway subgraph restrictions, the USD 20/month cap, fallback behavior and operator setup, see [GRAPH-GATEWAY.md](../../GRAPH-GATEWAY.md). Supply `GRAPH_API_KEY` through the process environment; no command-line key flag is needed.
+
+Failed Network queries retry Studio once. The process warns on stderr once per chain; if both fail, history reports unavailable without leaking URLs.

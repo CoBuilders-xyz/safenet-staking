@@ -59,6 +59,7 @@ The server reads these environment variables when it starts.
 | `MAINNET_RPC_URL` | The endpoint when `SAFENET_MCP_RPC_URL` is not set. Without either, public endpoints are used, which refuse history scans |
 | `GITHUB_TOKEN` or `GH_TOKEN` | Raises the GitHub API limit for the lookup that dates SEF's participation window. Optional |
 | `IPFS_GATEWAY` | An IPFS gateway, tried before the public gateways for SEF's reward dataset. Only its origin is used. Optional |
+| `GRAPH_API_KEY` | Optional runtime Graph Network key. Full `SUBGRAPH_URL_MAINNET` wins; without either, use new-account Studio. Never printed. |
 | `SUBGRAPH_URL_MAINNET` | The Mainnet subgraph `rewards_history` reads its periods from, instead of the default Studio deployment. Optional |
 | `SAFENET_MCP_SANCTIONS_ENDPOINT` | A URL every write GETs first, refusing on 403 or any failure. Never printed. Optional |
 | `SAFENET_MCP_GEO_CHECK` | `1` refuses every write while this machine's IP is in a country the web interface blocks. Optional |
@@ -507,3 +508,7 @@ is often committed.
 ## Requirements
 
 Node.js 22.14 or later.
+
+For gateway subgraph restrictions, the USD 20/month cap, fallback behavior and operator setup, see [GRAPH-GATEWAY.md](../../GRAPH-GATEWAY.md). Supply `GRAPH_API_KEY` through the process environment; no command-line key flag is needed.
+
+Failed Network queries retry Studio once. The process warns on stderr once per chain; if both fail, history reports unavailable without leaking URLs.

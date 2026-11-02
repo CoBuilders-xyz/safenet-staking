@@ -2,14 +2,14 @@
 /**
  * Build the production bundle and pack it into a CAR whose root CID anyone can reproduce.
  *
- *   1. Read build.env. It is the only input besides the source and the lockfile: every .env
- *      file, every VITE_ variable already in the shell and the graph-node port from .env.ports
+ *   1. Read build.env. Together with VITE_GRAPH_API_KEY, it supplies the public build inputs. Every .env
+ *      file, every other VITE_ variable in the shell and the graph-node port from .env.ports
  *      are ignored.
  *   2. `vite build --mode production` into dist/.
  *   3. tools/check-browser-safety.mjs over dist/. A secret in the bundle fails the release.
  *      Its bundle half compares dist/ with .env.local, which only a developer machine has: on
  *      the CI runner it finds nothing to compare. There the guarantee is that the build job
- *      receives no secret at all.
+ *      receives only the explicitly public Graph browser key (COB-566).
  *   3b. scripts/check-budget.ts: the bundle within performance-budget.json, or the release fails.
  *   4. Pack dist/ into release/app.car and write the root CID to release/CID.
  *
@@ -25,7 +25,7 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
-import { parseEnv } from "node:util"
+import { releaseEnvironment } from "./release-env"
 import { packDirectory, PackError, type Packed } from "@cobuilders/safenet-snapshots/ipfs"
 import { build } from "vite"
 
@@ -40,13 +40,8 @@ function fail(message: string): never {
   process.exit(1)
 }
 
-// --- 1. Environment: build.env and nothing else ---
-const publicEnv = parseEnv(readFileSync(BUILD_ENV, "utf8"))
-for (const key of Object.keys(publicEnv)) {
-  if (!key.startsWith("VITE_")) {
-    fail(`build.env holds ${key}. Only VITE_ keys belong there: the file is public and only Vite reads it.`)
-  }
-}
+// --- 1. Environment: build.env plus the explicit public gateway key ---
+const publicEnv = releaseEnvironment(readFileSync(BUILD_ENV, "utf8"), process.env.VITE_GRAPH_API_KEY)
 for (const key of Object.keys(process.env)) {
   if (key.startsWith("VITE_")) delete process.env[key]
 }
@@ -61,7 +56,7 @@ process.env.NODE_ENV = "production"
 // --- 2. Build ---
 rmSync(DIST, { recursive: true, force: true })
 rmSync(RELEASE, { recursive: true, force: true })
-console.log(`release: building with ${Object.keys(publicEnv).join(", ") || "no VITE_ value"} from build.env`)
+console.log(`release: building with ${Object.keys(publicEnv).join(", ") || "no VITE_ value"} from release inputs`)
 // envDir: false stops Vite from reading .env, .env.local and .env.production in apps/web.
 await build({ root: APP, mode: "production", envDir: false, logLevel: "warn" })
 if (!existsSync(join(DIST, "index.html"))) fail("the build wrote no dist/index.html")

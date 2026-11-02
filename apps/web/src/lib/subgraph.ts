@@ -1,7 +1,7 @@
 import { request, type RequestExtendedOptions, type Variables } from "graphql-request"
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core"
 import type { TFunction } from "i18next"
-import { SUBGRAPH_STALE_AFTER_SECONDS } from "@cobuilders/safenet-core"
+import { SUBGRAPH_STALE_AFTER_SECONDS, withSubgraphFallback } from "@cobuilders/safenet-core"
 
 /** A query that has not answered in this time counts as failed, so the page can fall back. */
 export const SUBGRAPH_TIMEOUT_MS = 10_000
@@ -128,13 +128,15 @@ export async function fetchSubgraph<T extends { _meta: SubgraphMeta | null }, V 
 ): Promise<SubgraphAnswer<T>> {
   // graphql-request types `variables` as optional or required depending on V, which a generic V
   // cannot satisfy. The documents' own types already bind variables to the query.
-  const options = {
-    url,
-    document,
-    variables,
-    signal: withTimeout(signal, SUBGRAPH_TIMEOUT_MS),
-  } as unknown as RequestExtendedOptions<V, T>
-  const data = await request<T, V>(options)
-  if (!data._meta) throw new Error("The subgraph answered without _meta")
-  return { data, freshness: readFreshness(data._meta, Date.now()) }
+  return withSubgraphFallback(url, async (endpoint) => {
+    const options = {
+      url: endpoint,
+      document,
+      variables,
+      signal: withTimeout(signal, SUBGRAPH_TIMEOUT_MS),
+    } as unknown as RequestExtendedOptions<V, T>
+    const data = await request<T, V>(options)
+    if (!data._meta) throw new Error("The subgraph answered without _meta")
+    return { data, freshness: readFreshness(data._meta, Date.now()) }
+  }, signal)
 }
