@@ -1,7 +1,8 @@
 # npm beta releases and Trusted Publishing
 
 The first release of `@cobuilders/safenet-cli` and `@cobuilders/safenet-mcp`
-is **0.1.0-beta.0**, under npm dist-tag **beta**, never `latest`.
+is **0.1.0-beta.0**. The intended channel is **beta**, with no prerelease under `latest`.
+npm initially violates this policy for a new package; the bootstrap cleanup below is mandatory.
 This document is an operator checklist, not authorization to publish.
 
 The Publish workflow builds each package once, installs the tarball outside the
@@ -34,7 +35,13 @@ and [npm/cli#8544](https://github.com/npm/cli/issues/8544).
 Check each package independently; one may exist while the other does not.
 Augusto must have publish rights in the `@cobuilders` npm organization.
 
-Choose **one** bootstrap option for missing packages:
+Choose **one** bootstrap option for missing packages. Both options require the tag cleanup below.
+
+**First-publish quirk:** npm also assigns `latest` to a brand-new package's first version,
+even with `--tag beta`. Until cleanup, untagged installs can receive the prerelease.
+Our policy is to remove this accidental tag, not publish a placeholder or dummy stable version.
+Treat publication and cleanup as one operator session. Do not announce the release until both packages' tags are verified.
+This is not atomic: it cannot prevent installs during the short publication-to-cleanup window.
 
 ### A. Interactive first beta (recommended)
 
@@ -47,13 +54,14 @@ npm publish ./cobuilders-safenet-mcp-0.1.0-beta.0.tgz --access public --tag beta
 ```
 
 Complete npm's interactive/browser approval. Never paste an OTP or token in chat.
+After each successful publish, immediately complete the post-bootstrap tag cleanup below.
 This interactive bootstrap cannot claim GitHub Actions provenance. Later OIDC
 publishes from the public GitHub repository receive provenance automatically.
 
 **This step already releases beta.0.** npm versions are immutable. Do not run
 publish=true or push `cli-v0.1.0-beta.0` / `mcp-v0.1.0-beta.0` afterward:
-those triggers would attempt to publish the same version again. Configure trust
-below, then use a reviewed version bump such as `0.1.0-beta.1` for the first OIDC run.
+those triggers would attempt to publish the same version again. Finish a reviewed version bump
+such as `0.1.0-beta.1` and its dry-run checks before configuring trust for the first OIDC run.
 Do not publish a dummy stable version just to reserve a package name.
 
 ### B. Temporary granular token for the first CI publish only
@@ -67,9 +75,45 @@ configuration for token auth. The normal workflow in this PR deliberately has no
 such token path. Run the first beta once per missing package, using the validated
 beta tags below or a publishing dispatch from main.
 
-After the packages exist, configure trust, remove that temporary workflow auth,
+After bootstrap, complete tag cleanup, remove that temporary workflow auth,
 delete the GitHub secret, and revoke the token in npm. Do not leave token auth as
 an automatic fallback. This also consumes beta.0; subsequent releases need new versions.
+Prepare the version bump and dry-run checks before configuring trust, as below.
+
+## Post-bootstrap tag cleanup (both options)
+
+Inspect each newly created package immediately after its first publish:
+
+```sh
+npm dist-tag ls @cobuilders/safenet-cli
+npm dist-tag ls @cobuilders/safenet-mcp
+```
+
+For each package, confirm `beta` points to `0.1.0-beta.0`.
+Run its removal command **only if `latest` also points to that bootstrap prerelease**:
+
+```sh
+npm dist-tag rm @cobuilders/safenet-cli latest
+npm dist-tag rm @cobuilders/safenet-mcp latest
+```
+
+If `latest` is already absent, skip that package's removal. If it points elsewhere, stop and inspect;
+never remove an existing stable release's tag. These commands remove tags, not package versions.
+Repeat `npm dist-tag ls` for both packages. Required state: `beta: 0.1.0-beta.0`, no `latest` for these new beta-only packages.
+Use explicit `@beta` installation commands. Check this state again after subsequent beta releases.
+
+## Prepare the first OIDC release before configuring trust
+
+1. Finish and merge the reviewed post-bootstrap version bump (for example, `0.1.0-beta.1`).
+2. Complete CI and both `publish=false` runs for the exact release commit. Confirm the new versions are unpublished.
+3. Only when ready to publish, configure each Trusted Publisher using the settings below.
+4. Complete the first successful OIDC publish for each package within **two days** of configuring its publisher.
+
+According to [npm Trusted Publishers](https://docs.npmjs.com/trusted-publishers/), an unused configuration
+expires if its first successful publish does not happen within two days. Do not start this clock during PR review.
+If it expires, open that package's Settings → Trusted Publisher on npmjs.com, delete the expired configuration,
+and recreate it with the same fields below. Then complete the first successful OIDC publish within the new two-day window.
+Before retrying, check whether the version was published despite an interrupted run; never attempt to overwrite an existing version.
 
 ## Configure npmjs.com (each package separately)
 
