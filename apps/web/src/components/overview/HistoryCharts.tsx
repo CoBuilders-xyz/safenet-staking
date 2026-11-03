@@ -2,9 +2,9 @@ import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { GNOSIS_INDEXED_PROGRAMME, GNOSIS_AEGIS_FIRST_COMPLETE_DAY, utcDayMs } from "@cobuilders/safenet-core"
-import { StakeHistoryDocument } from "@/graphql/mainnet/generated"
-import { AttestationHistoryDocument } from "@/graphql/gnosis/generated"
-import { useSubgraphQuery } from "@/hooks/useSubgraphQuery"
+import { StakeHistoryDocument, type StakeHistoryQuery } from "@/graphql/mainnet/generated"
+import { AttestationHistoryDocument, type AttestationHistoryQuery } from "@/graphql/gnosis/generated"
+import { useSubgraphQuery, type SubgraphResult } from "@/hooks/useSubgraphQuery"
 import { dailySeries } from "@/lib/history"
 import { describeDegradation } from "@/lib/subgraph"
 import { formatUtcDateTime } from "@/lib/format"
@@ -16,11 +16,22 @@ const DAY = 86400
 const date = (seconds: number) => new Date(seconds * 1000).toISOString().slice(0, 10)
 type Range = 7 | 30 | "all"
 export function HistoryChart({ kind }: { kind: "stake" | "attestations" }) {
+  return kind === "stake" ? <StakeHistoryChart /> : <AttestationHistoryChart />
+}
+
+function StakeHistoryChart() {
+  const result = useSubgraphQuery("mainnet", "stake-history", StakeHistoryDocument)
+  return <Chart kind="stake" result={result} />
+}
+
+function AttestationHistoryChart() {
+  const result = useSubgraphQuery("gnosis", "attestation-history", AttestationHistoryDocument, () => ({ programme: GNOSIS_INDEXED_PROGRAMME }))
+  return <Chart kind="attestations" result={result} />
+}
+
+function Chart({ kind, result }: { kind: "stake" | "attestations"; result: SubgraphResult<StakeHistoryQuery | AttestationHistoryQuery> }) {
   const { t } = useTranslation()
   const [range, setRange] = useState<Range>(30)
-  const stake = useSubgraphQuery("mainnet", "stake-history", StakeHistoryDocument)
-  const attestations = useSubgraphQuery("gnosis", "attestation-history", AttestationHistoryDocument, () => ({ programme: GNOSIS_INDEXED_PROGRAMME, GNOSIS_AEGIS_FIRST_COMPLETE_DAY, utcDayMs }))
-  const result = kind === "stake" ? stake : attestations
   const title = kind === "stake" ? t("overview.charts.stake", "Total SAFE staked over time") : t("overview.charts.attestations", "Attestations per day")
   const source = kind === "stake" ? t("overview.charts.mainnet", "Mainnet subgraph") : t("overview.charts.gnosis", "Gnosis subgraph")
   const today = result.status === "live" ? Math.floor(result.freshness.checkedAt / 1000 / DAY) * DAY : 0
@@ -42,6 +53,6 @@ export function HistoryChart({ kind }: { kind: "stake" | "attestations" }) {
         {kind === "stake" ? <AreaChart data={visible}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tickFormatter={date} minTickGap={30} /><YAxis width={70} tickFormatter={(v: number) => v.toLocaleString("en-US", { notation: "compact" })} /><Tooltip labelFormatter={(v) => date(Number(v))} /><Area type="stepAfter" dataKey="value" name="SAFE" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.25} /></AreaChart> : <BarChart data={visible}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tickFormatter={date} minTickGap={30} /><YAxis width={70} tickFormatter={(v: number) => v.toLocaleString("en-US", { notation: "compact" })} /><Tooltip labelFormatter={(v) => date(Number(v))} /><Bar dataKey="value" name={title} fill="var(--chart-1)" /></BarChart>}
       </ResponsiveContainer>
     </div>}
-    {kind === "attestations" && <p className="text-xs text-muted-foreground">{t("overview.charts.programme", "Programme: {{programme}}. Complete UTC days only.", { programme: GNOSIS_INDEXED_PROGRAMME, GNOSIS_AEGIS_FIRST_COMPLETE_DAY, utcDayMs })}</p>}
+    {kind === "attestations" && <p className="text-xs text-muted-foreground">{t("overview.charts.programme", "Programme: {{programme}}. Complete UTC days only.", { programme: GNOSIS_INDEXED_PROGRAMME })}</p>}
   </OverviewSection>
 }
