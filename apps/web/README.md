@@ -14,7 +14,7 @@ Safe Foundation's safenet-staking-ui; see [License](#license).
 | Path | Page | What it shows |
 |------|------|---------------|
 | `/` | `OverviewPage` | Network Overview, no wallet needed: headline figures, stake distribution, rewards with the root check, the validator table, the last 30 days, and the freshness of each subgraph |
-| `/dashboard` | `DashboardPage` | Staking stats, the claimable banners, quick actions, the staking section and the stake distribution chart |
+| `/dashboard` | `DashboardPage` | My stake. With a wallet: staking stats, the claimable banners, quick actions, the staking section and the stake distribution chart. Without one: a connect prompt and a link to Validators |
 | `/validators` | `ValidatorsPage` | Validator cards with Delegate and Undelegate. `?delegate=<address>` opens the delegate dialog for that validator |
 | `/validators/:address` | `ValidatorDetailPage` | One validator's figures and actions |
 | `/withdrawals` | `WithdrawalsPage` | The withdrawal queue, oldest first, with cooldowns and Claim |

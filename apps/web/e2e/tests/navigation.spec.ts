@@ -9,7 +9,7 @@ test.describe("Navigation", () => {
     await expect(layout.header).toBeVisible()
     await expect(layout.footer).toBeVisible()
     await expect(layout.navOverview).toBeVisible()
-    await expect(layout.navDashboard).toBeVisible()
+    await expect(layout.navMyStake).toBeVisible()
     await expect(layout.navValidators).toBeVisible()
     await expect(layout.navWithdrawals).toBeVisible()
   })
@@ -22,13 +22,13 @@ test.describe("Navigation", () => {
     await expect(page.getByRole("navigation").getByRole("link").first()).toHaveText("Overview")
   })
 
-  test("navigates to the dashboard", async ({ disconnectedPage: page }) => {
+  test("navigates to My stake", async ({ disconnectedPage: page }) => {
     const layout = new LayoutPage(page)
     await layout.goto("/")
 
-    await layout.navDashboard.click()
+    await layout.navMyStake.click()
     await expect(page).toHaveURL("/#/dashboard")
-    await expect(layout.navDashboard).toHaveAttribute("aria-current", "page")
+    await expect(layout.navMyStake).toHaveAttribute("aria-current", "page")
     await expect(page.getByRole("heading", { name: "Stake your SAFE" })).toBeVisible()
   })
 

@@ -44,7 +44,9 @@ Note the transaction hash of everything you send, for debugging later.
       distribution, Rewards, Validators, Recent activity.
 - [ ] Each figure names its source, and Data freshness gives each subgraph's last indexed block
       and age.
-- [ ] Dashboard (`/dashboard`) shows the total delegated; quick actions are hidden.
+- [ ] My stake (`/dashboard`) shows the hero, "Connect your wallet to see your stakes, rewards, and
+      positions", a Connect Wallet button and a Browse validators link; no stat cards, no quick
+      actions.
 - [ ] Validators (`/validators`) lists the validator cards with name, participation rate and
       total stake, and states SEF's 75% participation rule as text. A rate SEF does not publish
       reads Not published, never 0.00%.
@@ -65,7 +67,7 @@ with an account you are willing to transact from.
 | # | Scenario | Browser Wallet | WalletConnect | Safe App |
 |---|---|---|---|---|
 | 1 | The header shows the account and its SAFE balance | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
-| 2 | Dashboard: your stats and the quick actions appear | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
+| 2 | My stake: your stats and the quick actions appear | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
 | 3 | Delegate from a validator card: approve, then stake; Your Stake updates | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
 | 4 | Undelegate: the withdrawal appears in the queue with its cooldown | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
 | 5 | Withdrawals: Claim after the cooldown empties that entry | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail | ☐ Pass ☐ Fail |
@@ -114,7 +116,7 @@ Notes and transaction hashes:
 
 - [ ] Each dotted-underlined term opens its explanation on hover, on keyboard focus and on a
       tap, and closes on Escape or a second tap: Safenet and staking on the Overview, rewards and
-      Safenet on the Dashboard, validator, stake and Commission on Validators, Commission on a
+      Safenet on My stake, validator, stake and Commission on Validators, Commission on a
       validator's page, withdrawals on Withdrawals, rewards on Rewards, Unstaking period in both
       dialogs, and the unstaking period, slashing and rewards in "What happens if".
 - [ ] The unstaking period reads the same in every place, and matches the contract's
@@ -185,14 +187,14 @@ repeated in each table so a table can be checked alone.
 | Restricted | The restricted screen, as above |
 | Wrong network | The Wrong network notice above the page; the figures are unchanged |
 
-### Dashboard, `/dashboard`
+### My stake, `/dashboard`
 
 | State | What shows |
 |---|---|
 | Loading | Skeletons in the stat cards; "Your Rewards" with two skeletons; "Your Stake Distribution" with a skeleton. Claimable SAFE reads 0 until the rewards load |
 | Empty | "You have no active stakes. Visit the Validators page to stake."; no stake distribution chart with fewer than two positions; Total claimed hidden at 0 |
 | Error | A stat card whose read failed shows "Unavailable". SEF's validator list failing shows "SEF's validator list could not be loaded, so your stakes cannot be listed." and Retry. A failed per-validator stake read drops that row and that slice without a note. Claimable SAFE reads 0 when the rewards fail |
-| No wallet | Total SAFE Staked and Active Validators only; no connect prompt |
+| No wallet | The hero, then "Connect your wallet to see your stakes, rewards, and positions" with Connect Wallet and Browse validators; no stat cards, quick actions, staking section or chart |
 | Restricted | The restricted screen, as above |
 | Wrong network | The Wrong network notice; the stats stay; Unstake on a row still opens the dialog, whose submit button is disabled |
 

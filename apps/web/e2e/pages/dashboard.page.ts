@@ -12,6 +12,9 @@ export class DashboardPage {
   readonly quickActionUndelegate: Locator
   readonly quickActionClaim: Locator
   readonly onboardingBanner: Locator
+  readonly connectPrompt: Locator
+  readonly connectButton: Locator
+  readonly browseValidators: Locator
   readonly onboardingDismissButton: Locator
 
   constructor(page: Page) {
@@ -26,6 +29,9 @@ export class DashboardPage {
     this.quickActionUndelegate = page.getByRole("button", { name: /^Unstake$/ }).first()
     this.quickActionClaim = page.getByRole("button", { name: /^Withdraw$/ }).first()
     this.onboardingBanner = page.getByText("Welcome to Safe Staking")
+    this.connectPrompt = page.getByText("Connect your wallet to see your stakes, rewards, and positions", { exact: true })
+    this.connectButton = page.getByRole("main").getByRole("button", { name: "Connect Wallet", exact: true })
+    this.browseValidators = page.getByRole("main").getByRole("link", { name: "Browse validators", exact: true })
     this.onboardingDismissButton = page.getByRole("button", { name: "Dismiss" })
   }
 

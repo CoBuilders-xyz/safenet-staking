@@ -17,7 +17,9 @@ for (const [code, copy] of languages) {
     await page.goto("/#/dashboard")
     await layout.languageSelect.selectOption(code)
     await expect(page.getByRole("heading", { name: copy.dashboard.stakeYourSafe, exact: true })).toBeVisible()
-    await expect(page.getByRole("button", { name: copy.wallet.connectWallet, exact: true })).toBeVisible()
+    await expect(layout.header.getByRole("button", { name: copy.wallet.connectWallet, exact: true })).toBeVisible()
+    await expect(page.getByText(copy.dashboard.connectToSeeYourStakes, { exact: true })).toBeVisible()
+    await expect(page.getByRole("navigation").getByRole("link", { name: copy.header.nav.dashboard, exact: true })).toHaveAttribute("aria-current", "page")
     await expect(page.getByText(copy.onboarding.hero.dashboard.replace(/<[^>]+>/g, ""), { exact: true })).toBeVisible()
 
     await page.goto("/#/validators")

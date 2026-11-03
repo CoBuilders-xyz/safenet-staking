@@ -47,12 +47,15 @@
   "dashboard": {
     "action": "Action",
     "activeValidators": "Active Validators",
+    "browseValidators": "Browse validators",
     "claimFailed": "Claim failed",
     "claimRewards": "Claim Rewards",
     "claimYourAccumulatedSafeStakingRewards": "Claim your accumulated SAFE staking rewards.",
     "claimableSafe": "Claimable SAFE",
     "claimedSafe": "Claimed {{amount}} SAFE",
     "complianceNote": "Some rewards for <address>{{address}}</address> are pending compliance checks. Please reach out to the Safe Ecosystem Foundation at <email>legal@safefoundation.org</email>.",
+    "connectSafe": "Connect Safe",
+    "connectToSeeYourStakes": "Connect your wallet to see your stakes, rewards, and positions",
     "followTheProposalHere": "Follow the proposal here",
     "goToRewards": "Go to Rewards",
     "kycMayBeRequiredToClaimRewards": "KYC may be required to claim rewards.",
@@ -103,7 +106,7 @@
     "language": "Language",
     "lightMode": "Switch to light mode",
     "nav": {
-      "dashboard": "Dashboard",
+      "dashboard": "My stake",
       "overview": "Overview",
       "rewards": "Rewards",
       "validators": "Validators",
@@ -256,7 +259,7 @@
       "withdrawnDetail": "Withdrawn: Aegis participation unconfirmed."
     },
     "hero": {
-      "openDashboard": "Open the staking dashboard",
+      "openDashboard": "Manage my stake",
       "title": "Network overview"
     },
     "reason": {

@@ -100,7 +100,7 @@ describe("OverviewPage", () => {
   it("renders every section from the subgraphs, with freshness", () => {
     renderPage()
     expect(screen.getByRole("heading", { name: "Network overview" })).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Open the staking dashboard" })).toHaveAttribute("href", "/dashboard")
+    expect(screen.getByRole("link", { name: "Manage my stake" })).toHaveAttribute("href", "/dashboard")
     expect(screen.getByRole("status", { name: "Data freshness" })).toHaveTextContent("Mainnet subgraph: live. Last indexed block 25,900,000")
 
     expect(within(screen.getByRole("group", { name: "Total SAFE staked" })).getByText("73,000,000")).toBeInTheDocument()

@@ -26,7 +26,7 @@ export function OverviewPage() {
         subtitle={<Trans i18nKey="onboarding.hero.overview" defaults="The state of <network>Safenet</network> <staking>staking</staking> and consensus. No wallet needed." components={{ network: <Term term="safenet" children={null} />, staking: <Term term="staking" children={null} /> }} />}
       >
         <Button asChild variant="outline" className="mt-6">
-          <Link to="/dashboard">{t("overview.hero.openDashboard", "Open the staking dashboard")}</Link>
+          <Link to="/dashboard">{t("overview.hero.openDashboard", "Manage my stake")}</Link>
         </Button>
       </PageHero>
       <SectionBoundary title={t("overview.freshness.title", "Data freshness")}>

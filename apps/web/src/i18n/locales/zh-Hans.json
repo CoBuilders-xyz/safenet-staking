@@ -14,12 +14,15 @@
   "dashboard": {
     "action": "操作",
     "activeValidators": "活跃验证者",
+    "browseValidators": "浏览验证者",
     "claimFailed": "领取失败",
     "claimRewards": "领取奖励",
     "claimYourAccumulatedSafeStakingRewards": "领取累计的 SAFE 质押奖励。",
     "claimableSafe": "可领取的 SAFE",
     "claimedSafe": "已领取 {{amount}} SAFE",
     "complianceNote": "<address>{{address}}</address> 的部分奖励正在等待合规审核。请通过 <email>legal@safefoundation.org</email> 联系 Safe Ecosystem Foundation。",
+    "connectSafe": "连接 Safe",
+    "connectToSeeYourStakes": "连接钱包以查看您的质押、奖励和持仓",
     "followTheProposalHere": "在此查看提案",
     "goToRewards": "前往奖励页面",
     "kycMayBeRequiredToClaimRewards": "领取奖励可能需要 KYC 验证。",
@@ -70,7 +73,7 @@
     "language": "语言",
     "lightMode": "切换到浅色模式",
     "nav": {
-      "dashboard": "仪表板",
+      "dashboard": "我的质押",
       "overview": "概览",
       "rewards": "奖励",
       "validators": "验证者",
@@ -215,7 +218,7 @@
       "withdrawnDetail": "已退出：Aegis 参与情况未确认。"
     },
     "hero": {
-      "openDashboard": "打开质押仪表板",
+      "openDashboard": "管理我的质押",
       "title": "网络概览"
     },
     "reason": {
