@@ -27,6 +27,16 @@ test.describe("Network Overview", () => {
     await expect(page.getByRole("group", { name: "Attestations per day" })).toContainText("Gnosis subgraph")
     await expect(page.getByRole("group", { name: "Attestation latency" })).toContainText("~20 s")
 
+    const stakeHistory = page.getByRole("region", { name: "Total SAFE staked over time" })
+    await expect(stakeHistory.getByRole("img", { name: "Total SAFE staked over time" })).toBeVisible()
+    await expect(stakeHistory.getByRole("table")).toContainText("12,345")
+    const attestationHistory = page.getByRole("region", { name: "Attestations per day" })
+    await expect(attestationHistory.getByRole("img", { name: "Attestations per day" })).toBeVisible()
+    await expect(attestationHistory.getByRole("table")).toContainText("4,800")
+    await stakeHistory.getByRole("button", { name: "7 days" }).click()
+    await expect(stakeHistory.getByRole("button", { name: "7 days" })).toHaveAttribute("aria-pressed", "true")
+    await expect(page.getByText(/estimated APY/i)).toHaveCount(0)
+
     const distribution = page.getByRole("region", { name: "Stake distribution" })
     // 7,000 and 5,345 of 12,345: 56.7% and 43.3%, so HHI 3,215 + 1,875.
     await expect(distribution).toContainText("HHI 5,090")
@@ -83,6 +93,9 @@ test.describe("Network Overview", () => {
     await expect(validators).toContainText("5,000")
     await expect(validators).toContainText("99.90%")
 
+    await expect(page.getByRole("region", { name: "Total SAFE staked over time" })).toContainText("The subgraph could not be queried.")
+    await expect(page.getByRole("region", { name: "Attestations per day" })).toContainText("The subgraph could not be queried.")
+
     // A figure with no contract fallback says why it is missing.
     await expect(page.getByRole("region", { name: "Last 30 days" })).toContainText(
       "Unavailable. The subgraph could not be queried. No contract read gives a daily history.",
@@ -98,8 +111,17 @@ test.describe("Network Overview", () => {
       { timeout: 15_000 },
     )
     await expect(page.getByRole("group", { name: "Total SAFE staked" })).toContainText("10,000")
+    await expect(page.getByRole("region", { name: "Total SAFE staked over time" })).toContainText("past the 15 min limit")
+    await expect(page.getByRole("region", { name: "Attestations per day" }).getByRole("img")).toBeVisible()
     // The Gnosis subgraph is still fresh, so its figures stay.
     await expect(page.getByRole("group", { name: "Attestations per day" })).toContainText("4,800")
+  })
+
+  test("keeps the stake chart when the Gnosis index is stale", async ({ disconnectedPage: page, mockSubgraph }) => {
+    mockSubgraph.gnosis = "stale"
+    await page.goto("/")
+    await expect(page.getByRole("region", { name: "Attestations per day" })).toContainText("past the 15 min limit")
+    await expect(page.getByRole("region", { name: "Total SAFE staked over time" }).getByRole("img")).toBeVisible()
   })
 
   test("shows Aegis days from the subgraph, with no Beta notice", async ({ disconnectedPage: page }) => {

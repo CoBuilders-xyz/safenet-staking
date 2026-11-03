@@ -79,6 +79,14 @@ function mainnet(operation: string, mode: SubgraphMode, variables: Record<string
           { id: VALIDATORS.validatorC, totalStaked: "0", stakersCurrent: 0 },
         ],
       }
+    case "StakeHistory":
+      return {
+        _meta,
+        dayDatas: [
+          { date: today - DAY, totalStaked: SUBGRAPH_FIGURES.totalStaked.toString() },
+          { date: today - 3 * DAY, totalStaked: (12_000n * SAFE).toString() },
+        ],
+      }
     case "RecentDays":
       return {
         _meta,
@@ -219,6 +227,16 @@ function gnosis(operation: string, mode: SubgraphMode, variables: Record<string,
       consensusHours: page(history.consensusHours, variables.hoursAfter),
       validatorHours: page(history.validatorHours, variables.validatorHoursAfter),
     }
+  }
+  if (operation === "AttestationHistory") {
+    const _meta = meta(SUBGRAPH_FIGURES.gnosisBlock, mode)
+    if (mode === "empty" || (programme === "aegis" && !aegis)) return { _meta, consensusDays: [] }
+    if (programme !== "aegis" && programme !== "beta") throw new Error(`no mock for the programme ${String(programme)}`)
+    const today = Math.floor(Date.now() / 1000 / DAY) * DAY
+    const last = programme === "aegis" ? today : utcDayMs(BETA_END_DAY) / 1000
+    return { _meta, consensusDays: Array.from({ length: 16 }, (_, i) => ({
+      date: last - i * DAY, attestations: String(SUBGRAPH_FIGURES.attestationsPerDay),
+    })) }
   }
   if (mode === "empty") return { _meta: meta(SUBGRAPH_FIGURES.gnosisBlock, mode), firstDay: [], programmeConsensus: [], consensusDays: [], validatorDays: [] }
   if (operation !== "ConsensusWindow") throw new Error(`no mock for gnosis ${operation}`)
