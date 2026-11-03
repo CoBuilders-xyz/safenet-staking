@@ -327,6 +327,22 @@
     },
     "boundary": {
       "unavailable": "Недоступно. {{reason}}"
+    },
+    "charts": {
+      "all": "Всё время",
+      "attestations": "Аттестации по дням",
+      "days_few": "{{count}} дн.",
+      "days_many": "{{count}} дн.",
+      "days_one": "{{count}} дн.",
+      "days_other": "{{count}} дн.",
+      "empty": "Нет данных за этот период.",
+      "freshness": "{{source}}. Блок {{block}} проиндексирован в {{time}}.",
+      "gnosis": "Субграф Gnosis",
+      "mainnet": "Субграф Mainnet",
+      "programme": "Программа: {{programme}}. Только полные дни UTC.",
+      "range": "Период",
+      "stake": "Общий стейкинг SAFE по времени",
+      "tooMany": "История превышает размер страницы. График не может показать все данные."
     }
   },
   "programme": {

@@ -47,3 +47,11 @@ query RecentDays($since: Int!) {
     withdrawalCount
   }
 }
+
+query StakeHistory {
+  _meta { ...MainnetFreshness }
+  dayDatas(first: 1000, orderBy: date, orderDirection: desc) {
+    date
+    totalStaked
+  }
+}
