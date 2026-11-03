@@ -48,20 +48,20 @@ function Chart({ kind, result }: { kind: "stake" | "attestations"; result: Subgr
   const freshness = result.status === "live" ? t("overview.charts.freshness", "{{source}}. Indexed block {{block}} at {{time}}.", {
     source, block: result.freshness.block.toLocaleString("en-US"), time: formatUtcDateTime(new Date(result.freshness.blockTimestamp! * 1000).toISOString()),
   }) : source
-  return <OverviewSection title={title} source={freshness}>
-    <div className="flex gap-2" role="group" aria-label={t("overview.charts.range", "Time range")}>
+  return <OverviewSection title={title} source={freshness} className="min-w-0">
+    <div className="flex flex-wrap gap-2" role="group" aria-label={t("overview.charts.range", "Time range")}>
       {([7, 30, "all"] as const).map((r) => <Button key={r} size="sm" variant={range === r ? "default" : "outline"} aria-pressed={range === r} onClick={() => setRange(r)}>{r === "all" ? t("overview.charts.all", "All time") : t("overview.charts.days", "{{count}} days", { count: r })}</Button>)}
     </div>
-    {result.status === "loading" ? <Skeleton className="h-64 w-full" aria-label={t("overview.figure.loading", "Loading")} /> : result.status === "degraded" ? <p role="alert">{describeDegradation(result.degradation, t)}</p> : pageFull && range === "all" ? <p role="alert">{t("overview.charts.tooMany", "History exceeds the available page. The chart cannot show all data.")}</p> : visible.length === 0 ? <p>{t("overview.charts.empty", "No data is available for this range.")}</p> : <> <div className="h-64 w-full" role="img" aria-label={title}>
+    {result.status === "loading" ? <Skeleton className="h-64 w-full" aria-label={t("overview.figure.loading", "Loading")} /> : result.status === "degraded" ? <p role="alert">{describeDegradation(result.degradation, t)}</p> : pageFull && range === "all" ? <p role="alert">{t("overview.charts.tooMany", "History exceeds the available page. The chart cannot show all data.")}</p> : visible.length === 0 ? <p>{t("overview.charts.empty", "No data is available for this range.")}</p> : <> <div className="h-64 w-full min-w-0" role="img" aria-label={title}>
       <ResponsiveContainer width="100%" height="100%">
         {kind === "stake" ? <AreaChart data={visible}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tickFormatter={date} minTickGap={30} /><YAxis width={70} tickFormatter={(v: number) => v.toLocaleString("en-US", { notation: "compact" })} /><Tooltip labelFormatter={(v) => date(Number(v))} /><Area type="stepAfter" dataKey="value" name="SAFE" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.25} /></AreaChart> : <BarChart data={visible}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tickFormatter={date} minTickGap={30} /><YAxis width={70} tickFormatter={(v: number) => v.toLocaleString("en-US", { notation: "compact" })} /><Tooltip labelFormatter={(v) => date(Number(v))} /><Bar dataKey="value" name={title} fill="var(--chart-1)" /></BarChart>}
       </ResponsiveContainer>
     </div>
-    <table className="sr-only">
+    <div className="sr-only"><table>
       <caption>{title}</caption>
       <thead><tr><th scope="col">{t("overview.charts.date", "Date (UTC)")}</th><th scope="col">{title}</th></tr></thead>
       <tbody>{visible.map((point) => <tr key={point.date}><th scope="row">{date(point.date)}</th><td>{point.value.toLocaleString("en-US", { maximumFractionDigits: 2 })}</td></tr>)}</tbody>
-    </table></>}
+    </table></div></>}
     {kind === "attestations" && <p className="text-xs text-muted-foreground">{t("overview.charts.programme", "Programme: {{programme}}. Complete UTC days only.", { programme: GNOSIS_INDEXED_PROGRAMME })}</p>}
   </OverviewSection>
 }
