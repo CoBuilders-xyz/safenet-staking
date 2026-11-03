@@ -208,6 +208,7 @@
     "charts": {
       "all": "All time",
       "attestations": "Attestations per day",
+      "date": "Date (UTC)",
       "days_one": "{{count}} days",
       "days_other": "{{count}} days",
       "empty": "No data is available for this range.",

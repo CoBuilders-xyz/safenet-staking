@@ -304,6 +304,7 @@
     "charts": {
       "all": "全部时间",
       "attestations": "每日证明数",
+      "date": "日期（UTC）",
       "days_other": "{{count}} 天",
       "empty": "此时间范围内没有数据。",
       "freshness": "{{source}}。区块 {{block}} 于 {{time}} 完成索引。",

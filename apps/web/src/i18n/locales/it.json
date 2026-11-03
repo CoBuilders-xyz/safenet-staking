@@ -322,6 +322,7 @@
     "charts": {
       "all": "Tutto il periodo",
       "attestations": "Attestazioni al giorno",
+      "date": "Data (UTC)",
       "days_many": "{{count}} giorni",
       "days_one": "{{count}} giorni",
       "days_other": "{{count}} giorni",

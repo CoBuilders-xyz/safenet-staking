@@ -331,6 +331,7 @@
     "charts": {
       "all": "Всё время",
       "attestations": "Аттестации по дням",
+      "date": "Дата (UTC)",
       "days_few": "{{count}} дн.",
       "days_many": "{{count}} дн.",
       "days_one": "{{count}} дн.",

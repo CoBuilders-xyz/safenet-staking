@@ -313,6 +313,7 @@
     "charts": {
       "all": "Gesamter Zeitraum",
       "attestations": "Attestierungen pro Tag",
+      "date": "Datum (UTC)",
       "days_one": "{{count}} Tage",
       "days_other": "{{count}} Tage",
       "empty": "Keine Daten für diesen Zeitraum.",
