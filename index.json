@@ -1,0 +1,14 @@
+{
+  "schema": "safenet-snapshots-index/1",
+  "previous": null,
+  "days": {
+    "2026-11-04": {
+      "cid": "bafybeigotvi3d4vz4eaqnk3lo5uydh4opkecl3vxklffcnzlw4kwygk4qe",
+      "schema": "safenet-snapshot/1",
+      "mainnetBlock": "26337949",
+      "gnosisBlock": "49097038",
+      "blockTime": "2026-11-04T00:45:59.000Z",
+      "commit": "c5dec3ab68c6ee43fdf7f2208ad7c0db55d7b26d"
+    }
+  }
+}
