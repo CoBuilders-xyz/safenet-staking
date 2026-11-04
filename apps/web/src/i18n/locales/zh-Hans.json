@@ -300,6 +300,20 @@
     },
     "boundary": {
       "unavailable": "不可用。{{reason}}"
+    },
+    "charts": {
+      "all": "全部时间",
+      "attestations": "每日证明数",
+      "date": "日期（UTC）",
+      "days_other": "{{count}} 天",
+      "empty": "此时间范围内没有数据。",
+      "freshness": "{{source}}。区块 {{block}} 于 {{time}} 完成索引。",
+      "gnosis": "Gnosis 子图",
+      "mainnet": "Mainnet 子图",
+      "programme": "计划：{{programme}}。仅包含完整的 UTC 日。",
+      "range": "时间范围",
+      "stake": "SAFE 质押总量变化",
+      "tooMany": "历史数据超出可用页面。图表无法显示所有数据。"
     }
   },
   "programme": {

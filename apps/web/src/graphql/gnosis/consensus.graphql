@@ -40,3 +40,11 @@ query ConsensusWindow($days: Int!, $until: Int!, $programme: String!) {
     }
   }
 }
+
+query AttestationHistory($programme: String!) {
+  _meta { ...GnosisFreshness }
+  consensusDays(first: 1000, where: { programme: $programme }, orderBy: date, orderDirection: desc) {
+    date
+    attestations
+  }
+}

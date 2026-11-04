@@ -318,6 +318,22 @@
     },
     "boundary": {
       "unavailable": "Indisponible. {{reason}}"
+    },
+    "charts": {
+      "all": "Toute la période",
+      "attestations": "Attestations par jour",
+      "date": "Date (UTC)",
+      "days_many": "{{count}} jours",
+      "days_one": "{{count}} jours",
+      "days_other": "{{count}} jours",
+      "empty": "Aucune donnée pour cette période.",
+      "freshness": "{{source}}. Bloc {{block}} indexé à {{time}}.",
+      "gnosis": "Sous-graphe Gnosis",
+      "mainnet": "Sous-graphe Mainnet",
+      "programme": "Programme : {{programme}}. Jours UTC complets uniquement.",
+      "range": "Période",
+      "stake": "Total de SAFE stakés au fil du temps",
+      "tooMany": "L’historique dépasse la page disponible. Le graphique ne peut pas tout afficher."
     }
   },
   "programme": {

@@ -1,5 +1,6 @@
 import { Trans, useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
+import { HistoryChart } from "@/components/overview/HistoryCharts"
 import { PageHero } from "@/components/PageHero"
 import { Term } from "@/components/ui/term"
 import { Button } from "@/components/ui/button"
@@ -42,6 +43,10 @@ export function OverviewPage() {
         <SectionBoundary title={t("overview.rewards.title", "Rewards")}>
           <RewardsPanel />
         </SectionBoundary>
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <SectionBoundary title={t("overview.charts.stake", "Total SAFE staked over time")}><HistoryChart kind="stake" /></SectionBoundary>
+        <SectionBoundary title={t("overview.charts.attestations", "Attestations per day")}><HistoryChart kind="attestations" /></SectionBoundary>
       </div>
       <SectionBoundary title={t("overview.validators.title", "Validators")}>
         <ValidatorsPanel />

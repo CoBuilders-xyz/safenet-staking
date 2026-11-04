@@ -309,6 +309,21 @@
     },
     "boundary": {
       "unavailable": "Nicht verfügbar. {{reason}}"
+    },
+    "charts": {
+      "all": "Gesamter Zeitraum",
+      "attestations": "Attestierungen pro Tag",
+      "date": "Datum (UTC)",
+      "days_one": "{{count}} Tage",
+      "days_other": "{{count}} Tage",
+      "empty": "Keine Daten für diesen Zeitraum.",
+      "freshness": "{{source}}. Block {{block}} um {{time}} indexiert.",
+      "gnosis": "Gnosis-Subgraph",
+      "mainnet": "Mainnet-Subgraph",
+      "programme": "Programm: {{programme}}. Nur vollständige UTC-Tage.",
+      "range": "Zeitraum",
+      "stake": "Gesamter SAFE-Stake im Zeitverlauf",
+      "tooMany": "Der Verlauf überschreitet die verfügbare Seite. Nicht alle Daten können angezeigt werden."
     }
   },
   "programme": {
