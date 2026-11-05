@@ -245,6 +245,7 @@ test("a refused scan elsewhere fails the command with one sentence", async () =>
     rpcErrorText: "archive requests require a personal token at https://archive.invalid/v2/not-a-real-key",
   })
   assert.match(verbose.err, /History unavailable/)
+  assert.match(verbose.err, /^Caused by: Error: archive requests require a personal token at <url>/m)
   assert.ok(!verbose.err.includes("not-a-real-key"))
 })
 

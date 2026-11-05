@@ -1,3 +1,4 @@
+import { historyQuery, waitForIndexedBlock, historyPages } from './history-queries.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { execFileSync, spawn } from 'node:child_process';
@@ -14,23 +15,18 @@ const client=createPublicClient({transport:http('https://ethereum-rpc.publicnode
 const dir=process.argv[3];
 const env={PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:process.env.TMPDIR};
 const save=(name,data)=>writeFileSync(`${dir}/${name}.json`,JSON.stringify(data,(_,v)=>typeof v==='bigint'?String(v):v,2));
-const graphql=async(query)=>{
- // The installed command fills index lag with RPC. Wait briefly before comparing that head with the index.
- for(let attempt=0;attempt<16;attempt++) {
-  const r=await fetch(SUBGRAPH_ENDPOINTS.mainnet,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query}),signal:AbortSignal.timeout(20000)});
-  const b=await r.json(); if(r.ok && !b.errors && b.data)return b.data;
-  if(attempt===15)throw new Error('comparison subgraph request unavailable after sixteen attempts');
-  await new Promise(resolve=>setTimeout(resolve,4000));
- }
-};
+const graphql=historyQuery(SUBGRAPH_ENDPOINTS.mainnet);
 const cli=(name,args)=>{
  try {const out=execFileSync(prefix+'/node_modules/.bin/safenet',args,{cwd:prefix,env,encoding:'utf8',timeout:180000});
  writeFileSync(`${dir}/${name}.stdout`,out); return {exit:0,data:args.includes('--json')?JSON.parse(out):out};}
  catch(e){writeFileSync(`${dir}/${name}.stderr`,e.stderr??'');return {exit:e.status,error:'command failed'};}
 };
-const seed=await graphql('{ withdrawals(first: 1000) { staker } rewardAccounts(first: 1000, orderBy: claimCount, orderDirection: desc) { id claimCount } }');
-const stakers=new Set(seed.withdrawals.map(w=>w.staker));
-const addresses=seed.rewardAccounts.filter(a=>stakers.has(a.id)).slice(0,3).map(a=>a.id);
+const seedBlock=(await graphql('{ _meta {block{number}} }'))._meta.block.number;
+const seedWithdrawals=await historyPages(graphql,'withdrawals','staker',seedBlock);
+const seedAccounts=await historyPages(graphql,'rewardAccounts','claimCount',seedBlock);
+const stakers=new Set(seedWithdrawals.map(w=>w.staker));
+const addresses=seedAccounts.filter(a=>stakers.has(a.id) && a.claimCount>0)
+ .sort((a,b)=>b.claimCount-a.claimCount || a.id.localeCompare(b.id)).slice(0,3).map(a=>a.id);
 assert.equal(addresses.length,3);save('selected-addresses',addresses);console.log('Selected three accounts with claims and withdrawals');
 const receipts=new Map(); const blocks=new Map();
 const independent=createPublicClient({transport:http('https://eth.drpc.org',{retryCount:2})});
@@ -41,8 +37,9 @@ async function batches(items,fn){const out=[];for(let i=0;i<items.length;i+=4)ou
 const comparison=[];
 for(const [i,address] of [...addresses,zeroAddress].entries()){
  const run=cli(`installed-history-${i}`,['rewards','history',address,'--all','--json']);assert.equal(run.exit,0);const h=run.data;
- const indexed=await graphql(`{ rewardClaims(first: 1000, where: {account: "${address}"}, block: {number: ${h.block}}) {id amount blockNumber timestamp transactionHash} }`);
- assert.ok(indexed.rewardClaims.length<1000);assert.equal(h.count,indexed.rewardClaims.length);
+ await waitForIndexedBlock(graphql,h.block);
+ const indexed={rewardClaims:await historyPages(graphql,'rewardClaims','amount blockNumber timestamp transactionHash',h.block,`account: "${address}"`)};
+ assert.equal(h.count,indexed.rewardClaims.length);
  assert.equal(h.claims.length,h.count);assert.equal(h.totalClaimed,h.cumulativeClaimed.value);assert.equal(h.sumMatchesChain,true);
  const checks=await batches(indexed.rewardClaims,async c=>{
   const r=await receipt(c.transactionHash); const l=r.logs.find(l=>`${r.transactionHash}-${l.logIndex}`===c.id); assert.ok(l);assert.equal(l.address.toLowerCase(),CONTRACTS.merkleDrop.address.toLowerCase());
@@ -58,8 +55,10 @@ for(const [i,address] of [...addresses,zeroAddress].entries()){
 }
 save('claim-comparison',comparison);
 const w=cli('installed-network',['withdrawals','list','--json']);assert.equal(w.exit,0);
-const data=await graphql(`{ network(id: "1", block: {number: ${w.data.block}}) {withdrawalCount} withdrawals(first: 1000, block: {number: ${w.data.block}}) {id staker amount claimed initiatedAtBlock initiatedAtTimestamp initiatedTxHash claimedAtBlock claimedAtTimestamp claimedTxHash} }`);
-assert.ok(data.withdrawals.length<1000);assert.equal(data.withdrawals.length,data.network.withdrawalCount);
+await waitForIndexedBlock(graphql,w.data.block);
+const data=await graphql(`{ network(id: "1", block: {number: ${w.data.block}}) {withdrawalCount} }`);
+data.withdrawals=await historyPages(graphql,'withdrawals','staker amount claimed initiatedAtBlock initiatedAtTimestamp initiatedTxHash claimedAtBlock claimedAtTimestamp claimedTxHash',w.data.block);
+assert.equal(data.withdrawals.length,data.network.withdrawalCount);
 const withdrawalChecks=await batches(data.withdrawals,async row=>{
  for(const claimed of [false,true]){
   if(claimed && !row.claimed)continue;

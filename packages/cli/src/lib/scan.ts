@@ -31,6 +31,7 @@ export class ScanError extends SafenetError {}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+/** Read every requested block, shrinking and retrying refused ranges without skipping gaps. */
 export async function scanLogs<E extends AbiEvent>(
   ctx: Pick<Context, "client" | "retryDelayMs">,
   request: ScanRequest<E>,

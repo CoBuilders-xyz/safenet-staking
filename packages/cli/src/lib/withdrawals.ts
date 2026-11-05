@@ -40,6 +40,7 @@ export interface StakerWithdrawals {
   readonly total: bigint
 }
 
+/** Reconstruct all pending withdrawals at one head and check their sum against contract state. */
 export async function networkWithdrawals(ctx: Context): Promise<NetworkWithdrawals> {
   await requireHistoryMainnet(ctx)
   const { client } = ctx
@@ -78,7 +79,7 @@ export async function networkWithdrawals(ctx: Context): Promise<NetworkWithdrawa
       claimed: rows.size - open.length, openSum, logsMatchChain: true,
     }
   } catch (indexError) {
-    try { history = await scan(from, 1n) } catch { throw historyUnavailable(indexError) }
+    try { history = await scan(from, 1n) } catch (scanError) { throw historyUnavailable(indexError, scanError) }
   }
   const [initiated, claimed] = history
   // Keyed by staker and id. Ids come from one global counter today, but the pair cannot

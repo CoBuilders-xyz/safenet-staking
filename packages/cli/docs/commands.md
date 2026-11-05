@@ -52,7 +52,6 @@ error.
 then fill the index lag with recent RPC logs. Source fields identify complete coverage at the requested block.
 Totals are checked against the contract. Stale or partial indexes fall back to the full RPC scan.
 If both paths fail, exit 1 returns no partial document. Providers differ in range, rate and retention limits.
-The examples below retain the earlier RPC-only source strings; the JSON keys and numeric semantics are unchanged.
 `validators show` keeps its existing log scan and unavailable-count behavior.
 
 ## Reads
@@ -380,9 +379,11 @@ safenet validators show <validator address> --json
 ### `safenet withdrawals list`
 
 Without `--address`: the SAFE pending withdrawal across the network, from
-`totalPendingWithdrawals()`, and the count of withdrawals still open in the logs, checked against
+`totalPendingWithdrawals()`, and the count of withdrawals still open in the indexed history plus RPC tail, checked against
 that total. With `--address`: one staker's queue, from `getPendingWithdrawals(staker)`, with the
 time each becomes claimable.
+
+Recorded with public endpoints on 2026-11-05.
 
 | Option | What it does |
 |---|---|
@@ -393,14 +394,14 @@ safenet withdrawals list
 ```
 
 ```text
-Pending withdrawals on Ethereum Mainnet, block 26,286,986
+Pending withdrawals on Ethereum Mainnet, block 26,350,617
 
 FIGURE         VALUE                              SOURCE
-Total pending  5,924,343.977566872354969673 SAFE  chain: Staking.totalPendingWithdrawals()
-Count pending  21                                 chain: WithdrawalInitiated logs without a WithdrawalClaimed for the same staker and id, from block <Staking deploy block>
-History        118 initiated, 97 claimed          chain: WithdrawalInitiated and WithdrawalClaimed logs
+Total pending  5,924,636.414532364462762668 SAFE  chain: Staking.totalPendingWithdrawals()
+Count pending  22                                 subgraph: safenet-mainnet; complete at chain block 26350617 (index lag 0 blocks)
+History        121 initiated, 99 claimed          subgraph: safenet-mainnet; complete at chain block 26350617 (index lag 0 blocks)
 
-Check: the 21 open withdrawals in the logs sum to the total on chain.
+Check: the 22 open withdrawals in the history sum to the total on chain.
 ```
 
 ```sh
@@ -410,18 +411,18 @@ safenet withdrawals list --json
 ```json
 {
   "scope": "network",
-  "block": "26286986",
+  "block": "26350604",
   "total": {
-    "value": "5924343977566872354969673",
+    "value": "5924636414532364462762668",
     "source": "chain: Staking.totalPendingWithdrawals()"
   },
   "count": {
-    "value": 21,
-    "source": "chain: WithdrawalInitiated logs without a WithdrawalClaimed for the same staker and id, from block <Staking deploy block>"
+    "value": 22,
+    "source": "subgraph: safenet-mainnet through block 26350603; chain: logs from 26350604 through 26350604; complete at block 26350604 (index lag 1 blocks, filled by RPC)"
   },
-  "initiated": 118,
-  "claimed": 97,
-  "openSum": "5924343977566872354969673",
+  "initiated": 121,
+  "claimed": 99,
+  "openSum": "5924636414532364462762668",
   "logsMatchChain": true
 }
 ```
@@ -573,6 +574,8 @@ earned per period. A claim pays everything earned up to the root it proves, minu
 before, so one row can cover several periods, and a period that was never claimed has no row of its
 own. The total is summed over every claim, shown or not, and checked against `cumulativeClaimed()`.
 
+Recorded with public endpoints on 2026-11-05.
+
 | Argument or option | What it is |
 |---|---|
 | `<address>` | The staker's address |
@@ -583,56 +586,66 @@ safenet rewards history <staker>
 ```
 
 ```text
-Reward claims by <staker>, Ethereum Mainnet block 26,286,988
+Reward claims by <staker>, Ethereum Mainnet block 26,350,617
 
-TIME                       BLOCK                      AMOUNT  TRANSACTION
-2026-10-08 09:02 UTC  26,146,657   11.37723510768138583 SAFE  <transaction hash>
-2026-09-14 08:26 UTC  25,974,489  17.408113537074835959 SAFE  <transaction hash>
-2026-07-30 06:50 UTC  25,643,989   6.981751073554296229 SAFE  <transaction hash>
-2026-07-17 07:28 UTC  25,550,915  15.434448279446221109 SAFE  <transaction hash>
-2026-06-18 07:11 UTC  25,342,872  15.874356876256680234 SAFE  <transaction hash>
-2026-05-20 08:30 UTC  25,135,263   8.344028647739043126 SAFE  <transaction hash>
-2026-05-06 10:50 UTC  25,035,500    8.47250164042938639 SAFE  <transaction hash>
-2026-04-22 16:17 UTC  24,936,612  18.316403404121438358 SAFE  <transaction hash>
+TIME                       BLOCK                         AMOUNT  TRANSACTION
+2026-11-05 11:29 UTC  26,348,340  1,116.216663791256963135 SAFE  <transaction hash>
+2026-10-13 16:01 UTC  26,184,634  1,546.792210230086670212 SAFE  <transaction hash>
+2026-09-25 11:20 UTC  26,054,132  1,465.615775059220922006 SAFE  <transaction hash>
+2026-09-12 09:28 UTC  25,960,436  1,432.879697541463487911 SAFE  <transaction hash>
+2026-08-27 14:58 UTC  25,847,309   1,600.14712064885980802 SAFE  <transaction hash>
+2026-08-13 16:14 UTC  25,747,228  1,578.439925840300903007 SAFE  <transaction hash>
+2026-08-02 07:54 UTC  25,665,838  1,488.986549204597726744 SAFE  <transaction hash>
+2026-07-17 16:12 UTC  25,553,528  1,947.524670465458522893 SAFE  <transaction hash>
+2026-07-02 15:17 UTC  25,445,671  1,936.471928136351101263 SAFE  <transaction hash>
+2026-06-18 11:17 UTC  25,344,095  1,946.158789523412028222 SAFE  <transaction hash>
+2026-06-05 15:18 UTC  25,252,023  1,990.675309889030496262 SAFE  <transaction hash>
+2026-05-20 15:12 UTC  25,137,265  2,066.388527233289576612 SAFE  <transaction hash>
+2026-05-07 14:58 UTC  25,043,908  1,980.749431214892718761 SAFE  <transaction hash>
+2026-04-23 11:34 UTC  24,942,377  2,193.949027101514187524 SAFE  <transaction hash>
 
-8 claims, newest first.
-Claimed in total: 102.208838566303287235 SAFE, equal to chain: MerkleDrop.cumulativeClaimed(address).
-Source: chain: MerkleDrop Claimed logs for this account, from block <MerkleDrop deploy block>.
+14 claims, newest first.
+Claimed in total: 24,290.995625879735112572 SAFE, equal to chain: MerkleDrop.cumulativeClaimed(address).
+Source: subgraph: safenet-mainnet; complete at chain block 26350617 (index lag 0 blocks).
+
+Periods: not shown, because the subgraph could not give the periods (HTTP request failed.).
 ```
 
 ```sh
 safenet rewards history <staker> --json
 ```
 
-The `claims` array is cut to its first two entries here; the run returned eight.
+The `claims` array is cut to its first two entries here; the run returned 14.
 
 ```json
 {
-  "block": "26286988",
+  "block": "26350602",
   "address": "<staker>",
-  "source": "chain: MerkleDrop Claimed logs for this account, from block <MerkleDrop deploy block>",
-  "count": 8,
+  "source": "subgraph: safenet-mainnet; complete at chain block 26350602 (index lag 0 blocks)",
+  "count": 14,
   "claims": [
     {
-      "block": "26146657",
-      "time": "2026-10-08T09:02:59.000Z",
+      "block": "26348340",
+      "time": "2026-11-05T11:29:35.000Z",
       "transaction": "<transaction hash>",
-      "amount": "11377235107681385830"
+      "amount": "1116216663791256963135"
     },
     {
-      "block": "25974489",
-      "time": "2026-09-14T08:26:35.000Z",
+      "block": "26184634",
+      "time": "2026-10-13T16:01:59.000Z",
       "transaction": "<transaction hash>",
-      "amount": "17408113537074835959"
+      "amount": "1546792210230086670212"
     }
   ],
   "limited": false,
-  "totalClaimed": "102208838566303287235",
+  "totalClaimed": "24290995625879735112572",
   "cumulativeClaimed": {
-    "value": "102208838566303287235",
+    "value": "24290995625879735112572",
     "source": "chain: MerkleDrop.cumulativeClaimed(address)"
   },
-  "sumMatchesChain": true
+  "sumMatchesChain": true,
+  "periods": null,
+  "periodsReason": "the subgraph could not give the periods (HTTP request failed.)"
 }
 ```
 

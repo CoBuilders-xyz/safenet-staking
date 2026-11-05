@@ -35,6 +35,7 @@ export type IndexedClaim = z.output<typeof claimSchema>
 export type IndexedWithdrawal = z.output<typeof withdrawalSchema>
 const PAGE = 1000
 
+/** Fetch one history query with a deadline and a credential-free failure message. */
 async function query(ctx: Context, url: string, query: string): Promise<unknown> {
   // Never propagate provider bodies, URLs, or validation input: overrides may carry credentials.
   try {
@@ -49,6 +50,7 @@ async function query(ctx: Context, url: string, query: string): Promise<unknown>
   } catch { throw new SafenetError("the history subgraph request failed (HTTP, GraphQL, timeout or invalid response)") }
 }
 
+/** Verify the indexed snapshot against the captured chain head, including reorg and stale-data checks. */
 async function snapshot(ctx: Context, endpoint: string, head: bigint) {
   let parsed = metaSchema.safeParse(await query(ctx, endpoint, "{ _meta { block { number hash timestamp } hasIndexingErrors } }"))
   // The index can advance while the RPC head is captured. Ask for that earlier snapshot.
@@ -72,6 +74,7 @@ async function snapshot(ctx: Context, endpoint: string, head: bigint) {
   return { block, time: indexed.timestamp, at: `block: { hash: "${meta.hash}" }` }
 }
 
+/** Exhaust the pinned entity query and reject missing, duplicated or non-progressing pages. */
 async function pages<T extends { id: string }>(
   ctx: Context, endpoint: string, entity: string, fields: string, at: string,
   filter: string, schema: z.ZodType<T>, expected: number,
@@ -97,6 +100,7 @@ async function pages<T extends { id: string }>(
   return [...rows.values()]
 }
 
+/** Read all account claims and verify their count, payment sum and block boundaries. */
 export async function indexedClaims(ctx: Context, account: Address, head: bigint) {
   return withSubgraphFallback(subgraphUrl(ctx), async (endpoint) => {
     const snap = await snapshot(ctx, endpoint, head)
@@ -115,6 +119,7 @@ export async function indexedClaims(ctx: Context, account: Address, head: bigint
   })
 }
 
+/** Read every withdrawal, including claimed rows, and verify lifecycle fields and pending totals. */
 export async function indexedWithdrawals(ctx: Context, head: bigint) {
   return withSubgraphFallback(subgraphUrl(ctx), async (endpoint) => {
     const snap = await snapshot(ctx, endpoint, head)
@@ -137,16 +142,17 @@ export async function indexedWithdrawals(ctx: Context, head: bigint) {
   })
 }
 
+/** Describe the indexed coverage and the RPC tail that makes the result complete at its captured head. */
 export function indexedSource(block: bigint, head: bigint): string {
   if (block === head) return `subgraph: safenet-mainnet; complete at chain block ${head} (index lag 0 blocks)`
   return `subgraph: safenet-mainnet through block ${block}; chain: logs from ${block + 1n} through ${head}; complete at block ${head} (index lag ${head - block} blocks, filled by RPC)`
 }
 
 /** Both attempts failed: never return an empty or stale document as success. */
-export function historyUnavailable(indexError: unknown): SafenetError {
+export function historyUnavailable(indexError: unknown, scanError: unknown): SafenetError {
   const reason = indexError instanceof SafenetError ? indexError.message : "the indexed history or its RPC tail is unavailable"
   return new SafenetError(`History unavailable: ${reason}; the full RPC log scan also failed. No partial results returned. ` +
-    "Retry later or configure SUBGRAPH_URL_MAINNET and an RPC that serves the required logs; providers differ in range, rate and retention limits")
+    "Retry later or configure SUBGRAPH_URL_MAINNET and an RPC that serves the required logs; providers differ in range, rate and retention limits", { cause: scanError })
 }
 
 /** Read-only history is supported on Ethereum Mainnet only, including an explicit RPC override. */

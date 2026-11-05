@@ -112,6 +112,7 @@ export interface RewardsHistory {
 
 export const DEFAULT_HISTORY_LIMIT = 20
 
+/** Read every claim through a captured head, then limit only the displayed rows. */
 export async function rewardsHistory(
   ctx: Context,
   address: Address,
@@ -157,7 +158,7 @@ export async function rewardsHistory(
     }
     source = indexedSource(indexed.block, block)
   } catch (indexError) {
-    try { logs = normalize(await scanLogs(ctx, request)) } catch { throw historyUnavailable(indexError) }
+    try { logs = normalize(await scanLogs(ctx, request)) } catch (scanError) { throw historyUnavailable(indexError, scanError) }
   }
   const newestFirst = [...logs].sort((a, b) =>
     a.blockNumber === b.blockNumber ? (b.logIndex ?? 0) - (a.logIndex ?? 0) : b.blockNumber! > a.blockNumber! ? 1 : -1)
