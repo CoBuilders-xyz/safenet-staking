@@ -16,11 +16,11 @@ const env={PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:process.env.TMPDIR
 const save=(name,data)=>writeFileSync(`${dir}/${name}.json`,JSON.stringify(data,(_,v)=>typeof v==='bigint'?String(v):v,2));
 const graphql=async(query)=>{
  // The installed command fills index lag with RPC. Wait briefly before comparing that head with the index.
- for(let attempt=0;attempt<6;attempt++) {
+ for(let attempt=0;attempt<16;attempt++) {
   const r=await fetch(SUBGRAPH_ENDPOINTS.mainnet,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query}),signal:AbortSignal.timeout(20000)});
   const b=await r.json(); if(r.ok && !b.errors && b.data)return b.data;
-  if(attempt===5)throw new Error('comparison subgraph request unavailable after six attempts');
-  await new Promise(resolve=>setTimeout(resolve,2000));
+  if(attempt===15)throw new Error('comparison subgraph request unavailable after sixteen attempts');
+  await new Promise(resolve=>setTimeout(resolve,4000));
  }
 };
 const cli=(name,args)=>{
