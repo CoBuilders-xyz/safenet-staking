@@ -41,8 +41,12 @@ structured content the tool returns.
   cannot skip a gate or point the server at a URL of its choosing. A refused gate is a tool error
   with one sentence, and the report as structured content, `{ refused: true, compliance }`. The
   safenet-cli README's "Compliance gates" section describes each gate.
-- `validators_show` (its delegators count), `withdrawals_list` without `address`, and
-  `rewards_history` scan the chain's history and need an archive RPC endpoint.
+- `rewards_history` and network-wide `withdrawals_list` use paginated indexed history plus recent RPC logs.
+  They report complete coverage through the requested block and check totals against the chain.
+  A stale, incomplete or unavailable index falls back to a full RPC scan.
+  If both paths fail, the tool returns `isError`, without partial data or a false empty result.
+  Public RPC limits differ; historical logs do not inherently require archive state.
+  `validators_show` keeps its existing log scan and unavailable-count behavior.
 
 A result is structured content: the same JSON as `safenet <command> --json`. The text content
 holds a one or two sentence summary, then the same JSON, for clients that pass only text to the
@@ -56,11 +60,11 @@ The server reads these environment variables when it starts.
 | Variable | What it sets |
 |---|---|
 | `SAFENET_MCP_RPC_URL` | The Mainnet RPC endpoint |
-| `MAINNET_RPC_URL` | The endpoint when `SAFENET_MCP_RPC_URL` is not set. Without either, public endpoints are used, which refuse history scans |
+| `MAINNET_RPC_URL` | The endpoint when `SAFENET_MCP_RPC_URL` is not set. Without either, public endpoints are used |
 | `GITHUB_TOKEN` or `GH_TOKEN` | Raises the GitHub API limit for the lookup that dates SEF's participation window. Optional |
 | `IPFS_GATEWAY` | An IPFS gateway, tried before the public gateways for SEF's reward dataset. Only its origin is used. Optional |
 | `GRAPH_API_KEY` | Optional runtime Graph Network key. Full `SUBGRAPH_URL_MAINNET` wins; without either, use new-account Studio. Never printed. |
-| `SUBGRAPH_URL_MAINNET` | The Mainnet subgraph `rewards_history` reads its periods from, instead of the default Studio deployment. Optional |
+| `SUBGRAPH_URL_MAINNET` | The Mainnet subgraph `rewards_history` and network withdrawals read indexed history from, instead of the default Studio deployment. Optional |
 | `SAFENET_MCP_SANCTIONS_ENDPOINT` | A URL every write GETs first, refusing on 403 or any failure. Never printed. Optional |
 | `SAFENET_MCP_GEO_CHECK` | `1` refuses every write while this machine's IP is in a country the web interface blocks. Optional |
 | `SAFENET_MCP_ALLOW_WRITES` | `1` allows writes when a signer is also set. Anything else but `0` or nothing stops the server |
@@ -240,7 +244,7 @@ placeholder; and validator addresses are labels, as in the
       },
       {
         "name": "withdrawals_list",
-        "description": "Pending withdrawals: the network total and count, or one staker's queue when address is given. The network count needs an archive RPC endpoint."
+        "description": "Pending withdrawals: the network total and count, or one staker's queue when address is given. The network history uses indexed data and recent RPC logs, with a full log-scan fallback."
       },
       {
         "name": "rewards_check",
@@ -248,7 +252,7 @@ placeholder; and validator addresses are labels, as in the
       },
       {
         "name": "rewards_history",
-        "description": "An address's reward claims, newest first, the newest 20 unless all is true. Needs an archive RPC endpoint."
+        "description": "An address's reward claims, newest first, the newest 20 unless all is true. Uses indexed claims and recent RPC logs, with a full log-scan fallback."
       },
       {
         "name": "stake",

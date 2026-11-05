@@ -22,6 +22,8 @@ export interface ScanRequest<E extends AbiEvent> {
   readonly toBlock: bigint
   /** The first range tried. It doubles back up after a shrink. */
   readonly startChunk?: bigint
+  /** History reads can shrink to one block; existing callers keep their minimum. */
+  readonly minChunk?: bigint
 }
 
 /** A log scan that could not complete. Every range is read or the whole scan fails. */
@@ -35,6 +37,7 @@ export async function scanLogs<E extends AbiEvent>(
 ): Promise<GetLogsReturnType<E>> {
   const { client } = ctx
   const startChunk = request.startChunk ?? 50_000n
+  const minChunk = request.minChunk ?? MIN_CHUNK
   const out: GetLogsReturnType<E> = []
   let from = request.fromBlock
   let chunk = startChunk
@@ -55,8 +58,8 @@ export async function scanLogs<E extends AbiEvent>(
       attemptsAtMin = 0
       if (chunk < startChunk) chunk *= 2n
     } catch (error) {
-      if (chunk > MIN_CHUNK) {
-        chunk = chunk / 4n > MIN_CHUNK ? chunk / 4n : MIN_CHUNK
+      if (chunk > minChunk) {
+        chunk = chunk / 4n > minChunk ? chunk / 4n : minChunk
         continue
       }
       attemptsAtMin++
@@ -65,7 +68,7 @@ export async function scanLogs<E extends AbiEvent>(
         // It travels as the cause, for a caller that wants the detail.
         throw new ScanError(
           `Could not read ${request.event.name} logs for blocks ${from} to ${to}, even in ranges of ` +
-            `${MIN_CHUNK} blocks, so the scan stopped rather than skip them`,
+            `${minChunk} blocks, so the scan stopped rather than skip them`,
           { cause: error },
         )
       }

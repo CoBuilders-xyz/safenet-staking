@@ -48,9 +48,12 @@ These go before or after the command.
 Exit codes: 0 on success; 1 when the operation failed, with one sentence on stderr; 2 on a usage
 error.
 
-`validators show` (its delegators count), `withdrawals list` without `--address`, and
-`rewards history` scan the chain's logs from a contract's deploy block. The public endpoints refuse
-such scans, so these need an archive endpoint.
+`rewards history` and network-wide `withdrawals list` now read all indexed rows at one block hash,
+then fill the index lag with recent RPC logs. Source fields identify complete coverage at the requested block.
+Totals are checked against the contract. Stale or partial indexes fall back to the full RPC scan.
+If both paths fail, exit 1 returns no partial document. Providers differ in range, rate and retention limits.
+The examples below retain the earlier RPC-only source strings; the JSON keys and numeric semantics are unchanged.
+`validators show` keeps its existing log scan and unavailable-count behavior.
 
 ## Reads
 

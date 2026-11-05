@@ -238,12 +238,13 @@ test("validators show still prints when the endpoint refuses the delegators scan
 test("a refused scan elsewhere fails the command with one sentence", async () => {
   const r = await cli(["rewards", "history", STAKER], { logsRefused: true })
   assert.equal(r.code, 1)
-  assert.match(r.err, /^error: Could not read Claimed logs .*; if the endpoint refused the range, historical log scans need an archive endpoint, .*--verbose shows the error\.\n$/)
+  assert.match(r.err, /^error: History unavailable: .*No partial results returned\./)
+  assert.equal(r.out, "")
   const verbose = await cli(["rewards", "history", STAKER, "--verbose"], {
     logsRefused: true,
     rpcErrorText: "archive requests require a personal token at https://archive.invalid/v2/not-a-real-key",
   })
-  assert.match(verbose.err, /^Caused by: Error: archive requests require a personal token at <url>/m)
+  assert.match(verbose.err, /History unavailable/)
   assert.ok(!verbose.err.includes("not-a-real-key"))
 })
 
@@ -251,7 +252,7 @@ test("withdrawals list without an address gives the network total, count and a c
   const r = await cli(["withdrawals", "list"])
   assert.match(r.out, /Total pending\s+7 SAFE/)
   assert.match(r.out, /Count pending\s+1\s/)
-  assert.match(r.out, /Check: the 1 open withdrawals in the logs sum to the total on chain\./)
+  assert.match(r.out, /Check: the 1 open withdrawals in the history sum to the total on chain\./)
   // Another staker's withdrawal with an id someone else already claimed stays open.
   const shared = JSON.parse((await cli(["withdrawals", "list", "--json"], { sharedWithdrawalId: true })).out)
   assert.equal(shared.count.value, 2)

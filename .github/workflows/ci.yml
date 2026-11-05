@@ -131,3 +131,33 @@ jobs:
         run: |
           sleep 60
           pnpm verify:abis
+
+  history-packages:
+    name: history packages (no publish)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm --filter @cobuilders/safenet-cli --filter @cobuilders/safenet-mcp build
+      - name: Pack review artifacts
+        run: |
+          mkdir -p artifacts
+          npm pack ./packages/cli --pack-destination artifacts
+          npm pack ./packages/mcp --pack-destination artifacts
+          sha256sum artifacts/*.tgz > artifacts/SHA256SUMS
+          git rev-parse HEAD > artifacts/GIT_HEAD
+          cp docs/qa/COB-673.md docs/qa/COB-673-live.json docs/qa/cob-673-live.mjs artifacts/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cob-673-cli-mcp
+          path: artifacts/
+          retention-days: 14

@@ -13,11 +13,11 @@ export function renderNetworkWithdrawals(w: NetworkWithdrawals): string {
     ["Total pending", formatSafe(w.total.value), w.total.source],
     ["Count pending", formatCount(w.count.value), w.count.source],
     ["History", `${formatCount(w.initiated)} initiated, ${formatCount(w.claimed)} claimed`,
-      "chain: WithdrawalInitiated and WithdrawalClaimed logs"],
+      w.count.source],
   ]
   const check = w.logsMatchChain
-    ? `Check: the ${formatCount(w.count.value)} open withdrawals in the logs sum to the total on chain.`
-    : `Check failed: the open withdrawals in the logs sum to ${formatSafe(w.openSum)}, but the chain ` +
+    ? `Check: the ${formatCount(w.count.value)} open withdrawals in the history sum to the total on chain.`
+    : `Check failed: the open withdrawals in the history sum to ${formatSafe(w.openSum)}, but the chain ` +
       `reports ${formatSafe(w.total.value)}. The count may be wrong.`
   return [
     `Pending withdrawals on Ethereum Mainnet, block ${formatCount(w.block)}`,

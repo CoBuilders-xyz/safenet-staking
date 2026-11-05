@@ -112,3 +112,17 @@ test("MCP reward history falls back to Studio and surfaces double failure", asyn
     } finally { await s.close() }
   }
 })
+
+test("unavailable indexed history and refused RPC scans return isError without empty structured results", async () => {
+  const fake = fakeLibrary({ ...library, createContext: () => fakeContext({ subgraph: "down", logsRefused: true }) })
+  const s = await connect(readConfig({}), { fake })
+  try {
+    for (const [name, args] of [["rewards_history", { address: STAKER }], ["withdrawals_list", {}]] as const) {
+      const result = await s.call(name, args)
+      assert.equal(result.isError, true)
+      assert.equal(result.structuredContent, undefined)
+      assert.match(textOf(result), /History unavailable.*No partial results returned/)
+      assert.doesNotMatch(textOf(result), /https?:|private-provider-marker/)
+    }
+  } finally { await s.close() }
+})

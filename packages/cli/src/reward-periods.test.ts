@@ -206,7 +206,7 @@ test("period and account queries share the indexed block, while a full page stay
     ...ctx,
     fetch: async (input, init) => {
       const query = (JSON.parse(String(init?.body)) as { query: string }).query
-      queries.push(query)
+      if (!query.includes("hasIndexingErrors")) queries.push(query)
       const response = await ctx.fetch(input, init)
       if (query.includes("_meta")) return response
       const body = await response.json() as { data: { rewardClaims: unknown[] } }
@@ -277,7 +277,7 @@ test("period-query fallback reads Studio metadata and pins periods to Studio's o
     fetch: async (input, init) => {
       const query = (JSON.parse(String(init?.body)) as { query: string }).query
       const isGateway = String(input) === gateway
-      queries.push({ gateway: isGateway, query })
+      if (!query.includes("hasIndexingErrors")) queries.push({ gateway: isGateway, query })
       if (isGateway) {
         if (query.includes("_meta")) return Response.json({ data: { _meta: { block: { number: Number(BLOCK + 100n), timestamp: null } } } })
         return new Response("unavailable", { status: 503 })
