@@ -14,7 +14,7 @@
  * the claims are one consistent view, and no chain read is later than that block. What a period
  * paid out to stakers is not on chain: SEF's files hold it. So a row shows claims, not earnings.
  */
-import type { Address, Hash, Hex } from "viem"
+import { BaseError, HttpRequestError, type Address, type Hash, type Hex } from "viem"
 import { CONTRACTS, withSubgraphFallback, SUBGRAPH_ENDPOINTS, SUBGRAPH_STALE_AFTER_SECONDS, merkleDropAbi,
   rewardPeriodWindows, attributeRewardClaims, compareRewardPeriodEnds } from "@cobuilders/safenet-core"
 import type { Context } from "./context.js"
@@ -52,6 +52,16 @@ export interface RewardPeriods {
   readonly periods: readonly RewardPeriod[]
   /** Every period's subgraph figure equals the chain's at the same block. */
   readonly allMatch: boolean
+}
+
+/** Distinguishes RPC verification failures from successful subgraph queries. Never contains provider text. */
+class RewardPeriodsRpcError extends Error {}
+
+/** Retain the HTTP status, when available, without copying credential-bearing URLs or response bodies. */
+function periodRpcFailure(error: unknown, operation: string): RewardPeriodsRpcError {
+  const http = error instanceof BaseError ? error.walk((cause) => cause instanceof HttpRequestError) : undefined
+  const status = http instanceof HttpRequestError && http.status !== undefined ? ` (HTTP ${http.status})` : ""
+  return new RewardPeriodsRpcError(`${operation}${status}`)
 }
 
 /** At most this many entities per query. More would need paging; the reader says so instead. */
@@ -94,8 +104,8 @@ export function subgraphUrl(ctx: Context): string {
 }
 
 /**
- * The periods for `address`. Throws when the subgraph cannot answer; the caller reports that and
- * shows the claims it read from the chain.
+ * The periods for `address`. Subgraph and RPC verification failures remain distinct; the caller
+ * reports the failed stage while retaining independently verified claim history.
  */
 export async function readRewardPeriods(ctx: Context, address: Address): Promise<RewardPeriods> {
   const url = subgraphUrl(ctx)
@@ -118,8 +128,12 @@ export async function readRewardPeriods(ctx: Context, address: Address): Promise
   const windows = rewardPeriodWindows(data.rewardPeriods, head, data.network?.rewardPeriods)
 
   const [chainHead, headBlock] = await Promise.all([
-    ctx.client.getBlock(),
-    ctx.client.getBlock({ blockNumber: head }),
+    ctx.client.getBlock().catch((error: unknown) => {
+      throw periodRpcFailure(error, "the RPC could not read the chain head for reward periods")
+    }),
+    ctx.client.getBlock({ blockNumber: head }).catch((error: unknown) => {
+      throw periodRpcFailure(error, `the RPC could not read indexed block ${head} for reward periods`)
+    }),
   ])
   const headTime = new Date(Number(headBlock.timestamp) * 1000)
   const stale = Number(chainHead.timestamp - headBlock.timestamp) > SUBGRAPH_STALE_AFTER_SECONDS
@@ -133,6 +147,11 @@ export async function readRewardPeriods(ctx: Context, address: Address): Promise
       ctx.client.readContract({
         address: CONTRACTS.merkleDrop.address, abi: merkleDropAbi, functionName: "cumulativeClaimed",
         args: [address], blockNumber: r.endBlock,
+      }).catch((error: unknown) => {
+        const failure = periodRpcFailure(error,
+          `the RPC could not verify reward period ${r.distribution.period}: historical eth_call ` +
+          `MerkleDrop.cumulativeClaimed(address) failed at block ${r.endBlock}`)
+        throw new RewardPeriodsRpcError(`${failure.message}; use an RPC with historical contract-state access`)
       })))))
   }
 
@@ -162,6 +181,7 @@ export async function readRewardPeriods(ctx: Context, address: Address): Promise
 
 /** A failed read as the end of a sentence, without the endpoint's URL. */
 export function periodsFailure(err: unknown): string {
+  if (err instanceof RewardPeriodsRpcError) return err.message
   const text = err instanceof Error ? (err.message.split("\n")[0] ?? err.name) : String(err)
   return `the subgraph could not give the periods (${redactUrls(text)})`
 }

@@ -38,6 +38,8 @@ export interface FakeOptions {
   readonly rpcError?: Error
   /** eth_getLogs rejects, as the public endpoints do for historical ranges. */
   readonly logsRefused?: boolean
+  /** Only historical cumulativeClaimed eth_call fails; head state and logs still succeed. */
+  readonly historicalStateError?: Error
   /** The message eth_getLogs rejects with when `logsRefused` is set. */
   readonly rpcErrorText?: string
   /** Replaces SEF's rewards/latest.json, network-info.json or validator-info.json, to test a changed shape. */
@@ -221,6 +223,9 @@ function fakeClient(o: FakeOptions, sends: SendLog): PublicClient {
     },
     readContract: async (p: { functionName: string; args?: readonly unknown[]; blockNumber?: bigint }) => {
       fail()
+      if (o.historicalStateError && p.functionName === "cumulativeClaimed" && p.blockNumber !== undefined && p.blockNumber < BLOCK) {
+        throw o.historicalStateError
+      }
       const read = reads[p.functionName]
       if (!read) throw new Error(`fake chain: no ${p.functionName}`)
       return read(p.args ?? [], p.blockNumber)

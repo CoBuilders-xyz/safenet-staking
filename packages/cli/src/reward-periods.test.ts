@@ -294,3 +294,46 @@ test("period-query fallback reads Studio metadata and pins periods to Studio's o
   assert.equal(result.periods?.subgraph.block, BLOCK)
   assert.equal(result.periods?.allMatch, true)
 })
+
+test("successful subgraph queries plus denied historical state identify the RPC stage in CLI JSON and text", async () => {
+  const { HttpRequestError, BaseError } = await import("viem")
+  // Mirrors viem's nested contract/call/HTTP errors, with a synthetic credential-bearing URL.
+  const historicalStateError = new BaseError("outer provider text must not escape", {
+    cause: new HttpRequestError({ url: "https://rpc.invalid/private-marker", status: 403, details: "private-provider-marker" }),
+  })
+  for (const flags of [[], ["--json"]]) {
+    const r = await history({ historicalStateError }, ...flags)
+    assert.equal(r.code, 0)
+    assert.match(r.out, /the RPC could not verify reward period 1: historical eth_call/)
+    assert.match(r.out, /block 25999995.*HTTP 403/)
+    assert.match(r.out, /historical contract-state access/)
+    assert.doesNotMatch(r.out + r.err, /subgraph could not give|private-marker|private-provider-marker|outer provider text/)
+    if (flags.length) {
+      const h = JSON.parse(r.out)
+      assert.equal(h.periods, null)
+      assert.equal(h.count, 2)
+      assert.equal(h.sumMatchesChain, true)
+    }
+  }
+})
+
+test("historical state transport failures stay explicit without claiming HTTP denial or subgraph failure", async () => {
+  const r = await history({ historicalStateError: new Error("timeout at https://rpc.invalid/private-marker") }, "--json")
+  const h = JSON.parse(r.out)
+  assert.equal(r.code, 0)
+  assert.equal(h.periods, null)
+  assert.match(h.periodsReason, /the RPC could not verify reward period 1/)
+  assert.doesNotMatch(h.periodsReason, /HTTP|private-marker|subgraph/)
+})
+
+test("RPC block metadata failures are distinguished from GraphQL errors", async () => {
+  const { readRewardPeriods, periodsFailure } = await import("./lib/reward-periods.js")
+  const ctx = fakeContext()
+  await assert.rejects(readRewardPeriods({
+    ...ctx, client: { ...ctx.client, getBlock: async () => { throw new Error("private-marker") } },
+  }, STAKER), (error: unknown) => {
+    assert.match(periodsFailure(error), /the RPC could not read .* for reward periods/)
+    assert.doesNotMatch(periodsFailure(error), /private-marker|subgraph/)
+    return true
+  })
+})

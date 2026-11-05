@@ -126,3 +126,21 @@ test("unavailable indexed history and refused RPC scans return isError without e
     }
   } finally { await s.close() }
 })
+
+test("MCP distinguishes historical RPC state denial from successful subgraph reads", async () => {
+  const { HttpRequestError } = await import("viem")
+  const fake = fakeLibrary({ ...library, createContext: () => fakeContext({
+    historicalStateError: new HttpRequestError({ url: "https://rpc.invalid/private-marker", status: 403 }),
+  }) })
+  const s = await connect(readConfig({}), { fake })
+  try {
+    const result = await s.call("rewards_history", { address: STAKER })
+    assert.equal(result.isError, undefined)
+    assert.equal(result.structuredContent?.periods, null)
+    assert.equal(result.structuredContent?.count, 2)
+    assert.equal(result.structuredContent?.sumMatchesChain, true)
+    assert.match(textOf(result), /the RPC could not verify reward period 1: historical eth_call/)
+    assert.match(textOf(result), /HTTP 403/)
+    assert.doesNotMatch(JSON.stringify(result), /private-marker|subgraph could not give/)
+  } finally { await s.close() }
+})

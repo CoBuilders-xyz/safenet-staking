@@ -574,7 +574,7 @@ earned per period. A claim pays everything earned up to the root it proves, minu
 before, so one row can cover several periods, and a period that was never claimed has no row of its
 own. The total is summed over every claim, shown or not, and checked against `cumulativeClaimed()`.
 
-Recorded with public endpoints on 2026-11-05.
+Recorded with PublicNode on 2026-11-05; its historical state requests returned HTTP 403.
 
 | Argument or option | What it is |
 |---|---|
@@ -582,11 +582,11 @@ Recorded with public endpoints on 2026-11-05.
 | `--all` | Every claim. Without it, the newest 20 |
 
 ```sh
-safenet rewards history <staker>
+safenet --rpc-url https://ethereum-rpc.publicnode.com rewards history <staker>
 ```
 
 ```text
-Reward claims by <staker>, Ethereum Mainnet block 26,350,617
+Reward claims by <staker>, Ethereum Mainnet block 26,350,832
 
 TIME                       BLOCK                         AMOUNT  TRANSACTION
 2026-11-05 11:29 UTC  26,348,340  1,116.216663791256963135 SAFE  <transaction hash>
@@ -606,22 +606,22 @@ TIME                       BLOCK                         AMOUNT  TRANSACTION
 
 14 claims, newest first.
 Claimed in total: 24,290.995625879735112572 SAFE, equal to chain: MerkleDrop.cumulativeClaimed(address).
-Source: subgraph: safenet-mainnet; complete at chain block 26350617 (index lag 0 blocks).
+Source: subgraph: safenet-mainnet; complete at chain block 26350832 (index lag 0 blocks).
 
-Periods: not shown, because the subgraph could not give the periods (HTTP request failed.).
+Periods: not shown, because the RPC could not verify reward period 6: historical eth_call MerkleDrop.cumulativeClaimed(address) failed at block 25440330 (HTTP 403); use an RPC with historical contract-state access.
 ```
 
 ```sh
-safenet rewards history <staker> --json
+safenet --rpc-url https://ethereum-rpc.publicnode.com rewards history <staker> --json
 ```
 
 The `claims` array is cut to its first two entries here; the run returned 14.
 
 ```json
 {
-  "block": "26350602",
+  "block": "26350827",
   "address": "<staker>",
-  "source": "subgraph: safenet-mainnet; complete at chain block 26350602 (index lag 0 blocks)",
+  "source": "subgraph: safenet-mainnet; complete at chain block 26350827 (index lag 0 blocks)",
   "count": 14,
   "claims": [
     {
@@ -645,7 +645,7 @@ The `claims` array is cut to its first two entries here; the run returned 14.
   },
   "sumMatchesChain": true,
   "periods": null,
-  "periodsReason": "the subgraph could not give the periods (HTTP request failed.)"
+  "periodsReason": "the RPC could not verify reward period 6: historical eth_call MerkleDrop.cumulativeClaimed(address) failed at block 25440330 (HTTP 403); use an RPC with historical contract-state access"
 }
 ```
 

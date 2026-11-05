@@ -525,3 +525,9 @@ The in-repo version is `0.1.0-beta.1`, the first OIDC publish candidate after Au
 CI uses npm Trusted Publishing (GitHub OIDC), with dist-tag `beta` and no permanent npm token.
 Publishing beta.1 moves `beta`; `latest` stays at beta.0 until Augusto removes it from his authenticated session.
 See [NPM-RELEASE.md](https://github.com/CoBuilders-xyz/safenet-staking/blob/main/NPM-RELEASE.md) for the operator checklist.
+
+Period comparisons use the same subgraph endpoint as claim history, then verify
+`cumulativeClaimed(address)` through historical RPC `eth_call` requests at each period end.
+A provider can serve current balances and recent logs while refusing those historical state reads.
+Such failures identify the RPC operation and block in `periodsReason`; they do not imply a failed GraphQL query.
+Use an RPC with historical contract-state access to obtain verified periods.

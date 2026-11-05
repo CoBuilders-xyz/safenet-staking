@@ -155,7 +155,7 @@ jobs:
           npm pack ./packages/mcp --pack-destination artifacts
           sha256sum artifacts/*.tgz > artifacts/SHA256SUMS
           git rev-parse HEAD > artifacts/GIT_HEAD
-          cp docs/qa/COB-673.md docs/qa/COB-673-live.json docs/qa/cob-673-live.mjs docs/qa/history-queries.mjs artifacts/
+          cp docs/qa/COB-673.md artifacts/
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cob-673-cli-mcp
