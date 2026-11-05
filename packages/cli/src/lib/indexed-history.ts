@@ -52,11 +52,26 @@ async function query(ctx: Context, url: string, query: string): Promise<unknown>
 
 /** Verify the indexed snapshot against the captured chain head, including reorg and stale-data checks. */
 async function snapshot(ctx: Context, endpoint: string, head: bigint) {
-  let parsed = metaSchema.safeParse(await query(ctx, endpoint, "{ _meta { block { number hash timestamp } hasIndexingErrors } }"))
+  const parsed = metaSchema.safeParse(await query(ctx, endpoint, "{ _meta { block { number hash timestamp } hasIndexingErrors } }"))
   // The index can advance while the RPC head is captured. Ask for that earlier snapshot.
   if (parsed.success && BigInt(parsed.data._meta.block.number) > head) {
-    parsed = metaSchema.safeParse(await query(ctx, endpoint,
+    const pinned = z.object({ _meta: z.object({
+      hasIndexingErrors: z.literal(false),
+      block: z.object({ number: count, hash: hash.nullable(), timestamp: count.nullable() }),
+    }) }).safeParse(await query(ctx, endpoint,
       `{ _meta(block: { number: ${head} }) { block { number hash timestamp } hasIndexingErrors } }`))
+    if (!pinned.success || BigInt(pinned.data._meta.block.number) !== head) {
+      throw new SafenetError("the history subgraph metadata is incomplete or has indexing errors")
+    }
+    // Graph Node omits hash/time for historical metadata. Pin entity reads to the RPC hash instead.
+    const block = await ctx.client.getBlock({ blockNumber: head })
+    const meta = pinned.data._meta.block
+    if (!hash.safeParse(block.hash).success ||
+      (meta.hash !== null && meta.hash !== block.hash) ||
+      (meta.timestamp !== null && BigInt(meta.timestamp) !== block.timestamp)) {
+      throw new SafenetError("the history subgraph block does not match the chain")
+    }
+    return { block: head, time: block.timestamp, at: `block: { hash: "${block.hash}" }` }
   }
   if (!parsed.success) throw new SafenetError("the history subgraph metadata is incomplete or has indexing errors")
   const meta = parsed.data._meta.block

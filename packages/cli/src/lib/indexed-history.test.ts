@@ -191,8 +191,8 @@ test("an index ahead of the captured RPC head can serve the earlier requested sn
   const ctx = { ...f.ctx, fetch: (async (url, init) => {
     const q = JSON.parse(String(init?.body)).query as string
     if (q.includes("hasIndexingErrors")) return Response.json({ data: { _meta: {
-      block: { number: Number(q.includes("_meta(block:") ? HEAD : HEAD + 1n), hash: HASH,
-        timestamp: Number(BLOCK_TIME + (q.includes("_meta(block:") ? 2n : 3n) * 12n) }, hasIndexingErrors: false,
+      block: { number: Number(q.includes("_meta(block:") ? HEAD : HEAD + 1n), hash: q.includes("_meta(block:") ? null : HASH,
+        timestamp: q.includes("_meta(block:") ? null : Number(BLOCK_TIME + 3n * 12n) }, hasIndexingErrors: false,
     } } })
     return f.ctx.fetch(url, init)
   }) as typeof fetch }
@@ -200,6 +200,26 @@ test("an index ahead of the captured RPC head can serve the earlier requested sn
   assert.equal(result.count, 2)
   assert.match(result.source, /index lag 0 blocks/)
   assert.equal(f.ranges.length, 0)
+  assert.ok(f.queries.filter((q) => q.includes("rewardClaims(")).every((q) => q.includes(`block: { hash: "${HASH}" }`)))
+})
+
+test("historical metadata still rejects indexing errors, wrong blocks and conflicting hashes", async () => {
+  for (const bad of [
+    { block: { number: Number(HEAD), hash: null, timestamp: null }, hasIndexingErrors: true },
+    { block: { number: Number(HEAD - 1n), hash: null, timestamp: null }, hasIndexingErrors: false },
+    { block: { number: Number(HEAD), hash: fakeRoot(901), timestamp: null }, hasIndexingErrors: false },
+  ]) {
+    const f = fixture()
+    const ctx = { ...f.ctx, fetch: (async (url, init) => {
+      const q = JSON.parse(String(init?.body)).query as string
+      if (q.includes("hasIndexingErrors")) return Response.json({ data: { _meta: q.includes("_meta(block:") ? bad : {
+        block: { number: Number(HEAD + 1n), hash: HASH, timestamp: Number(BLOCK_TIME + 36n) }, hasIndexingErrors: false,
+      } } })
+      return f.ctx.fetch(url, init)
+    }) as typeof fetch }
+    await assert.rejects(indexedClaims(ctx, STAKER, HEAD), /metadata is incomplete|does not match the chain/)
+    assert.equal(f.queries.length, 0)
+  }
 })
 
 test("a duplicate page, even with a matching aggregate count, cannot loop or silently dedupe", async () => {
