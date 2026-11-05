@@ -16,5 +16,5 @@ The SVG's existing padding stays intact. Raster icons have a solid black backgro
 The Python standard library packages the 16/32/48 PNG frames into both ICO files.
 No raster resizing, upscaling, or tracing occurs.
 
-The Safari mask copies the original SVG geometry and changes white fill to black.
-Its background remains transparent.
+The Safari mask uses a 16×16 canvas and scales the original path by 16/346.
+It preserves the shape and padding, with black fill and a transparent background.

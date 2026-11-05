@@ -3,6 +3,7 @@ from pathlib import Path
 import struct
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 public = Path(__file__).resolve().parents[1] / "public"
 source = public / "brand/cobuilders-mark.svg"
@@ -45,7 +46,13 @@ ico += b"".join(frames[size] for size in (16, 32, 48))
 for name in ("favicon.ico", "favicon-dot.ico"):
     (public / name).write_bytes(ico)
 
-# Preserve the original path and transparent canvas; change only the mark color.
-(public / "safari-pinned-tab.svg").write_text(
-    source.read_text().replace('fill="white"', 'fill="#000000"')
-)
+# Safari requires a 16-unit canvas. Scale the path to preserve shape and padding.
+ET.register_namespace("", "http://www.w3.org/2000/svg")
+mask = ET.fromstring(source.read_text())
+mask.set("width", "16")
+mask.set("height", "16")
+mask.set("viewBox", "0 0 16 16")
+path = mask.find("{http://www.w3.org/2000/svg}path")
+path.set("fill", "#000000")
+path.set("transform", f"scale({16 / 346})")
+(public / "safari-pinned-tab.svg").write_text(ET.tostring(mask, encoding="unicode") + "\n")
