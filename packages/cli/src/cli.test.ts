@@ -245,7 +245,7 @@ test("a refused scan elsewhere fails the command with one sentence", async () =>
     rpcErrorText: "archive requests require a personal token at https://archive.invalid/v2/not-a-real-key",
   })
   assert.match(verbose.err, /History unavailable/)
-  assert.match(verbose.err, /^Caused by: Error: archive requests require a personal token at <url>/m)
+  assert.match(verbose.err, /^Caused by: RPC log request failed \(provider details omitted\)\./m)
   assert.ok(!verbose.err.includes("not-a-real-key"))
 })
 
@@ -314,4 +314,29 @@ test("rewards history lists claims newest first and checks them against the chai
   assert.deepEqual(j.claims.map((c: { amount: string }) => c.amount), ["4000000000000000000", "6000000000000000000"])
   assert.equal(j.limited, false)
   assert.equal(j.sumMatchesChain, true)
+})
+
+
+test("verbose history failures print HTTP status without provider-controlled messages, stacks or short credentials", async () => {
+  const { BaseError, HttpRequestError } = await import("viem")
+  const providerError = new BaseError("synthetic-short-key rejected", {
+    cause: new HttpRequestError({
+      url: "https://rpc.invalid/synthetic-url-key", status: 403,
+      details: "API credential synthetic-short-key was rejected",
+    }),
+  })
+  for (const args of [["rewards", "history", STAKER], ["withdrawals", "list"]]) {
+    const rt = fakeRuntime({ subgraph: "down" })
+    const code = await run([...args, "--verbose", "--json"], {
+      ...rt,
+      createContext: (options) => {
+        const ctx = rt.createContext(options)
+        return { ...ctx, client: { ...ctx.client, getLogs: async () => { throw providerError } } }
+      },
+    })
+    assert.equal(code, 1)
+    assert.equal(rt.stdout(), "")
+    assert.match(rt.stderr(), /Caused by: RPC log request failed \(HTTP 403\)\./)
+    assert.doesNotMatch(rt.stdout() + rt.stderr(), /synthetic-short-key|synthetic-url-key|API credential|rpc\.invalid/)
+  }
 })
