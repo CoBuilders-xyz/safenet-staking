@@ -7,6 +7,7 @@
  */
 import { subgraphEndpoints } from "@cobuilders/safenet-core"
 import { Command, CommanderError } from "commander"
+import { BaseError, HttpRequestError } from "viem"
 import pkg from "../package.json" with { type: "json" }
 import {
   ComplianceRefusal, createContext, errorSentence as librarySentence, redactUrls, rpcEndpoints, rpcHosts, scrubSecrets, ScanError, SafenetError,
@@ -170,10 +171,15 @@ export async function run(argv: readonly string[], runtime: Runtime): Promise<nu
     runtime.io.err(`error: ${errorSentence(err)}\n`)
     if ((argv.includes("--verbose") || argv.includes("-v")) && err instanceof Error && err.stack) {
       runtime.io.err(`${redactUrls(err.stack)}\n`)
-      // A scan wraps the RPC error that ended it. Show it, with URLs removed like everything else.
-      if (err instanceof ScanError && err.cause !== undefined) {
-        const cause = err.cause instanceof Error ? (err.cause.stack ?? err.cause.message) : String(err.cause)
-        runtime.io.err(`Caused by: ${redactUrls(cause)}\n`)
+      // Provider messages and stacks can echo short credentials outside URLs. Only print a validated status.
+      const scan = err instanceof ScanError ? err
+        : err instanceof SafenetError && err.cause instanceof ScanError ? err.cause : undefined
+      if (scan?.cause !== undefined) {
+        const http = scan.cause instanceof BaseError
+          ? scan.cause.walk((cause) => cause instanceof HttpRequestError) : undefined
+        const status = http instanceof HttpRequestError && typeof http.status === "number" &&
+          Number.isInteger(http.status) && http.status >= 100 && http.status <= 599 ? http.status : undefined
+        runtime.io.err(`Caused by: RPC log request failed (${status === undefined ? "provider details omitted" : `HTTP ${status}`}).\n`)
       }
     }
     return 1

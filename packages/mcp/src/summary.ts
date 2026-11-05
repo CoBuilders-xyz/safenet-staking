@@ -16,8 +16,7 @@ export const safe = (wei: bigint): string => `${formatUnits(wei, 18)} SAFE`
  * endpoint is the server's business, as it is the CLI's.
  */
 export const ARCHIVE_ADVICE =
-  "if the endpoint refused the range, historical log scans need an archive endpoint, which the public " +
-  "endpoints are not, so start the server with SAFENET_MCP_RPC_URL or MAINNET_RPC_URL set to one"
+  "RPC providers differ in log range, rate and retention limits; use an endpoint that serves the required logs; set SAFENET_MCP_RPC_URL or MAINNET_RPC_URL"
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 

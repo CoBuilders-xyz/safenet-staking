@@ -112,3 +112,35 @@ test("MCP reward history falls back to Studio and surfaces double failure", asyn
     } finally { await s.close() }
   }
 })
+
+test("unavailable indexed history and refused RPC scans return isError without empty structured results", async () => {
+  const fake = fakeLibrary({ ...library, createContext: () => fakeContext({ subgraph: "down", logsRefused: true }) })
+  const s = await connect(readConfig({}), { fake })
+  try {
+    for (const [name, args] of [["rewards_history", { address: STAKER }], ["withdrawals_list", {}]] as const) {
+      const result = await s.call(name, args)
+      assert.equal(result.isError, true)
+      assert.equal(result.structuredContent, undefined)
+      assert.match(textOf(result), /History unavailable.*No partial results returned/)
+      assert.doesNotMatch(textOf(result), /https?:|private-provider-marker/)
+    }
+  } finally { await s.close() }
+})
+
+test("MCP distinguishes historical RPC state denial from successful subgraph reads", async () => {
+  const { HttpRequestError } = await import("viem")
+  const fake = fakeLibrary({ ...library, createContext: () => fakeContext({
+    historicalStateError: new HttpRequestError({ url: "https://rpc.invalid/private-marker", status: 403 }),
+  }) })
+  const s = await connect(readConfig({}), { fake })
+  try {
+    const result = await s.call("rewards_history", { address: STAKER })
+    assert.equal(result.isError, undefined)
+    assert.equal(result.structuredContent?.periods, null)
+    assert.equal(result.structuredContent?.count, 2)
+    assert.equal(result.structuredContent?.sumMatchesChain, true)
+    assert.match(textOf(result), /the RPC could not verify reward period 1: historical eth_call/)
+    assert.match(textOf(result), /HTTP 403/)
+    assert.doesNotMatch(JSON.stringify(result), /private-marker|subgraph could not give/)
+  } finally { await s.close() }
+})

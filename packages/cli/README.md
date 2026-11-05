@@ -95,10 +95,14 @@ Global options, before or after the command:
 Exit codes: 0 on success; 1 when the operation failed, with one sentence on stderr; 2 on a usage
 error.
 
-`validators show` (its delegators count), `withdrawals list` without `--address`, and
-`rewards history` scan the chain's history and need an archive RPC endpoint. The public endpoints
-refuse such scans. `validators show` still prints without one and marks the delegators count
-unavailable.
+`rewards history` and network-wide `withdrawals list` read the public Mainnet subgraph first.
+They page every row at one verified block hash, then read recent RPC logs through the requested head.
+The source states the indexed block, lag and completed coverage. Totals must match the contract.
+An unavailable, incomplete or stale index falls back to a full RPC log scan.
+If neither path completes, the command exits 1 without a partial JSON document or a false empty result.
+RPC providers differ in log range, rate and retention limits; historical logs do not inherently require archive state.
+`validators show` keeps its existing log scan and marks its delegators count unavailable if that scan fails.
+
 
 ## Writes and `--dry-run`
 
@@ -212,7 +216,7 @@ The web visitor endpoint remains unset; CLI operators can still supply their own
 | `GITHUB_TOKEN` or `GH_TOKEN` | Raises the GitHub API limit for the lookup that dates SEF's participation window. Optional |
 | `IPFS_GATEWAY` | An IPFS gateway, tried before the public gateways for SEF's reward dataset. Only its origin is used: a path such as `/ipfs/` is dropped. Optional |
 | `GRAPH_API_KEY` | Optional runtime Graph Network key. Full `SUBGRAPH_URL_MAINNET` wins; without either, use new-account Studio. Never printed. |
-| `SUBGRAPH_URL_MAINNET` | The Mainnet subgraph `rewards history` reads its periods from, instead of the Studio deployment in `packages/core`. Never printed. Optional |
+| `SUBGRAPH_URL_MAINNET` | The Mainnet subgraph `rewards history` and network withdrawals read indexed history from, instead of the Studio deployment in `packages/core`. Never printed. Optional |
 
 An RPC URL can carry a key. It is never printed: `--verbose` shows the host only, and error
 messages have URLs removed.
@@ -248,3 +252,9 @@ The in-repo version is `0.1.0-beta.1`, the first OIDC publish candidate after Au
 CI uses npm Trusted Publishing (GitHub OIDC), with dist-tag `beta` and no permanent npm token.
 Publishing beta.1 moves `beta`; `latest` stays at beta.0 until Augusto removes it from his authenticated session.
 See [NPM-RELEASE.md](https://github.com/CoBuilders-xyz/safenet-staking/blob/main/NPM-RELEASE.md) for the operator checklist.
+
+Period comparisons use the same subgraph endpoint as claim history, then verify
+`cumulativeClaimed(address)` through historical RPC `eth_call` requests at each period end.
+A provider can serve current balances and recent logs while refusing those historical state reads.
+Such failures identify the RPC operation and block in `periodsReason`; they do not imply a failed GraphQL query.
+Use an RPC with historical contract-state access to obtain verified periods.

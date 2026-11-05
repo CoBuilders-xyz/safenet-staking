@@ -4,6 +4,8 @@ import { CONTRACTS, indexedEvent, stakingAbi } from "@cobuilders/safenet-core"
 import type { Context } from "./context.js"
 import { figure, type Figure } from "./figure.js"
 import { scanLogs } from "./scan.js"
+import { indexedWithdrawals, indexedSource, historyUnavailable, requireHistoryMainnet } from "./indexed-history.js"
+import { SafenetError } from "./errors.js"
 
 export interface NetworkWithdrawals {
   readonly scope: "network"
@@ -38,16 +40,48 @@ export interface StakerWithdrawals {
   readonly total: bigint
 }
 
+/** Reconstruct all pending withdrawals at one head and check their sum against contract state. */
 export async function networkWithdrawals(ctx: Context): Promise<NetworkWithdrawals> {
+  await requireHistoryMainnet(ctx)
   const { client } = ctx
   const staking = CONTRACTS.staking.address
   const block = await client.getBlockNumber()
   const from = CONTRACTS.staking.deployBlock
-  const [total, initiated, claimed] = await Promise.all([
-    client.readContract({ address: staking, abi: stakingAbi, functionName: "totalPendingWithdrawals", blockNumber: block }),
-    scanLogs(ctx, { address: staking, event: indexedEvent("staking", "WithdrawalInitiated"), fromBlock: from, toBlock: block }),
-    scanLogs(ctx, { address: staking, event: indexedEvent("staking", "WithdrawalClaimed"), fromBlock: from, toBlock: block }),
+  const total = await client.readContract({ address: staking, abi: stakingAbi, functionName: "totalPendingWithdrawals", blockNumber: block })
+  const scan = async (fromBlock: bigint, minChunk?: bigint) => Promise.all([
+    scanLogs(ctx, { address: staking, event: indexedEvent("staking", "WithdrawalInitiated"), fromBlock, toBlock: block, ...(minChunk === undefined ? {} : { minChunk }) }),
+    scanLogs(ctx, { address: staking, event: indexedEvent("staking", "WithdrawalClaimed"), fromBlock, toBlock: block, ...(minChunk === undefined ? {} : { minChunk }) }),
   ])
+  let history: Awaited<ReturnType<typeof scan>>
+  try {
+    const indexed = await indexedWithdrawals(ctx, block)
+    const rows = new Map(indexed.rows.map((r) => [`${r.staker}:${r.id}`, { amount: r.amount, claimed: r.claimed }]))
+    const [initiations, claims] = await scan(indexed.block + 1n, 1n)
+    for (const log of initiations) {
+      const { staker, withdrawalId, amount } = log.args
+      if (!staker || withdrawalId === undefined || amount === undefined) throw new SafenetError("The withdrawal initiation log is incomplete")
+      const key = `${staker.toLowerCase()}:${withdrawalId}`
+      if (rows.has(key)) throw new SafenetError("The withdrawal initiation is duplicated")
+      rows.set(key, { amount, claimed: false })
+    }
+    for (const log of claims) {
+      const { staker, withdrawalId, amount } = log.args
+      const row = rows.get(`${staker?.toLowerCase()}:${withdrawalId}`)
+      if (!row || row.claimed || row.amount !== amount) throw new SafenetError("The withdrawal claim does not match its initiation")
+      row.claimed = true
+    }
+    const open = [...rows.values()].filter((r) => !r.claimed)
+    const openSum = open.reduce((sum, r) => sum + r.amount, 0n)
+    if (openSum !== total) throw new SafenetError("the indexed withdrawals and RPC tail do not sum to totalPendingWithdrawals on chain")
+    return {
+      scope: "network", block, total: figure(total, "chain: Staking.totalPendingWithdrawals()"),
+      count: figure(open.length, indexedSource(indexed.block, block)), initiated: rows.size,
+      claimed: rows.size - open.length, openSum, logsMatchChain: true,
+    }
+  } catch (indexError) {
+    try { history = await scan(from, 1n) } catch (scanError) { throw historyUnavailable(indexError, scanError) }
+  }
+  const [initiated, claimed] = history
   // Keyed by staker and id. Ids come from one global counter today, but the pair cannot
   // collide even if that changes.
   const key = (l: { args: { staker?: string | undefined; withdrawalId?: bigint | undefined } }) =>

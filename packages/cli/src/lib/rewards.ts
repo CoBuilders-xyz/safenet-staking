@@ -5,6 +5,8 @@ import { periodsFailure, readRewardPeriods, type RewardPeriods } from "./reward-
 import type { Context } from "./context.js"
 import { figure, sameHex, type Figure } from "./figure.js"
 import { scanLogs } from "./scan.js"
+import { indexedClaims, indexedSource, historyUnavailable, requireHistoryMainnet } from "./indexed-history.js"
+import { SafenetError } from "./errors.js"
 import { fetchRewardProof, parseWei, type RewardsSourceUsed } from "./sef.js"
 
 export interface RewardsCheck {
@@ -110,18 +112,19 @@ export interface RewardsHistory {
 
 export const DEFAULT_HISTORY_LIMIT = 20
 
+/** Read every claim through a captured head, then limit only the displayed rows. */
 export async function rewardsHistory(
   ctx: Context,
   address: Address,
   options: { limit: number | null } = { limit: DEFAULT_HISTORY_LIMIT },
 ): Promise<RewardsHistory> {
+  await requireHistoryMainnet(ctx)
   const { client } = ctx
   const merkleDrop = CONTRACTS.merkleDrop.address
   const from = CONTRACTS.merkleDrop.deployBlock
   const event = indexedEvent("merkleDrop", "Claimed")
   const block = await client.getBlockNumber()
-  const [logs, cumulativeClaimed, periods] = await Promise.all([
-    scanLogs(ctx, { address: merkleDrop, event, args: { account: address }, fromBlock: from, toBlock: block }),
+  const [cumulativeClaimed, periods] = await Promise.all([
     client.readContract({
       address: merkleDrop, abi: merkleDropAbi, functionName: "cumulativeClaimed", args: [address], blockNumber: block,
     }),
@@ -130,6 +133,33 @@ export async function rewardsHistory(
       (err: unknown) => ({ value: null, reason: periodsFailure(err) }),
     ),
   ])
+  const request = { address: merkleDrop, event, args: { account: address }, fromBlock: from, toBlock: block, minChunk: 1n }
+  type Row = { blockNumber: bigint; logIndex: number; transactionHash: Hash; args: { amount: bigint } }
+  const normalize = (logs: Awaited<ReturnType<typeof scanLogs<typeof event>>>): Row[] => {
+    const rows = new Map<string, Row>()
+    for (const log of logs) {
+      if (log.blockNumber === null || log.logIndex === null || !log.transactionHash || log.args.amount === undefined) {
+        throw new SafenetError("The claim log response is incomplete")
+      }
+      rows.set(`${log.transactionHash}:${log.logIndex}`, { ...log, blockNumber: log.blockNumber,
+        logIndex: log.logIndex, transactionHash: log.transactionHash, args: { amount: log.args.amount } })
+    }
+    return [...rows.values()]
+  }
+  let logs: Row[]
+  let source = `chain: MerkleDrop ${event.name} logs for this account, from block ${from}`
+  try {
+    const indexed = await indexedClaims(ctx, address, block)
+    const tail = normalize(await scanLogs(ctx, { ...request, fromBlock: indexed.block + 1n, minChunk: 1n }))
+    logs = [...indexed.rows.map((r) => ({ blockNumber: r.blockNumber, logIndex: r.logIndex,
+      transactionHash: r.transactionHash as Hash, args: { amount: r.amount } })), ...tail]
+    if (logs.reduce((sum, row) => sum + row.args.amount, 0n) !== cumulativeClaimed) {
+      throw new SafenetError("the indexed claims and RPC tail do not sum to cumulativeClaimed on chain")
+    }
+    source = indexedSource(indexed.block, block)
+  } catch (indexError) {
+    try { logs = normalize(await scanLogs(ctx, request)) } catch (scanError) { throw historyUnavailable(indexError, scanError) }
+  }
   const newestFirst = [...logs].sort((a, b) =>
     a.blockNumber === b.blockNumber ? (b.logIndex ?? 0) - (a.logIndex ?? 0) : b.blockNumber! > a.blockNumber! ? 1 : -1)
   const shown = options.limit === null ? newestFirst : newestFirst.slice(0, options.limit)
@@ -148,7 +178,7 @@ export async function rewardsHistory(
   return {
     block,
     address,
-    source: `chain: MerkleDrop ${event.name} logs for this account, from block ${from}`,
+    source,
     count: logs.length,
     claims: shown.map((l) => ({
       block: l.blockNumber!,

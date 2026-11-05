@@ -47,3 +47,25 @@ test("a scan that the endpoint refuses even at the smallest range fails, never s
       e.cause instanceof Error && e.cause.message === "range too large",
   )
 })
+
+test("a history tail handles a one-block provider limit without gaps", async () => {
+  const { ctx, served } = rangeLimited(1n)
+  await scanLogs(ctx, { address, event, fromBlock: 100n, toBlock: 103n, minChunk: 1n })
+  assert.deepEqual(served, [[100n, 100n], [101n, 101n], [102n, 102n], [103n, 103n]])
+})
+
+test("transient rate limits retry the same block, and persistent limits fail", async () => {
+  let calls = 0
+  const client = { getLogs: async () => {
+    if (++calls < 3) throw new Error("429 rate limit")
+    return []
+  } } as unknown as PublicClient
+  assert.deepEqual(await scanLogs({ client, retryDelayMs: 0 }, {
+    address, event, fromBlock: 1n, toBlock: 1n, startChunk: 1n, minChunk: 1n,
+  }), [])
+  assert.equal(calls, 3)
+  const denied = { getLogs: async () => { throw new Error("429 rate limit") } } as unknown as PublicClient
+  await assert.rejects(scanLogs({ client: denied, retryDelayMs: 0 }, {
+    address, event, fromBlock: 1n, toBlock: 1n, startChunk: 1n, minChunk: 1n,
+  }), ScanError)
+})

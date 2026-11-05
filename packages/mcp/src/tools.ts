@@ -146,7 +146,7 @@ export const TOOLS: readonly Tool[] = [
   read({
     name: "withdrawals_list",
     command: ["withdrawals", "list"],
-    description: "Pending withdrawals: the network total and count, or one staker's queue when address is given. The network count needs an archive RPC endpoint.",
+    description: "Pending withdrawals: the network total and count, or one staker's queue when address is given. The network history uses indexed data and recent RPC logs, with a full log-scan fallback.",
     input: z.strictObject({ address: address("address", "One staker's pending withdrawals").optional() }),
     run: (lib, ctx, args): Promise<NetworkWithdrawals | StakerWithdrawals> =>
       args.address ? lib.stakerWithdrawals(ctx, args.address) : lib.networkWithdrawals(ctx),
@@ -163,7 +163,7 @@ export const TOOLS: readonly Tool[] = [
   read({
     name: "rewards_history",
     command: ["rewards", "history"],
-    description: `An address's reward claims, newest first, the newest ${DEFAULT_HISTORY_LIMIT} unless all is true. Needs an archive RPC endpoint.`,
+    description: `An address's reward claims, newest first, the newest ${DEFAULT_HISTORY_LIMIT} unless all is true. Uses indexed claims and recent RPC logs, with a full log-scan fallback.`,
     input: z
       .strictObject({ address: stakerArg, all: flag(`Every claim, not only the newest ${DEFAULT_HISTORY_LIMIT}`) })
       .transform((o) => ({ address: o.address, limit: o.all ? null : DEFAULT_HISTORY_LIMIT })),
