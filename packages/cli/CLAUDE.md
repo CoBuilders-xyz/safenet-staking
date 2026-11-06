@@ -78,11 +78,14 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   option, a write exits 2. `--from <address>` sets the address of a dry run without a signer.
   Every environment-key invocation emits `ENV_KEY_WARNING` from `src/cli.ts` on stderr, including dry runs.
 - `--walletconnect --wallet-account <address>` loads the external signer in `commands/walletconnect.ts`.
-  It requires a terminal, `WALLETCONNECT_PROJECT_ID`, and WalletConnect v2 `eth_signTransaction` support.
-  Pairing URI display requires deliberate confirmation. Never capture the URI in evidence.
-  It verifies the approved chain/account, reviews each simulated transaction, validates returned signed bytes,
-  and broadcasts through the selected RPC. Session storage is memory only. Command cleanup closes the signer.
-  Cancellation, account/chain changes, disconnect, expiry, and timeouts prevent further signatures and broadcasts.
+  It requires a terminal and WalletConnect v2 `eth_sendTransaction` support.
+  The default project ID is `f35bb4d915df109f8006841b674b5604`; `WALLETCONNECT_PROJECT_ID` optionally overrides it.
+  Pairing QR and URI display on stderr require deliberate confirmation. Never capture either in evidence.
+  It checks the approved chain/account and reviews each simulated transaction. The wallet signs and broadcasts.
+  The CLI validates the returned 32-byte hash and polls receipts through its selected RPC.
+  Session storage is memory only. Command cleanup closes the signer.
+  Cancellation, account/chain changes, disconnect, expiry, and timeouts stop further CLI requests.
+  A wallet request already sent may still broadcast. Check wallet activity before retrying.
   `src/fork/signers.test.ts` proves effects using an emulated transport; it does not prove physical hardware.
 - Every write passes the compliance gates before operation reads and signing, dry runs included:
   `checkCompliance()` in `src/lib/compliance.ts`, over core's `src/compliance.ts`. The sanctions
@@ -97,7 +100,7 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
 - A live write first checks that the endpoint is on chain 1. Each transaction's hash goes to
   stderr the moment it is sent, and its receipt when it confirms, so `--json` stays one document
   on stdout. A hash whose receipt cannot be read is reported as sent, with the hash, and is not
-  retried. The hash is computed from the signed bytes before the broadcast, so a broadcast that
+  retried. Local signers compute the hash from signed bytes before broadcast, so a broadcast that
   fails is reported with it too: the node may have taken the transaction anyway.
 - Amounts are typed in SAFE, exactly, up to 18 decimals. Results carry each amount as both
   `wei` and `safe`.

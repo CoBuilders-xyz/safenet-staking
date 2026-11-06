@@ -1,5 +1,7 @@
 # safenet command reference
 
+Install `@cobuilders/safenet-cli`; run its `safenet` executable.
+
 Every `safenet` command, with its arguments and options, one example, and what it printed against
 Ethereum Mainnet. The [README](../README.md) covers installation, signing and settings.
 
@@ -671,8 +673,13 @@ Every write takes these options:
 
 Without `--dry-run`, choose `--private-key-env`, `--keystore`, or `--walletconnect` with `--wallet-account`.
 A write without a signer exits 2. Signer options cannot be combined.
-WalletConnect requires a terminal, `WALLETCONNECT_PROJECT_ID`, and a wallet supporting `eth_signTransaction`.
-Confirm pairing URI display deliberately. Keep the URI out of logs and evidence.
+WalletConnect requires a terminal and a wallet supporting `eth_sendTransaction`.
+The default project ID is `f35bb4d915df109f8006841b674b5604`; `WALLETCONNECT_PROJECT_ID` optionally overrides it.
+Pass `--walletconnect --wallet-account <address>` to require your expected Mainnet account.
+Type `connect` to display the sensitive terminal QR and URI on stderr. Keep both out of logs and evidence.
+**The wallet signs and broadcasts through its own RPC. The CLI validates the returned hash and polls its selected RPC.**
+Compare the request in your wallet before approving. Cancellation or timeout cannot stop a request already sent.
+Check wallet activity before retrying; the wallet may still broadcast.
 See [Signing](../README.md#signing) for wallet compatibility and session safeguards.
 With `--dry-run`, WalletConnect obtains the account but signs and broadcasts nothing.
 A key loaded from `--private-key-env` prints this line on stderr, in a live run and in a dry run:

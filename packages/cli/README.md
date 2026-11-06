@@ -1,4 +1,4 @@
-# safenet-cli
+# safenet
 
 `safenet` is a command-line interface for Safenet staking on Ethereum Mainnet. Six commands
 read the staking contracts and the data SEF (Safe Ecosystem Foundation) publishes. Five write:
@@ -9,6 +9,7 @@ exactly, to the last wei. `--json` gives the same fields, with amounts as wei in
 
 ## Install
 
+The npm package is `@cobuilders/safenet-cli`. Its executable is `safenet`.
 Install the published beta globally:
 
 ```sh
@@ -138,30 +139,36 @@ without a signer option, a write exits 2.
 
 ### WalletConnect and hardware wallets
 
-The bridge requires WalletConnect v2 and `eth_signTransaction`. Wallets that only support
-`eth_sendTransaction` are unsupported. No physical device or companion app has been verified yet.
+The bridge requires WalletConnect v2 and `eth_sendTransaction`, as used by the web interface.
+No physical device or companion app has been verified with this CLI change yet.
 A software wallet can also connect. The CLI cannot prove that its account belongs to hardware.
 
-Set `WALLETCONNECT_PROJECT_ID` using your existing WalletConnect project. Run this in an interactive terminal:
+The CLI uses project ID `f35bb4d915df109f8006841b674b5604` by default.
+Optionally set `WALLETCONNECT_PROJECT_ID` to use your own project.
+Run this in an interactive terminal. Pass `--wallet-account` with the expected Mainnet address:
 
 ```sh
 safenet stake "$VALIDATOR" 1 --walletconnect --wallet-account "$WALLET_ACCOUNT" --rpc-url "$RPC_URL"
 ```
 
-Stop terminal recording. Type `connect` to display the sensitive pairing URI on stderr.
-Paste it into your companion app's WalletConnect connection field. Never save it in logs, screenshots, or evidence.
+Stop terminal recording. Type `connect` to display the sensitive pairing QR and URI on stderr.
+Scan the QR or paste the URI into your companion app's WalletConnect connection field.
+Never save either in logs, screenshots, or evidence.
 Approve the expected Mainnet account. Each invocation creates a fresh session and keeps session data in memory only.
 
 The CLI simulates each call before requesting its signature. It then displays the contract, function, arguments,
 account, chain, gas limit, nonce, and fee limits. Amounts and fees use wei. Unlimited approval shows the full integer.
 Type `sign` for each transaction, then compare the request with your device before approving it.
-The CLI verifies the signed account and transaction fields, then broadcasts through the selected RPC.
-The wallet never broadcasts the transaction. No wallet private key enters the CLI.
+**Warning: the wallet signs and broadcasts each transaction through its own RPC.**
+The CLI validates the returned 32-byte transaction hash and polls receipts through the selected CLI RPC.
+The CLI cannot verify signed bytes before broadcast. Compare the complete request on your wallet before approving.
+Use a wallet and CLI RPC connected to the same network. No wallet private key enters the CLI.
 
-Reject a prompt or press Ctrl-C to cancel. Pairing, review, and signing each have a two-minute deadline.
-Account changes, chain changes, session updates, disconnection, and expiry stop further signing.
-A late signature after cancellation or timeout cannot trigger broadcast. Already broadcast transactions remain on chain.
-Check any reported hash before retrying. The CLI closes the session after success, failure, and dry runs.
+Reject a prompt or press Ctrl-C to cancel. Pairing, review, and wallet requests have two-minute deadlines.
+Account changes, chain changes, session updates, disconnection, and expiry stop further CLI requests.
+**Cancellation, timeout, or disconnection cannot stop a wallet request already sent. The wallet may still broadcast.**
+Check wallet activity and any reported hash before retrying. Already broadcast transactions remain on chain.
+The CLI closes the session after success, failure, and dry runs.
 
 `--dry-run` with WalletConnect connects only to identify the account; it never requests a signature.
 For unattended use, select `--dry-run --from "$WALLET_ACCOUNT"`. WalletConnect refuses noninteractive terminals.
@@ -170,18 +177,20 @@ MCP keeps its existing noninteractive local signers and defaults to dry runs. It
 ### Physical hardware acceptance
 
 Automated transport tests are not physical hardware proof. Allow 30–60 minutes with the device operator.
-Use a Ledger or Trezor test account with a companion app that explicitly supports WalletConnect v2 `eth_signTransaction`.
+Use a Ledger or Trezor test account with a companion app that explicitly supports WalletConnect v2 `eth_sendTransaction`.
 Do not assume Ledger Live, MetaMask, or another named app supports this method without checking its current capabilities.
 An unsupported method is an acceptance blocker; record the device, firmware, app version, and refusal.
 
 1. Prepare a separate Anvil Mainnet fork and a hardware test account. Fund that account only on the fork.
-2. Use its isolated RPC endpoint. Keep the existing manual QA fork and stake untouched.
+2. Configure both the wallet and CLI to use that isolated fork RPC. A CLI RPC override alone cannot redirect wallet broadcasts.
+   Keep the existing manual QA fork and stake untouched.
 3. Read the validator and contract addresses from core or the fork. Set the command variables shown above.
 4. Run the command with `--dry-run`. Approve pairing. Confirm no signature request and no nonce or stake change.
 5. Run without `--dry-run`. Review both approval and stake on the terminal and device. Approve both.
 6. Read the receipts, allowance, and stake from the fork. Confirm the stake increased by exactly one SAFE.
 7. Repeat and reject on the device. Test terminal cancellation, disconnect, account change, chain change, and timeout.
-8. Confirm no broadcast after each refusal. If approval already confirmed, record that partial result accurately.
+8. Confirm no broadcast after wallet refusal. Check wallet activity after cancellation, disconnect, or timeout; pending requests may broadcast.
+   If approval already confirmed, record that partial result accurately.
 9. Use a sanctioned fixture and confirm refusal before any device signature request.
 10. Record public transaction hashes, receipt status, stake differences, device/app versions, and elapsed time in Linear.
 
@@ -211,7 +220,7 @@ The web visitor endpoint remains unset; CLI operators can still supply their own
 
 | Variable | What it sets |
 |---|---|
-| `WALLETCONNECT_PROJECT_ID` | Existing project ID used only for interactive WalletConnect signing |
+| `WALLETCONNECT_PROJECT_ID` | Optional override for the built-in project ID `f35bb4d915df109f8006841b674b5604` |
 | `MAINNET_RPC_URL` | The Mainnet RPC endpoint, tried before the public endpoints. `--rpc-url` overrides it |
 | `GITHUB_TOKEN` or `GH_TOKEN` | Raises the GitHub API limit for the lookup that dates SEF's participation window. Optional |
 | `IPFS_GATEWAY` | An IPFS gateway, tried before the public gateways for SEF's reward dataset. Only its origin is used: a path such as `/ipfs/` is dropped. Optional |

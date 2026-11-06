@@ -62,11 +62,18 @@ async function keystoreKey(request: Extract<SignerRequest, { kind: "keystore" }>
   return decryptKeystore(json, password)
 }
 
+export const DEFAULT_WALLETCONNECT_PROJECT_ID = "f35bb4d915df109f8006841b674b5604"
+
+export function walletConnectProjectId(value?: string): string {
+  const projectId = value ?? DEFAULT_WALLETCONNECT_PROJECT_ID
+  if (!/^[a-f0-9]{32}$/i.test(projectId)) throw new UsageError("WALLETCONNECT_PROJECT_ID must be a valid project ID")
+  return projectId
+}
+
 export async function loadSigner(request: SignerRequest, ctx: Context, sources: SignerSources): Promise<Signer> {
   if (request.kind === "walletconnect") {
     if (!sources.wallet) throw new UsageError("WalletConnect needs an interactive terminal; use --dry-run --from for automation")
-    const projectId = sources.env.WALLETCONNECT_PROJECT_ID
-    if (!projectId || !/^[a-f0-9]{32}$/i.test(projectId)) throw new UsageError("Set WALLETCONNECT_PROJECT_ID to a valid project ID")
+    const projectId = walletConnectProjectId(sources.env.WALLETCONNECT_PROJECT_ID)
     let bridge
     try { bridge = await createWalletBridge(projectId, sources.wallet.signal) }
     catch (err) {

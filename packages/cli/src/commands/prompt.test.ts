@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { EventEmitter } from "node:events"
 import { test } from "node:test"
-import { terminalPasswordPrompt } from "./prompt.js"
+import { showWalletPairing, terminalPasswordPrompt } from "./prompt.js"
 
 async function terminal(run: (input: FakeInput, output: string[]) => Promise<void>, raw = false) {
   const stdin = Object.getOwnPropertyDescriptor(process, "stdin")!
@@ -88,5 +88,34 @@ test("a cancelled signal does not enter raw mode or write the prompt", async () 
     assert.equal(input.isRaw, false)
     assert.deepEqual(output, [])
     assert.deepEqual(input.eventNames(), [])
+  })
+})
+
+test("pairing writes a terminal QR and URI to stderr only after connect confirmation", async () => {
+  await terminal(async (input, output) => {
+    const uri = "wc:unit-test-pairing@2?symKey=unit-test-only"
+    const result = showWalletPairing(uri, new AbortController().signal)
+    assert.equal(output.length, 1)
+    assert.ok(!output.join("").includes(uri))
+    input.emit("data", "connect\r")
+    await result
+    const rendered = output.join("")
+    assert.match(rendered, /Scan this QR/)
+    assert.ok(rendered.includes(uri))
+    assert.match(rendered, /[▀▄█]/)
+  })
+})
+
+test("pairing refusal and cancellation never display QR or URI", async () => {
+  for (const abort of [false, true]) await terminal(async (input, output) => {
+    const controller = new AbortController()
+    const uri = "wc:unit-test-sensitive-pairing"
+    const result = showWalletPairing(uri, controller.signal)
+    const rejection = assert.rejects(result, /cancelled/)
+    if (abort) controller.abort()
+    else input.emit("data", "no\r")
+    await rejection
+    assert.ok(!output.join("").includes(uri))
+    assert.doesNotMatch(output.join(""), /[▀▄█]/)
   })
 })

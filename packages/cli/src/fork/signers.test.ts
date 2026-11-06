@@ -37,18 +37,20 @@ test("env, keystore password prompt, and emulated WalletConnect sign real fork s
       const bridge: WalletBridge = {
         connect: async () => ({ uri: "wc:emulated-test-only", approval: async () => ({
           topic: "emulated", namespaces: { eip155: {
-            accounts: [`eip155:${CHAINS.mainnet.id}:${account.address}`], methods: ["eth_signTransaction"],
+            accounts: [`eip155:${CHAINS.mainnet.id}:${account.address}`], methods: ["eth_sendTransaction"],
           } },
         }) }),
         onChange: () => () => {},
         close: async () => { closes++ },
         async request(_topic, wire) {
           signatures++
-          return account.signTransaction({
+          const serializedTransaction = await account.signTransaction({
             chainId: Number(wire.chainId), to: wire.to as Address, data: wire.data as Hex,
             value: BigInt(wire.value!), nonce: Number(wire.nonce), gas: BigInt(wire.gas!),
             type: "eip1559", maxFeePerGas: BigInt(wire.maxFeePerGas!), maxPriorityFeePerGas: BigInt(wire.maxPriorityFeePerGas!),
           })
+          // Emulate the wallet's broadcast, using the same isolated fork as the CLI.
+          return c.chain.sendRawTransaction({ serializedTransaction })
         },
       }
       const runtime: Runtime = {

@@ -1,3 +1,5 @@
+import QRCode from "qrcode"
+
 /**
  * A prompt that does not echo, for keystore passwords and deliberate wallet confirmations. Without a terminal there is nothing to ask in, and the caller says so.
  */
@@ -46,4 +48,15 @@ export function terminalPasswordPrompt(signal?: AbortSignal): ((prompt: string) 
       stdin.once("error", failed)
       stdin.resume()
     })
+}
+
+/** Display pairing material only after the operator confirms terminal recording has stopped. */
+export async function showWalletPairing(uri: string, signal: AbortSignal): Promise<void> {
+  const prompt = terminalPasswordPrompt(signal)
+  if (!prompt) throw new Error("WalletConnect needs an interactive terminal")
+  const answer = await prompt("Pairing URI and QR are sensitive. Stop terminal recording. Type connect to display them: ")
+  if (answer !== "connect") throw new Error("Wallet pairing cancelled")
+  const qr = await QRCode.toString(uri, { type: "terminal", small: true })
+  if (signal.aborted) throw new Error("Wallet pairing cancelled")
+  process.stderr.write(`Scan this QR or paste the URI into your wallet app. Never share either:\n${qr}\n${uri}\n`)
 }
