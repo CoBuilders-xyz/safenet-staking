@@ -83,6 +83,9 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   Pairing QR and URI display on stderr require deliberate confirmation. Never capture either in evidence.
   It checks the approved chain/account and reviews each simulated transaction. The wallet signs and broadcasts.
   The CLI validates the returned 32-byte hash and polls receipts through its selected RPC.
+  After a successful receipt, `Signer.verifyConfirmedTransaction` checks the mined call before the runner confirms or continues.
+  WalletConnect checks sender, destination, calldata, zero value, and the receipt hash/block. Nonce, gas, and fees may differ.
+  Failed verification invalidates the wallet and stops subsequent steps. This cannot prevent a broadcast already made.
   Session storage is memory only. Command cleanup closes the signer.
   Cancellation, account/chain changes, disconnect, expiry, and timeouts stop further CLI requests.
   A wallet request already sent may still broadcast. Check wallet activity before retrying.

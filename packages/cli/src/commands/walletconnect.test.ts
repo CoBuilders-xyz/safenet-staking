@@ -4,12 +4,16 @@ import { encodeFunctionData, type Hex } from "viem"
 import { mnemonicToAccount } from "viem/accounts"
 import { CHAINS, CONTRACTS, erc20Abi } from "@cobuilders/safenet-core"
 import { SignClient } from "@walletconnect/sign-client"
-import { TEST_MNEMONIC } from "../test-support.js"
+import { fakeRuntime, TEST_MNEMONIC, VALIDATOR_A } from "../test-support.js"
+import { run } from "../cli.js"
 import { createRunner, type Context } from "../lib/index.js"
 import { createWalletBridge, memoryStorage, walletConnectSigner, type WalletBridge, type WalletInteraction } from "./walletconnect.js"
 
 const account = mnemonicToAccount(TEST_MNEMONIC)
 const hash = `0x${"ab".repeat(32)}` as Hex
+const secondHash = `0x${"cd".repeat(32)}` as Hex
+const replacementHash = `0x${"12".repeat(32)}` as Hex
+const blockHash = `0x${"ef".repeat(32)}` as Hex
 const tx = {
   to: CONTRACTS.safeToken.address,
   data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [CONTRACTS.staking.address, 1n] }),
@@ -88,28 +92,126 @@ test("requests wallet broadcast only after review, returns its hash, and closes 
   assert.equal(s.counts().closed, 1)
 })
 
-test("the selected RPC polls the wallet hash and reports receipt confirmation", async () => {
+test("the selected RPC verifies the mined call after receipt polling and before reporting confirmation", async () => {
   const s = setup()
   const polled: Hex[] = []
+  const events: string[] = []
   Object.assign(s.ctx.client, {
     simulateContract: async () => ({}),
     estimateContractGas: async () => tx.gas,
     waitForTransactionReceipt: async ({ hash }: { hash: Hex }) => {
       polled.push(hash)
-      return { status: "success", blockNumber: 42n, gasUsed: 45_000n, logs: [] }
+      events.push("receipt")
+      return { transactionHash: hash, blockHash, status: "success", blockNumber: 42n, gasUsed: 45_000n, logs: [] }
+    },
+    getTransaction: async ({ hash: requestedHash }: { hash: Hex }) => {
+      events.push("lookup")
+      assert.equal(requestedHash, hash)
+      return { hash, blockHash, from: account.address.toLowerCase(), to: tx.to.toLowerCase(), input: tx.data, value: 0n,
+        nonce: 99, gas: 90_000n, maxFeePerGas: 100n, maxPriorityFeePerGas: 50n }
     },
   })
   const signer = await walletConnectSigner(s.ctx, account.address, s.bridge, s.interaction)
   const progress: string[] = []
-  const runner = await createRunner(s.ctx, { dryRun: false, signer }, { onProgress: (event) => progress.push(event.type) })
+  const runner = await createRunner(s.ctx, { dryRun: false, signer }, { onProgress: (event) => {
+    progress.push(event.type)
+    events.push(event.type)
+  } })
   const result = await runner.run({
     contract: "SAFE token", address: tx.to, abi: erc20Abi, functionName: "approve", args: [CONTRACTS.staking.address, 1n],
   })
   assert.deepEqual(polled, [hash])
   assert.deepEqual(progress, ["sent", "confirmed"])
+  assert.deepEqual(events, ["sent", "receipt", "lookup", "confirmed"])
   assert.deepEqual(result.step.transaction, { hash, status: "success", block: 42n, gasUsed: 45_000n })
   assert.equal(s.counts().sent, 0)
   await signer.close!()
+})
+
+/** Run approve then stake through the real CLI flow, with controlled mined RPC responses. */
+async function stakeFlow(lookup: (mined: Record<string, unknown>, index: number) => Promise<unknown>, replacement = false) {
+  const s = setup()
+  const requests: Record<string, string>[] = []
+  const lookups: Hex[] = []
+  s.bridge.request = async (_topic, wire) => {
+    requests.push(wire)
+    return requests.length === 1 ? hash : secondHash
+  }
+  let signer: Awaited<ReturnType<typeof walletConnectSigner>> | undefined
+  const runtime = fakeRuntime({ loadSigner: async (_request, ctx) => {
+    Object.assign(ctx.client, {
+      waitForTransactionReceipt: async ({ hash: sentHash }: { hash: Hex }) => ({
+        transactionHash: replacement && sentHash === hash ? replacementHash : sentHash, blockHash,
+        status: "success", blockNumber: 42n, gasUsed: 45_000n, logs: [],
+      }),
+      getTransaction: async ({ hash: minedHash }: { hash: Hex }) => {
+        lookups.push(minedHash)
+        const wire = requests.at(-1)!
+        return lookup({ hash: minedHash, blockHash, from: wire.from, to: wire.to, input: wire.data, value: 0n,
+          nonce: 99, gas: 90_000n, maxFeePerGas: 100n, maxPriorityFeePerGas: 50n }, requests.length - 1)
+      },
+    })
+    signer = await walletConnectSigner(ctx, account.address, s.bridge, s.interaction)
+    return signer
+  } })
+  const code = await run(["stake", VALIDATOR_A, "1", "--walletconnect", "--wallet-account", account.address, "--json"], runtime)
+  return { code, requests, lookups, signer, out: runtime.stdout(), err: runtime.stderr(), counts: s.counts() }
+}
+
+test("verified approval allows stake, including wallet changes to nonce, gas, and fees", async () => {
+  const result = await stakeFlow(async (mined) => mined)
+  assert.equal(result.code, 0, result.err)
+  assert.equal(result.requests.length, 2)
+  assert.deepEqual(result.lookups, [hash, secondHash])
+  assert.equal((result.err.match(/confirmed /g) ?? []).length, 2)
+  assert.equal(result.counts.sent, 0)
+  assert.equal(result.counts.closed, 1)
+})
+
+test("confirmation reports the verified replacement hash rather than the original wallet hash", async () => {
+  const result = await stakeFlow(async (mined) => mined, true)
+  assert.equal(result.code, 0, result.err)
+  assert.deepEqual(result.lookups, [replacementHash, secondHash])
+  const output = JSON.parse(result.out) as { steps: { transaction: { hash: Hex } }[] }
+  assert.equal(output.steps[0]!.transaction.hash, replacementHash)
+})
+
+test("mismatched or unverifiable mined approval stops the CLI before stake and invalidates the wallet", async () => {
+  const changes = [
+    { from: CONTRACTS.staking.address }, { to: CONTRACTS.staking.address }, { input: "0x" }, { value: 1n },
+    { hash: secondHash }, { blockHash: secondHash }, { blockHash: null },
+    { from: undefined }, { to: null }, { input: undefined }, { value: undefined },
+  ]
+  const failures = [
+    ...changes.map((change) => async (mined: Record<string, unknown>) => ({ ...mined, ...change })),
+    async () => { throw new Error("wc:private-rpc-payload") },
+    async () => new Promise<never>(() => {}),
+  ]
+  for (const lookup of failures) {
+    const result = await stakeFlow(lookup)
+    assert.equal(result.code, 1)
+    assert.equal(result.requests.length, 1)
+    assert.match(result.err, /could not be verified against the reviewed call/)
+    assert.match(result.err, /may already have broadcast.*check wallet activity/)
+    assert.ok(result.err.includes(hash))
+    assert.doesNotMatch(result.err, /confirmed |private-rpc-payload|nothing was (sent|broadcast)/)
+    assert.equal(result.out, "")
+    assert.equal(result.counts.sent, 0)
+    assert.equal(result.counts.closed, 1)
+    await assert.rejects(result.signer!.send(tx), /cancelled|changed/)
+  }
+})
+
+test("a later verification failure retains the confirmed approval and never confirms stake", async () => {
+  const result = await stakeFlow(async (mined, index) => index === 0 ? mined : { ...mined, value: 1n })
+  assert.equal(result.code, 1)
+  assert.equal(result.requests.length, 2)
+  assert.equal((result.err.match(/^confirmed /gm) ?? []).length, 1)
+  assert.match(result.err, /may already have broadcast.*already confirmed, and not undone/)
+  assert.ok(result.err.includes(hash))
+  assert.ok(result.err.includes(secondHash))
+  assert.doesNotMatch(result.err, /^confirmed Staking\.stake/m)
+  assert.equal(result.counts.closed, 1)
 })
 
 test("wrong RPC chain, wrong approved account, and missing send method close without a wallet request", async () => {

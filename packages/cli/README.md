@@ -161,6 +161,9 @@ account, chain, gas limit, nonce, and fee limits. Amounts and fees use wei. Unli
 Type `sign` for each transaction, then compare the request with your device before approving it.
 **Warning: the wallet signs and broadcasts each transaction through its own RPC.**
 The CLI validates the returned 32-byte transaction hash and polls receipts through the selected CLI RPC.
+After a successful receipt, it checks the mined sender, destination, calldata, and zero value against the reviewed call.
+A mismatch or failed lookup stops confirmation and all subsequent steps. The wallet may already have broadcast.
+Wallet changes to nonce, gas, and fees are allowed.
 The CLI cannot verify signed bytes before broadcast. Compare the complete request on your wallet before approving.
 Use a wallet and CLI RPC connected to the same network. No wallet private key enters the CLI.
 

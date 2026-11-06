@@ -129,6 +129,7 @@ function review(tx: TransactionToSend, from: Address, request: TransactionSerial
   }, (_, value: unknown) => typeof value === "bigint" ? value.toString() : value, 2)
 }
 
+/** Review each wallet request and verify its mined call before the runner can confirm or continue. */
 export async function walletConnectSigner(
   ctx: Context, expected: Address, bridge: WalletBridge, interaction: WalletInteraction,
 ): Promise<Signer> {
@@ -185,6 +186,21 @@ export async function walletConnectSigner(
     }
     return {
       address: getAddress(expected), close,
+      async verifyConfirmedTransaction(tx, receipt) {
+        try {
+          const mined = await bounded(() => ctx.client.getTransaction({ hash: receipt.transactionHash }), "confirmed transaction lookup")
+          if (mined.hash?.toLowerCase() !== receipt.transactionHash.toLowerCase() ||
+            !mined.blockHash || mined.blockHash.toLowerCase() !== receipt.blockHash.toLowerCase() ||
+            mined.from?.toLowerCase() !== expected.toLowerCase() || mined.to?.toLowerCase() !== tx.to.toLowerCase() ||
+            mined.input?.toLowerCase() !== tx.data.toLowerCase() || mined.value !== 0n) {
+            throw new Error("Confirmed transaction does not match the reviewed call")
+          }
+        } catch {
+          invalidate()
+          throw new SafenetError(`Wallet transaction ${receipt.transactionHash} could not be verified against the reviewed call; ` +
+            "the wallet may already have broadcast; no further steps were sent; check wallet activity before retrying")
+        }
+      },
       async send(tx) {
         if (await bounded(() => ctx.client.getChainId(), "RPC check") !== CHAIN) {
           throw new SafenetError("The RPC chain changed; nothing was signed")
