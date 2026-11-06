@@ -390,13 +390,26 @@ pnpm --filter @cobuilders/safenet-web release:pin
 
 ### Safe App
 
+Use **`https://safenet.cobuilders.xyz`** as the Custom Safe App URL.
+In [Safe{Wallet}](https://app.safe.global), open your Ethereum Mainnet Safe, then Apps → My custom apps → Add custom app.
+Enter that URL, complete Safe's acknowledgement, and open Safenet Staking.
+The Safe connector connects automatically, and the header must show the Safe's address.
+Follow the [manual checklist](MANUAL_TESTING.md#safe-app) to verify the connection and iframe.
+
 `public/manifest.json` is the Safe App manifest. Safe{Wallet} reads `name`, `description` and
 `iconPath`, a path relative to the app; the `icons` array and the other fields serve browsers
-installing the app as a PWA. The dev and
-preview servers send the CORS headers Safe{Wallet} needs to read it, and a
-`frame-ancestors` policy that lets Safe{Wallet} frame the app (`vite.config.ts`). Wherever the app
-is served, Safe{Wallet} must be able to read the manifest. In Safe{Wallet}, add the app's URL as
-a custom Safe App and open it from the Safe; the Safe connector connects by itself.
+installing the app as a PWA. A readable manifest alone does not prove that Safe can frame the app.
+
+The `eth.limo` gateway sends CSP `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN`.
+These headers block `https://app.safe.global` from embedding the app and cause the iframe's "refused to connect" error.
+App code, a manifest change, or an HTML CSP cannot override these gateway response headers.
+Do not use `eth.limo` or a `dweb` CID URL for this setup; the earlier dweb URL failed Safe's app check.
+
+Vercel currently serves `https://safenet.cobuilders.xyz` without `frame-ancestors` or `X-Frame-Options` response headers.
+Its manifest response permits cross-origin access, so no code or header change is needed for this setup.
+Keep Vercel free of `X-Frame-Options` and any CSP that excludes `https://app.safe.global` from framing the app.
+The dev and preview servers configure their own CORS and Safe-compatible `frame-ancestors` headers in `vite.config.ts`.
+Those settings do not control Vercel or IPFS gateway response headers.
 
 ## License
 
