@@ -32,6 +32,7 @@ function setup() {
   const session = { topic: "unit-test-session", namespaces: namespace() }
   const ctx = { client: {
     getChainId: async () => CHAINS.mainnet.id,
+    getTransactionCount: async () => 0,
     prepareTransactionRequest: async () => prepared,
     sendRawTransaction: async () => { sent++; throw new Error("CLI must never broadcast WalletConnect transactions") },
   } } as unknown as Context
@@ -129,7 +130,7 @@ test("the selected RPC verifies the mined call after receipt polling and before 
 })
 
 /** Run approve then stake through the real CLI flow, with controlled mined RPC responses. */
-async function stakeFlow(lookup: (mined: Record<string, unknown>, index: number) => Promise<unknown>, replacement = false) {
+async function stakeFlow(lookup: (mined: Record<string, unknown>, index: number) => Promise<unknown>, replacement = false, nonceFloor = 0) {
   const s = setup()
   const requests: Record<string, string>[] = []
   const lookups: Hex[] = []
@@ -140,6 +141,7 @@ async function stakeFlow(lookup: (mined: Record<string, unknown>, index: number)
   let signer: Awaited<ReturnType<typeof walletConnectSigner>> | undefined
   const runtime = fakeRuntime({ loadSigner: async (_request, ctx) => {
     Object.assign(ctx.client, {
+      getTransactionCount: async () => nonceFloor + requests.length,
       waitForTransactionReceipt: async ({ hash: sentHash }: { hash: Hex }) => ({
         transactionHash: replacement && sentHash === hash ? replacementHash : sentHash, blockHash,
         status: "success", blockNumber: 42n, gasUsed: 45_000n, logs: [],
@@ -169,11 +171,40 @@ test("verified approval allows stake, including wallet changes to nonce, gas, an
 })
 
 test("confirmation reports the verified replacement hash rather than the original wallet hash", async () => {
-  const result = await stakeFlow(async (mined) => mined, true)
+  const result = await stakeFlow(async (mined, index) => ({ ...mined, nonce: 10 + index }), true, 10)
   assert.equal(result.code, 0, result.err)
   assert.deepEqual(result.lookups, [replacementHash, secondHash])
   const output = JSON.parse(result.out) as { steps: { transaction: { hash: Hex } }[] }
   assert.equal(output.steps[0]!.transaction.hash, replacementHash)
+})
+
+test("an older identical approval cannot confirm a new request, even with the same receipt block", async () => {
+  // Nonce 9 was consumed before dispatch. The current wallet may use nonce 10 or higher.
+  // Keep every call field, hash, and block match intact: only nonce freshness rejects the replay.
+  const result = await stakeFlow(async (mined) => ({ ...mined, nonce: 9 }), false, 10)
+  assert.equal(result.code, 1)
+  assert.equal(result.requests.length, 1)
+  assert.match(result.err, /could not be verified.*may already have broadcast/)
+  assert.doesNotMatch(result.err, /^confirmed /m)
+  assert.equal(result.counts.closed, 1)
+})
+
+test("nonce lookup failure or invalid data prevents sending the wallet request", async () => {
+  for (const nonce of ["failure", -1, Number.NaN, 0.5]) {
+    const s = setup()
+    s.ctx.client.getTransactionCount = async () => {
+      if (typeof nonce === "string") throw new Error("wc:private-rpc-payload")
+      return nonce
+    }
+    const signer = await walletConnectSigner(s.ctx, account.address, s.bridge, s.interaction)
+    await assert.rejects(signer.send(tx), (error: Error) => {
+      assert.match(error.message, /nonce.*(rejected|invalid)|invalid account nonce/)
+      assert.doesNotMatch(error.message, /private-rpc-payload/)
+      return true
+    })
+    assert.equal(s.counts().requested, 0)
+    await signer.close!()
+  }
 })
 
 test("mismatched or unverifiable mined approval stops the CLI before stake and invalidates the wallet", async () => {

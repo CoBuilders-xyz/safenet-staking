@@ -136,6 +136,7 @@ export async function walletConnectSigner(
   const controller = new AbortController()
   let invalid = false
   let closed = false
+  let requestNonceFloor: number | undefined
   const pending = new Set<() => void>()
   const invalidate = () => { invalid = true; controller.abort(); for (const reject of pending) reject() }
   const off = bridge.onChange(invalidate)
@@ -189,12 +190,14 @@ export async function walletConnectSigner(
       async verifyConfirmedTransaction(tx, receipt) {
         try {
           const mined = await bounded(() => ctx.client.getTransaction({ hash: receipt.transactionHash }), "confirmed transaction lookup")
-          if (mined.hash?.toLowerCase() !== receipt.transactionHash.toLowerCase() ||
+          if (requestNonceFloor === undefined || !Number.isSafeInteger(mined.nonce) || mined.nonce < requestNonceFloor ||
+            mined.hash?.toLowerCase() !== receipt.transactionHash.toLowerCase() ||
             !mined.blockHash || mined.blockHash.toLowerCase() !== receipt.blockHash.toLowerCase() ||
             mined.from?.toLowerCase() !== expected.toLowerCase() || mined.to?.toLowerCase() !== tx.to.toLowerCase() ||
             mined.input?.toLowerCase() !== tx.data.toLowerCase() || mined.value !== 0n) {
             throw new Error("Confirmed transaction does not match the reviewed call")
           }
+          requestNonceFloor = undefined
         } catch {
           invalidate()
           throw new SafenetError(`Wallet transaction ${receipt.transactionHash} could not be verified against the reviewed call; ` +
@@ -233,6 +236,15 @@ export async function walletConnectSigner(
           const value = request[key]
           if (value != null) wire[key] = numberToHex(value)
         }
+        // Reject hashes for already-mined account nonces, including earlier calls in the same block.
+        // This is a lower bound, not a requirement to use the prepared nonce; replacements remain valid.
+        const nonceFloor = await bounded(() => ctx.client.getTransactionCount({
+          address: expected, blockTag: "latest",
+        }), "request nonce check")
+        if (!Number.isSafeInteger(nonceFloor) || nonceFloor < 0) {
+          throw new SafenetError("The RPC returned an invalid account nonce; nothing was sent to the wallet")
+        }
+        requestNonceFloor = nonceFloor
         let hash: unknown
         try {
           // The wallet owns broadcast. A timeout or disconnect cannot revoke its pending request.

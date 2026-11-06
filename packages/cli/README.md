@@ -164,6 +164,9 @@ The CLI validates the returned 32-byte transaction hash and polls receipts throu
 After a successful receipt, it checks the mined sender, destination, calldata, and zero value against the reviewed call.
 A mismatch or failed lookup stops confirmation and all subsequent steps. The wallet may already have broadcast.
 Wallet changes to nonce, gas, and fees are allowed.
+Before dispatch, the CLI reads the latest mined account nonce. It rejects confirmed nonces below that boundary.
+This rejects matching calls already mined at that snapshot, including earlier calls in the same block.
+WalletConnect returns only a hash; it cannot cryptographically bind that hash to the current request. Trust your wallet.
 The CLI cannot verify signed bytes before broadcast. Compare the complete request on your wallet before approving.
 Use a wallet and CLI RPC connected to the same network. No wallet private key enters the CLI.
 

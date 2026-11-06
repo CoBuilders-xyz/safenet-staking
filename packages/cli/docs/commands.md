@@ -680,7 +680,8 @@ Type `connect` to display the sensitive terminal QR and URI on stderr. Keep both
 **The wallet signs and broadcasts through its own RPC. The CLI validates the returned hash and polls its selected RPC.**
 After a successful receipt, the CLI checks the mined sender, destination, calldata, and zero value before confirming or continuing.
 A mismatch or unavailable transaction stops further steps; the wallet may already have broadcast.
-Nonce, gas, and fee changes are allowed. This verification happens after broadcast.
+Nonce, gas, and fee changes are allowed. The nonce must meet the latest mined account nonce sampled before dispatch.
+This rejects matching calls already mined at that snapshot. Hash-only responses still require a trusted wallet. Verification happens after broadcast.
 Compare the request in your wallet before approving. Cancellation or timeout cannot stop a request already sent.
 Check wallet activity before retrying; the wallet may still broadcast.
 See [Signing](../README.md#signing) for wallet compatibility and session safeguards.

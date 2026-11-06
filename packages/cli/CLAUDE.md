@@ -85,6 +85,8 @@ Run it from the repository without building: `pnpm --filter @cobuilders/safenet-
   The CLI validates the returned 32-byte hash and polls receipts through its selected RPC.
   After a successful receipt, `Signer.verifyConfirmedTransaction` checks the mined call before the runner confirms or continues.
   WalletConnect checks sender, destination, calldata, zero value, and the receipt hash/block. Nonce, gas, and fees may differ.
+  A pre-dispatch latest mined nonce provides a lower bound, rejecting matching calls already mined at that snapshot.
+  The hash-only protocol cannot cryptographically prove request identity; the wallet remains trusted.
   Failed verification invalidates the wallet and stops subsequent steps. This cannot prevent a broadcast already made.
   Session storage is memory only. Command cleanup closes the signer.
   Cancellation, account/chain changes, disconnect, expiry, and timeouts stop further CLI requests.
