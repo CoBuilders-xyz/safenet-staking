@@ -7,7 +7,7 @@
  */
 import {
   BaseError, InsufficientFundsError, keccak256,
-  type Address, type Hash, type Hex, type LocalAccount, type PublicClient, type TransactionSerializable,
+  type Address, type Hash, type Hex, type LocalAccount, type PublicClient, type TransactionReceipt, type TransactionSerializable,
 } from "viem"
 import { SafenetError } from "./errors.js"
 
@@ -22,6 +22,8 @@ export interface Signer {
   readonly address: Address
   /** Signs and broadcasts one transaction, and returns its hash. */
   send(tx: TransactionToSend): Promise<Hash>
+  /** Verify a wallet's mined transaction before confirming the call or starting another step. */
+  verifyConfirmedTransaction?(tx: TransactionToSend, receipt: Pick<TransactionReceipt, "transactionHash" | "blockHash">): Promise<void>
   /** Release an interactive wallet session after the command, including failed or dry runs. */
   close?(): Promise<void>
 }

@@ -11,7 +11,7 @@ export function addWriteOptions(command: Command): Command {
   return command
     .option("--dry-run", "read, simulate and estimate every transaction, and print what would be sent; nothing is signed")
     .option("--private-key-env <NAME>", "sign with the private key held in the environment variable NAME")
-    .option("--walletconnect", "connect an external wallet through a private pairing URI in the terminal")
+    .option("--walletconnect", "connect an external wallet through a private pairing QR and URI in the terminal")
     .option("--wallet-account <address>", "with --walletconnect: require this Mainnet signing account")
     .option("--keystore <path>", "sign with a version 3 keystore file; asks for its password")
     .option("--password-env <NAME>", "with --keystore: read the password from the environment variable NAME")

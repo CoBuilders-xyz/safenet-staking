@@ -316,15 +316,22 @@ function liveRunner(ctx: Context, signer: Signer, options: WriteOptions): Runner
             `(${err instanceof BaseError ? err.shortMessage : "no answer"}); look the hash up before sending again`,
         ))
       }
+      if (receipt.status !== "success") {
+        return fail(new SafenetError(`${c.contract}.${c.functionName} reverted on chain in ${hash}`))
+      }
+      if (signer.verifyConfirmedTransaction) {
+        try {
+          await signer.verifyConfirmedTransaction({ to: c.address, data: encode(c), gas }, receipt)
+          // Receipt polling can follow a replacement; report the hash that was actually verified.
+          hash = receipt.transactionHash
+        } catch (err) { return fail(err) }
+      }
       const step = stepOf(c, figure(gas, "eth_estimateGas"), {
         hash,
         status: receipt.status,
         block: receipt.blockNumber,
         gasUsed: receipt.gasUsed,
       })
-      if (receipt.status !== "success") {
-        return fail(new SafenetError(`${c.contract}.${c.functionName} reverted on chain in ${hash}`))
-      }
       steps.push(step)
       options.onProgress?.({ type: "confirmed", step })
       return { step, logs: receipt.logs }

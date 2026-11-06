@@ -129,7 +129,7 @@ test("WalletConnect passes every write through the gates before review, signatur
         paired++
         return { uri: "wc:unit-test-pairing", approval: async () => ({
           topic: "unit-test-session",
-          namespaces: { eip155: { accounts: [`eip155:${CHAINS.mainnet.id}:${STAKER}`], methods: ["eth_signTransaction"] } },
+          namespaces: { eip155: { accounts: [`eip155:${CHAINS.mainnet.id}:${STAKER}`], methods: ["eth_sendTransaction"] } },
         }) }
       },
       request: async () => { requested++; throw new Error("signature tripwire") },

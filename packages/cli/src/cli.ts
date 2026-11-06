@@ -15,7 +15,7 @@ import {
 } from "./lib/index.js"
 import { ARCHIVE_ADVICE, toJson } from "./commands/format.js"
 import { globalSchema, parseOptions, UsageError, type GlobalOptions, type WriteRequest } from "./commands/options.js"
-import { terminalPasswordPrompt } from "./commands/prompt.js"
+import { showWalletPairing, terminalPasswordPrompt } from "./commands/prompt.js"
 import { registerRewards } from "./commands/rewards.js"
 import { loadSigner, type SignerRequest } from "./commands/signer.js"
 import { registerStake } from "./commands/stake.js"
@@ -210,14 +210,11 @@ export function processRuntime(): Runtime {
           env: process.env, askPassword: prompt,
           wallet: {
             signal: controller.signal,
-            async showUri(uri, signal) {
-              const answer = await terminalPasswordPrompt(signal)!("Pairing URI is sensitive. Stop terminal recording. Type connect to display it: ")
-              if (answer !== "connect") throw new SafenetError("Wallet pairing cancelled")
-              process.stderr.write(`Paste this URI into your hardware wallet companion app. Never share it:\n${uri}\n`)
-            },
+            showUri: showWalletPairing,
             async confirm(review, signal) {
-              process.stderr.write(`Review transaction (amounts and fees in wei):\n${review}\n`)
-              return await terminalPasswordPrompt(signal)!("Compare with your device. Type sign to request its signature: ") === "sign"
+              process.stderr.write(`Review transaction (amounts and fees in wei):\n${review}\n` +
+                "Warning: the wallet signs and broadcasts. Cancellation or timeout cannot stop a pending wallet request.\n")
+              return await terminalPasswordPrompt(signal)!("Compare with your device. Type sign to request signing and broadcast: ") === "sign"
             },
           },
         })
