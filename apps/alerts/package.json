@@ -19,15 +19,15 @@
     "web-push": "3.6.7"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "2.0.0-beta.v.8",
-    "@cloudflare/workers-types": "5.20261029.1",
-    "@electric-sql/pglite": "0.3.14",
-    "@types/node": "24.10.13",
+    "@cloudflare/vite-plugin": "2.0.0-beta.v.12",
+    "@cloudflare/workers-types": "5.20261104.1",
+    "@electric-sql/pglite": "0.5.15",
+    "@types/node": "26.6.6",
     "@types/web-push": "3.6.4",
-    "cf": "1.0.0-beta.25",
+    "cf": "1.0.0-beta.28",
     "miniflare": "5.20261023.3-beta",
     "tsx": "4.23.15",
-    "typescript": "5.9.3",
-    "vite": "7.3.7"
+    "typescript": "7.0.2",
+    "vite": "8.3.6"
   }
 }

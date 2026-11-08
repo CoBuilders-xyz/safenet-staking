@@ -64,10 +64,10 @@
   },
   "devDependencies": {
     "@cobuilders/safenet-core": "workspace:*",
-    "@types/node": "22.19.2",
+    "@types/node": "26.6.6",
     "postject": "1.0.0-alpha.6",
-    "tsup": "8.5.1",
+    "tsup": "9.0.0",
     "tsx": "4.23.15",
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   }
 }
