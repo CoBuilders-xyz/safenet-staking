@@ -119,7 +119,10 @@ The figures the CLI's library computes come from it, not from a copy: `getStatus
 themselves, so the builder hands them a context pinned to the snapshot's points
 (`src/pinned.ts`): the head is the pinned block, every contract read without a block is held at
 it, a log scan past it is refused, and a read of SEF's `main` is a read at the pinned commit.
-Each SEF file is fetched once, so the figures and the copy in `sef/` are the same bytes.
+Each SEF file is fetched once, so the figures and the copy in `sef/` are the same bytes. The
+chain id is read as it is, because no block changes it. The library's own subgraph queries are
+refused, so `networkWithdrawals` falls back to its log scan: the withdrawal figures come from
+the chain alone, and the check against the subgraph's rows below stays independent.
 
 The Mainnet block sits a few confirmations below the lower of the RPC's head and the Mainnet
 subgraph's head. Every subgraph query names the block by the hash the RPC gave, which fails when

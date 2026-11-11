@@ -1,8 +1,9 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { SEF_DATA, ensResolverAbi, ensUniversalResolverAbi, readRewardsEnsState } from "@cobuilders/safenet-core"
+import { networkWithdrawals, type Context } from "@cobuilders/safenet-cli/lib"
+import { CONTRACTS, SEF_DATA, ensResolverAbi, ensUniversalResolverAbi, readRewardsEnsState } from "@cobuilders/safenet-core"
 import { encodeFunctionResult, numberToHex, pad, type PublicClient } from "viem"
-import { pinClient, pinFetch, type SefPin } from "./pinned.js"
+import { pinClient, pinContext, pinFetch, type SefPin } from "./pinned.js"
 import { COMMIT, REWARDS_COMMIT } from "./test-support.js"
 
 const PIN = 100n
@@ -154,4 +155,57 @@ test("the snapshot's copy of a SEF file is the bytes the CLI read", async () => 
 test("a SEF file the commit does not have fails, rather than copy an error page", async () => {
   const base = (async () => new Response("Not Found", { status: 404 })) as typeof fetch
   await assert.rejects(pinFetch(base, PINS).sefFile("validator-info.json"), /answered HTTP 404/)
+})
+
+test("a query with a body is refused and never answered from memory", async () => {
+  const { base, urls } = countingFetch()
+  const { fetch } = pinFetch(base, PINS)
+  const url = "https://api.studio.thegraph.com/query/1/safenet-mainnet/version/latest"
+  await assert.rejects(fetch(url, { method: "POST", body: "{}" }), /reads the subgraphs itself/)
+  await assert.rejects(fetch(new Request(url, { method: "POST", body: "{}" })), /reads the subgraphs itself/)
+  assert.equal(urls.length, 0)
+})
+
+// The builder hands the CLI library's own operations a pinned context. These tests run the real
+// operations through it, so a read the library adds that the pin does not cover fails here, not
+// in the nightly run (issue #95: getChainId, added to networkWithdrawals).
+const AFTER_DEPLOY = CONTRACTS.staking.deployBlock + 10n
+
+function mainnetClient() {
+  const calls: string[] = []
+  const client = {
+    chain: { id: 1 },
+    getChainId: async () => { calls.push("getChainId"); return 1 },
+    getBlockNumber: async () => { calls.push("getBlockNumber"); return AFTER_DEPLOY + 1_000n },
+    getBlock: async ({ blockNumber }: { blockNumber: bigint }) => ({ number: blockNumber, hash: `0x${"ab".repeat(32)}`, timestamp: 1n }),
+    readContract: async ({ functionName, blockNumber }: { functionName: string; blockNumber?: bigint }) => {
+      calls.push(`readContract ${functionName} at ${blockNumber}`)
+      if (functionName === "totalPendingWithdrawals") return 0n
+      throw new Error(`unexpected read ${functionName}`)
+    },
+    getLogs: async ({ toBlock }: { toBlock: bigint }) => { calls.push(`getLogs to ${toBlock}`); return [] },
+  } as unknown as PublicClient
+  return { client, calls }
+}
+
+test("getChainId reaches the RPC: a chain id is the same at every block", async () => {
+  const { client, calls } = mainnetClient()
+  assert.equal(await pinClient(client, PIN).getChainId(), 1)
+  assert.deepEqual(calls, ["getChainId"])
+})
+
+test("the CLI's networkWithdrawals runs under the pinned context, from the chain alone", async () => {
+  const { client, calls } = mainnetClient()
+  const { base, urls } = countingFetch()
+  const ctx: Context = { client, fetch: base, retryDelayMs: 0 }
+  const result = await networkWithdrawals(pinContext(ctx, AFTER_DEPLOY, pinFetch(base, PINS)))
+  assert.equal(result.block, AFTER_DEPLOY)
+  assert.equal(result.logsMatchChain, true)
+  // The figure comes from the chain's logs, so the check against the subgraph's rows stays independent.
+  assert.match(result.count.source, /^chain: WithdrawalInitiated logs/)
+  assert.equal(urls.length, 0, "no subgraph query left the pinned fetch")
+  assert.ok(calls.includes("getChainId"))
+  assert.ok(calls.includes(`readContract totalPendingWithdrawals at ${AFTER_DEPLOY}`))
+  assert.ok(calls.filter((c) => c.startsWith("getLogs")).every((c) => BigInt(c.slice("getLogs to ".length)) <= AFTER_DEPLOY))
+  assert.ok(!calls.includes("getBlockNumber"), "the head is the pinned block")
 })

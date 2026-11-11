@@ -10,7 +10,9 @@
  * memory after that, so every operation sees the same bytes, and the snapshot copies those
  * bytes as published.
  *
- * A read this file does not pin throws, rather than read the head unnoticed.
+ * A read this file does not pin throws, rather than read the head unnoticed. The chain id is
+ * the one read that passes as it is, because it is the same at every block. A request with a
+ * body, such as a subgraph query, throws too: the snapshot reads the subgraphs itself.
  */
 import type { Context } from "@cobuilders/safenet-cli/lib"
 import { SEF_DATA } from "@cobuilders/safenet-core"
@@ -38,6 +40,12 @@ const COMMITS_URL: Readonly<Record<string, string>> = {
 /** The client methods the CLI's reads use. Any other one throws. */
 const PINNED_METHODS = new Set(["getBlockNumber", "getBlock", "readContract", "getLogs"])
 
+/**
+ * Reads that answer the same at every block, so they reach the RPC as they are. `getChainId`
+ * is the CLI's check that the endpoint is Mainnet before a history read.
+ */
+const BLOCK_INDEPENDENT = new Set(["getChainId"])
+
 type Args = Record<string, unknown> | undefined
 
 /** The client, with every read held at `block`. */
@@ -61,6 +69,7 @@ export function pinClient(client: PublicClient, block: bigint): PublicClient {
           return value.call(target, { ...request, params: [params[0], toHex(at), ...params.slice(2)] }, options)
         }
       }
+      if (BLOCK_INDEPENDENT.has(prop)) return value.bind(target)
       if (!PINNED_METHODS.has(prop)) {
         // viem's other plumbing, such as `extend`, stays reachable for viem; the
         // reads the CLI might grow into are refused by name.
@@ -140,6 +149,14 @@ export function pinFetch(base: typeof fetch, pins: readonly SefPin[]): PinnedFet
 
   const pinnedFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
+    const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase()
+    if (method !== "GET" || init?.body != null || (input instanceof Request && input.body !== null)) {
+      // The memory below is keyed by URL, so it would answer every query to one endpoint with
+      // the first one's bytes. The only such reads are the CLI's history queries to the Mainnet
+      // subgraph. The snapshot reads the subgraphs itself, at the pinned blocks, and checks the
+      // chain's figures against them; refusing here keeps those figures from the chain alone.
+      throw new SnapshotError(`a ${method} request or a request with a body is refused; the snapshot reads the subgraphs itself at the pinned blocks`)
+    }
     const committed = COMMITS_URL[url]
     if (committed !== undefined) {
       const pin = byPath.get(committed)
