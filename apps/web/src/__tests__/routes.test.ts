@@ -11,6 +11,10 @@ describe("routeImportFor", () => {
     expect(routeImportFor("#/validators/0xabc")).toBe(pageImports.ValidatorDetail)
     expect(routeImportFor("#/withdrawals")).toBe(pageImports.Withdrawals)
     expect(routeImportFor("#/rewards")).toBe(pageImports.Rewards)
+    for (const path of ["#/imprint", "#/terms", "#/privacy", "#/faq"]) {
+      expect(routeImportFor(path)).toBe(pageImports.Content)
+    }
+    expect(routeImportFor("#/terms/more")).toBe(pageImports.NotFound)
     expect(routeImportFor("#/nowhere")).toBe(pageImports.NotFound)
     expect(routeImportFor("#/validators/0xabc/more")).toBe(pageImports.NotFound)
   })

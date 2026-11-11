@@ -20,6 +20,10 @@ const ROUTES = [
   { path: `/#/validators/${VALIDATORS.validatorA}`, ready: "Back to Validators" },
   { path: "/#/withdrawals", ready: "Withdrawals" },
   { path: "/#/rewards", ready: "Rewards" },
+  { path: "/#/imprint", ready: "Imprint" },
+  { path: "/#/terms", ready: "Terms of use" },
+  { path: "/#/privacy", ready: "Privacy policy" },
+  { path: "/#/faq", ready: "Frequently asked questions" },
   { path: "/#/no-such-page", ready: "Page not found" },
 ]
 

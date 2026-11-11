@@ -96,7 +96,7 @@ holds those constants equal to the `programme.*` keys. Render the translated key
 
 ### Routing (`src/App.tsx`)
 
-`HashRouter`. Seven routes under a shared `Layout` (header, footer, `<Outlet />`), each page
+`HashRouter`. The routes sit under a shared `Layout` (header, footer, `<Outlet />`), each page
 wrapped in `ErrorBoundary`:
 
 - `/` → `OverviewPage`: Network Overview, no wallet needed. Headline figures, stake distribution,
@@ -114,6 +114,12 @@ wrapped in `ErrorBoundary`:
   a batching wallet
 - `/rewards` → `RewardsPage`: Your rewards, Claim, Claim & Stake, Programme, and Verifiability,
   the on-chain root checked against SEF's published one
+- `/imprint`, `/terms`, `/privacy`, `/faq` → `ContentPage`: the Markdown texts in `src/content/en`,
+  parsed by `src/lib/markdown.ts` into elements, never HTML. `src/content/README.md` has the
+  supported subset and the placeholder status. The footer links to them through `LegalLink`,
+  which prefers `VITE_TERMS_URL`, `VITE_PRIVACY_URL` or `VITE_IMPRINT_URL` when set. The footer
+  names the operator from `src/config/legal.ts`. On the restricted screen the routes are closed,
+  so its footer links only to documents hosted elsewhere
 - `*` → `NotFoundPage`
 
 Pages are lazy-loaded with `React.lazy()` from `src/routes.ts`. The page of the URL opened starts

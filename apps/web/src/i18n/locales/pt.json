@@ -64,6 +64,7 @@
     "documentation": "Documentação",
     "faq": "Perguntas frequentes",
     "imprint": "Informações legais",
+    "operatedBy": "Operado por {{operator}}",
     "privacy": "Privacidade",
     "terms": "Termos"
   },
@@ -80,6 +81,10 @@
       "withdrawals": "Saques"
     },
     "openMenu": "Abrir menu"
+  },
+  "legal": {
+    "englishOnly": "Este texto está disponível apenas em inglês.",
+    "placeholderNotice": "Texto provisório. O texto final aguarda revisão jurídica."
   },
   "onboarding": {
     "accessCheckFailed": "Falha na verificação de acesso",

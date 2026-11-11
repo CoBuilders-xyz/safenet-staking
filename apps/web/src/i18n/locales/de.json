@@ -64,6 +64,7 @@
     "documentation": "Dokumentation",
     "faq": "FAQ",
     "imprint": "Impressum",
+    "operatedBy": "Betrieben von {{operator}}",
     "privacy": "Datenschutz",
     "terms": "Nutzungsbedingungen"
   },
@@ -80,6 +81,10 @@
       "withdrawals": "Auszahlungen"
     },
     "openMenu": "Menü öffnen"
+  },
+  "legal": {
+    "englishOnly": "Dieser Text ist nur auf Englisch verfügbar.",
+    "placeholderNotice": "Platzhalter. Der endgültige Text wird noch rechtlich geprüft."
   },
   "onboarding": {
     "accessCheckFailed": "Zugriffsprüfung fehlgeschlagen",

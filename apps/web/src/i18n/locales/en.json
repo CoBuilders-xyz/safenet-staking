@@ -97,6 +97,7 @@
     "documentation": "Documentation",
     "faq": "FAQ",
     "imprint": "Imprint",
+    "operatedBy": "Operated by {{operator}}",
     "privacy": "Privacy",
     "terms": "Terms"
   },
@@ -113,6 +114,10 @@
       "withdrawals": "Withdrawals"
     },
     "openMenu": "Open menu"
+  },
+  "legal": {
+    "englishOnly": "This text is only available in English.",
+    "placeholderNotice": "Placeholder. The final text is pending legal review."
   },
   "onboarding": {
     "accessCheckFailed": "Access Check Failed",

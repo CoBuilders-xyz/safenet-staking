@@ -64,6 +64,7 @@
     "documentation": "Documentazione",
     "faq": "FAQ",
     "imprint": "Note legali",
+    "operatedBy": "Gestito da {{operator}}",
     "privacy": "Privacy",
     "terms": "Termini"
   },
@@ -80,6 +81,10 @@
       "withdrawals": "Prelievi"
     },
     "openMenu": "Aprire il menu"
+  },
+  "legal": {
+    "englishOnly": "Questo testo è disponibile solo in inglese.",
+    "placeholderNotice": "Testo provvisorio. Il testo definitivo è in attesa di revisione legale."
   },
   "onboarding": {
     "accessCheckFailed": "Verifica dell’accesso non riuscita",

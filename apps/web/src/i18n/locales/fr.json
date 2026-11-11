@@ -64,6 +64,7 @@
     "documentation": "Documentation",
     "faq": "FAQ",
     "imprint": "Mentions légales",
+    "operatedBy": "Exploité par {{operator}}",
     "privacy": "Confidentialité",
     "terms": "Conditions"
   },
@@ -80,6 +81,10 @@
       "withdrawals": "Retraits"
     },
     "openMenu": "Ouvrir le menu"
+  },
+  "legal": {
+    "englishOnly": "Ce texte est disponible uniquement en anglais.",
+    "placeholderNotice": "Texte provisoire. Le texte définitif est en attente de révision juridique."
   },
   "onboarding": {
     "accessCheckFailed": "Échec du contrôle d’accès",

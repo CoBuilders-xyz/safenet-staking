@@ -64,6 +64,7 @@
     "documentation": "文档",
     "faq": "常见问题",
     "imprint": "法律声明",
+    "operatedBy": "由 {{operator}} 运营",
     "privacy": "隐私",
     "terms": "条款"
   },
@@ -80,6 +81,10 @@
       "withdrawals": "提取"
     },
     "openMenu": "打开菜单"
+  },
+  "legal": {
+    "englishOnly": "本文仅提供英文版。",
+    "placeholderNotice": "占位文本。最终文本有待法律审核。"
   },
   "onboarding": {
     "accessCheckFailed": "访问检查失败",

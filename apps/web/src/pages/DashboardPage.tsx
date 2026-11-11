@@ -9,10 +9,9 @@ import { PageHero } from "@/components/PageHero"
 import { Button } from "@/components/ui/button"
 import { Term } from "@/components/ui/term"
 import { ConnectButton } from "@/components/wallet/ConnectButton"
+import { LegalLink } from "@/components/LegalLink"
 import { useToast } from "@/hooks/useToast"
 import { isSafeApp } from "@/lib/safe"
-
-const termsUrl = import.meta.env.VITE_TERMS_URL as string | undefined
 
 /** My stake: the connected wallet's positions. With no wallet, the network figures live on the Overview. */
 export function DashboardPage() {
@@ -26,11 +25,7 @@ export function DashboardPage() {
       >
         <p className="mt-4 text-xs text-muted-foreground">
           {t("dashboard.rewardsAreNotGuaranteedAndMayVary", "Rewards are not guaranteed and may vary.")}{" "}
-          {termsUrl ? (
-            <a href={termsUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">{t("dashboard.seeTermsForDetails", "See terms for details.")}</a>
-          ) : (
-            t("dashboard.seeTermsForDetails", "See terms for details.")
-          )}
+          <LegalLink page="terms" className="underline hover:text-foreground transition-colors">{t("dashboard.seeTermsForDetails", "See terms for details.")}</LegalLink>
         </p>
       </PageHero>
       {isConnected ? (

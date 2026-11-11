@@ -16,6 +16,7 @@ import { useGeoblockCheck } from "@/hooks/useGeoblockCheck"
 import { useWalletSanctionsCheck } from "@/hooks/useWalletSanctionsCheck"
 import { useToast } from "@/hooks/useToast"
 import { pageImports, routeImportFor, routeContentImport } from "@/routes"
+import { CONTENT_PAGES } from "@/config/legal"
 import Loader2 from "lucide-react/dist/esm/icons/loader-2"
 
 // The first page's code loads while the gates are still answering, rather than after them.
@@ -30,6 +31,7 @@ const ValidatorDetailPage = lazy(pageImports.ValidatorDetail)
 const WithdrawalsPage = lazy(pageImports.Withdrawals)
 const RewardsPage = lazy(pageImports.Rewards)
 const AlertsPage = lazy(pageImports.Alerts)
+const ContentPage = lazy(pageImports.Content)
 const NotFoundPage = lazy(pageImports.NotFound)
 
 /** Preload all route chunks so IPFS-hosted builds are warm. */
@@ -173,6 +175,9 @@ function App() {
             <Route path="/withdrawals" element={<ErrorBoundary><WithdrawalsPage /></ErrorBoundary>} />
             <Route path="/rewards" element={<ErrorBoundary><RewardsPage /></ErrorBoundary>} />
             <Route path="/alerts" element={<ErrorBoundary><AlertsPage /></ErrorBoundary>} />
+            {CONTENT_PAGES.map(name => (
+              <Route key={name} path={`/${name}`} element={<ErrorBoundary><ContentPage name={name} /></ErrorBoundary>} />
+            ))}
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>

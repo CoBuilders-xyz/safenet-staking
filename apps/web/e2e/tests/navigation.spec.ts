@@ -72,4 +72,30 @@ test.describe("Navigation", () => {
     await expect(layout.footerDocs).toBeVisible()
     await expect(layout.footerFaq).toBeVisible()
   })
+
+  test("footer names the operator and opens the in-app pages", async ({ disconnectedPage: page }) => {
+    const layout = new LayoutPage(page)
+    await layout.goto()
+
+    await expect(layout.footer.getByText("Operated by Backstage Online LLC")).toBeVisible()
+    // playwright.config.ts sets VITE_TERMS_URL, which replaces the in-app terms.
+    await expect(layout.footerTerms).toHaveAttribute("href", "https://terms.test")
+
+    const pages = [
+      { link: "Privacy", url: "/#/privacy", title: "Privacy policy", placeholder: true },
+      { link: "Imprint", url: "/#/imprint", title: "Imprint", placeholder: true },
+      { link: "FAQ", url: "/#/faq", title: "Frequently asked questions", placeholder: false },
+    ]
+    for (const { link, url, title, placeholder } of pages) {
+      await layout.footer.getByRole("link", { name: link }).click()
+      await expect(page).toHaveURL(url)
+      await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible()
+      await expect(page.getByText("Placeholder. The final text is pending legal review.")).toHaveCount(placeholder ? 1 : 0)
+    }
+
+    // A link inside a text stays in the app.
+    await page.getByRole("main").getByRole("link", { name: "Terms of use" }).click()
+    await expect(page).toHaveURL("/#/terms")
+    await expect(page.getByRole("heading", { level: 1, name: "Terms of use" })).toBeVisible()
+  })
 })
