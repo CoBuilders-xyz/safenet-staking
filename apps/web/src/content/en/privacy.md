@@ -50,6 +50,8 @@ You can delete this data in your browser settings at any time.
 
 Each service below receives your IP address and the content of the request. Their own privacy policies apply.
 
+The providers named below are the defaults of the standard build. A deployment can configure other RPC, subgraph and IPFS providers. **[TODO: confirm the providers of this deployment]**
+
 - **Ethereum RPC providers.** The interface reads the chain through public RPC endpoints. At the time of writing these are `ethereum-rpc.publicnode.com`, `eth.drpc.org` and `1rpc.io`. With a wallet connected, the requests contain your wallet address. This includes the read of the on-chain sanctions oracle for your address.
 - **The Graph.** The interface reads indexed data from The Graph, through `gateway.thegraph.com` or `api.studio.thegraph.com`. The reward history query contains your wallet address.
 - **SEF's published data.** The interface reads validator data and reward data that the Safe Ecosystem Foundation publishes on GitHub (`raw.githubusercontent.com`) and on IPFS. The IPFS gateways are `ipfs.orbitor.dev` and `ipfs.filebase.io` at the time of writing. The request for your reward proof contains your wallet address.

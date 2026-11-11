@@ -32,6 +32,10 @@ The privacy policy states data flows that come from the code. A test in
 `src/pages/__tests__/ContentPage.test.tsx` fails when the policy does not name a host that
 `packages/core` gives the browser. Keep those statements true when the text changes.
 
+The policy names the default providers. `VITE_RPC_URL`, `VITE_SUBGRAPH_URL_MAINNET`,
+`VITE_SUBGRAPH_URL_GNOSIS`, `VITE_GRAPH_API_KEY` and `VITE_IPFS_GATEWAY` change who receives the
+requests. When a deployment sets one of them, name its providers in the policy.
+
 ## Supported Markdown
 
 The renderer (`src/lib/markdown.ts`, `src/components/Markdown.tsx`) supports this subset. It
