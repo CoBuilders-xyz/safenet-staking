@@ -32,9 +32,12 @@ The privacy policy states data flows that come from the code. A test in
 `src/pages/__tests__/ContentPage.test.tsx` fails when the policy does not name a host that
 `packages/core` gives the browser. Keep those statements true when the text changes.
 
-The policy names the default providers. `VITE_RPC_URL`, `VITE_SUBGRAPH_URL_MAINNET`,
-`VITE_SUBGRAPH_URL_GNOSIS`, `VITE_GRAPH_API_KEY` and `VITE_IPFS_GATEWAY` change who receives the
-requests. When a deployment sets one of them, name its providers in the policy.
+The policy names the default providers. A variable that sets a URL or a provider changes who
+receives the requests: `VITE_RPC_URL` and its fallbacks, `VITE_SUBGRAPH_URL_MAINNET`,
+`VITE_SUBGRAPH_URL_GNOSIS`, `VITE_GRAPH_API_KEY`, `VITE_IPFS_GATEWAY`, `VITE_REWARDS_BASE_URL`,
+`VITE_VALIDATOR_INFO_URL` and `VITE_ALERTS_API_URL`. The requests for reward proofs and to the
+alerts service contain the wallet address. When a deployment sets one of these variables, name
+its providers in the policy.
 
 ## Supported Markdown
 
