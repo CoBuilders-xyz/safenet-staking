@@ -71,13 +71,38 @@ source files, logs or browser variables:
 
 | Binding | Purpose |
 | --- | --- |
-| `APP_ORIGIN` | Exact browser origin, scheme and host, with no path or trailing slash. SIWE domain and CORS allowlist. |
+| `APP_ORIGINS` | Comma-separated exact browser origins allowed to call the API, for example `https://safenet.cobuilders.eth.limo,https://safenet.cobuilders.xyz`. See [Allowed origins](#allowed-origins). |
+| `APP_ORIGIN` | Legacy single origin. Still accepted, alone or merged with `APP_ORIGINS`. |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Project REST origin and backend service credential. |
 | `MAINNET_RPC_URL`, `GNOSIS_RPC_URL` | Mainnet reads/contract-wallet verification and finalized Aegis history. Must answer the expected chain ID. |
 | `SUBGRAPH_URL_MAINNET` | Production Mainnet subgraph endpoint; a Studio development endpoint cannot support sustained subscription volume. |
 | `REWARDS_BASE_URL` | Optional isolated-fork dataset override. Normally resolve the canonical ENS dataset, with core's repository fallback. |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_NAME` | A dedicated bot token and its username, without `@`. Do not reuse a bot consumed by another getUpdates poller or webhook. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Persistent matching VAPID keypair and valid `mailto:` or HTTPS contact. Keep the private key server-side. |
+
+### Allowed origins
+
+The interface is served from more than one origin, such as the ENS/IPFS release at
+`https://safenet.cobuilders.eth.limo` and `https://safenet.cobuilders.xyz`. List every origin
+the Worker must serve in `APP_ORIGINS`. Set at least one of `APP_ORIGINS` and `APP_ORIGIN`.
+
+* Each entry is a scheme, a host and an optional port. Entries are trimmed, lowercased and
+  normalized, so a trailing slash is allowed. Paths, queries, fragments, credentials and
+  wildcards are not. Plain `http` is allowed only for `localhost` and `127.0.0.1`.
+* A malformed entry, or no entry at all, makes every API route except `/health` answer 503.
+  The Worker never drops a bad entry silently.
+* CORS echoes the request's `Origin` only when it matches an entry exactly. Every response
+  sends `Vary: Origin`. Any other origin gets 403 and no CORS headers.
+* The SIWE challenge names the request's origin as its `domain` and `uri`, so the wallet shows
+  and checks the site the user is on. `/auth/verify` accepts a challenge only from the origin it
+  names. A challenge from one origin redeemed from another answers 401 and stays unused.
+  This is a consistency check: a client outside a browser can forge `Origin`. The wallet's own
+  domain check protects users from phishing.
+* Add a gateway only if it serves the interface from its own origin. Do not list a shared
+  path-based gateway: every site behind that origin could then call the API.
+
+For local development, copy `.dev.vars.example` to `.dev.vars` and fill in the values.
+Git ignores `.dev.vars`.
 
 Set the web build's `VITE_ALERTS_API_URL` to the approved service origin. This is public and must
 contain no credentials. Without it, the route explicitly reports that alerts are not configured.
@@ -86,8 +111,8 @@ Supabase account access alone is insufficient: a project URL and service key are
 
 ## Authentication and ownership
 
-The server creates a five-minute SIWE challenge for core's Mainnet chain and the configured app
-origin. A signature is verified using viem's public client, including deployed ERC-1271 wallets.
+The server creates a five-minute SIWE challenge for core's Mainnet chain and the allowed origin
+of the request. A signature is verified using viem's public client, including deployed ERC-1271 wallets.
 Safe owners must satisfy the Safe's signature threshold; recovering one owner EOA is insufficient.
 If verification fails while other owners approve, the UI retries the same signature and challenge.
 An expired challenge requires a new signature; it never reuses a consumed nonce.

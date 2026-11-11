@@ -1,3 +1,4 @@
 .cloudflare/
 .wrangler/
 .dev.vars*
+!.dev.vars.example

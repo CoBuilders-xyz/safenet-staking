@@ -13,31 +13,32 @@ import { sendEvent, telegramUpdates } from "./delivery.js"
 import { initialChronology, foldChronology } from "./chronology.js"
 import type { Env, Subscription } from "./types.js"
 
-const env: Env = { APP_ORIGIN: "https://app.test", SUPABASE_URL: "https://unused.test", SUPABASE_SERVICE_KEY: "unused",
+const origin = "https://app.test"
+const env: Env = { APP_ORIGIN: origin, SUPABASE_URL: "https://unused.test", SUPABASE_SERVICE_KEY: "unused",
   TELEGRAM_BOT_TOKEN: "test-only", TELEGRAM_BOT_NAME: "test_bot" }
 const account = privateKeyToAccount(generatePrivateKey())
 
 async function signed(db: SqlDatabase) {
-  const c = await challenge(db, env, { wallet: account.address })
+  const c = await challenge(db, env, origin, { wallet: account.address })
   const signature = await account.signMessage({ message: c.message })
-  return { c, signature, session: await authenticate(db, env, { id: c.id, signature }, verifyMessage) }
+  return { c, signature, session: await authenticate(db, env, origin, { id: c.id, signature }, verifyMessage) }
 }
 
 test("real wallet signature, SIWE scope, atomic replay, expiry, wrong signer and service-only database access", async () => {
   const db = new SqlDatabase(); await db.setup()
   try {
-    const c = await challenge(db, env, { wallet: account.address })
+    const c = await challenge(db, env, origin, { wallet: account.address })
     const message = parseSiweMessage(c.message)
     assert.equal(message.chainId, CHAINS.mainnet.id)
     assert.equal(message.domain, "app.test")
-    assert.equal(message.uri, env.APP_ORIGIN)
+    assert.equal(message.uri, origin)
     const signature = await account.signMessage({ message: c.message })
-    const outcomes = await Promise.allSettled([authenticate(db, env, { id: c.id, signature }, verifyMessage), authenticate(db, env, { id: c.id, signature }, verifyMessage)])
+    const outcomes = await Promise.allSettled([authenticate(db, env, origin, { id: c.id, signature }, verifyMessage), authenticate(db, env, origin, { id: c.id, signature }, verifyMessage)])
     assert.equal(outcomes.filter(o => o.status === "fulfilled").length, 1)
-    const old = await challenge(db, env, { wallet: account.address }, Date.now() - 600_000)
-    await assert.rejects(authenticate(db, env, { id: old.id, signature }, verifyMessage), /expired/)
-    const fresh = await challenge(db, env, { wallet: CONTRACTS.staking.address })
-    await assert.rejects(authenticate(db, env, { id: fresh.id, signature: await account.signMessage({ message: fresh.message }) }, verifyMessage), /verification failed/)
+    const old = await challenge(db, env, origin, { wallet: account.address }, Date.now() - 600_000)
+    await assert.rejects(authenticate(db, env, origin, { id: old.id, signature }, verifyMessage), /expired/)
+    const fresh = await challenge(db, env, origin, { wallet: CONTRACTS.staking.address })
+    await assert.rejects(authenticate(db, env, origin, { id: fresh.id, signature: await account.signMessage({ message: fresh.message }) }, verifyMessage), /verification failed/)
     await db.pg.exec("set role anon")
     await assert.rejects(db.pg.query("select * from alerts_subscriptions"), /permission denied/)
     await assert.rejects(db.pg.query("select alerts_authenticate($1,$2,$3)", [c.id, "x", "x"]), /permission denied/)
@@ -48,12 +49,12 @@ test("API isolates wallets, refuses wrong origins, revokes deleted subscriptions
   const db = new SqlDatabase(); await db.setup()
   try {
     const auth = await signed(db)
-    const request = (path: string, method = "GET", body?: unknown, origin = env.APP_ORIGIN) => api(new Request(`https://alerts.test${path}`, {
-      method, headers: { Origin: origin, Authorization: `Bearer ${auth.session.token}`, "Content-Type": "application/json" },
+    const request = (path: string, method = "GET", body?: unknown, from = origin) => api(new Request(`https://alerts.test${path}`, {
+      method, headers: { Origin: from, Authorization: `Bearer ${auth.session.token}`, "Content-Type": "application/json" },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     }), env, db, verifyMessage)
     assert.equal((await request("/subscriptions", "GET", undefined, "https://evil.test")).status, 403)
-    assert.equal((await api(new Request("https://alerts.test/subscriptions", { headers: { Origin: env.APP_ORIGIN } }), env, db)).status, 401)
+    assert.equal((await api(new Request("https://alerts.test/subscriptions", { headers: { Origin: origin } }), env, db)).status, 401)
     const created = await request("/subscriptions", "POST", { triggers: ["cooldown", "missed"], participation: 75, missed: 3, channel: { kind: "telegram" } })
     assert.equal(created.status, 200)
     const { id } = await created.json() as { id: string }
@@ -150,9 +151,9 @@ test("failed delivery retries after its lease; concurrent claims and expired rec
 test("a challenge expiring during verification cannot create a session", async () => {
   const db = new SqlDatabase(); await db.setup()
   try {
-    const c = await challenge(db, env, { wallet: account.address })
+    const c = await challenge(db, env, origin, { wallet: account.address })
     const signature = await account.signMessage({ message: c.message })
-    await assert.rejects(authenticate(db, env, { id: c.id, signature }, async args => {
+    await assert.rejects(authenticate(db, env, origin, { id: c.id, signature }, async args => {
       const valid = await verifyMessage(args)
       await db.pg.query("update alerts_challenges set expires_at=now()-interval '1 second' where id=$1", [c.id])
       return valid
