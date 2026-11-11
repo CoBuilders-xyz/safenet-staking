@@ -35,9 +35,11 @@ The privacy policy states data flows that come from the code. A test in
 The policy names the default providers. A variable that sets a URL or a provider changes who
 receives the requests: `VITE_RPC_URL` and its fallbacks, `VITE_SUBGRAPH_URL_MAINNET`,
 `VITE_SUBGRAPH_URL_GNOSIS`, `VITE_GRAPH_API_KEY`, `VITE_IPFS_GATEWAY`, `VITE_REWARDS_BASE_URL`,
-`VITE_VALIDATOR_INFO_URL` and `VITE_ALERTS_API_URL`. The requests for reward proofs and to the
-alerts service contain the wallet address. When a deployment sets one of these variables, name
-its providers in the policy.
+`VITE_VALIDATOR_INFO_URL`, `VITE_ALERTS_API_URL`, `VITE_SANCTIONS_API_URL`,
+`VITE_PLAUSIBLE_DOMAIN` and `VITE_PLAUSIBLE_ENDPOINT`. The table of variables in
+`apps/web/README.md` is the full list. The requests for reward proofs and to the alerts service
+contain the wallet address. When a deployment sets one of these variables, name its providers
+in the policy.
 
 ## Supported Markdown
 
