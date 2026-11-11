@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright"
+import { GNOSIS_AEGIS_FIRST_COMPLETE_DAY } from "@cobuilders/safenet-core"
 import { test, expect } from "../fixtures/base.fixture"
 import { VALIDATORS } from "../fixtures/test-data"
 import { LayoutPage } from "../pages/layout.page"
@@ -55,6 +56,11 @@ test("Aegis membership retains a validator with zero attendance", async ({ disco
   await page.goto(`/#/validators/${VALIDATORS.validatorB}`)
   const section = page.getByRole("region", { name: "Participation over time" })
   await expect(section.getByText("0.00%", { exact: true }).first()).toBeVisible()
-  await expect(section.getByText(/^Aegis, 8 Oct 2026 to.*Gnosis subgraph/)).toBeVisible()
+  // The mock's buckets end yesterday, so only the whole history starts on Aegis's first day;
+  // the 30-day window's start moves with the clock.
+  await section.getByRole("button", { name: "All", exact: true }).click()
+  const firstDay = new Date(`${GNOSIS_AEGIS_FIRST_COMPLETE_DAY}T00:00:00Z`)
+    .toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
+  await expect(section.getByText(new RegExp(`^Aegis, ${firstDay} to.*Gnosis subgraph`))).toBeVisible()
   await expect(section.getByRole("note", { name: "Beta ended" })).toHaveCount(0)
 })
