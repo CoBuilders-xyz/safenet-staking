@@ -185,8 +185,8 @@ function mainnetClient() {
       throw new Error(`unexpected read ${functionName}`)
     },
     // Two withdrawals initiated, the first claimed: one open, of 7.
-    getLogs: async ({ event, toBlock }: { event: { name: string }; toBlock: bigint }) => {
-      calls.push(`getLogs ${event.name} to ${toBlock}`)
+    getLogs: async ({ event, fromBlock, toBlock }: { event: { name: string }; fromBlock: bigint; toBlock: bigint }) => {
+      calls.push(`getLogs ${event.name} ${fromBlock} to ${toBlock}`)
       return event.name === "WithdrawalInitiated"
         ? [{ args: { staker: STAKER, withdrawalId: 1n, amount: 5n } }, { args: { staker: STAKER, withdrawalId: 2n, amount: 7n } }]
         : [{ args: { staker: STAKER, withdrawalId: 1n, amount: 5n } }]
@@ -216,7 +216,9 @@ test("the CLI's networkWithdrawals runs under the pinned context, from the chain
   assert.ok(calls.includes("getChainId"))
   assert.ok(calls.includes(`readContract totalPendingWithdrawals at ${AFTER_DEPLOY}`))
   assert.deepEqual(calls.filter((c) => c.startsWith("getLogs")).sort(), [
-    `getLogs WithdrawalClaimed to ${AFTER_DEPLOY}`, `getLogs WithdrawalInitiated to ${AFTER_DEPLOY}`,
+    // The whole history: each scan starts at the staking contract's deploy block.
+    `getLogs WithdrawalClaimed ${CONTRACTS.staking.deployBlock} to ${AFTER_DEPLOY}`,
+    `getLogs WithdrawalInitiated ${CONTRACTS.staking.deployBlock} to ${AFTER_DEPLOY}`,
   ])
   assert.ok(!calls.includes("getBlockNumber"), "the head is the pinned block")
 })
