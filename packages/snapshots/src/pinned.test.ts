@@ -170,6 +170,7 @@ test("a query with a body is refused and never answered from memory", async () =
 // operations through it, so a read the library adds that the pin does not cover fails here, not
 // in the nightly run (issue #95: getChainId, added to networkWithdrawals).
 const AFTER_DEPLOY = CONTRACTS.staking.deployBlock + 10n
+const STAKER = `0x${"12".repeat(20)}`
 
 function mainnetClient() {
   const calls: string[] = []
@@ -180,10 +181,16 @@ function mainnetClient() {
     getBlock: async ({ blockNumber }: { blockNumber: bigint }) => ({ number: blockNumber, hash: `0x${"ab".repeat(32)}`, timestamp: 1n }),
     readContract: async ({ functionName, blockNumber }: { functionName: string; blockNumber?: bigint }) => {
       calls.push(`readContract ${functionName} at ${blockNumber}`)
-      if (functionName === "totalPendingWithdrawals") return 0n
+      if (functionName === "totalPendingWithdrawals") return 7n
       throw new Error(`unexpected read ${functionName}`)
     },
-    getLogs: async ({ toBlock }: { toBlock: bigint }) => { calls.push(`getLogs to ${toBlock}`); return [] },
+    // Two withdrawals initiated, the first claimed: one open, of 7.
+    getLogs: async ({ event, toBlock }: { event: { name: string }; toBlock: bigint }) => {
+      calls.push(`getLogs ${event.name} to ${toBlock}`)
+      return event.name === "WithdrawalInitiated"
+        ? [{ args: { staker: STAKER, withdrawalId: 1n, amount: 5n } }, { args: { staker: STAKER, withdrawalId: 2n, amount: 7n } }]
+        : [{ args: { staker: STAKER, withdrawalId: 1n, amount: 5n } }]
+    },
   } as unknown as PublicClient
   return { client, calls }
 }
@@ -201,11 +208,15 @@ test("the CLI's networkWithdrawals runs under the pinned context, from the chain
   const result = await networkWithdrawals(pinContext(ctx, AFTER_DEPLOY, pinFetch(base, PINS)))
   assert.equal(result.block, AFTER_DEPLOY)
   assert.equal(result.logsMatchChain, true)
+  assert.equal(result.count.value, 1)
+  assert.deepEqual([result.initiated, result.claimed, result.openSum], [2, 1, 7n])
   // The figure comes from the chain's logs, so the check against the subgraph's rows stays independent.
   assert.match(result.count.source, /^chain: WithdrawalInitiated logs/)
   assert.equal(urls.length, 0, "no subgraph query left the pinned fetch")
   assert.ok(calls.includes("getChainId"))
   assert.ok(calls.includes(`readContract totalPendingWithdrawals at ${AFTER_DEPLOY}`))
-  assert.ok(calls.filter((c) => c.startsWith("getLogs")).every((c) => BigInt(c.slice("getLogs to ".length)) <= AFTER_DEPLOY))
+  assert.deepEqual(calls.filter((c) => c.startsWith("getLogs")).sort(), [
+    `getLogs WithdrawalClaimed to ${AFTER_DEPLOY}`, `getLogs WithdrawalInitiated to ${AFTER_DEPLOY}`,
+  ])
   assert.ok(!calls.includes("getBlockNumber"), "the head is the pinned block")
 })
