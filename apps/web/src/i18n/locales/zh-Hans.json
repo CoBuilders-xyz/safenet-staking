@@ -91,6 +91,7 @@
     "commission": "佣金",
     "confirmStake": "确认委托",
     "disconnectWallet": "断开钱包",
+    "estimatedAprDefinition": "这是根据过往奖励得出的估算，并非承诺。来源：SEF 公布的奖励文件和 Mainnet subgraph。它是 SEF 在上一个奖励周期发给验证者和委托人的奖励（不含 sentinel 奖励），除以该周期内平均的 SAFE 质押总量，再乘以 365 天与周期天数之比，不计复利。它是扣除验证者佣金之前的数值：委托人实际获得的是扣除其验证者佣金后的部分。未来奖励随质押总量、验证者参与度和佣金而变化，且不作保证。",
     "hero": {
       "dashboard": "通过帮助保护 <network>Safenet</network> 赚取<rewards>奖励</rewards>",
       "overview": "<network>Safenet</network> 的<staking>质押</staking>和共识状态。无需钱包。",
@@ -167,6 +168,23 @@
       "minutesSeconds": "{{m}} 分 {{s}} 秒",
       "seconds": "{{n}} 秒"
     },
+    "apr": {
+      "reason": {
+        "invalidAmount": "SEF 奖励文件或 subgraph 中的某个金额不是整数 wei。",
+        "invalidPeriodEnd": "SEF 奖励文件的周期没有在 UTC 午夜结束。",
+        "misalignedPeriod": "SEF 奖励文件的结束日期不是奖励周期的边界。",
+        "noDailyStake": "{{why}} 估算需要 subgraph 的每日质押总量。",
+        "noPeriodYet": "读取的奖励文件中还没有完整的 Aegis 奖励周期。",
+        "noRewards": "SEF 奖励文件中没有 Aegis 的质押奖励。",
+        "noSentinelTotal": "SEF 奖励文件没有把 sentinel 奖励与质押奖励分开。",
+        "noStake": "该奖励周期内没有质押的 SAFE。",
+        "noStakeBeforePeriod": "Mainnet subgraph 中没有奖励周期开始时的质押总量。",
+        "notIndexed": "Mainnet subgraph 尚未索引到奖励周期的结束。",
+        "outsideBudget": "SEF 公布的质押奖励与每个奖励周期的分配不一致，因此该估算方法不再成立。",
+        "periodInFuture": "SEF 奖励文件给出的奖励周期尚未结束。",
+        "stale": "SEF 最新的奖励周期结束得太久，无法反映当前的奖励率。"
+      }
+    },
     "betaWindow": "Beta，{{from}} 至 {{to}}",
     "common": {
       "unavailable": "不可用"
@@ -205,6 +223,9 @@
       "activeValidators": "活跃验证者",
       "attestationsDetail_other": "{{count}} 个完整日的平均值，范围 {{min}} 至 {{max}}",
       "attestationsPerDay": "每日证明数",
+      "estimatedApr": "估算 APR（基于上一个奖励周期）",
+      "estimatedAprDetail": "奖励周期 {{from}} 至 {{to}}，年化，未扣除验证者佣金。<term>估算方法</term>",
+      "estimatedAprSource": "SEF 奖励文件和 Mainnet subgraph",
       "gnosisSource": "Gnosis 子图，{{from}} 至 {{to}} 的完整 UTC 日",
       "gnosisSourceBeta": "{{beta}}。Gnosis 子图，完整 UTC 日。",
       "latency": "证明延迟",

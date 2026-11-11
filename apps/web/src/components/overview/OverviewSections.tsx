@@ -1,7 +1,8 @@
 import type { TFunction } from "i18next"
-import { useTranslation } from "react-i18next"
+import { Trans, useTranslation } from "react-i18next"
 import { AEGIS_START_DAY, BETA_END_DAY, REWARD_PARTICIPATION_THRESHOLD, utcDayMs } from "@cobuilders/safenet-core"
 import { Badge } from "@/components/ui/badge"
+import { Term } from "@/components/ui/term"
 import { Progress } from "@/components/ui/progress"
 import { StatRow } from "@/components/rewards/RewardsSection"
 import { useNetworkQuery, useNetworkTotals } from "@/hooks/useNetworkTotals"
@@ -9,6 +10,7 @@ import { useValidatorStakes, type ValidatorStakeRow } from "@/hooks/useValidator
 import { useRewardsOverview } from "@/hooks/useRewardsOverview"
 import { RECENT_DAYS, useRecentDays } from "@/hooks/useRecentDays"
 import { useConsensusFigures } from "@/hooks/useConsensusFigures"
+import { useEstimatedApr } from "@/hooks/useEstimatedApr"
 import { findValidator, useValidators } from "@/hooks/useValidators"
 import { hhi } from "@/lib/distribution"
 import type { FigureSource } from "@/lib/figure"
@@ -108,6 +110,7 @@ export function HeadlineStats() {
   const { t } = useTranslation()
   const { totalStaked, validatorCounts } = useNetworkTotals()
   const { attestations, latency, window, snapshot, snapshotReason, betaOnly } = useConsensusFigures()
+  const apr = useEstimatedApr()
   const fromMainnet = (source: FigureSource) => mainnetSource(source, t)
   // A snapshot figure says why it is shown. The freshness panel says so too when the subgraph is
   // down, but not when it is live and simply has no complete day yet.
@@ -129,12 +132,26 @@ export function HeadlineStats() {
   return (
     <div className="space-y-4">
       {betaOnly && <BetaEndedNotice />}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Stat
           label={t("overview.headline.totalStaked", "Total SAFE staked")}
           figure={totalStaked}
           format={(v) => formatTokenAmount(v, 18, 0)}
           source={fromMainnet}
+        />
+        <Stat
+          label={t("overview.headline.estimatedApr", "Estimated APR (based on last reward period)")}
+          figure={apr}
+          format={(v) => `${(v.apr * 100).toFixed(1)}%`}
+          detail={(v) => (
+            <Trans
+              i18nKey="overview.headline.estimatedAprDetail"
+              defaults="Reward period {{from}} to {{to}}, annualized, before validator commission. <term>How it is estimated</term>"
+              values={{ from: dayOf(v.periodStart), to: dayOf(v.periodEnd - 86_400) }}
+              components={{ term: <Term term="estimatedApr" children={null} /> }}
+            />
+          )}
+          source={() => t("overview.headline.estimatedAprSource", "SEF's rewards file and the Mainnet subgraph")}
         />
         <Stat
           label={t("overview.headline.activeValidators", "Active validators")}

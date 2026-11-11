@@ -318,8 +318,9 @@ it came through, or why the repository was read. When the repository's 404 settl
 address has no proof while the dataset did not answer, Your rewards adds that this rests on the
 mirror.
 
-SEF's `latest.json` carries exactly `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal` and
-`unpaidAmount`.
+SEF's `latest.json` carries `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal` and
+`unpaidAmount`. From the first Aegis file, rewardsUntil 2026-10-27, it also carries
+`sentinelTokenTotal`, the part of `tokenTotal` paid to sentinels. SEF does not document it.
 
 ## Reward proofs
 

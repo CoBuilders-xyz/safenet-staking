@@ -101,7 +101,10 @@ wrapped in `ErrorBoundary`:
 
 - `/` → `OverviewPage`: Network Overview, no wallet needed. Headline figures, stake distribution,
   rewards with the root check, the validator table, the last 30 days, and a freshness line per
-  subgraph
+  subgraph. The headline's estimated APR is `estimateApr` in `src/lib/estimatedApr.ts`, the
+  whole method in one function, behind `useEstimatedApr`: the last reward period's staker
+  rewards over its average daily total staked, times 365 over the period's days. Gross, simple,
+  network-wide; any failed check shows the reason instead of a number
 - `/dashboard` → `DashboardPage`, "My stake" in the navigation. With a wallet: stats, claimable
   banners, quick actions, the staking section, the stake distribution chart. Without one: a connect
   prompt and a link to Validators; the network figures are on the Overview
@@ -219,8 +222,9 @@ when the dataset did not answer, Your rewards says the absence rests on the mirr
 (`proofAbsenceCaveat` in `src/lib/rewardsSource.ts`). `useProgrammeRewards` returns
 `latestSource`, which Verifiability shows as the source of `latest.json`.
 
-SEF's `latest.json` carries exactly `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal` and
-`unpaidAmount`.
+SEF's `latest.json` carries `epoch`, `merkleRoot`, `rewardsUntil`, `tokenTotal` and
+`unpaidAmount`. From the first Aegis file, rewardsUntil 2026-10-27, it also carries
+`sentinelTokenTotal`, the part of `tokenTotal` paid to sentinels. SEF does not document it.
 
 `useRewards` disables Claim when the proof's root differs from the MerkleDrop's root.
 

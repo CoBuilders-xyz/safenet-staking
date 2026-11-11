@@ -91,6 +91,7 @@
     "commission": "Commissione",
     "confirmStake": "Conferma delega",
     "disconnectWallet": "Disconnetti wallet",
+    "estimatedAprDefinition": "Una stima basata sulle ricompense passate, non una promessa. Fonte: il file delle ricompense pubblicato dalla SEF e il subgraph di Mainnet. Sono le ricompense della SEF a validatori e delegatori per l'ultimo periodo di ricompensa, escluse quelle dei sentinel, divise per il totale medio di SAFE in staking in quel periodo e moltiplicate per 365 giorni sulla durata del periodo, senza capitalizzazione. È al lordo della commissione del validatore: i delegatori la ricevono meno la commissione del proprio validatore. Le ricompense future variano con lo stake totale, la partecipazione dei validatori e la commissione, e non sono garantite.",
     "hero": {
       "dashboard": "Ottieni <rewards>ricompense</rewards> contribuendo alla sicurezza di <network>Safenet</network>",
       "overview": "Lo stato dello <staking>staking</staking> e del consenso di <network>Safenet</network>. Non serve un wallet.",
@@ -169,6 +170,23 @@
       "minutesSeconds": "{{m}} min {{s}} s",
       "seconds": "{{n}} s"
     },
+    "apr": {
+      "reason": {
+        "invalidAmount": "Un importo nel file delle ricompense della SEF o nel subgraph non è un numero intero di wei.",
+        "invalidPeriodEnd": "Il file delle ricompense della SEF non termina il suo periodo a mezzanotte UTC.",
+        "misalignedPeriod": "Il file delle ricompense della SEF termina in una data che non è il confine di un periodo di ricompensa.",
+        "noDailyStake": "{{why}} La stima richiede il totale giornaliero in staking del subgraph.",
+        "noPeriodYet": "Il file delle ricompense letto non contiene ancora alcun periodo di ricompensa Aegis completo.",
+        "noRewards": "Il file delle ricompense della SEF non mostra ricompense di staking per Aegis.",
+        "noSentinelTotal": "Il file delle ricompense della SEF non separa le ricompense dei sentinel da quelle di staking.",
+        "noStake": "Durante il periodo di ricompensa non c'era SAFE in staking.",
+        "noStakeBeforePeriod": "Il subgraph di Mainnet non ha il totale in staking dall'inizio del periodo di ricompensa.",
+        "notIndexed": "Il subgraph di Mainnet non ha ancora indicizzato la fine del periodo di ricompensa.",
+        "outsideBudget": "Le ricompense di staking pubblicate dalla SEF differiscono dall'allocazione per periodo di ricompensa, quindi il metodo di questa stima non è più valido.",
+        "periodInFuture": "Il file delle ricompense della SEF indica un periodo di ricompensa non ancora terminato.",
+        "stale": "L'ultimo periodo di ricompensa della SEF è terminato troppo tempo fa per descrivere il tasso attuale."
+      }
+    },
     "betaWindow": "Beta, dal {{from}} al {{to}}",
     "common": {
       "unavailable": "Non disponibile"
@@ -211,6 +229,9 @@
       "attestationsDetail_one": "Media su {{count}} giorno completo, intervallo da {{min}} a {{max}}",
       "attestationsDetail_other": "Media su {{count}} giorni completi, intervallo da {{min}} a {{max}}",
       "attestationsPerDay": "Attestazioni al giorno",
+      "estimatedApr": "APR stimato (in base all'ultimo periodo di ricompensa)",
+      "estimatedAprDetail": "Periodo di ricompensa dal {{from}} al {{to}}, annualizzato, al lordo della commissione del validatore. <term>Come viene stimato</term>",
+      "estimatedAprSource": "File delle ricompense della SEF e subgraph di Mainnet",
       "gnosisSource": "Subgraph Gnosis, giorni UTC completi dal {{from}} al {{to}}",
       "gnosisSourceBeta": "{{beta}}. Subgraph Gnosis, giorni UTC completi.",
       "latency": "Latenza di attestazione",

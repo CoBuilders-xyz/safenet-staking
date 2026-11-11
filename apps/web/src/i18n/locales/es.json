@@ -91,6 +91,7 @@
     "commission": "Comisión",
     "confirmStake": "Confirmar delegación",
     "disconnectWallet": "Desconectar wallet",
+    "estimatedAprDefinition": "Una estimación a partir de recompensas pasadas, no una promesa. Fuente: el archivo de recompensas publicado por SEF y el subgraph de Mainnet. Son las recompensas de SEF para validadores y delegadores del último período de recompensas, sin las recompensas de los sentinels, divididas por el total medio de SAFE en staking en ese período y multiplicadas por 365 días sobre la duración del período, sin capitalización. Es antes de la comisión del validador: los delegadores la reciben menos la comisión de su validador. Las recompensas futuras varían con el stake total, la participación de los validadores y la comisión, y no están garantizadas.",
     "hero": {
       "dashboard": "Ganá <rewards>recompensas</rewards> por ayudar a proteger <network>Safenet</network>",
       "overview": "El estado del <staking>staking</staking> y el consenso de <network>Safenet</network>. No necesitás una wallet.",
@@ -169,6 +170,23 @@
       "minutesSeconds": "{{m}} min {{s}} s",
       "seconds": "{{n}} s"
     },
+    "apr": {
+      "reason": {
+        "invalidAmount": "Un importe del archivo de recompensas de SEF o del subgraph no es un número entero de wei.",
+        "invalidPeriodEnd": "El archivo de recompensas de SEF no termina su período a medianoche UTC.",
+        "misalignedPeriod": "El archivo de recompensas de SEF termina en una fecha que no es un límite de período de recompensas.",
+        "noDailyStake": "{{why}} La estimación necesita el total diario en staking del subgraph.",
+        "noPeriodYet": "El archivo de recompensas leído aún no contiene ningún período de recompensas completo de Aegis.",
+        "noRewards": "El archivo de recompensas de SEF no muestra recompensas de staking para Aegis.",
+        "noSentinelTotal": "El archivo de recompensas de SEF no separa las recompensas de los sentinels de las de staking.",
+        "noStake": "No hubo SAFE en staking durante el período de recompensas.",
+        "noStakeBeforePeriod": "El subgraph de Mainnet no tiene el total en staking del inicio del período de recompensas.",
+        "notIndexed": "El subgraph de Mainnet aún no ha indexado el final del período de recompensas.",
+        "outsideBudget": "Las recompensas de staking publicadas por SEF difieren de la asignación por período de recompensas, así que el método de esta estimación ya no es válido.",
+        "periodInFuture": "El archivo de recompensas de SEF indica un período de recompensas que aún no ha terminado.",
+        "stale": "El último período de recompensas de SEF terminó hace demasiado tiempo para describir la tasa actual."
+      }
+    },
     "betaWindow": "Beta, de {{from}} a {{to}}",
     "common": {
       "unavailable": "No disponible"
@@ -211,6 +229,9 @@
       "attestationsDetail_one": "Media de {{count}} día completo, rango de {{min}} a {{max}}",
       "attestationsDetail_other": "Media de {{count}} días completos, rango de {{min}} a {{max}}",
       "attestationsPerDay": "Atestaciones por día",
+      "estimatedApr": "APR estimado (según el último período de recompensas)",
+      "estimatedAprDetail": "Período de recompensas del {{from}} al {{to}}, anualizado, antes de la comisión del validador. <term>Cómo se estima</term>",
+      "estimatedAprSource": "Archivo de recompensas de SEF y subgraph de Mainnet",
       "gnosisSource": "Subgrafo de Gnosis, días UTC completos del {{from}} al {{to}}",
       "gnosisSourceBeta": "{{beta}}. Subgrafo de Gnosis, días UTC completos.",
       "latency": "Latencia de atestación",

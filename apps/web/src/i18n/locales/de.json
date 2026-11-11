@@ -91,6 +91,7 @@
     "commission": "Provision",
     "confirmStake": "Delegation bestätigen",
     "disconnectWallet": "Wallet trennen",
+    "estimatedAprDefinition": "Eine Schätzung aus vergangenen Belohnungen, kein Versprechen. Quelle: die von SEF veröffentlichte Belohnungsdatei und der Mainnet-Subgraph. Sie besteht aus den Belohnungen von SEF für Validatoren und Delegierende in der letzten Belohnungsperiode, ohne Sentinel-Belohnungen, geteilt durch den durchschnittlich insgesamt gestakten SAFE dieser Periode und dann mit 365 Tagen geteilt durch die Länge der Periode multipliziert, ohne Zinseszins. Sie gilt vor der Provision des Validators: Delegierende erhalten sie abzüglich der Provision ihres Validators. Künftige Belohnungen hängen vom gesamten Stake, der Teilnahme der Validatoren und der Provision ab und sind nicht garantiert.",
     "hero": {
       "dashboard": "Verdiene <rewards>Belohnungen</rewards>, indem du <network>Safenet</network> absicherst",
       "overview": "Der Stand von <staking>Staking</staking> und Konsens in <network>Safenet</network>. Keine Wallet erforderlich.",
@@ -168,6 +169,23 @@
       "minutesSeconds": "{{m}} Min. {{s}} Sek.",
       "seconds": "{{n}} Sek."
     },
+    "apr": {
+      "reason": {
+        "invalidAmount": "Ein Betrag in der Belohnungsdatei von SEF oder im Subgraph ist keine ganze Zahl von Wei.",
+        "invalidPeriodEnd": "Die Belohnungsdatei von SEF beendet ihre Periode nicht um Mitternacht UTC.",
+        "misalignedPeriod": "Die Belohnungsdatei von SEF endet an einem Datum, das keine Grenze einer Belohnungsperiode ist.",
+        "noDailyStake": "{{why}} Die Schätzung braucht den täglichen gestakten Gesamtbetrag aus dem Subgraph.",
+        "noPeriodYet": "Die gelesene Belohnungsdatei enthält noch keine vollständige Aegis-Belohnungsperiode.",
+        "noRewards": "Die Belohnungsdatei von SEF zeigt keine Staker-Belohnungen für Aegis.",
+        "noSentinelTotal": "Die Belohnungsdatei von SEF trennt Sentinel-Belohnungen nicht von Staker-Belohnungen.",
+        "noStake": "Während der Belohnungsperiode war kein SAFE gestakt.",
+        "noStakeBeforePeriod": "Der Mainnet-Subgraph enthält keinen gestakten Gesamtbetrag vom Beginn der Belohnungsperiode.",
+        "notIndexed": "Der Mainnet-Subgraph hat das Ende der Belohnungsperiode noch nicht indexiert.",
+        "outsideBudget": "Die von SEF veröffentlichten Staker-Belohnungen weichen von der Zuteilung pro Belohnungsperiode ab, daher gilt die Methode hinter dieser Schätzung nicht mehr.",
+        "periodInFuture": "Die Belohnungsdatei von SEF nennt eine Belohnungsperiode, die noch nicht beendet ist.",
+        "stale": "Die letzte Belohnungsperiode von SEF endete vor zu langer Zeit, um die aktuelle Rate zu beschreiben."
+      }
+    },
     "betaWindow": "Beta, {{from}} bis {{to}}",
     "common": {
       "unavailable": "Nicht verfügbar"
@@ -208,6 +226,9 @@
       "attestationsDetail_one": "Mittelwert über {{count}} vollständigen Tag, Spanne {{min}} bis {{max}}",
       "attestationsDetail_other": "Mittelwert über {{count}} vollständige Tage, Spanne {{min}} bis {{max}}",
       "attestationsPerDay": "Attestierungen pro Tag",
+      "estimatedApr": "Geschätzter APR (basierend auf der letzten Belohnungsperiode)",
+      "estimatedAprDetail": "Belohnungsperiode {{from}} bis {{to}}, auf ein Jahr hochgerechnet, vor der Provision des Validators. <term>So wird geschätzt</term>",
+      "estimatedAprSource": "Belohnungsdatei von SEF und Mainnet-Subgraph",
       "gnosisSource": "Gnosis-Subgraph, vollständige UTC-Tage {{from}} bis {{to}}",
       "gnosisSourceBeta": "{{beta}}. Gnosis-Subgraph, vollständige UTC-Tage.",
       "latency": "Attestierungslatenz",
