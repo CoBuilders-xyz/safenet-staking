@@ -49,10 +49,6 @@ D1 executes as one transaction. The chronology commit checks its lease, revision
 that batch through the named constraints of `alerts_guard`; a failed check rolls back every write.
 Cloudflare's Time Travel keeps 30 days of point-in-time recovery on a paid plan.
 
-The earlier Supabase schema had no recorded production installation. This port assumes none holds
-data, so migration 0002 creates the archive empty and converts no legacy checkpoint. If an
-installation does hold subscriptions, export them before the switch; nothing here reads Supabase.
-
 ### Existing checkpoints after the participation-window fix
 
 The fix preserves the complete participation window during days without attestations.
