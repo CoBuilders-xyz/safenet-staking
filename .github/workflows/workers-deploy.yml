@@ -104,8 +104,8 @@ jobs:
           # Alerts-specific RPCs when set, else the organization RPCs the other workflows use.
           MAINNET_RPC_URL: ${{ secrets.ALERTS_MAINNET_RPC_URL || secrets.MAINNET_RPC_URL }}
           GNOSIS_RPC_URL: ${{ secrets.ALERTS_GNOSIS_RPC_URL || secrets.GNOSIS_RPC_URL }}
-          # The organization Graph key. The Worker derives the Mainnet gateway URL from it through
-          # core. ALERTS_SUBGRAPH_URL_MAINNET, when set, overrides that URL.
+          # The organization Graph key. The Mainnet gateway URL is derived from it through core and
+          # uploaded on every deploy. ALERTS_SUBGRAPH_URL_MAINNET, when set, is uploaded instead.
           GRAPH_API_KEY: ${{ secrets.GRAPH_API_KEY }}
           SUBGRAPH_URL_MAINNET: ${{ secrets.ALERTS_SUBGRAPH_URL_MAINNET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -117,13 +117,6 @@ jobs:
           secrets="$RUNNER_TEMP/alerts-secrets.json"
           trap 'rm -f "$secrets"' EXIT
           umask 077
-          node -e '
-            const required = ["APP_ORIGINS", "MAINNET_RPC_URL", "GNOSIS_RPC_URL", "GRAPH_API_KEY",
-              "TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_NAME", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"]
-            const missing = required.filter(name => !process.env[name])
-            if (missing.length) { console.error("::error::Missing production values: " + missing.join(", ")); process.exit(1) }
-            const out = Object.fromEntries(required.map(name => [name, process.env[name]]))
-            if (process.env.SUBGRAPH_URL_MAINNET) out.SUBGRAPH_URL_MAINNET = process.env.SUBGRAPH_URL_MAINNET
-            require("node:fs").writeFileSync(process.argv[1], JSON.stringify(out))
-          ' "$secrets"
+          # src/deploy-secrets.ts checks the required values and always includes SUBGRAPH_URL_MAINNET.
+          node --import tsx scripts/deploy-secrets.ts "$secrets"
           pnpm exec cf deploy --secrets-file "$secrets" --message "safenet-alerts ${GITHUB_SHA::12}"

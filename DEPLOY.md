@@ -37,7 +37,7 @@ Everything else already exists. Never put a value in the repository.
 | `MAINNET_RPC_URL` | `ALERTS_MAINNET_RPC_URL`, else `MAINNET_RPC_URL` | `production` secret, else organization secret |
 | `GNOSIS_RPC_URL` | `ALERTS_GNOSIS_RPC_URL`, else `GNOSIS_RPC_URL` | `production` secret, else organization secret |
 | `GRAPH_API_KEY` | `GRAPH_API_KEY` | organization secret. The Worker derives the Mainnet Network gateway URL from it through core |
-| `SUBGRAPH_URL_MAINNET` | `ALERTS_SUBGRAPH_URL_MAINNET` | optional `production` secret; overrides the derived URL |
+| `SUBGRAPH_URL_MAINNET` | `ALERTS_SUBGRAPH_URL_MAINNET`, else the URL derived from `GRAPH_API_KEY` | optional `production` secret. Every deploy uploads one of the two, so removing the override takes effect on the next deploy |
 | `TELEGRAM_BOT_TOKEN` | `TELEGRAM_BOT_TOKEN` | repository secret |
 | `TELEGRAM_BOT_NAME`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT` | same names | `production` variables |
 | `VAPID_PRIVATE_KEY` | `VAPID_PRIVATE_KEY` | `production` secret |
