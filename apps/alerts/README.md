@@ -28,13 +28,13 @@ real Safe threshold signing, a deployed D1 database, or fork-triggered acceptanc
 
 The local CLI is a package dependency. `pnpm --filter @cobuilders/safenet-alerts dev` binds
 loopback port 8796. It uses only this checkout's configuration. Never reuse or reset the manual
-QA fork for alert testing. The `cf` config disables workers.dev and preview URLs and declares no
-route. The custom domain comes from Terraform in `infra/`. Migrations and deployment run only through
+QA fork for alert testing. The Worker answers on its workers.dev URL; the `cf` config disables
+preview URLs and declares no route or custom domain. Migrations and deployment run only through
 the manual workflow `.github/workflows/workers-deploy.yml`; `DEPLOY.md` at the root has the order.
 
 ## Provisioning contract
 
-Terraform in `infra/` creates the D1 database `safenet-alerts`. The deploy workflow applies
+`cf d1 create` creates the D1 database `safenet-alerts` once (`DEPLOY.md`). The deploy workflow applies
 `migrations/` with `cf d1 migrations apply`, which records each file in `d1_migrations` and applies
 it once, before it deploys the Worker. Do not start a Worker whose migrations failed.
 The `DB` binding names the database by the ID in `ALERTS_D1_DATABASE_ID` at build time, so a

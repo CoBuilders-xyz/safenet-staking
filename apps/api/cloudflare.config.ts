@@ -6,6 +6,8 @@ export default defineConfig({
     name: "safenet-api",
     entrypoint: "./src/index.ts",
     compatibilityDate: "2026-10-29",
+    // Served at safenet-api.<account subdomain>.workers.dev. No custom domain for now.
+    workersDev: true,
     env: {
       GITHUB_TOKEN: bindings.secret(),
       SUBGRAPH_URL_MAINNET: bindings.text(SUBGRAPH_ENDPOINTS.mainnet),

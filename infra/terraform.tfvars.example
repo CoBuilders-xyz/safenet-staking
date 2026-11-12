@@ -1,8 +1,0 @@
-# Copy to terraform.tfvars (git-ignored). No value here is a secret.
-account_id       = "<CLOUDFLARE_ACCOUNT_ID>"
-zone_name        = "safenet.cobuilders.xyz"
-create_zone      = true
-web_hostname     = "safenet.cobuilders.xyz"
-web_cname_target = "<CNAME target from Vercel's domain settings>"
-# Set true after the first deploy of both Workers.
-attach_worker_domains = false

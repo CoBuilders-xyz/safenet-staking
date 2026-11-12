@@ -88,7 +88,7 @@ jobs:
         env:
           ALERTS_D1_DATABASE_ID: ${{ vars.ALERTS_D1_DATABASE_ID }}
         run: |
-          if [ -z "$ALERTS_D1_DATABASE_ID" ]; then echo "::error::Set the production variable ALERTS_D1_DATABASE_ID from 'terraform output alerts_d1_database_id'"; exit 1; fi
+          if [ -z "$ALERTS_D1_DATABASE_ID" ]; then echo "::error::Set the production variable ALERTS_D1_DATABASE_ID to the ID that 'cf d1 create' printed (DEPLOY.md)"; exit 1; fi
           pnpm exec cf d1 migrations apply "$ALERTS_D1_DATABASE_ID"
       # Secrets go in a JSON file, which cf uploads with the version. JSON, not dotenv: cf expands
       # $VAR inside dotenv values, which would alter a secret that contains a dollar sign.

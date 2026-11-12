@@ -2,9 +2,9 @@
 /**
  * Build the production bundle and pack it into a CAR whose root CID anyone can reproduce.
  *
- *   1. Read build.env. Together with VITE_GRAPH_API_KEY, it supplies the public build inputs. Every .env
- *      file, every other VITE_ variable in the shell and the graph-node port from .env.ports
- *      are ignored.
+ *   1. Read build.env. Together with VITE_GRAPH_API_KEY and the service URLs VITE_VALIDATOR_INFO_URL
+ *      and VITE_ALERTS_API_URL, it supplies the public build inputs. Every .env file, every other
+ *      VITE_ variable in the shell and the graph-node port from .env.ports are ignored.
  *   2. `vite build --mode production` into dist/.
  *   3. tools/check-browser-safety.mjs over dist/. A secret in the bundle fails the release.
  *      Its bundle half compares dist/ with .env.local, which only a developer machine has: on
@@ -25,7 +25,7 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
-import { releaseEnvironment } from "./release-env"
+import { RELEASE_URL_INPUTS, releaseEnvironment } from "./release-env"
 import { packDirectory, PackError, type Packed } from "@cobuilders/safenet-snapshots/ipfs"
 import { build } from "vite"
 
@@ -40,8 +40,9 @@ function fail(message: string): never {
   process.exit(1)
 }
 
-// --- 1. Environment: build.env plus the explicit public gateway key ---
-const publicEnv = releaseEnvironment(readFileSync(BUILD_ENV, "utf8"), process.env.VITE_GRAPH_API_KEY)
+// --- 1. Environment: build.env plus the explicit public gateway key and service URLs ---
+const publicEnv = releaseEnvironment(readFileSync(BUILD_ENV, "utf8"), process.env.VITE_GRAPH_API_KEY,
+  Object.fromEntries(RELEASE_URL_INPUTS.map(key => [key, process.env[key]])))
 for (const key of Object.keys(process.env)) {
   if (key.startsWith("VITE_")) delete process.env[key]
 }

@@ -12,6 +12,9 @@ CID you build matches the CID being served, the interface you load is the source
 - pnpm **10.28.2**, the version in the `packageManager` field of `package.json`.
   `corepack enable` selects it for you.
 
+Set `VITE_VALIDATOR_INFO_URL` and `VITE_ALERTS_API_URL` to the values in the release's job
+summary, or leave them unset when it lists none. Both are public URLs.
+
 For a gateway-enabled release, also supply its public browser key as `VITE_GRAPH_API_KEY`.
 Obtain that value from the released JavaScript (the `/api/<KEY>/subgraphs/id/` URL),
 or from the operator. Do not commit or print it. It is already public in that release.
@@ -57,7 +60,7 @@ It prints the root CID. It must equal `apps/web/release/CID`.
 |---|---|
 | The source at the commit | `apps/web`, `packages/core` |
 | Every dependency, at an exact version | `pnpm-lock.yaml` |
-| The public build-time values | `apps/web/build.env` plus `VITE_GRAPH_API_KEY` from the environment |
+| The public build-time values | `apps/web/build.env` plus `VITE_GRAPH_API_KEY`, `VITE_VALIDATOR_INFO_URL` and `VITE_ALERTS_API_URL` from the environment. The release job summary lists both URLs |
 | The CID settings | `ipfs-car` 3.1.0 defaults: CIDv1, raw leaves, 1 MiB fixed-size chunks, balanced layout 1024 links wide, no mtime, no mode |
 
 Nothing else. The release build ignores every `.env` file, every other `VITE_` variable in your
