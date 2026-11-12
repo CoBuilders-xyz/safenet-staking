@@ -9,7 +9,6 @@ export default defineConfig({
     // Served at safenet-api.<account subdomain>.workers.dev. No custom domain for now.
     workersDev: true,
     env: {
-      GITHUB_TOKEN: bindings.secret(),
       SUBGRAPH_URL_MAINNET: bindings.text(SUBGRAPH_ENDPOINTS.mainnet),
       SUBGRAPH_URL_GNOSIS: bindings.text(SUBGRAPH_ENDPOINTS.gnosis),
     },

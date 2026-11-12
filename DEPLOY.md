@@ -15,64 +15,43 @@ migrations. There is no Terraform: without a zone, DNS or custom domains, it wou
 database, and need a state bucket, its keys and another API token for that. One `cf d1 create`
 does the same.
 
-## Prerequisites
+## What remains before the first deploy
 
-Do these once, by hand. Never put a value from this list in the repository.
-
-1. **Cloudflare account** on the Workers Paid plan. The alerts poller exceeds the free plan's CPU
-   and subrequest limits. In *Workers & Pages*, choose the account's workers.dev subdomain if it
-   has none. Both Worker URLs use it.
-2. **Deploy API token**, for GitHub Actions: start from the *Edit Cloudflare Workers* template, add
-   *D1 Edit*, and limit it to this account.
-3. **D1 database.** With that token in `CLOUDFLARE_API_TOKEN` and the account ID in
-   `CLOUDFLARE_ACCOUNT_ID`, from `apps/alerts`:
+1. **Workers Paid** on the Cloudflare account. On the free plan, a Cron run gets 10 ms of CPU and
+   50 subrequests; one alerts poll needs far more.
+2. **The D1 database and its ID.** With `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in the
+   shell, from `apps/alerts`:
    ```sh
    pnpm exec cf d1 create --name safenet-alerts --read-replication-mode disabled
    ```
-   Keep the database ID it prints. Without read replicas, every read sees the last write.
-4. **Telegram bot.** Create a dedicated bot with BotFather. Keep its token and its username without
-   `@`. Set no webhook, and give the token to no other poller: the Worker reads `getUpdates`.
-5. **RPC and subgraph endpoints** for alerts. Each one must answer the expected chain ID.
-   - Mainnet RPC: reads, finalized blocks and ERC-1271 signature checks for Safe wallets.
-   - Gnosis RPC: `eth_getLogs` over ranges of up to 2,000 finalized blocks.
-   - Mainnet subgraph: the production query URL with its API key. A Studio development URL cannot
-     carry sustained traffic.
-6. **VAPID key pair** for Web Push. Run `npx web-push generate-vapid-keys` once and keep the pair
-   for good: a new pair invalidates every browser subscription. The subject is a `mailto:` or
-   `https:` contact.
-7. **GitHub token for the API**: a fine-grained token with no permissions. It raises GitHub's rate
-   limit for SEF's data. `cf` requires every secret a Worker declares, so the deploy stops without it.
-8. **GitHub environment `production`.** Add a required reviewer and allow the branch `main` only.
-   Then add the values below to that environment.
+   Set the ID it prints as the `production` environment variable `ALERTS_D1_DATABASE_ID`.
+3. **The two web URLs** as repository variables, and in Vercel: see [Web](#web-where-the-interface-finds-the-workers).
 
-### GitHub `production` environment
+Everything else already exists. Never put a value in the repository.
 
-Secrets:
+### What the workflow reads, and from where
 
-| Name | Value |
-| --- | --- |
-| `CLOUDFLARE_API_TOKEN` | Deploy API token, step 2 |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID |
-| `ALERTS_MAINNET_RPC_URL` | Mainnet RPC URL |
-| `ALERTS_GNOSIS_RPC_URL` | Gnosis RPC URL |
-| `ALERTS_SUBGRAPH_URL_MAINNET` | Mainnet subgraph query URL, with its key |
-| `TELEGRAM_BOT_TOKEN` | Bot token |
-| `VAPID_PRIVATE_KEY` | VAPID private key |
-| `SAFENET_API_GITHUB_TOKEN` | GitHub token, step 7 |
-
-Variables, which are public:
-
-| Name | Value |
-| --- | --- |
-| `ALERTS_D1_DATABASE_ID` | The ID from step 3 |
-| `TELEGRAM_BOT_NAME` | Bot username, without `@` |
-| `VAPID_PUBLIC_KEY` | VAPID public key |
-| `VAPID_SUBJECT` | For example `mailto:alerts@cobuilders.xyz` |
-| `ALERTS_APP_ORIGINS` | Optional. Overrides the default `https://safenet.cobuilders.xyz,https://safenet.cobuilders.eth.limo` |
+| Worker value | GitHub source | Level |
+| --- | --- | --- |
+| Cloudflare credentials | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | `production` secrets |
+| `MAINNET_RPC_URL` | `ALERTS_MAINNET_RPC_URL`, else `MAINNET_RPC_URL` | `production` secret, else organization secret |
+| `GNOSIS_RPC_URL` | `ALERTS_GNOSIS_RPC_URL`, else `GNOSIS_RPC_URL` | `production` secret, else organization secret |
+| `GRAPH_API_KEY` | `GRAPH_API_KEY` | organization secret. The Worker derives the Mainnet Network gateway URL from it through core |
+| `SUBGRAPH_URL_MAINNET` | `ALERTS_SUBGRAPH_URL_MAINNET` | optional `production` secret; overrides the derived URL |
+| `TELEGRAM_BOT_TOKEN` | `TELEGRAM_BOT_TOKEN` | repository secret |
+| `TELEGRAM_BOT_NAME`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT` | same names | `production` variables |
+| `VAPID_PRIVATE_KEY` | `VAPID_PRIVATE_KEY` | `production` secret |
+| D1 binding | `ALERTS_D1_DATABASE_ID` | `production` variable |
+| `APP_ORIGINS` | `ALERTS_APP_ORIGINS`, else `https://safenet.cobuilders.xyz,https://safenet.cobuilders.eth.limo` | optional `production` variable |
+| API `GITHUB_TOKEN` | `SAFENET_API_GITHUB_TOKEN` | optional `production` secret. Without it the deploy warns, and GitHub allows the API 60 unauthenticated requests per hour |
 
 `https://safenet.cobuilders.xyz` is also the Safe App origin: Safe{Wallet} loads the app in an
 iframe from that origin. A new web origin must be added to `ALERTS_APP_ORIGINS`, or sign-in to
 alerts answers 403 from it.
+
+The Telegram bot must be dedicated to this Worker: no webhook and no other poller, because the
+Worker reads `getUpdates`. Keep the VAPID pair for good: a new pair invalidates every browser
+subscription.
 
 ### Web: where the interface finds the Workers
 
@@ -93,7 +72,7 @@ configured.
 
 ## Order of operations
 
-1. Do the prerequisites. Add the secrets and variables of the `production` environment.
+1. Do the three steps in [What remains](#what-remains-before-the-first-deploy).
 2. Run *Workers deploy* from `main` with target `both`, and approve it. The workflow tests each
    package, applies the D1 migrations, then deploys both Workers.
 3. Check:

@@ -11,7 +11,9 @@ export interface Dependencies {
   cache?: Pick<Cache, "match" | "put">
 }
 export function createApp(dependencies: Dependencies = {}) {
-  const app = new Hono<{ Bindings: Env }>()
+  // GITHUB_TOKEN is optional, so the config does not declare it: cf requires every declared secret.
+  // Without it, GitHub allows 60 unauthenticated requests per hour from the Worker's address.
+  const app = new Hono<{ Bindings: Env & { GITHUB_TOKEN?: string } }>()
   const fetcher = dependencies.fetch ?? fetch
   const lookup = dependencies.ens ?? ensLookup(fetcher)
   const now = dependencies.now ?? Date.now

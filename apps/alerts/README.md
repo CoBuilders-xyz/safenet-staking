@@ -82,7 +82,8 @@ source files, logs or browser variables:
 | `APP_ORIGINS` | Comma-separated exact browser origins allowed to call the API, for example `https://safenet.cobuilders.eth.limo,https://safenet.cobuilders.xyz`. See [Allowed origins](#allowed-origins). |
 | `APP_ORIGIN` | Legacy single origin. Still accepted, alone or merged with `APP_ORIGINS`. |
 | `MAINNET_RPC_URL`, `GNOSIS_RPC_URL` | Mainnet reads/contract-wallet verification and finalized Aegis history. Must answer the expected chain ID. |
-| `SUBGRAPH_URL_MAINNET` | Production Mainnet subgraph endpoint; a Studio development endpoint cannot support sustained subscription volume. |
+| `GRAPH_API_KEY` | The Graph API key. Core derives the Mainnet Network gateway URL from it; a Studio development endpoint cannot support sustained subscription volume. |
+| `SUBGRAPH_URL_MAINNET` | Optional. Overrides the Mainnet subgraph URL derived from `GRAPH_API_KEY`. |
 | `REWARDS_BASE_URL` | Optional isolated-fork dataset override. Normally resolve the canonical ENS dataset, with core's repository fallback. |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_NAME` | A dedicated bot token and its username, without `@`. Do not reuse a bot consumed by another getUpdates poller or webhook. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Persistent matching VAPID keypair and valid `mailto:` or HTTPS contact. Keep the private key server-side. |

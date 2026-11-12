@@ -21,6 +21,8 @@ export type Env = Pick<ConfiguredEnv, "DB"> & Partial<Omit<ConfiguredEnv, "DB">>
   APP_ORIGIN?: string
   /** Isolated-fork dataset override. Optional, so not a declared (required) secret. */
   REWARDS_BASE_URL?: string
+  /** Overrides the Mainnet subgraph URL that core derives from GRAPH_API_KEY. Optional. */
+  SUBGRAPH_URL_MAINNET?: string
 }
 export class HttpError extends Error {
   constructor(public status: number, message: string) { super(message) }

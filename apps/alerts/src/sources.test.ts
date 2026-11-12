@@ -1,8 +1,8 @@
 import { test, mock } from "node:test"
 import assert from "node:assert/strict"
 import { decodeFunctionData, encodeFunctionResult, encodePacked, keccak256, numberToHex, encodeAbiParameters, encodeEventTopics, type AbiEvent, type Hex } from "viem"
-import { CHAINS, CONTRACTS, merkleDropAbi, stakingAbi, indexedEvent } from "@cobuilders/safenet-core"
-import { advanceChronology, walletConditions } from "./sources.js"
+import { CHAINS, CONTRACTS, NETWORK_SUBGRAPH_IDS, SUBGRAPH_ENDPOINTS, merkleDropAbi, stakingAbi, indexedEvent } from "@cobuilders/safenet-core"
+import { advanceChronology, mainnetSubgraphUrl, walletConditions } from "./sources.js"
 import { TestDatabase, noDatabase } from "./testing/database.js"
 import { initialChronology, type Chronology } from "./chronology.js"
 import type { Env, Subscription } from "./types.js"
@@ -304,4 +304,13 @@ test("missing registration uses the first observation as a stable alert key", as
   assert.equal(keys[0], `deregistered:${validator}:70`)
   assert.equal(keys[0], keys[1])
   assert.equal(keys[2], `deregistered:${validator}:96`)
+})
+
+test("the Mainnet subgraph URL: the override, else the Network gateway for GRAPH_API_KEY, else Studio", () => {
+  const key = "test-only-graph-key"
+  const gateway = mainnetSubgraphUrl({ GRAPH_API_KEY: key })
+  assert.equal(new URL(gateway).origin, "https://gateway.thegraph.com")
+  assert.ok(gateway.includes(`/api/${key}/subgraphs/id/${NETWORK_SUBGRAPH_IDS.mainnet}`))
+  assert.equal(mainnetSubgraphUrl({ GRAPH_API_KEY: key, SUBGRAPH_URL_MAINNET: "https://graph.test" }), "https://graph.test")
+  assert.equal(mainnetSubgraphUrl({}), SUBGRAPH_ENDPOINTS.mainnet)
 })

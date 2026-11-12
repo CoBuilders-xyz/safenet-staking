@@ -56,9 +56,8 @@ jobs:
           done
           if [ -n "$missing" ]; then echo "::error::Missing secrets:$missing"; exit 1; fi
 
-      # The API reads public subgraph and SEF endpoints from core. Its GITHUB_TOKEN raises GitHub's
-      # rate limit for SEF's data: a GitHub token with no scope, not this workflow's token. cf
-      # requires every declared secret, so the deploy stops without it.
+      # The API reads public subgraph and SEF endpoints from core. Its optional GITHUB_TOKEN raises
+      # GitHub's rate limit for SEF's data: a GitHub token with no scope, not this workflow's token.
       - name: Check and test the API
         if: inputs.target != 'alerts'
         run: pnpm --filter @cobuilders/safenet-api check && pnpm --filter @cobuilders/safenet-api test
@@ -72,8 +71,10 @@ jobs:
           trap 'rm -f "$secrets"' EXIT
           umask 077
           node -e '
-            if (!process.env.SAFENET_API_GITHUB_TOKEN) { console.error("::error::Missing production secret SAFENET_API_GITHUB_TOKEN"); process.exit(1) }
-            require("node:fs").writeFileSync(process.argv[1], JSON.stringify({ GITHUB_TOKEN: process.env.SAFENET_API_GITHUB_TOKEN }))
+            const out = {}
+            if (process.env.SAFENET_API_GITHUB_TOKEN) out.GITHUB_TOKEN = process.env.SAFENET_API_GITHUB_TOKEN
+            else console.log("::warning::SAFENET_API_GITHUB_TOKEN is not set. The API reads SEF data from GitHub unauthenticated: 60 requests per hour.")
+            require("node:fs").writeFileSync(process.argv[1], JSON.stringify(out))
           ' "$secrets"
           pnpm exec cf deploy --secrets-file "$secrets" --message "safenet-api ${GITHUB_SHA::12}"
 
@@ -100,8 +101,12 @@ jobs:
           # Public, so committed. safenet.cobuilders.xyz is also the Safe App origin: Safe{Wallet}
           # loads the app in an iframe from that origin, so the app's requests carry it.
           APP_ORIGINS: ${{ vars.ALERTS_APP_ORIGINS || 'https://safenet.cobuilders.xyz,https://safenet.cobuilders.eth.limo' }}
-          MAINNET_RPC_URL: ${{ secrets.ALERTS_MAINNET_RPC_URL }}
-          GNOSIS_RPC_URL: ${{ secrets.ALERTS_GNOSIS_RPC_URL }}
+          # Alerts-specific RPCs when set, else the organization RPCs the other workflows use.
+          MAINNET_RPC_URL: ${{ secrets.ALERTS_MAINNET_RPC_URL || secrets.MAINNET_RPC_URL }}
+          GNOSIS_RPC_URL: ${{ secrets.ALERTS_GNOSIS_RPC_URL || secrets.GNOSIS_RPC_URL }}
+          # The organization Graph key. The Worker derives the Mainnet gateway URL from it through
+          # core. ALERTS_SUBGRAPH_URL_MAINNET, when set, overrides that URL.
+          GRAPH_API_KEY: ${{ secrets.GRAPH_API_KEY }}
           SUBGRAPH_URL_MAINNET: ${{ secrets.ALERTS_SUBGRAPH_URL_MAINNET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_BOT_NAME: ${{ vars.TELEGRAM_BOT_NAME }}
@@ -113,11 +118,12 @@ jobs:
           trap 'rm -f "$secrets"' EXIT
           umask 077
           node -e '
-            const required = ["APP_ORIGINS", "MAINNET_RPC_URL", "GNOSIS_RPC_URL", "SUBGRAPH_URL_MAINNET",
+            const required = ["APP_ORIGINS", "MAINNET_RPC_URL", "GNOSIS_RPC_URL", "GRAPH_API_KEY",
               "TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_NAME", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"]
             const missing = required.filter(name => !process.env[name])
             if (missing.length) { console.error("::error::Missing production values: " + missing.join(", ")); process.exit(1) }
             const out = Object.fromEntries(required.map(name => [name, process.env[name]]))
+            if (process.env.SUBGRAPH_URL_MAINNET) out.SUBGRAPH_URL_MAINNET = process.env.SUBGRAPH_URL_MAINNET
             require("node:fs").writeFileSync(process.argv[1], JSON.stringify(out))
           ' "$secrets"
           pnpm exec cf deploy --secrets-file "$secrets" --message "safenet-alerts ${GITHUB_SHA::12}"
