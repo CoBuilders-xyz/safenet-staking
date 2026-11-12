@@ -7,6 +7,51 @@ function restricted(page: Page) {
 }
 
 test.describe("Restricted screen", () => {
+  test("the legal pages open for a blocked visitor and make no location lookup of their own", async ({ disconnectedPage: page }) => {
+    const lookups: string[] = []
+    await page.route("**/api.country.is**", (route) => {
+      lookups.push(route.request().url())
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ country: "CU" }) })
+    })
+    await page.route("**/ipapi.co/**", (route) => {
+      lookups.push(route.request().url())
+      return route.abort("connectionrefused")
+    })
+
+    const legal = [
+      ["/#/imprint", "Imprint"],
+      ["/#/terms", "Terms of use"],
+      ["/#/privacy", "Privacy policy"],
+      ["/#/faq", "Frequently asked questions"],
+    ] as const
+    for (const [path, title] of legal) {
+      await page.goto(path)
+      // A full load each time: moving between hashes alone would not load the document again.
+      await page.reload()
+      await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible({ timeout: 10_000 })
+      await expect(page.locator('link[rel="preconnect"]')).toHaveCount(0)
+      await expect(page.getByRole("button", { name: "Connect Wallet" })).toHaveCount(0)
+    }
+    expect(lookups).toEqual([])
+
+    // Into the interface from a legal page: now the check runs, and the interface stays closed.
+    await page.getByRole("link", { name: "Back to Overview" }).click()
+    await expect(page.getByRole("heading", { name: "Access Restricted" })).toBeVisible({ timeout: 10_000 })
+    await expect(restricted(page)).toContainText("unavailable in Cuba")
+    expect(lookups).toHaveLength(1)
+
+    // And the restricted screen links back to the legal pages.
+    await page.getByRole("contentinfo").getByRole("link", { name: "Privacy" }).click()
+    await expect(page.getByRole("heading", { level: 1, name: "Privacy policy" })).toBeVisible()
+    await expect(page.getByRole("heading", { name: "Access Restricted" })).toHaveCount(0)
+  })
+
+  test("the interface itself still connects early to the location service", async ({ disconnectedPage: page }) => {
+    await page.goto("/")
+    await expect(page.getByRole("heading", { name: "Network overview" })).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('link[rel="preconnect"]')).toHaveAttribute("href", "https://api.country.is")
+  })
+
   test("malformed primary location and a failed fallback keep the interface closed", async ({ disconnectedPage: page }) => {
     await page.route("**/api.country.is**", (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ country: { code: "RU" } }) }),

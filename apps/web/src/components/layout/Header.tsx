@@ -11,8 +11,18 @@ import Moon from "lucide-react/dist/esm/icons/moon"
 import { Button } from "@/components/ui/button"
 import { LanguageSwitcher } from "./LanguageSwitcher"
 
+interface HeaderProps {
+  /**
+   * On the legal pages, which a visitor reads whatever the access checks would answer: the name,
+   * the language and the theme, and one link back. No navigation and no wallet control.
+   */
+  standalone?: boolean
+}
+
+const navLinkClass = "flex items-center px-4 py-3 text-sm font-medium uppercase tracking-wider leading-5 transition-colors border-b-2"
+
 /** Desktop navigation has its own row so wallet controls fit with longer translated labels. */
-export function Header() {
+export function Header({ standalone = false }: HeaderProps) {
   const { t } = useTranslation()
   const { pathname } = useLocation()
   const navItems = [
@@ -53,30 +63,42 @@ export function Header() {
           >
             {isDark ? <Sun className="h-5 w-5" aria-hidden="true" /> : <Moon className="h-5 w-5" aria-hidden="true" />}
           </Button>
-          <div className="hidden xl:block">
-            <ConnectButton />
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="xl:hidden"
-            onClick={() => setMobileMenuOpen((v) => !v)}
-            aria-label={mobileMenuOpen ? t("header.closeMenu", "Close menu") : t("header.openMenu", "Open menu")}
-            aria-expanded={mobileMenuOpen}
-          >
-            {mobileMenuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
-          </Button>
+          {!standalone && (
+            <>
+              <div className="hidden xl:block">
+                <ConnectButton />
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="xl:hidden"
+                onClick={() => setMobileMenuOpen((v) => !v)}
+                aria-label={mobileMenuOpen ? t("header.closeMenu", "Close menu") : t("header.openMenu", "Open menu")}
+                aria-expanded={mobileMenuOpen}
+              >
+                {mobileMenuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
-      <nav className="container mx-auto hidden xl:flex items-stretch min-h-12 gap-1 px-4 -mb-px">
+      {standalone && (
+        <nav className="container mx-auto flex min-h-12 items-stretch px-4 -mb-px">
+          <Link to="/" className={cn(navLinkClass, "text-muted-foreground border-transparent hover:text-foreground")}>
+            {t("common.backToOverview", "Back to Overview")}
+          </Link>
+        </nav>
+      )}
+
+      {!standalone && <nav className="container mx-auto hidden xl:flex items-stretch min-h-12 gap-1 px-4 -mb-px">
         {navItems.map((item) => (
           <Link
             key={item.path}
             to={item.path}
             aria-current={pathname === item.path ? "page" : undefined}
             className={cn(
-              "flex items-center px-4 py-3 text-sm font-medium uppercase tracking-wider leading-5 transition-colors border-b-2",
+              navLinkClass,
               pathname === item.path
                 ? "text-foreground border-primary"
                 : "text-muted-foreground border-transparent hover:text-foreground",
@@ -85,9 +107,9 @@ export function Header() {
             {item.label}
           </Link>
         ))}
-      </nav>
+      </nav>}
 
-      {mobileMenuOpen && (
+      {!standalone && mobileMenuOpen && (
         <div className="border-t xl:hidden">
           <nav className="container mx-auto flex flex-col gap-1 px-4 py-3">
             {navItems.map((item) => (

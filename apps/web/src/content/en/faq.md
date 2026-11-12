@@ -36,7 +36,7 @@ No, not to read. The Overview and the Validators pages work without a wallet. Yo
 
 ### Why can I not open the interface?
 
-The interface refuses access from restricted countries and for wallet addresses on a sanctions list. It also refuses access when a check cannot give an answer, for example when a country lookup fails. In that case, reload the page later. The [Terms of use](#/terms) say who may use the interface, and the [Privacy policy](#/privacy) describes the checks.
+The interface refuses access from restricted countries and for wallet addresses on a sanctions list. It also refuses access when a check cannot give an answer, for example when a country lookup fails. In that case, reload the page later. The [Terms of use](#/terms) say who may use the interface, and the [Privacy policy](#/privacy) describes the checks. The legal pages and this FAQ open without the checks, so everyone can read them.
 
 ## Self-custody
 
@@ -150,7 +150,7 @@ The interface has no accounts and sets no cookies. It sends no analytics. Your b
 
 ### Why does the interface look up my country?
 
-To refuse access from restricted countries. Your browser asks a lookup service (`api.country.is`, then `ipapi.co`) for the country of your connection. The service sees your IP address. Your browser keeps the country code for 7 days. The operator receives neither your IP address nor the result.
+To refuse access from restricted countries. Your browser asks a lookup service (`api.country.is`, then `ipapi.co`) for the country of your connection. The service sees your IP address. The legal pages and this FAQ do not start the lookup. Your browser keeps the country code for 7 days. The operator receives neither your IP address nor the result.
 
 ### How do I get my data deleted?
 

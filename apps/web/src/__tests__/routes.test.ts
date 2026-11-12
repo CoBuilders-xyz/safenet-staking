@@ -14,6 +14,10 @@ describe("routeImportFor", () => {
     for (const path of ["#/imprint", "#/terms", "#/privacy", "#/faq"]) {
       expect(routeImportFor(path)).toBe(pageImports.Content)
     }
+    // As the router matches them: no case, a trailing slash, a query.
+    for (const path of ["#/Privacy", "#/terms/", "#/faq?from=footer"]) {
+      expect(routeImportFor(path)).toBe(pageImports.Content)
+    }
     expect(routeImportFor("#/terms/more")).toBe(pageImports.NotFound)
     expect(routeImportFor("#/nowhere")).toBe(pageImports.NotFound)
     expect(routeImportFor("#/validators/0xabc/more")).toBe(pageImports.NotFound)

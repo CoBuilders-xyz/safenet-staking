@@ -28,4 +28,16 @@ describe("Layout", () => {
     expect(screen.getByText("Skip to main content")).toBeInTheDocument()
     expect(screen.getByRole("main")).toContainElement(screen.getByTestId("wrong-network"))
   })
+
+  it("standalone, for the legal pages: no wrong-network notice", () => {
+    render(
+      <MemoryRouter>
+        <Layout standalone />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByTestId("header")).toBeInTheDocument()
+    expect(screen.getByTestId("footer")).toBeInTheDocument()
+    expect(screen.queryByTestId("wrong-network")).toBeNull()
+  })
 })

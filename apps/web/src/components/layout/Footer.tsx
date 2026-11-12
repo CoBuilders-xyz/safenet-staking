@@ -1,21 +1,13 @@
 import { useTranslation } from "react-i18next"
 import { SEF_DOCS } from "@cobuilders/safenet-core"
 import { LegalLink } from "@/components/LegalLink"
-import { LEGAL_URL_OVERRIDES, OPERATOR_NAME, type ContentPageName } from "@/config/legal"
+import { OPERATOR_NAME, type ContentPageName } from "@/config/legal"
 
 const docsUrl = import.meta.env.VITE_DOCS_URL || SEF_DOCS.home
 
 const linkClass = "hover:text-foreground transition-colors"
 
-interface FooterProps {
-  /**
-   * False where the routes are closed, as on the restricted screen: an in-app page cannot open
-   * there, so only a document the operator hosts elsewhere is linked.
-   */
-  inAppPages?: boolean
-}
-
-export function Footer({ inAppPages = true }: FooterProps) {
+export function Footer() {
   const { t } = useTranslation()
   const labels: Record<ContentPageName, string> = {
     terms: t("footer.terms", "Terms"),
@@ -23,8 +15,7 @@ export function Footer({ inAppPages = true }: FooterProps) {
     imprint: t("footer.imprint", "Imprint"),
     faq: t("footer.faq", "FAQ"),
   }
-  const link = (page: ContentPageName) =>
-    (inAppPages || LEGAL_URL_OVERRIDES[page]) && <LegalLink page={page} className={linkClass}>{labels[page]}</LegalLink>
+  const link = (page: ContentPageName) => <LegalLink page={page} className={linkClass}>{labels[page]}</LegalLink>
   return (
     <footer className="border-t border-border mt-auto">
       <div className="container mx-auto flex flex-col items-center gap-3 px-4 py-5 sm:flex-row sm:justify-between">

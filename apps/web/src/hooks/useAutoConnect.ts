@@ -8,14 +8,17 @@ import { isSafeApp } from "@/lib/safe"
  *
  * This replaces wagmi's built-in reconnectOnMount so that Safe Apps always
  * connect to the Safe connector instead of whichever wallet was last used.
+ *
+ * It connects once, the first time `enabled` is true: the legal pages pass false, so opening one
+ * of them contacts no wallet.
  */
-export function useAutoConnect() {
+export function useAutoConnect(enabled = true) {
   const { connect, connectors } = useConnect()
   const { reconnect } = useReconnect()
   const hasAttempted = useRef(false)
 
   useEffect(() => {
-    if (hasAttempted.current) return
+    if (!enabled || hasAttempted.current) return
     hasAttempted.current = true
 
     if (isSafeApp) {
@@ -28,5 +31,5 @@ export function useAutoConnect() {
 
     // Outside Safe context, restore previous wallet session
     reconnect()
-  }, [connect, connectors, reconnect])
+  }, [enabled, connect, connectors, reconnect])
 }

@@ -21,7 +21,7 @@ Contact for every privacy question and request: [contact@cobuilders.xyz](mailto:
 
 ## 3. Country check
 
-The interface refuses access from the countries on our restricted list. The list is part of the public source code. To apply it, your browser looks up the country of your connection before the interface opens.
+The interface refuses access from the countries on our restricted list. The list is part of the public source code. To apply it, your browser looks up the country of your connection before the interface opens. The imprint, the terms of use, this policy and the FAQ open without this lookup, so you can read them first.
 
 - **What is sent.** Your browser sends a request to `api.country.is`. If that request fails, it sends a request to `ipapi.co`. Each provider receives your IP address and the usual technical data of a web request, such as your browser type. The request contains no wallet address and no other identifier from us.
 - **What comes back.** A two-letter country code.

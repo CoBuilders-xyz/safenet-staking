@@ -25,7 +25,7 @@ export function RestrictedScreen({ restriction, actions }: RestrictedScreenProps
           {actions && <div className="flex flex-wrap justify-center gap-3">{actions}</div>}
         </div>
       </main>
-      <Footer inAppPages={false} />
+      <Footer />
     </div>
   )
 }

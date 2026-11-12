@@ -4,12 +4,12 @@ import { MemoryRouter } from "react-router-dom"
 import { SEF_DOCS } from "@cobuilders/safenet-core"
 
 // The override URLs are read at module scope, so each test imports the footer after its stubs.
-async function renderFooter(props: { inAppPages?: boolean } = {}) {
+async function renderFooter() {
   vi.resetModules()
   const { Footer } = await import("../layout/Footer")
   render(
     <MemoryRouter>
-      <Footer {...props} />
+      <Footer />
     </MemoryRouter>,
   )
 }
@@ -52,17 +52,5 @@ describe("Footer", () => {
       expect(link).toHaveAttribute("target", "_blank")
     }
     expect(screen.getByRole("link", { name: "FAQ" })).toHaveAttribute("href", "/faq")
-  })
-
-  it("links only to documents hosted elsewhere where the routes are closed", async () => {
-    vi.stubEnv("VITE_TERMS_URL", "https://example.com/terms")
-    vi.stubEnv("VITE_PRIVACY_URL", "")
-    vi.stubEnv("VITE_IMPRINT_URL", "")
-    await renderFooter({ inAppPages: false })
-
-    expect(screen.getByText("Operated by Backstage Online LLC")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Terms" })).toHaveAttribute("href", "https://example.com/terms")
-    expect(screen.getByRole("link", { name: "Documentation" })).toBeInTheDocument()
-    for (const name of ["Privacy", "Imprint", "FAQ"]) expect(screen.queryByRole("link", { name })).toBeNull()
   })
 })

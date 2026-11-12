@@ -1,4 +1,4 @@
-import { CONTENT_PAGES } from "@/config/legal"
+import { contentPageAt } from "@/config/legal"
 
 /** Preloaded beside the first page so its tooltip provider adds no later network round trip. */
 export const routeContentImport = () => import("@/components/layout/RouteContent")
@@ -34,6 +34,6 @@ export function routeImportFor(hash: string): () => Promise<unknown> {
   if (path === "/withdrawals") return pageImports.Withdrawals
   if (path === "/rewards") return pageImports.Rewards
   if (path === "/alerts") return pageImports.Alerts
-  if (CONTENT_PAGES.some(name => path === `/${name}`)) return pageImports.Content
+  if (contentPageAt(path)) return pageImports.Content
   return pageImports.NotFound
 }

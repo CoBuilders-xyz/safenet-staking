@@ -118,13 +118,20 @@ wrapped in `ErrorBoundary`:
   parsed by `src/lib/markdown.ts` into elements, never HTML. `src/content/README.md` has the
   supported subset and the placeholder status. The footer links to them through `LegalLink`,
   which prefers `VITE_TERMS_URL`, `VITE_PRIVACY_URL` or `VITE_IMPRINT_URL` when set. The footer
-  names the operator from `src/config/legal.ts`. On the restricted screen the routes are closed,
-  so its footer links only to documents hosted elsewhere
+  names the operator from `src/config/legal.ts`. These four routes render outside the gates
+  (`OpenPages` in `App.tsx`), so a blocked visitor can read them, the restricted screen links to
+  them, and they start no country lookup, no sanctions request and no wallet connection. Their
+  `Layout` is `standalone`: no navigation, no wallet control, one link back
 - `*` → `NotFoundPage`
 
 Pages are lazy-loaded with `React.lazy()` from `src/routes.ts`. The page of the URL opened starts
 loading at once, alongside the gates (`routeImportFor`); the others preload after the `load`
 event, when the browser is idle.
+
+`Shell` in `App.tsx` chooses by the route alone, through `contentPageAt` in `src/config/legal.ts`:
+a legal page, or `GatedApp`, which holds every other route behind the gates. The script in
+`index.html` that preconnects to the location service skips the same four routes; a test in
+`src/__tests__/index-html.test.ts` holds it to the list.
 
 App-level gates, each rendering `RestrictedScreen` with a `Restriction` (`src/lib/restriction.ts`):
 the gate, and whether it refused or could not answer. Each hook returns `allowed`, `isLoading` and
