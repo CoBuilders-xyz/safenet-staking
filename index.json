@@ -1,6 +1,6 @@
 {
   "schema": "safenet-snapshots-index/1",
-  "previous": "bafybeigyy3mcdbamsuubdtjuy7jmgv4uj2kf3lz23pebcw6fo7sbjeshru",
+  "previous": "bafybeiagpxikpm4z3c2sczohkdvjaspnm4vhoj3tpik5yxwjiyma3mxe3i",
   "days": {
     "2026-11-04": {
       "cid": "bafybeigotvi3d4vz4eaqnk3lo5uydh4opkecl3vxklffcnzlw4kwygk4qe",
@@ -24,6 +24,14 @@
       "mainnetBlock": "26393417",
       "gnosisBlock": "49228396",
       "blockTime": "2026-11-11T18:16:11.000Z",
+      "commit": "b88974f5fb53903e5b71031c14ada85bd0630eb6"
+    },
+    "2026-11-12": {
+      "cid": "bafybeieyg4tksmns6qedtgoe575ho3zka6v77cvd26l4h4ionhhax4oeey",
+      "schema": "safenet-snapshot/1",
+      "mainnetBlock": "26395374",
+      "gnosisBlock": "49233023",
+      "blockTime": "2026-11-12T00:48:23.000Z",
       "commit": "b88974f5fb53903e5b71031c14ada85bd0630eb6"
     }
   }
