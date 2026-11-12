@@ -1,14 +1,13 @@
-import type { Database } from "./db.js"
+import type { Database, PollRun } from "./db.js"
 
-export interface PollRun { started_at: string; completed_at: string | null; ok: boolean }
+export type { PollRun }
 const INTERVAL = 5 * 60_000
 /** Follow the timestamp cursor until empty, including pages capped below our requested limit. */
-export async function loadPollRuns(db: Pick<Database, "request">, from: number, until: number): Promise<PollRun[]> {
+export async function loadPollRuns(db: Pick<Database, "runs">, from: number, until: number): Promise<PollRun[]> {
   const runs: PollRun[] = []
-  let cursor: string | undefined
-  const range = `started_at=gte.${encodeURIComponent(new Date(from).toISOString())}&started_at=lt.${encodeURIComponent(new Date(until).toISOString())}`
+  let cursor = ""
   for (;;) {
-    const page = await db.request<PollRun[]>(`alerts_runs?${range}&order=started_at.asc&limit=1000${cursor ? `&started_at=gt.${encodeURIComponent(cursor)}` : ""}`)
+    const page = await db.runs(new Date(from).toISOString(), new Date(until).toISOString(), cursor, 1000)
     if (!page.length) return runs
     runs.push(...page)
     cursor = page.at(-1)!.started_at

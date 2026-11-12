@@ -7,9 +7,8 @@ APP_ORIGINS=http://localhost:5173,https://safenet.cobuilders.eth.limo,https://sa
 # Legacy single origin. Optional; merged with APP_ORIGINS when both are set.
 # APP_ORIGIN=
 
+# The DB binding is a local D1 database; it needs no value here.
 # Other bindings, described in README.md. Uncomment and set the ones you need.
-# SUPABASE_URL=
-# SUPABASE_SERVICE_KEY=
 # MAINNET_RPC_URL=
 # GNOSIS_RPC_URL=
 # SUBGRAPH_URL_MAINNET=

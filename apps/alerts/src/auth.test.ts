@@ -5,13 +5,14 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
 import { CHAINS, CONTRACTS } from "@cobuilders/safenet-core"
 import { verifyWallet } from "./auth.js"
 import type { Env } from "./types.js"
+import { noDatabase } from "./testing/database.js"
 
 test("contract-wallet verification uses the contract address and message; an owner signature alone cannot authenticate it", async () => {
   const owner = privateKeyToAccount(generatePrivateKey())
   const message = "Contract-wallet authentication test"
   const signature = await owner.signMessage({ message })
   const address = CONTRACTS.staking.address
-  const env: Env = { APP_ORIGIN: "https://app.test", SUPABASE_URL: "https://unused.test", SUPABASE_SERVICE_KEY: "unused", MAINNET_RPC_URL: "https://rpc.test" }
+  const env: Env = { APP_ORIGIN: "https://app.test", DB: noDatabase, MAINNET_RPC_URL: "https://rpc.test" }
   let approved = false
   let wrongChain = false
   let calls = 0

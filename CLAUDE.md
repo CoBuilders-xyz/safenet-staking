@@ -115,7 +115,7 @@ graph-node.toml             EXISTS   graph-node config for two chains at once
 .github/workflows/          EXISTS   CI
 
 apps/api                    EXISTS   validator REST API, Cloudflare Worker; freshness and HTTP probes
-apps/alerts                 EXISTS   signed subscriptions, scheduled poller and delivery, with Supabase
+apps/alerts                 EXISTS   signed subscriptions, scheduled poller and delivery, on Cloudflare D1
 packages/testing            planned  shared fixtures: anvil, RPC mocks, Playwright helpers
 ```
 

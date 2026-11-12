@@ -3,14 +3,14 @@ import assert from "node:assert/strict"
 import { decodeFunctionData, encodeFunctionResult, encodePacked, keccak256, numberToHex, encodeAbiParameters, encodeEventTopics, type AbiEvent, type Hex } from "viem"
 import { CHAINS, CONTRACTS, merkleDropAbi, stakingAbi, indexedEvent } from "@cobuilders/safenet-core"
 import { advanceChronology, walletConditions } from "./sources.js"
-import { SqlDatabase } from "./testing/database.js"
+import { TestDatabase, noDatabase } from "./testing/database.js"
 import { initialChronology, type Chronology } from "./chronology.js"
 import type { Env, Subscription } from "./types.js"
 
 const wallet = CONTRACTS.safeToken.address
 const validator = CONTRACTS.staking.address
 const leaf = keccak256(encodePacked(["address", "uint256"], [wallet, 100n]))
-const env: Env = { APP_ORIGIN: "https://app.test", SUPABASE_URL: "https://unused.test", SUPABASE_SERVICE_KEY: "unused",
+const env: Env = { APP_ORIGIN: "https://app.test", DB: noDatabase,
   MAINNET_RPC_URL: "https://rpc.test", REWARDS_BASE_URL: "https://proof.test", SUBGRAPH_URL_MAINNET: "https://graph.test" }
 const sub: Subscription = { id: crypto.randomUUID(), wallet, triggers: ["cooldown", "rewards", "deregistered"], participation: 75, missed: 3,
   channel: { kind: "telegram" }, telegram_chat: null, status: "unverified", last_delivery: null }
@@ -138,7 +138,7 @@ test("stale delegation indexing cannot manufacture deregistration or discard ver
 
 
 test("Gnosis source commits dense ranges across polls, recovers an old SID and refuses changed finalized history", async () => {
-  const db = new SqlDatabase(); await db.setup()
+  const db = await TestDatabase.create()
   const first = CONTRACTS.aegisFrostCoordinator.deployBlock
   const timestamp = Math.floor(Date.now() / 1000)
   const root = numberToHex(1, { size: 32 })
@@ -183,21 +183,21 @@ test("Gnosis source commits dense ranges across polls, recovers an old SID and r
     } else assert.fail("Unexpected Gnosis method")
     return Response.json({ id: request.id, jsonrpc: "2.0", result })
   })
-  const saved = async () => (await db.request<{ value: Chronology }[]>("alerts_state?key=eq.aegis"))[0]!.value
+  const saved = async () => (await db.state<Chronology>("aegis"))!
   try {
     let holder = crypto.randomUUID()
-    await db.rpc("lock_run", { holder })
+    await db.lockRun(holder)
     let result = await advanceChronology({ ...env, GNOSIS_RPC_URL: "https://gnosis.test" }, initialChronology(), db, holder)
     assert.equal(result.current, false)
     assert.equal(result.state.cursor, (first + 9n).toString())
     assert.ok(ranges.some(size => size > 1)) // Dense requests shrink to complete-block batches.
     assert.deepEqual(result.state.pending, {})
-    await db.rpc("lock_run", { holder, release: true })
+    await db.releaseRun(holder)
     holder = crypto.randomUUID()
-    await db.rpc("lock_run", { holder })
+    await db.lockRun(holder)
     result = await advanceChronology({ ...env, GNOSIS_RPC_URL: "https://gnosis.test" }, await saved(), db, holder)
     assert.equal(result.current, true)
-    assert.equal((await db.pg.query<{ count: number }>("select count(*)::int as count from alerts_ceremonies")).rows[0]!.count, 11_000)
+    assert.equal((await db.query("select sid from alerts_ceremonies")).length, 11_000)
     late = true
     // Backfill still obeys ten ranges per invocation across the long attestation delay.
     for (let i = 0; i < 5; i++) result = await advanceChronology({ ...env, GNOSIS_RPC_URL: "https://gnosis.test" }, await saved(), db, holder)
@@ -211,14 +211,14 @@ test("Gnosis source commits dense ranges across polls, recovers an old SID and r
     changedHash = false; saturated = true; late = false
     await assert.rejects(advanceChronology({ ...env, GNOSIS_RPC_URL: "https://gnosis.test" }, initialChronology(), db, holder), /Single block/)
     assert.deepEqual(await saved(), before)
-  } finally { mocked.mock.restore(); await db.pg.close() }
+  } finally { mocked.mock.restore(); await db.close() }
 })
 
 for (const scenario of ["archive", "provider", "provider-single-block", "unrelated-provider"] as const) {
   test(`chronology range recovery: ${scenario}`, async () => {
-    const db = new SqlDatabase(); await db.setup()
+    const db = await TestDatabase.create()
     const holder = crypto.randomUUID()
-    await db.rpc("lock_run", { holder })
+    await db.lockRun(holder)
     const first = CONTRACTS.aegisFrostCoordinator.deployBlock
     const now = Math.floor(Date.now() / 1000)
     const root = numberToHex(1, { size: 32 }), hash = numberToHex(2, { size: 32 })
@@ -227,12 +227,12 @@ for (const scenario of ["archive", "provider", "provider-single-block", "unrelat
     const end = first + BigInt(count - 1)
     const ranges: number[] = []
     if (scenario === "archive") {
-      // Each ceremony fits 64 KiB, but recovering all 200 exceeds the SQL 8 MiB bound.
+      // Each ceremony fits 64 KiB, but recovering all 200 exceeds the 8 MiB transfer bound.
       const ceremony = { root, shares: { [root]: [signer], losing: Array.from({ length: 1015 }, () => signer) } }
       assert.ok(JSON.stringify(ceremony).length < 64 * 1024)
       const rows = Object.fromEntries(Array.from({ length: count }, (_, i) => [numberToHex(i + 1, { size: 32 }), ceremony]))
-      await db.pg.query("insert into alerts_ceremonies select key,value from jsonb_each($1::jsonb)", [JSON.stringify(rows)])
-      assert.equal(await db.rpc("load_ceremonies", { holder, expected_revision: 0, sids: Object.keys(rows) }), null)
+      for (const [sid, value] of Object.entries(rows)) await db.query("insert into alerts_ceremonies(sid, ceremony) values (?, ?)", sid, JSON.stringify(value))
+      assert.equal(await db.loadCeremonies(holder, 0, Object.keys(rows)), null)
     }
     const event: AbiEvent = scenario === "archive" ? indexedEvent("aegisConsensus", "TransactionAttested") : indexedEvent("aegisFrostCoordinator", "SignShared")
     const mocked = mock.method(globalThis, "fetch", async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -269,7 +269,7 @@ for (const scenario of ["archive", "provider", "provider-single-block", "unrelat
       if (scenario === "provider-single-block" || scenario === "unrelated-provider") {
         await assert.rejects(advanceChronology(env, initialChronology(), db, holder))
         assert.ok(ranges.every(size => size === count), "non-capacity failures must not shrink ranges")
-        assert.deepEqual(await db.request("alerts_state?key=eq.aegis"), [])
+        assert.equal(await db.state("aegis"), undefined)
       } else {
         const result = await advanceChronology(env, initialChronology(), db, holder)
         assert.equal(result.current, true)
@@ -278,10 +278,10 @@ for (const scenario of ["archive", "provider", "provider-single-block", "unrelat
         if (scenario === "archive") {
           assert.equal(result.state.rounds.length, 200)
           assert.ok(result.state.rounds.every(round => round.present.length === 1 && round.present[0] === signer))
-          assert.equal((await db.pg.query("select * from alerts_ceremonies where not ceremony ? 'counted'")).rows.length, 0)
-        } else assert.equal((await db.pg.query("select * from alerts_ceremonies")).rows.length, 1100)
+          assert.equal((await db.query("select sid from alerts_ceremonies where json_type(ceremony, '$.counted') is null")).length, 0)
+        } else assert.equal((await db.query("select sid from alerts_ceremonies")).length, 1100)
       }
-    } finally { mocked.mock.restore(); await db.pg.close() }
+    } finally { mocked.mock.restore(); await db.close() }
   })
 }
 

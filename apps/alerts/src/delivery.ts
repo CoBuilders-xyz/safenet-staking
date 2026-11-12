@@ -33,13 +33,12 @@ export async function deliver(env: Env, subscription: Subscription, payload: { t
 
 export async function sendEvent(db: Database, env: Env, sub: Subscription, key: string, body: string, send = deliver) {
   const ack = randomToken()
-  if (!await db.rpc<boolean>("reserve", { subscription_id: sub.id, event: key, acknowledgement: await digest(ack) })) return "duplicate"
+  if (!await db.reserve(sub.id, key, await digest(ack))) return "duplicate"
   let result: DeliveryResult = "failed"
   try { result = await send(env, sub, { title: "Safenet", body, ack }) } catch { /* Never log provider URLs or bodies. */ }
   // Only finish our own attempt. A reclaimed lease has a different receipt capability.
-  const path = `alerts_deliveries?subscription=eq.${sub.id}&event_key=eq.${encodeURIComponent(key)}&state=eq.sending&ack_hash=eq.${await digest(ack)}`
-  const completed = await db.request<{ subscription: string }[]>(path, "PATCH", { state: result === "accepted" ? "accepted" : "failed", updated_at: new Date().toISOString() })
-  if (result === "expired" && completed.length) await db.request(`alerts_subscriptions?id=eq.${sub.id}`, "PATCH", { status: "expired" })
+  const completed = await db.finishDelivery(sub.id, key, await digest(ack), result === "accepted")
+  if (result === "expired" && completed) await db.expireSubscription(sub.id)
   // Provider acceptance does not prove the browser displayed the notification or a person saw it.
   return result
 }
@@ -51,10 +50,10 @@ interface TelegramUpdate {
 }
 export async function telegramUpdates(db: Database, env: Env, transport: typeof fetch = fetch) {
   if (!env.TELEGRAM_BOT_TOKEN) return
-  const stored = await db.request<{ value: number }[]>("alerts_state?key=eq.telegram_offset")
+  const offset = await db.state<number>("telegram_offset")
   const response = await transport(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getUpdates`, {
     method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(10_000),
-    body: JSON.stringify({ offset: stored[0]?.value ?? 0, limit: 100, timeout: 0, allowed_updates: ["message", "callback_query"] }),
+    body: JSON.stringify({ offset: offset ?? 0, limit: 100, timeout: 0, allowed_updates: ["message", "callback_query"] }),
   })
   if (!response.ok) throw new Error("Telegram polling unavailable")
   const data = await response.json() as { ok: boolean; result: TelegramUpdate[] }
@@ -63,22 +62,17 @@ export async function telegramUpdates(db: Database, env: Env, transport: typeof 
     const message = update.message
     const link = message?.text?.match(/^\/start ([\w-]{43})$/)?.[1]
     if (link && message?.chat.type === "private") {
-      await db.rpc("link_telegram", { link: await digest(link), chat: String(message.chat.id) })
+      await db.linkTelegram(await digest(link), String(message.chat.id))
     }
     const callback = update.callback_query
     if (callback?.data && /^[\w-]{43}$/.test(callback.data) && callback.message?.chat.type === "private") {
       // The random capability can acknowledge only its own event, and only from its bound chat.
-      const hash = await digest(callback.data)
-      const deliveries = await db.request<{ subscription: string }[]>(`alerts_deliveries?ack_hash=eq.${hash}&limit=1`)
-      if (deliveries[0]) {
-        const subscriptions = await db.request<{ id: string }[]>(`alerts_subscriptions?id=eq.${deliveries[0].subscription}&telegram_chat=eq.${callback.message.chat.id}`)
-        if (subscriptions[0]) await db.rpc("acknowledge", { acknowledgement: hash })
-      }
+      await db.acknowledge(await digest(callback.data), String(callback.message.chat.id))
       await transport(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
         method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(10_000),
         body: JSON.stringify({ callback_query_id: callback.id }),
       })
     }
-    await db.rpc("save_state", { state_key: "telegram_offset", state_value: update.update_id + 1 })
+    await db.saveState("telegram_offset", update.update_id + 1)
   }
 }

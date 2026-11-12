@@ -4,7 +4,7 @@ import { verifyMessage } from "viem"
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
 import { createSiweMessage, parseSiweMessage } from "viem/siwe"
 import { CHAINS } from "@cobuilders/safenet-core"
-import { SqlDatabase } from "./testing/database.js"
+import { TestDatabase, noDatabase } from "./testing/database.js"
 import { allowedOrigins } from "./origins.js"
 import { authenticate, challenge } from "./auth.js"
 import { api } from "./api.js"
@@ -12,12 +12,12 @@ import { HttpError, type Env } from "./types.js"
 
 const limo = "https://safenet.cobuilders.eth.limo"
 const xyz = "https://safenet.cobuilders.xyz"
-const base = { SUPABASE_URL: "https://unused.test", SUPABASE_SERVICE_KEY: "unused" }
+const base = { DB: noDatabase }
 const env: Env = { ...base, APP_ORIGINS: `${limo},${xyz}` }
 const account = privateKeyToAccount(generatePrivateKey())
 const unavailable = (error: unknown) => error instanceof HttpError && error.status === 503
 
-const call = (path: string, origin: string | null, configured: Env = env, body?: unknown, db?: SqlDatabase) => api(new Request(`https://alerts.test${path}`, {
+const call = (path: string, origin: string | null, configured: Env = env, body?: unknown, db?: TestDatabase) => api(new Request(`https://alerts.test${path}`, {
   method: body === undefined ? (path === "/config" ? "GET" : "OPTIONS") : "POST",
   headers: { ...(origin === null ? {} : { Origin: origin }), "Content-Type": "application/json" },
   ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -64,7 +64,7 @@ test("CORS reflects only an allowlisted origin and always varies on Origin", asy
 })
 
 test("each allowlisted origin signs in with a SIWE message that names it; legacy APP_ORIGIN still works", async () => {
-  const db = new SqlDatabase(); await db.setup(false)
+  const db = await TestDatabase.create()
   try {
     for (const [configured, origin] of [[env, limo], [env, xyz], [{ ...base, APP_ORIGIN: "https://app.test" }, "https://app.test"]] as const) {
       const c = await challenge(db, configured, origin, { wallet: account.address })
@@ -78,11 +78,11 @@ test("each allowlisted origin signs in with a SIWE message that names it; legacy
     const c = await challenge(db, env, xyz, { wallet: account.address })
     const signature = await account.signMessage({ message: c.message })
     await assert.rejects(authenticate(db, env, "https://evil.test", { id: c.id, signature }, verifyMessage), /Origin refused/)
-  } finally { await db.pg.close() }
+  } finally { await db.close() }
 })
 
 test("a challenge issued for one origin cannot be redeemed from another, and stays usable from its own", async () => {
-  const db = new SqlDatabase(); await db.setup(false)
+  const db = await TestDatabase.create()
   try {
     const issued = await call("/auth/challenge", limo, env, { wallet: account.address }, db)
     assert.equal(issued.status, 200)
@@ -93,26 +93,26 @@ test("a challenge issued for one origin cannot be redeemed from another, and sta
     assert.deepEqual(await replay.json(), { error: "Challenge origin mismatch" })
     const unlisted = await call("/auth/verify", "https://evil.test", env, { id: c.id, signature }, db)
     assert.equal(unlisted.status, 403)
-    assert.equal((await db.request<{ used: boolean }[]>(`alerts_challenges?id=eq.${c.id}`))[0]!.used, false)
+    assert.equal((await db.challenge(c.id))!.used, false)
     const own = await call("/auth/verify", limo, env, { id: c.id, signature }, db)
     assert.equal(own.status, 200)
     assert.equal((await call("/auth/verify", limo, env, { id: c.id, signature }, db)).status, 401)
-  } finally { await db.pg.close() }
+  } finally { await db.close() }
 })
 
 test("a stored SIWE message whose domain or URI differs from the request origin is refused before verification", async () => {
-  const db = new SqlDatabase(); await db.setup(false)
+  const db = await TestDatabase.create()
   try {
     const now = new Date()
     const expires = new Date(now.getTime() + 5 * 60_000)
     const siwe = (domain: string, uri: string) => createSiweMessage({ address: account.address, chainId: CHAINS.mainnet.id, domain, uri,
       version: "1", nonce: "abcdefgh12345678", issuedAt: now, expirationTime: expires })
     for (const message of [siwe("evil.test", xyz), siwe(new URL(xyz).host, "https://evil.test"), siwe(new URL(limo).host, xyz), "not a SIWE message"]) {
-      const [row] = await db.rpc<{ id: string }[]>("issue_challenge", { owner_wallet: account.address.toLowerCase(), signed_message: message, expiry: expires.toISOString() })
+      const id = await db.issueChallenge(account.address.toLowerCase(), message, expires.toISOString())
       let verified = false
       const verify = async (args: Parameters<typeof verifyMessage>[0]) => { verified = true; return verifyMessage(args) }
-      await assert.rejects(authenticate(db, env, xyz, { id: row!.id, signature: await account.signMessage({ message }) }, verify), /origin mismatch/)
+      await assert.rejects(authenticate(db, env, xyz, { id: id!, signature: await account.signMessage({ message }) }, verify), /origin mismatch/)
       assert.equal(verified, false)
     }
-  } finally { await db.pg.close() }
+  } finally { await db.close() }
 })

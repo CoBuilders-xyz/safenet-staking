@@ -1,9 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { readFile } from "node:fs/promises"
-import { URL } from "node:url"
 import { CONTRACTS } from "@cobuilders/safenet-core"
-import { SqlDatabase } from "./testing/database.js"
+import { TestDatabase, noDatabase } from "./testing/database.js"
 import { persistChronologyBatch } from "./archive.js"
 import { initialChronology, memberCondition, type Chronology, type RoundEvent } from "./chronology.js"
 import { poll, adapters } from "./poller.js"
@@ -14,19 +12,22 @@ const signer = CONTRACTS.aegisConsensus.address.toLowerCase()
 const newcomer = CONTRACTS.aegisFrostCoordinator.address.toLowerCase()
 const staker = CONTRACTS.staking.address.toLowerCase()
 const now = Math.floor(Date.now() / 1000)
-const env: Env = { APP_ORIGIN: "https://app.test", SUPABASE_URL: "https://unused.test", SUPABASE_SERVICE_KEY: "unused" }
+const env: Env = { APP_ORIGIN: "https://app.test", DB: noDatabase }
 const event = (offset: number, index: number, data: Partial<RoundEvent>): RoundEvent => ({
   kind: "share", block: (first + BigInt(offset)).toString(), index, time: now - 86400, ...data,
 })
-const checkpoint = async (db: SqlDatabase) => (await db.request<{ value: Chronology }[]>("alerts_state?key=eq.aegis"))[0]!.value
-async function lease(db: SqlDatabase) {
+const checkpoint = async (db: TestDatabase) => (await db.state<Chronology>("aegis"))!
+const count = async (db: TestDatabase, where = "true") =>
+  (await db.query<{ n: number }>(`select count(*) as n from alerts_ceremonies where ${where}`))[0]!.n
+const sids = async (db: TestDatabase) => (await db.query<{ sid: string }>("select sid from alerts_ceremonies order by sid")).map(row => row.sid)
+async function lease(db: TestDatabase) {
   const holder = crypto.randomUUID()
-  assert.equal(await db.rpc("lock_run", { holder }), true)
+  assert.equal(await db.lockRun(holder), true)
   return holder
 }
 
 test("over 10,000 unmatched ceremonies persist across restarts and an old winning share survives late attestation", async () => {
-  const db = new SqlDatabase(); await db.setup()
+  const db = await TestDatabase.create()
   try {
     let holder = await lease(db)
     let state = initialChronology()
@@ -38,11 +39,11 @@ test("over 10,000 unmatched ceremonies persist across restarts and an old winnin
       assert.deepEqual(state.pending, {})
       assert.deepEqual(await checkpoint(db), state)
       // A fresh poller loads only the checkpoint. It does not load the entire archive.
-      await db.rpc("lock_run", { holder, release: true })
+      await db.releaseRun(holder)
       holder = await lease(db)
       state = await checkpoint(db)
     }
-    assert.equal((await db.pg.query<{ count: number }>("select count(*)::int as count from alerts_ceremonies")).rows[0]!.count, 11_000)
+    assert.equal(await count(db), 11_000)
     state = await persistChronologyBatch(db, holder, state, [
       event(100_000, 0, { kind: "completed", sid: "sid-0", root: "winner" }),
       event(100_000, 1, { kind: "attested", sid: "sid-0" }),
@@ -50,13 +51,14 @@ test("over 10,000 unmatched ceremonies persist across restarts and an old winnin
     assert.deepEqual(state.rounds[0]!.present, [signer])
     assert.equal(memberCondition(state, staker, now)[0]!.misses, 0)
     assert.equal(memberCondition(state, staker, now)[0]!.participation, 100)
-    assert.deepEqual((await db.pg.query<{ ceremony: unknown }>("select ceremony from alerts_ceremonies where sid='sid-0'")).rows[0]!.ceremony, { shares: {}, counted: true })
+    assert.deepEqual(JSON.parse((await db.query<{ ceremony: string }>("select ceremony from alerts_ceremonies where sid = 'sid-0'"))[0]!.ceremony),
+      { shares: {}, counted: true })
     assert.deepEqual(await checkpoint(db), state)
-  } finally { await db.pg.close() }
+  } finally { await db.close() }
 })
 
 test("archive recovery preserves completion blocking, chronological order and attestation membership snapshots", async () => {
-  const db = new SqlDatabase(); await db.setup()
+  const db = await TestDatabase.create()
   try {
     const holder = await lease(db)
     let state = await persistChronologyBatch(db, holder, initialChronology(), [
@@ -79,8 +81,8 @@ test("archive recovery preserves completion blocking, chronological order and at
     assert.equal(state.members[signer]!.misses, 1)
     assert.equal(state.members[newcomer]!.misses, 1)
     // Completing "early" also releases "later", although this batch has no event for it.
-    assert.deepEqual(await db.rpc("load_ceremonies", { holder, expected_revision: state.revision, sids: ["later"] }),
-      { later: { shares: {}, counted: true } })
+    assert.deepEqual(await db.loadCeremonies(holder, state.revision!, ["later", "unknown"]),
+      { later: { shares: {}, counted: true }, unknown: null })
     state = await persistChronologyBatch(db, holder, state, [], first + 2000n, "pruned", now)
     assert.equal(state.counted.later, undefined)
     state = await persistChronologyBatch(db, holder, await checkpoint(db), [
@@ -88,11 +90,11 @@ test("archive recovery preserves completion blocking, chronological order and at
     ], first + 2001n, "repeated", now)
     assert.deepEqual(state.pending, {})
     assert.deepEqual(state.rounds.map(r => r.sid), ["early", "later"])
-  } finally { await db.pg.close() }
+  } finally { await db.close() }
 })
 
 test("one completion archives every newly released round beyond the input-event batch limit", async () => {
-  const db = new SqlDatabase(); await db.setup()
+  const db = await TestDatabase.create()
   try {
     const holder = await lease(db)
     let state = await persistChronologyBatch(db, holder, initialChronology(), [
@@ -111,61 +113,53 @@ test("one completion archives every newly released round beyond the input-event 
     ], first + 4n, "released", now)
     assert.equal(state.rounds.length, 1201)
     assert.deepEqual(state.pending, {})
-    assert.equal((await db.pg.query<{ count: number }>("select count(*)::int as count from alerts_ceremonies where ceremony ? 'counted'")).rows[0]!.count, 1201)
+    assert.equal(await count(db, "json_type(ceremony, '$.counted') is not null"), 1201)
     assert.deepEqual(await checkpoint(db), state)
-  } finally { await db.pg.close() }
+  } finally { await db.close() }
 })
 
-test("migration atomically moves legacy JSON entries and retains blocked rounds and snapshots", async () => {
-  const db = new SqlDatabase(); await db.setup(false)
+test("a checkpoint above D1's 2 MB row limit is stored in parts and reads back whole", async () => {
+  const db = await TestDatabase.create()
   try {
-    const legacy: Chronology = { ...initialChronology(),
-      pending: Object.fromEntries(Array.from({ length: 10_000 }, (_, i) => [`legacy-${i}`, { shares: { winner: [signer] }, root: "winner" }])) }
-    delete legacy.archiveVersion
-    delete legacy.revision
-    legacy.counted["old-counted"] = legacy.cursor
-    legacy.pending.blocked = { shares: {}, at: { block: first.toString(), index: 0, time: now, members: [signer] } }
-    legacy.members[signer] = { staker, misses: 0, streakStart: null }
-    await db.rpc("save_state", { state_key: "aegis", state_value: legacy })
-    const oldHolder = await lease(db)
-    await db.pg.exec("reset role")
-    await db.pg.exec(await readFile(new URL("../migrations/002_ceremony_archive.sql", import.meta.url), "utf8"))
-    await db.pg.exec("set role service_role")
-    const migrated = await checkpoint(db)
-    assert.deepEqual(migrated.pending, { blocked: legacy.pending.blocked })
-    assert.equal(migrated.cursor, legacy.cursor)
-    assert.equal(migrated.revision, 1)
-    assert.equal((await db.pg.query<{ count: number }>("select count(*)::int as count from alerts_ceremonies")).rows[0]!.count, 10_001)
-    await assert.rejects(db.rpc("load_ceremonies", { holder: oldHolder, expected_revision: 1, sids: ["legacy-0"] }), /lease/)
-    await assert.rejects(db.rpc("save_state", { state_key: "aegis", state_value: legacy }), /atomic/)
     const holder = await lease(db)
-    assert.deepEqual(await db.rpc("load_ceremonies", { holder, expected_revision: 1, sids: ["old-counted"] }), { "old-counted": { shares: {}, counted: true } })
-    const next = await persistChronologyBatch(db, holder, migrated, [
-      event(0, 1, { kind: "completed", sid: "blocked", root: "winner" }),
-      event(0, 2, { kind: "attested", sid: "legacy-0" }),
-    ], first, "migrated", now)
-    assert.deepEqual(next.rounds.map(r => r.present), [[], [signer]])
-    assert.equal(next.members[signer]!.misses, 0)
-  } finally { await db.pg.close() }
+    // Attestations without a completion stay pending in the checkpoint. Non-ASCII SIDs test the part boundaries.
+    let state = initialChronology()
+    for (let page = 0; page < 3; page++) {
+      const blocked = Array.from({ length: 1000 }, (_, i) => event(page, i, { kind: "attested", sid: `blocked-${page}-${i}-${"é".repeat(300)}` }))
+      state = await persistChronologyBatch(db, holder, state, blocked, first + BigInt(page), `large-${page}`, now)
+    }
+    assert.ok(new TextEncoder().encode(JSON.stringify(state)).byteLength > 2_000_000)
+    assert.ok((await db.query("select part from alerts_state where key = 'aegis'")).length > 2)
+    assert.deepEqual(await checkpoint(db), state)
+  } finally { await db.close() }
+})
+
+test("the generic state write refuses the checkpoint, and the archive refuses a malformed ceremony", async () => {
+  const db = await TestDatabase.create()
+  try {
+    const holder = await lease(db)
+    await assert.rejects(db.saveState("aegis", initialChronology()), /atomic/)
+    const next = { ...initialChronology(), revision: 1 }
+    for (const ceremony of [{ shares: {}, at: { block: "1", index: 0, time: 0, members: [] } }, { shares: [] }, { shares: { r: ["x".repeat(70_000)] } }]) {
+      await assert.rejects(db.saveChronology(holder, 0, next, { bad: ceremony as never }, []), /invalid chronology batch/)
+    }
+    assert.equal(await db.state("aegis"), undefined)
+    assert.equal(await count(db), 0)
+  } finally { await db.close() }
 })
 
 test("archive write failure rolls back deletions and checkpoint, and the poller sends no false attendance alerts", async () => {
-  const db = new SqlDatabase(); await db.setup()
+  const db = await TestDatabase.create()
   try {
     const holder = await lease(db)
     const before = await persistChronologyBatch(db, holder, initialChronology(), [
       event(0, 0, { sid: "old", root: "winner", participant: signer, staker }),
     ], first, "before", now)
-    await db.rpc("lock_run", { holder, release: true })
-    await db.pg.exec("reset role")
-    await db.pg.exec(`create function reject_archive_write() returns trigger language plpgsql as $$
-      begin raise exception 'archive unavailable'; end $$;
-      create trigger reject_archive before insert or update on alerts_ceremonies for each row execute function reject_archive_write();`)
-    await db.pg.exec("set role service_role")
-    await db.rpc("subscribe", { owner_wallet: staker, signature: "test", link: "test", settings: {
-      triggers: ["missed", "participation"], missed: 1, participation: 100,
-      channel: { kind: "push", endpoint: "https://fcm.googleapis.com/test", keys: {} },
-    } })
+    await db.releaseRun(holder)
+    await db.query(`create trigger reject_archive before insert on alerts_ceremonies
+      begin select raise(abort, 'archive unavailable'); end`)
+    await db.subscribe(staker, "test", { triggers: ["missed", "participation"], missed: 1, participation: 100,
+      channel: { kind: "push", endpoint: "https://fcm.googleapis.com/test", keys: {} } }, "test")
     let sent = 0
     await poll(env, db, { ...adapters, telegramUpdates: async () => {},
       walletConditions: async () => ({ events: [], validators: [CONTRACTS.staking.address], failed: 0 }),
@@ -181,44 +175,41 @@ test("archive write failure rolls back deletions and checkpoint, and the poller 
     })
     assert.equal(sent, 0)
     assert.deepEqual(await checkpoint(db), before)
-    assert.equal((await db.pg.query("select * from alerts_ceremonies where sid='old'")).rows.length, 1)
-    assert.equal((await db.pg.query("select * from alerts_ceremonies where sid='new'")).rows.length, 0)
-    assert.equal((await db.request<{ ok: boolean }[]>("alerts_runs"))[0]!.ok, false)
-  } finally { await db.pg.close() }
+    assert.deepEqual(await sids(db), ["old"])
+    assert.equal((await db.latestRun())!.ok, false)
+  } finally { await db.close() }
 })
 
 test("incomplete recovery and stale owners or revisions cannot advance the checkpoint", async () => {
-  const db = new SqlDatabase(); await db.setup()
+  const db = await TestDatabase.create()
   try {
     const holder = await lease(db)
     const before = await persistChronologyBatch(db, holder, initialChronology(), [
       event(0, 0, { sid: "old", root: "winner", participant: signer }),
     ], first, "before", now)
     const events = [event(1, 0, { kind: "attested", sid: "old" })]
-    const original = db.rpc.bind(db)
-    db.rpc = async <T>(name: string, body: unknown): Promise<T> => name === "load_ceremonies" ? {} as T : original<T>(name, body)
+    const original = db.loadCeremonies.bind(db)
+    db.loadCeremonies = async () => ({})
     await assert.rejects(persistChronologyBatch(db, holder, before, events, first + 1n, "after", now), /Incomplete ceremony recovery/)
-    db.rpc = original
+    db.loadCeremonies = original
     await assert.rejects(persistChronologyBatch(db, holder, initialChronology(), events, first + 1n, "after", now), /revision/)
-    await db.pg.query("update alerts_lock set until_at=now()-interval '1 second'")
+    await db.query("update alerts_lock set until_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 second')")
     const successor = await lease(db)
     await assert.rejects(persistChronologyBatch(db, holder, before, events, first + 1n, "after", now), /lease/)
     assert.deepEqual(await checkpoint(db), before)
-    await assert.rejects(db.rpc("save_chronology", { holder, expected_revision: 1, state_value: { ...before, revision: 2 },
-      archive_writes: {}, archive_deletes: ["old"] }), /lease/)
+    await assert.rejects(db.saveChronology(holder, 1, { ...before, revision: 2 }, {}, ["old"]), /lease/)
+    // A cursor behind the stored checkpoint never commits.
+    await assert.rejects(db.saveChronology(successor, 1, { ...before, revision: 2, cursor: (first - 5n).toString() }, {}, []), /invalid chronology batch/)
     // Two writers with the same lease and snapshot still cannot commit twice.
     const outcomes = await Promise.allSettled([1, 2].map(() => persistChronologyBatch(db, successor, before, events, first + 1n, "after", now)))
     assert.equal(outcomes.filter(outcome => outcome.status === "fulfilled").length, 1)
     assert.equal((await checkpoint(db)).revision, 2)
-    await db.pg.exec("set role anon")
-    await assert.rejects(db.pg.query("select * from alerts_ceremonies"), /permission denied/)
-    await assert.rejects(db.rpc("load_ceremonies", { holder: successor, expected_revision: 2, sids: [] }), /permission denied/)
-    await assert.rejects(db.rpc("save_chronology", { holder: successor, expected_revision: 2, state_value: {}, archive_writes: {}, archive_deletes: [] }), /permission denied/)
-  } finally { await db.pg.close() }
+    assert.deepEqual(await db.query("select revision, cursor from alerts_chronology"), [{ revision: 2, cursor: Number(first + 1n) }])
+  } finally { await db.close() }
 })
 
 test("checkpoint failure and lease expiry during commit roll back every archive mutation", async () => {
-  const db = new SqlDatabase(); await db.setup()
+  const db = await TestDatabase.create()
   try {
     const holder = await lease(db)
     const before = await persistChronologyBatch(db, holder, initialChronology(), [
@@ -226,44 +217,22 @@ test("checkpoint failure and lease expiry during commit roll back every archive 
     ], first, "before", now)
     const events = [event(1, 0, { kind: "attested", sid: "old" }),
       event(1, 1, { sid: "new", root: "winner", participant: signer })]
-    await db.pg.exec("reset role")
-    await db.pg.exec(`create function reject_checkpoint() returns trigger language plpgsql as $$
-      begin raise exception 'checkpoint unavailable'; end $$;
-      create trigger reject_checkpoint before update on alerts_state for each row execute function reject_checkpoint();`)
-    await db.pg.exec("set role service_role")
-    await assert.rejects(persistChronologyBatch(db, holder, before, events, first + 1n, "after", now), /checkpoint unavailable/)
+    await db.query(`create trigger reject_checkpoint before insert on alerts_state
+      begin select raise(abort, 'checkpoint unavailable'); end`)
+    await assert.rejects(persistChronologyBatch(db, holder, before, events, first + 1n, "after", now), /Database operation failed/)
     assert.deepEqual(await checkpoint(db), before)
-    assert.deepEqual((await db.pg.query<{ sid: string }>("select sid from alerts_ceremonies")).rows, [{ sid: "old" }])
-    await db.pg.exec("reset role")
-    await db.pg.exec(`drop trigger reject_checkpoint on alerts_state;
-      create function expire_chronology_lease() returns trigger language plpgsql as $$
-      begin update alerts_lock set until_at=clock_timestamp()-interval '1 second'; return new; end $$;
-      create trigger expire_lease before insert on alerts_ceremonies for each row execute function expire_chronology_lease();`)
-    await db.pg.exec("set role service_role")
+    assert.deepEqual(await sids(db), ["old"])
+    await db.query("drop trigger reject_checkpoint")
+    await db.query(`create trigger expire_lease before insert on alerts_ceremonies
+      begin update alerts_lock set until_at = '2000-01-01T00:00:00.000Z'; end`)
     await assert.rejects(persistChronologyBatch(db, holder, before, events, first + 1n, "after", now), /lease lost/)
     assert.deepEqual(await checkpoint(db), before)
-    assert.deepEqual((await db.pg.query<{ sid: string }>("select sid from alerts_ceremonies")).rows, [{ sid: "old" }])
-  } finally { await db.pg.close() }
-})
-
-test("oversized archived ceremonies fail migration without losing legacy JSON", async () => {
-  const db = new SqlDatabase(); await db.setup(false)
-  try {
-    const before = initialChronology()
-    delete before.archiveVersion
-    delete before.revision
-    before.pending.large = { shares: { winner: Array.from({ length: 2000 }, () => signer) } }
-    await db.rpc("save_state", { state_key: "aegis", state_value: before })
-    await db.pg.exec("reset role")
-    await assert.rejects(db.pg.exec(await readFile(new URL("../migrations/002_ceremony_archive.sql", import.meta.url), "utf8")), /check constraint/)
-    await db.pg.exec("rollback; set role service_role")
-    assert.deepEqual(await checkpoint(db), before)
-    assert.equal((await db.pg.query<{ name: string | null }>("select to_regclass('public.alerts_ceremonies')::text as name")).rows[0]!.name, null)
-  } finally { await db.pg.close() }
+    assert.deepEqual(await sids(db), ["old"])
+  } finally { await db.close() }
 })
 
 test("counted SID tombstones survive pruning and restart without blocking later or delayed first attestations", async () => {
-  const db = new SqlDatabase(); await db.setup()
+  const db = await TestDatabase.create()
   try {
     const holder = await lease(db)
     let state = await persistChronologyBatch(db, holder, initialChronology(), [
@@ -290,8 +259,8 @@ test("counted SID tombstones survive pruning and restart without blocking later 
     assert.deepEqual(state.pending, {})
     assert.equal(memberCondition(state, staker, now)[0]!.participation, 100)
     assert.equal(memberCondition(state, staker, now)[0]!.misses, 0)
-    const rows = await db.pg.query<{ ceremony: { counted: boolean } }>("select ceremony from alerts_ceremonies")
-    assert.equal(rows.rows.length, 3)
-    assert.ok(rows.rows.every(row => row.ceremony.counted))
-  } finally { await db.pg.close() }
+    const rows = await db.query<{ ceremony: string }>("select ceremony from alerts_ceremonies")
+    assert.equal(rows.length, 3)
+    assert.ok(rows.every(row => (JSON.parse(row.ceremony) as { counted?: boolean }).counted))
+  } finally { await db.close() }
 })
