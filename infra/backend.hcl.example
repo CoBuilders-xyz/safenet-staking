@@ -1,0 +1,4 @@
+# Copy to backend.hcl (git-ignored) and run: terraform init -backend-config=backend.hcl
+# The R2 access key is not here: export AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.
+bucket    = "safenet-terraform-state"
+endpoints = { s3 = "https://<ACCOUNT_ID>.r2.cloudflarestorage.com" }

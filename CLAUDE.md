@@ -110,6 +110,8 @@ packages/snapshots          EXISTS   the daily snapshot of the validator dataset
 tools/                      EXISTS   edit hook, task guard, browser-safety check, metrics report
 docs/                       EXISTS   the manual QA fork guide, translations and operational runbook
 scripts/setup.sh            EXISTS   what `pnpm bootstrap` runs
+infra/                      EXISTS   Terraform for the Cloudflare zone, D1 and Workers custom domains;
+                                     DEPLOY.md has the order
 docker-compose.yml          EXISTS   local graph-node, postgres and ipfs
 graph-node.toml             EXISTS   graph-node config for two chains at once
 .github/workflows/          EXISTS   CI
@@ -169,6 +171,10 @@ snapshot, publication or index jobs call `page-on-red.yml`.
 `release.yml` runs on a tag `v*` or by hand: its `build` job receives no secret, builds from
 `apps/web/build.env`, packs `apps/web/release/app.car` and prints the CID; its `pin` job runs only
 from `main` or a `v*` tag, needs `PINATA_JWT` and `PINATA_GATEWAY`, and fails when they are empty.
+`workers-deploy.yml` runs only by hand, from `main`, through the protected `production`
+environment: it tests `apps/api` and `apps/alerts`, applies the alerts D1 migrations and deploys
+both Workers with `cf deploy`. Terraform in `infra/` is never run by CI. `DEPLOY.md` lists every
+input.
 `availability.yml` runs the `availability` script of `apps/web` every six hours, on demand, and
 on a pull request that changes the check or `deployments.json`; it writes the table to the job summary and drives the
 second badge in `README.md`. `deployments.json` at the repository root, documented in `README.md`,
