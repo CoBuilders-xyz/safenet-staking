@@ -44,6 +44,18 @@ in this tree does not establish that either service is live.
 
 See the [operational runbook](docs/RUNBOOK.md) for monitoring, incident triage, recovery and delivery evidence.
 
+## Safe App
+
+Use **`https://safenet.cobuilders.xyz`** as the Custom Safe App URL in [Safe{Wallet}](https://app.safe.global).
+Open your Ethereum Mainnet Safe, select Apps, then My custom apps, and add that URL.
+Open Safenet Staking and check that the header shows your Safe's address.
+
+The `eth.limo` gateway blocks the Safe iframe with CSP `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN`.
+App code cannot override these gateway response headers.
+Do not use `eth.limo` or a `dweb` CID URL for this setup; the earlier dweb URL failed Safe's app check.
+Vercel currently serves the custom app without these iframe restrictions.
+See the [Safe App guide](apps/web/README.md#safe-app) and [manual verification](apps/web/MANUAL_TESTING.md#safe-app).
+
 ## Setup
 
 Use the Node version in `.nvmrc` and pnpm.

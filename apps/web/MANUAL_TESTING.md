@@ -267,14 +267,30 @@ what it covers. These need a person:
 
 ## Safe App
 
-The Safe App entry point, the URL to add in Safe{Wallet}, is published with each release. A
-local `pnpm --filter @cobuilders/safenet-web dev` or `preview` server is configured to be framed
-by Safe{Wallet} as well: `vite.config.ts` sends the CORS, private-network and `frame-ancestors`
-headers for it.
+Use **`https://safenet.cobuilders.xyz`** as the Custom Safe App URL.
+Do not use `eth.limo` or a `dweb` CID URL for this setup.
+The `eth.limo` gateway sends CSP `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN`, which block Safe's iframe.
+App code cannot override these gateway response headers. The earlier dweb URL failed Safe's app check.
 
-- [ ] In Safe{Wallet}, on Ethereum, add the entry point as a custom Safe App. Safe{Wallet} reads
-      the manifest and shows the name, description and icon in `apps/web/public/manifest.json`.
-- [ ] Open the app from the Safe. It connects through the Safe connector by itself: no Connect
+Check the deployed headers with GET requests before testing in Safe:
+
+```sh
+curl -sS -D - -o /dev/null https://safenet.cobuilders.xyz/
+curl -sS -D - -o /dev/null https://safenet.cobuilders.xyz/manifest.json
+```
+
+Both must return HTTP 200. The manifest must permit cross-origin access from `https://app.safe.global`.
+Vercel currently sends `Access-Control-Allow-Origin: *` and no `frame-ancestors` or `X-Frame-Options` response headers.
+Keep those responses compatible with Safe; do not add a CSP that excludes `https://app.safe.global` as a frame ancestor.
+
+A local `pnpm --filter @cobuilders/safenet-web dev` or `preview` server also permits framing by Safe.
+Its CORS, private-network and `frame-ancestors` headers come from `vite.config.ts`, which does not control deployed gateway headers.
+
+- [ ] Open [Safe{Wallet}](https://app.safe.global) and select your Ethereum Mainnet Safe.
+- [ ] Select Apps → My custom apps → Add custom app. Enter `https://safenet.cobuilders.xyz` and complete Safe's acknowledgement.
+      Safe reads the manifest and shows the name, description and icon in `apps/web/public/manifest.json`.
+- [ ] Open Safenet Staking. The iframe renders without "refused to connect" or a frame-policy error in the browser console.
+- [ ] It connects through the Safe connector by itself: no Connect
       Wallet button, no connector menu, and the header shows the Safe's address.
 - [ ] Public data renders inside the iframe, as outside it.
 - [ ] Delegate with an allowance below the amount. A Safe that supports atomic batching proposes
