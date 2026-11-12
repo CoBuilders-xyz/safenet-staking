@@ -180,11 +180,15 @@ test("failed delivery retries after its lease; concurrent claims and expired rec
   } finally { await db.close() }
 })
 
-test("an expired endpoint disables its subscription", async () => {
+test("an expired endpoint disables its subscription, and an older receipt does not reactivate it", async () => {
   const db = await TestDatabase.create()
   try {
     const sub = await db.subscribe(account.address, "sig", telegram, "link")
-    assert.equal(await sendEvent(db, env, sub, "cooldown:1", "ready", async () => "expired"), "expired")
+    let receipt = ""
+    await sendEvent(db, env, sub, "cooldown:1", "ready", async (_env, _sub, payload) => { receipt = payload.ack; return "accepted" })
+    assert.equal(await sendEvent(db, env, sub, "cooldown:2", "ready", async () => "expired"), "expired")
+    assert.equal((await row(db, sub.id))!.status, "expired")
+    assert.equal(await db.acknowledge(await digest(receipt)), true) // The delivery is still marked received.
     assert.equal((await row(db, sub.id))!.status, "expired")
     assert.deepEqual(await db.activeSubscriptions("", 50), [])
   } finally { await db.close() }

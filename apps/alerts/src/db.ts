@@ -166,14 +166,17 @@ export class Database {
   async expireSubscription(id: string) {
     await this.run("update alerts_subscriptions set status = 'expired' where id = ?", id)
   }
-  /** Records receipt once. With `chat`, only the subscription's linked Telegram chat can confirm it. */
+  /**
+   * Records receipt once. With `chat`, only the subscription's linked Telegram chat can confirm it.
+   * A receipt for an older delivery never reactivates an expired subscription.
+   */
   async acknowledge(ackHash: string, chat?: string): Promise<boolean> {
     const now = iso(Date.now())
     const match = `ack_hash = ?1 and ack_expires > ?2 and state in ('sending', 'accepted')
       and (?3 is null or subscription in (select id from alerts_subscriptions where telegram_chat = ?3))`
     const [, received] = await this.batch([
       this.sql(`update alerts_subscriptions set status = 'verified', last_delivery = ?2
-        where id in (select subscription from alerts_deliveries where ${match})`, ackHash, now, chat ?? null),
+        where status != 'expired' and id in (select subscription from alerts_deliveries where ${match})`, ackHash, now, chat ?? null),
       this.sql(`update alerts_deliveries set state = 'received', updated_at = ?2 where ${match}`, ackHash, now, chat ?? null),
     ])
     return received!.meta.changes > 0
