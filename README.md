@@ -76,6 +76,18 @@ Every package implements the same five. Turborepo fans them out.
 `pnpm fork:up` starts the manual QA fork for Claim & Stake, the interface on an Anvil fork of
 Mainnet with a funded test account: [docs/manual-qa-fork.md](docs/manual-qa-fork.md).
 
+## CLI wallets
+
+Install `@cobuilders/safenet-cli`; run the `safenet` executable.
+For WalletConnect, pass `--walletconnect --wallet-account <address>` in an interactive terminal.
+Type `connect` to display the pairing QR and URI on stderr. Keep both private.
+The built-in project ID is `f35bb4d915df109f8006841b674b5604`; `WALLETCONNECT_PROJECT_ID` optionally overrides it.
+
+**The wallet signs and broadcasts through its own RPC.** The CLI validates the returned hash and polls receipts.
+It verifies the mined call before confirming a step or continuing. Failed verification stops subsequent steps.
+Cancellation or timeout cannot stop a pending wallet request. Check wallet activity before retrying.
+See [CLI signing](packages/cli/README.md#signing) for details.
+
 ## MCP server
 
 `packages/mcp` is `safenet-mcp`, an MCP server over stdio that gives an AI client the reads of

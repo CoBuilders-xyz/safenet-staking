@@ -1,7 +1,7 @@
-/** WalletConnect only signs; the selected RPC broadcasts verified bytes. No session reaches disk. */
+/** WalletConnect wallets sign and broadcast. The selected RPC polls receipts. Sessions stay in memory. */
 import {
-  decodeFunctionData, getAddress, keccak256, maxUint256, numberToHex, parseTransaction, recoverTransactionAddress,
-  type Address, type Hex, type TransactionSerializable, type TransactionSerialized,
+  decodeFunctionData, getAddress, maxUint256, numberToHex,
+  type Address, type Hash, type TransactionSerializable,
 } from "viem"
 import { CHAINS, CONTRACTS, erc20Abi, stakingAbi, merkleDropAbi } from "@cobuilders/safenet-core"
 import { SafenetError, type Context, type Signer, type TransactionToSend } from "../lib/index.js"
@@ -12,7 +12,7 @@ const TIMEOUT = 120_000
 
 type Session = { topic: string; namespaces: Record<string, { accounts: string[]; methods: string[] }> }
 
-/** A narrow transport boundary. Tests replace this, never the transaction verification. */
+/** A narrow transport boundary. Tests replace this to exercise wallet responses. */
 export interface WalletBridge {
   connect(): Promise<{ uri?: string; approval(): Promise<Session> }>
   request(topic: string, transaction: Record<string, string>): Promise<unknown>
@@ -57,7 +57,7 @@ export async function createWalletBridge(projectId: string, signal?: AbortSignal
     // SDK's Core allows relayUrl=undefined; its ICore declaration omits that optional value.
     core: core as NonNullable<NonNullable<Parameters<typeof SignClient.init>[0]>["core"]>, logger: "silent",
     metadata: {
-      name: "Safenet CLI", description: "Review and sign Safenet transactions",
+      name: "Safenet CLI", description: "Review and send Safenet transactions",
       url: "https://github.com/CoBuilders-xyz/safenet-staking", icons: [],
     },
   })
@@ -75,10 +75,10 @@ export async function createWalletBridge(projectId: string, signal?: AbortSignal
   finally { clearTimeout(timer); signal?.removeEventListener("abort", cancel) }
   return {
     connect: () => client.connect({ requiredNamespaces: {
-      eip155: { chains: [NAMESPACE], methods: ["eth_signTransaction"], events: ["accountsChanged", "chainChanged"] },
+      eip155: { chains: [NAMESPACE], methods: ["eth_sendTransaction"], events: ["accountsChanged", "chainChanged"] },
     } }),
     request: (topic, transaction) => client.request({
-      topic, chainId: NAMESPACE, request: { method: "eth_signTransaction", params: [transaction] },
+      topic, chainId: NAMESPACE, request: { method: "eth_sendTransaction", params: [transaction] },
     }),
     onChange(listener) {
       // Any session mutation requires a fresh invocation, including a change back to the original account.
@@ -107,7 +107,7 @@ export async function createWalletBridge(projectId: string, signal?: AbortSignal
 }
 
 function review(tx: TransactionToSend, from: Address, request: TransactionSerializable): string {
-  // ABIs and destinations come only from core. Unknown targets fail before a signature is requested.
+  // ABIs and destinations come only from core. Unknown targets fail before a transaction is requested.
   const contracts = [
     { address: CONTRACTS.safeToken.address, abi: erc20Abi, name: "SAFE token" },
     { address: CONTRACTS.staking.address, abi: stakingAbi, name: "Staking" },
@@ -129,12 +129,14 @@ function review(tx: TransactionToSend, from: Address, request: TransactionSerial
   }, (_, value: unknown) => typeof value === "bigint" ? value.toString() : value, 2)
 }
 
+/** Review each wallet request and verify its mined call before the runner can confirm or continue. */
 export async function walletConnectSigner(
   ctx: Context, expected: Address, bridge: WalletBridge, interaction: WalletInteraction,
 ): Promise<Signer> {
   const controller = new AbortController()
   let invalid = false
   let closed = false
+  let requestNonceFloor: number | undefined
   const pending = new Set<() => void>()
   const invalidate = () => { invalid = true; controller.abort(); for (const reject of pending) reject() }
   const off = bridge.onChange(invalidate)
@@ -179,12 +181,29 @@ export async function walletConnectSigner(
     await bounded(() => interaction.showUri(connection.uri!, controller.signal), "pairing")
     const session = await bounded(() => connection.approval(), "approval")
     const namespace = session.namespaces.eip155 ?? session.namespaces[NAMESPACE]
-    if (!namespace?.methods.includes("eth_signTransaction") ||
+    if (!namespace?.methods.includes("eth_sendTransaction") ||
       !namespace.accounts.some((a) => a.toLowerCase() === `${NAMESPACE}:${expected}`.toLowerCase())) {
-      throw new SafenetError("Wallet must approve the requested Mainnet account and eth_signTransaction; this wallet may be unsupported")
+      throw new SafenetError("Wallet must approve the requested Mainnet account and eth_sendTransaction; this wallet may be unsupported")
     }
     return {
       address: getAddress(expected), close,
+      async verifyConfirmedTransaction(tx, receipt) {
+        try {
+          const mined = await bounded(() => ctx.client.getTransaction({ hash: receipt.transactionHash }), "confirmed transaction lookup")
+          if (requestNonceFloor === undefined || !Number.isSafeInteger(mined.nonce) || mined.nonce < requestNonceFloor ||
+            mined.hash?.toLowerCase() !== receipt.transactionHash.toLowerCase() ||
+            !mined.blockHash || mined.blockHash.toLowerCase() !== receipt.blockHash.toLowerCase() ||
+            mined.from?.toLowerCase() !== expected.toLowerCase() || mined.to?.toLowerCase() !== tx.to.toLowerCase() ||
+            mined.input?.toLowerCase() !== tx.data.toLowerCase() || mined.value !== 0n) {
+            throw new Error("Confirmed transaction does not match the reviewed call")
+          }
+          requestNonceFloor = undefined
+        } catch {
+          invalidate()
+          throw new SafenetError(`Wallet transaction ${receipt.transactionHash} could not be verified against the reviewed call; ` +
+            "the wallet may already have broadcast; no further steps were sent; check wallet activity before retrying")
+        }
+      },
       async send(tx) {
         if (await bounded(() => ctx.client.getChainId(), "RPC check") !== CHAIN) {
           throw new SafenetError("The RPC chain changed; nothing was signed")
@@ -196,7 +215,7 @@ export async function walletConnectSigner(
           throw new SafenetError("The RPC prepared an unsupported transaction type; nothing was signed")
         }
         // eth_fillTransaction can include an effective gasPrice alongside EIP-1559 fee caps.
-        // Only the fees encoded by the selected transaction type belong in review and signing.
+        // Only the fees for the selected transaction type belong in review and the wallet request.
         const request = {
           ...prepared,
           gasPrice: prepared.type === "legacy" ? prepared.gasPrice : undefined,
@@ -217,37 +236,29 @@ export async function walletConnectSigner(
           const value = request[key]
           if (value != null) wire[key] = numberToHex(value)
         }
-        const raw = await bounded(() => bridge.request(session.topic, wire), "signature")
+        // Reject hashes for already-mined account nonces, including earlier calls in the same block.
+        // This is a lower bound, not a requirement to use the prepared nonce; replacements remain valid.
+        const nonceFloor = await bounded(() => ctx.client.getTransactionCount({
+          address: expected, blockTag: "latest",
+        }), "request nonce check")
+        if (!Number.isSafeInteger(nonceFloor) || nonceFloor < 0) {
+          throw new SafenetError("The RPC returned an invalid account nonce; nothing was sent to the wallet")
+        }
+        requestNonceFloor = nonceFloor
+        let hash: unknown
         try {
-          if (typeof raw !== "string" || !/^0x[0-9a-f]+$/i.test(raw)) throw new Error()
-          const signed = parseTransaction(raw as Hex)
-          const signer = await recoverTransactionAddress({ serializedTransaction: raw as TransactionSerialized })
-          const expectedFields = {
-            chainId: CHAIN, data: tx.data, gas: tx.gas, nonce: request.nonce,
-            gasPrice: request.gasPrice ?? undefined, maxFeePerGas: request.maxFeePerGas ?? undefined,
-            maxPriorityFeePerGas: request.maxPriorityFeePerGas ?? undefined, type: request.type,
-          }
-          if (signer.toLowerCase() !== expected.toLowerCase() || signed.to?.toLowerCase() !== tx.to.toLowerCase() ||
-            (signed.accessList?.length ?? 0) !== 0 || (signed.value ?? 0n) !== 0n) throw new Error()
-          for (const [key, value] of Object.entries(expectedFields)) {
-            const actual = (signed as Record<string, unknown>)[key]
-            // RLP encodes zero as empty; viem omits zero-valued fee fields when parsing it.
-            if ((typeof value === "bigint" ? actual ?? 0n : actual) !== value) {
-              throw new SafenetError(`Wallet returned a different signed ${key}; nothing was broadcast`)
-            }
-          }
+          // The wallet owns broadcast. A timeout or disconnect cannot revoke its pending request.
+          hash = await bounded(() => bridge.request(session.topic, wire), "transaction request")
         } catch (err) {
-          if (err instanceof SafenetError) throw err
-          throw new SafenetError("Wallet returned a different or invalid signed transaction; nothing was broadcast")
+          invalidate()
+          const message = err instanceof SafenetError ? err.message : "Wallet transaction request failed"
+          throw new SafenetError(`${message}; the wallet may have broadcast; check wallet activity before retrying`)
         }
-        if (invalid || interaction.signal?.aborted) throw new SafenetError("Wallet changed or disconnected; nothing was broadcast")
-        const hash = keccak256(raw as Hex)
-        try {
-          // The wallet never broadcasts. A timeout before this point cannot submit a late signature.
-          return await ctx.client.sendRawTransaction({ serializedTransaction: raw as Hex })
-        } catch {
-          throw new SafenetError(`Broadcast of ${hash} failed; it may still confirm; inspect the hash before retrying`)
+        if (typeof hash !== "string" || !/^0x[0-9a-f]{64}$/i.test(hash)) {
+          invalidate()
+          throw new SafenetError("Wallet returned an invalid transaction hash; it may have broadcast; check wallet activity before retrying")
         }
+        return hash as Hash
       },
     }
   } catch (err) { await close(); throw err }

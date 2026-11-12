@@ -34,6 +34,7 @@ test("the binary's bundle runs reads and dry runs without workspace dependencies
     const inputs = Object.keys(metadata.inputs).join("\n")
     assert.match(inputs, /@walletconnect\/sign-client/)
     assert.match(inputs, /@walletconnect\/core/)
+    assert.match(inputs, /qrcode/)
     assert.doesNotMatch(source, /require\(["'](?:bufferutil|utf-8-validate)["']\)/)
     await smokeBinary(copy, process.execPath)
   } finally {

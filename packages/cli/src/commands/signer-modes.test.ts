@@ -2,7 +2,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { mnemonicToAccount } from "viem/accounts"
 import { parseOptions, writeSchema } from "./options.js"
-import { loadSigner } from "./signer.js"
+import { DEFAULT_WALLETCONNECT_PROJECT_ID, loadSigner, walletConnectProjectId } from "./signer.js"
 import { errorSentence, scrubUsage, run } from "../cli.js"
 import { fakeRuntime, type FakeOptions, TEST_MNEMONIC, VALIDATOR_A, STAKER } from "../test-support.js"
 import type { Context } from "../lib/index.js"
@@ -64,4 +64,14 @@ test("pairing URIs are removed from ordinary and verbose error redaction", () =>
   const uri = "wc:unit-test-topic@2?relay-protocol=irn&symKey=unit-test-only"
   assert.ok(!scrubUsage(`bad argument ${uri}`).includes("unit-test"))
   assert.ok(!errorSentence(new Error(`failed ${uri}`)).includes("unit-test"))
+})
+
+test("WalletConnect uses the built-in project ID unless a valid override is supplied", () => {
+  assert.equal(DEFAULT_WALLETCONNECT_PROJECT_ID, "f35bb4d915df109f8006841b674b5604")
+  assert.equal(walletConnectProjectId(), DEFAULT_WALLETCONNECT_PROJECT_ID)
+  const override = "aB".repeat(16)
+  assert.equal(walletConnectProjectId(override), override)
+  for (const invalid of ["", " ", "x".repeat(32), "a".repeat(31), "a".repeat(33)]) {
+    assert.throws(() => walletConnectProjectId(invalid), /valid project ID/)
+  }
 })
