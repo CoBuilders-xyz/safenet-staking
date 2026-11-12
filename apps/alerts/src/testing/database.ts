@@ -1,56 +1,39 @@
-import { PGlite } from "@electric-sql/pglite"
+import { readdir, readFile } from "node:fs/promises"
 import { URL } from "node:url"
-import { readFile } from "node:fs/promises"
+import { Miniflare, convertV4MiniflareOptions } from "miniflare"
 import { Database } from "../db.js"
 
-const identifier = (s: string) => {
-  if (!/^[a-z_]+$/.test(s)) throw new Error("Invalid test SQL identifier")
-  return `"${s}"`
-}
-const parameter = (v: unknown) => v !== null && typeof v === "object" ? JSON.stringify(v) : v
-/** Test-only PostgREST facade over real PostgreSQL semantics; no mock of the migration functions. */
-export class SqlDatabase extends Database {
-  readonly pg = new PGlite()
-  constructor() { super({ SUPABASE_URL: "https://unused.test", SUPABASE_SERVICE_KEY: "unused" }) }
-  async setup(archive = true) {
-    await this.pg.exec("create role anon; create role authenticated; create role service_role bypassrls;")
-    await this.pg.exec(await readFile(new URL("../../migrations/001_alerts.sql", import.meta.url), "utf8"))
-    if (archive) await this.pg.exec(await readFile(new URL("../../migrations/002_ceremony_archive.sql", import.meta.url), "utf8"))
-    await this.pg.exec("set role service_role")
-  }
-  override async request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
-    const url = new URL(path, "https://unused.test/")
-    const data = (body ?? {}) as Record<string, unknown>
-    const params: unknown[] = []
-    const bind = (value: unknown) => { params.push(parameter(value)); return `$${params.length}` }
-    if (url.pathname.startsWith("/rpc/")) {
-      const name = url.pathname.slice(5)
-      const query = `select * from ${identifier(name)}(${Object.entries(data).map(([k, v]) => `${identifier(k)} => ${bind(k === "state_value" && typeof v === "string" ? JSON.stringify(v) : v)}`).join(",")})`
-      const { rows } = await this.pg.query<Record<string, unknown>>(query, params)
-      return (["alerts_subscribe", "alerts_issue_challenge"].includes(name) ? rows : rows[0]?.[name]) as T
-    }
-    const table = identifier(url.pathname.slice(1))
-    let query: string
-    if (method === "POST") query = `insert into ${table} (${Object.keys(data).map(identifier).join(",")}) values (${Object.values(data).map(bind).join(",")})`
-    else if (method === "PATCH") query = `update ${table} set ${Object.entries(data).map(([k, v]) => `${identifier(k)}=${bind(v)}`).join(",")}`
-    else if (method === "DELETE") query = `delete from ${table}`
-    else query = `select * from ${table}`
-    if (method !== "POST") {
-      const where: string[] = []
-      for (const [key, value] of url.searchParams) {
-        if (["limit", "order"].includes(key)) continue
-        const dot = value.indexOf(".")
-        const op = { eq: "=", neq: "!=", gt: ">" }[value.slice(0, dot)]
-        if (!op) throw new Error("Unsupported test operator")
-        where.push(`${identifier(key)} ${op} ${bind(value.slice(dot + 1))}`)
-      }
-      if (where.length) query += ` where ${where.join(" and ")}`
-    }
-    if (method === "GET") {
-      const order = url.searchParams.get("order")
-      if (order) query += ` order by ${identifier(order.split(".")[0]!)} ${order.endsWith(".desc") ? "desc" : "asc"}`
-      if (url.searchParams.has("limit")) query += ` limit ${bind(Number(url.searchParams.get("limit")))}`
-    } else query += " returning *"
-    return (await this.pg.query(query, params)).rows as T
+const migrations = new URL("../../migrations/", import.meta.url)
+
+/** Applies every migration in file order, each in one batch, as `cf d1 migrations apply` does. */
+export async function applyMigrations(d1: D1Database) {
+  for (const file of (await readdir(migrations)).filter(name => name.endsWith(".sql")).sort()) {
+    const statements = (await readFile(new URL(file, migrations), "utf8")).replace(/^\s*--.*$/gm, "")
+      .split(/;\s*$/m).map(statement => statement.trim()).filter(Boolean)
+    await d1.batch(statements.map(statement => d1.prepare(statement)))
   }
 }
+
+/** For tests whose code path never reaches the database. */
+export const noDatabase = new Proxy({}, { get() { throw new Error("This test must not use the database") } }) as D1Database
+
+/** A fresh D1 database in workerd, through Miniflare: real D1 semantics, no mock of the queries. */
+export class TestDatabase extends Database {
+  private constructor(d1: D1Database, private readonly runtime: Miniflare) { super(d1) }
+  static async create() {
+    const runtime = new Miniflare(convertV4MiniflareOptions({
+      modules: true, script: "export default {}", d1Databases: { DB: crypto.randomUUID() },
+    }))
+    const d1 = await runtime.getD1Database("DB") as unknown as D1Database
+    await applyMigrations(d1)
+    return new TestDatabase(d1, runtime)
+  }
+  /** Raw SQL for test setup and inspection. */
+  async query<T = Record<string, unknown>>(sql: string, ...values: unknown[]): Promise<T[]> {
+    return (await this.d1.prepare(sql).bind(...values).all<T>()).results
+  }
+  close() { return this.runtime.dispose() }
+}
+
+/** An ISO timestamp `ms` milliseconds from now, in the database's format. */
+export const at = (ms: number) => new Date(Date.now() + ms).toISOString()

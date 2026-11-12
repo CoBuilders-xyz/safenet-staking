@@ -8,7 +8,7 @@ Never put credentials, wallet-to-chat mappings or push subscription endpoints in
 ## Assign before delivery
 
 The release owner must assign a primary operator and backup for each service: web/IPFS/ENS,
-Mainnet and Gnosis indexing, REST API, Alerts/Supabase, npm/binaries and incident response.
+Mainnet and Gnosis indexing, REST API, Alerts/D1, npm/binaries and incident response.
 Record notification routing, support hours, escalation contacts, billing, renewal dates and the
 approved evidence-retention location. These are operator decisions, not repository defaults.
 
@@ -23,7 +23,7 @@ optional endpoint do not establish coverage of every required list or jurisdicti
 | --- | --- | --- |
 | Web | `apps/web`; release CAR/CID; browser smoke and accessibility reports | Public RPCs, SEF data, subgraphs, approved wallet integrations |
 | Validator API | [API README](../apps/api/README.md); six routes; freshness headers; `/v1/health` | Worker account, GitHub token, production subgraph capacity, rate limits |
-| Alerts | [Alerts README](../apps/alerts/README.md); `/health`; aggregate `alerts_runs` | Paid Worker plan, Supabase migrations/secrets, Telegram, VAPID and approved recipients |
+| Alerts | [Alerts README](../apps/alerts/README.md); `/health`; aggregate `alerts_runs` | Paid Worker plan, D1 migrations/secrets, Telegram, VAPID and approved recipients |
 | Daily snapshots | [Snapshot README](../packages/snapshots/README.md); dated index on `snapshots` branch | Archive RPC, Pinata credentials and healthy gateways |
 | CLI/MCP | [CLI](../packages/cli/README.md), [MCP](../packages/mcp/README.md), installed-package and binary checks | RPC; user-controlled signer for writes; npm publication permissions |
 | Indexers | [Mainnet](../packages/subgraph-mainnet/CLAUDE.md), [Gnosis](../packages/subgraph-gnosis/CLAUDE.md) | Studio or Graph Network publication and gateway access |
@@ -78,7 +78,7 @@ Keep snapshot input, index input and publication output in distinct directories.
 
 - Web: preserve the prior release CID and deployment record. Verify its assets first. Changing ENS contenthash requires the owner's explicit signature.
 - API/Alerts: retain the last reviewed Worker artifact and configuration inventory. Roll back only through the approved deployment account. Check database compatibility first.
-- Supabase: test backup restoration in an isolated environment. Restore schema and retention policies as well as data. Never put production subscription data into public QA fixtures.
+- D1: test a Time Travel restore in an isolated environment. Restore schema and retention policies as well as data. Never put production subscription data into public QA fixtures.
 - Subgraphs: retain deployment IDs and schema versions. Switching a production gateway requires parity checks and an approved configuration change.
 - npm: published versions are immutable. Prefer a corrected version and approved dist-tag change; do not assume a local git revert retracts a published package.
 

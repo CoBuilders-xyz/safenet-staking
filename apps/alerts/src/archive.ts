@@ -1,7 +1,7 @@
-import { foldArchivedBatch, type Ceremony, type Chronology, type RoundEvent } from "./chronology.js"
+import { foldArchivedBatch, type Chronology, type RoundEvent } from "./chronology.js"
 import type { Database } from "./db.js"
 
-// Match migration 002. Bound transfers as well as ceremony counts.
+// Match db.ts and migration 0002. Bound transfers as well as ceremony counts.
 export const CHRONOLOGY_BATCH_EVENTS = 1000
 const MAX_TRANSFER_BYTES = 8 * 1024 * 1024
 const MAX_CEREMONY_BYTES = 64 * 1024
@@ -15,10 +15,8 @@ export async function persistChronologyBatch(db: Database, holder: string, previ
   if (previous.archiveVersion !== 1) throw new Error("Chronology archive migration required")
   if (events.length > CHRONOLOGY_BATCH_EVENTS) throw new Error("Chronology event batch exceeds capacity")
   const sids = [...new Set(events.flatMap(event => event.sid ? [event.sid] : []))]
-  const recovered = await db.rpc<Record<string, Ceremony | null> | null>("load_ceremonies", {
-    holder, expected_revision: previous.revision ?? 0, sids,
-  })
-  // SQL returns null for a bounded read that exceeds its transfer budget; it changes no state.
+  const recovered = await db.loadCeremonies(holder, previous.revision ?? 0, sids)
+  // The read returns null when it exceeds its transfer budget; it changes no state.
   if (recovered === null) throw new ChronologyRangeCapacity("Ceremony recovery exceeds capacity")
   // A missing response entry is different from an explicit SQL NULL for a new SID.
   if (!recovered || Object.keys(recovered).length !== sids.length || sids.some(sid => !Object.hasOwn(recovered, sid))) {
@@ -57,9 +55,7 @@ export async function persistChronologyBatch(db: Database, holder: string, previ
   }
   // Delete recovered rows only when they move into the ordered pending queue. Counted SIDs retain tombstones.
   const deletes = sids.filter(sid => recovered[sid] !== null && !writes[sid])
-  const saved = await db.rpc<number>("save_chronology", {
-    holder, expected_revision: previous.revision ?? 0, state_value: state, archive_writes: writes, archive_deletes: deletes,
-  })
+  const saved = await db.saveChronology(holder, previous.revision ?? 0, state, writes, deletes)
   if (saved !== state.revision) throw new Error("Chronology commit not confirmed")
   return state
 }

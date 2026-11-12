@@ -2,26 +2,25 @@ import { Database } from "./db.js"
 import { initialChronology, memberCondition, type Chronology } from "./chronology.js"
 import { advanceChronology, walletConditions, type Condition } from "./sources.js"
 import { sendEvent, telegramUpdates } from "./delivery.js"
-import type { Env, Subscription } from "./types.js"
+import type { Env } from "./types.js"
 
 export const adapters = { advanceChronology, walletConditions, sendEvent, telegramUpdates }
-export async function poll(env: Env, db = new Database(env), io = adapters) {
+export async function poll(env: Env, db = new Database(env.DB), io = adapters) {
   const holder = crypto.randomUUID()
-  if (!await db.rpc<boolean>("lock_run", { holder })) return
+  if (!await db.lockRun(holder)) return
   const started = new Date().toISOString()
   const deadline = Date.now() + 10 * 60_000
   let evaluated = 0, accepted = 0, failed = 0
   try {
-    await db.request("alerts_runs", "POST", { started_at: started })
+    await db.startRun(started)
     // A Telegram outage must not prevent delivery to already subscribed browsers.
     // Keep the run unhealthy so the failed linking/receipt poll remains visible.
     try { await io.telegramUpdates(db, env) } catch { failed++ }
     let chronology: Awaited<ReturnType<typeof advanceChronology>> | undefined
     let chronologyFailed = false
-    const savedCursor = await db.request<{ value: string }[]>("alerts_state?key=eq.subscription_cursor")
-    let cursor = savedCursor[0]?.value ?? ""
+    let cursor = await db.state<string>("subscription_cursor") ?? ""
     for (;;) {
-      const subscriptions = await db.request<Subscription[]>(`alerts_subscriptions?status=neq.expired&order=id.asc&limit=50${cursor ? `&id=gt.${cursor}` : ""}`)
+      const subscriptions = await db.activeSubscriptions(cursor, 50)
       for (const sub of subscriptions) {
         if (sub.channel.kind === "telegram" && !sub.telegram_chat) continue
         evaluated++
@@ -39,8 +38,8 @@ export async function poll(env: Env, db = new Database(env), io = adapters) {
             if (chronologyFailed) throw new Error("Aegis chronology unavailable")
             if (!chronology) {
               try {
-                const rows = await db.request<{ value: Chronology }[]>("alerts_state?key=eq.aegis")
-                chronology = await io.advanceChronology(env, rows[0]?.value ?? initialChronology(), db, holder)
+                const saved = await db.state<Chronology>("aegis")
+                chronology = await io.advanceChronology(env, saved ?? initialChronology(), db, holder)
               } catch (error) { chronologyFailed = true; throw error }
             }
             if (!chronology.current) failed++
@@ -68,20 +67,20 @@ export async function poll(env: Env, db = new Database(env), io = adapters) {
         if (Date.now() > deadline) break
       }
       if (Date.now() > deadline) {
-        await db.rpc("save_state", { state_key: "subscription_cursor", state_value: cursor })
+        await db.saveState("subscription_cursor", cursor)
         break
       }
       if (subscriptions.length < 50) {
-        await db.rpc("save_state", { state_key: "subscription_cursor", state_value: "" })
+        await db.saveState("subscription_cursor", "")
         break
       }
       cursor = subscriptions.at(-1)!.id
     }
-    await db.rpc("cleanup", {})
-    await db.request(`alerts_runs?started_at=eq.${encodeURIComponent(started)}`, "PATCH", { completed_at: new Date().toISOString(), ok: failed === 0, evaluated, accepted, failed })
+    await db.cleanup()
+    await db.finishRun(started, { ok: failed === 0, evaluated, accepted, failed })
     // Aggregate-only logs: no wallets, endpoints, signatures, chat IDs or upstream errors.
     console.log(JSON.stringify({ event: "alerts_poll", evaluated, accepted, failed }))
   } finally {
-    await db.rpc("lock_run", { holder, release: true })
+    await db.releaseRun(holder)
   }
 }

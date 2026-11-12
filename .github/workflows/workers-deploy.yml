@@ -1,0 +1,122 @@
+name: Workers deploy
+
+# Deploys the REST API (apps/api) and the alerts Worker (apps/alerts) to Cloudflare with `cf`, from
+# the configs in each package. Alerts first applies its D1 migrations. Runs only by hand, only from
+# main, and only through the `production` environment, whose protection rules gate every run.
+# Pull requests never reach this workflow. DEPLOY.md lists every secret and variable it reads.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which Worker to deploy.
+        type: choice
+        options: [both, api, alerts]
+        default: both
+
+concurrency:
+  group: workers-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+  CF_SEND_TELEMETRY: "false"
+
+jobs:
+  deploy:
+    name: deploy ${{ inputs.target }}
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      # Pin actions to full SHA: mutable tags can be moved to malicious code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          # No dependency cache: a cache written by another workflow could feed a deployed Worker.
+          package-manager-cache: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Require the Cloudflare credentials
+        run: |
+          missing=""
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then echo "::error::Missing secrets:$missing"; exit 1; fi
+
+      # The API reads public subgraph and SEF endpoints from core. Its optional GITHUB_TOKEN raises
+      # GitHub's rate limit for SEF's data: a GitHub token with no scope, not this workflow's token.
+      - name: Check and test the API
+        if: inputs.target != 'alerts'
+        run: pnpm --filter @cobuilders/safenet-api check && pnpm --filter @cobuilders/safenet-api test
+      - name: Deploy the API
+        if: inputs.target != 'alerts'
+        working-directory: apps/api
+        env:
+          SAFENET_API_GITHUB_TOKEN: ${{ secrets.SAFENET_API_GITHUB_TOKEN }}
+        run: |
+          secrets="$RUNNER_TEMP/api-secrets.json"
+          trap 'rm -f "$secrets"' EXIT
+          umask 077
+          node -e '
+            const out = {}
+            if (process.env.SAFENET_API_GITHUB_TOKEN) out.GITHUB_TOKEN = process.env.SAFENET_API_GITHUB_TOKEN
+            else console.log("::warning::SAFENET_API_GITHUB_TOKEN is not set. The API reads SEF data from GitHub unauthenticated: 60 requests per hour.")
+            require("node:fs").writeFileSync(process.argv[1], JSON.stringify(out))
+          ' "$secrets"
+          pnpm exec cf deploy --secrets-file "$secrets" --message "safenet-api ${GITHUB_SHA::12}"
+
+      - name: Check and test alerts
+        if: inputs.target != 'api'
+        run: pnpm --filter @cobuilders/safenet-alerts check && pnpm --filter @cobuilders/safenet-alerts test
+      # Migrations run before the new Worker version: the code may need the new schema. D1 records
+      # applied files in d1_migrations, so a rerun applies nothing twice.
+      - name: Apply the alerts D1 migrations
+        if: inputs.target != 'api'
+        working-directory: apps/alerts
+        env:
+          ALERTS_D1_DATABASE_ID: ${{ vars.ALERTS_D1_DATABASE_ID }}
+        run: |
+          if [ -z "$ALERTS_D1_DATABASE_ID" ]; then echo "::error::Set the production variable ALERTS_D1_DATABASE_ID to the ID that 'cf d1 create' printed (DEPLOY.md)"; exit 1; fi
+          pnpm exec cf d1 migrations apply "$ALERTS_D1_DATABASE_ID"
+      # Secrets go in a JSON file, which cf uploads with the version. JSON, not dotenv: cf expands
+      # $VAR inside dotenv values, which would alter a secret that contains a dollar sign.
+      - name: Deploy alerts
+        if: inputs.target != 'api'
+        working-directory: apps/alerts
+        env:
+          ALERTS_D1_DATABASE_ID: ${{ vars.ALERTS_D1_DATABASE_ID }}
+          # Public, so committed. safenet.cobuilders.xyz is also the Safe App origin: Safe{Wallet}
+          # loads the app in an iframe from that origin, so the app's requests carry it.
+          APP_ORIGINS: ${{ vars.ALERTS_APP_ORIGINS || 'https://safenet.cobuilders.xyz,https://safenet.cobuilders.eth.limo' }}
+          # Alerts-specific RPCs when set, else the organization RPCs the other workflows use.
+          MAINNET_RPC_URL: ${{ secrets.ALERTS_MAINNET_RPC_URL || secrets.MAINNET_RPC_URL }}
+          GNOSIS_RPC_URL: ${{ secrets.ALERTS_GNOSIS_RPC_URL || secrets.GNOSIS_RPC_URL }}
+          # The organization Graph key. The Mainnet gateway URL is derived from it through core and
+          # uploaded on every deploy. ALERTS_SUBGRAPH_URL_MAINNET, when set, is uploaded instead.
+          GRAPH_API_KEY: ${{ secrets.GRAPH_API_KEY }}
+          SUBGRAPH_URL_MAINNET: ${{ secrets.ALERTS_SUBGRAPH_URL_MAINNET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_BOT_NAME: ${{ vars.TELEGRAM_BOT_NAME }}
+          VAPID_PUBLIC_KEY: ${{ vars.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ vars.VAPID_SUBJECT }}
+        run: |
+          secrets="$RUNNER_TEMP/alerts-secrets.json"
+          trap 'rm -f "$secrets"' EXIT
+          umask 077
+          # src/deploy-secrets.ts checks the required values and always includes SUBGRAPH_URL_MAINNET.
+          node --import tsx scripts/deploy-secrets.ts "$secrets"
+          pnpm exec cf deploy --secrets-file "$secrets" --message "safenet-alerts ${GITHUB_SHA::12}"

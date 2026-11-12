@@ -324,7 +324,8 @@ The interface says Delegate and Undelegate. The contract says stake, and so do t
   GraphQL codegen and its checks.
 - `scripts/release.ts`, `scripts/release-pin.ts`: the IPFS release behind `release:build` and
   `release:pin`. They pack, pin and check gateways through `@cobuilders/safenet-snapshots/ipfs`,
-  shared with daily snapshots. Its tests live there. `build.env` plus the explicit public `VITE_GRAPH_API_KEY` are the release inputs.
+  shared with daily snapshots. Its tests live there. `build.env` plus the explicit public `VITE_GRAPH_API_KEY`, `VITE_VALIDATOR_INFO_URL` and
+  `VITE_ALERTS_API_URL` from the environment are the release inputs (`scripts/release-env.ts`).
   Never commit the gateway key; restrict its subgraphs and spending (COB-566).
 - `scripts/availability.ts`, `scripts/availability-checks.ts`: `availability`. The checks take
   `fetch` as an argument, so each branch is unit-tested.

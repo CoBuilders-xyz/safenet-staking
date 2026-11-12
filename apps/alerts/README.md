@@ -1,6 +1,6 @@
 # Safenet alerts
 
-This Worker authenticates a wallet signature and stores opt-in subscriptions in Supabase.
+This Worker authenticates a wallet signature and stores opt-in subscriptions in Cloudflare D1.
 It creates no user accounts, holds no funds and sends no transactions.
 The web route is `/#/alerts`, consistent with the application's hash routing.
 
@@ -18,28 +18,36 @@ E2E_PORT=5296 pnpm --filter @cobuilders/safenet-web test:e2e alerts.spec.ts --wo
 pnpm check
 ```
 
-`test` executes the migration in embedded PostgreSQL. It verifies real EOA signatures,
+`test` applies the migrations to a fresh D1 database in workerd, through Miniflare, for each test.
+No query is mocked. It verifies real EOA signatures,
 atomic nonce consumption, expiry, wallet isolation, role restrictions, notification deduplication,
 private Telegram linking, chronological misses and Web Push payload decryption.
 `test` also runs `test:runtime`, which builds with `cf` and runs the artifact in workerd, with isolated mock providers.
 The web E2E tests mock the alert API and wallet. These tests do **not** prove real delivery,
-real Safe threshold signing, a Supabase deployment, or fork-triggered acceptance.
+real Safe threshold signing, a deployed D1 database, or fork-triggered acceptance.
 
 The local CLI is a package dependency. `pnpm --filter @cobuilders/safenet-alerts dev` binds
 loopback port 8796. It uses only this checkout's configuration. Never reuse or reset the manual
-QA fork for alert testing. The `cf` config disables workers.dev and preview URLs; no public
-route is created by this change. No migration or deployment runs automatically.
+QA fork for alert testing. The Worker answers on its workers.dev URL; the `cf` config disables
+preview URLs and declares no route or custom domain. Migrations and deployment run only through
+the manual workflow `.github/workflows/workers-deploy.yml`; `DEPLOY.md` at the root has the order.
 
 ## Provisioning contract
 
-The release owner must select an approved Supabase project and Worker endpoint before deployment.
-Apply `migrations/001_alerts.sql`, then `002_ceremony_archive.sql`, with the project's migration role.
-Stop the old Worker before migration and start the updated Worker afterward.
-Migration 002 atomically moves existing unmatched JSON entries into the SID archive.
-It retains blocked attestations and membership snapshots, invalidates the old lease, and rejects legacy checkpoint writes.
-A migration failure rolls back all changes; do not start the updated Worker until migration succeeds.
-Do not apply these migrations to an unrelated project. All tables have RLS enabled and no browser policies. Only the Worker receives the service
-role key. Supabase Auth is not used.
+`cf d1 create` creates the D1 database `safenet-alerts` once (`DEPLOY.md`). The deploy workflow applies
+`migrations/` with `cf d1 migrations apply`, which records each file in `d1_migrations` and applies
+it once, before it deploys the Worker. Do not start a Worker whose migrations failed.
+The `DB` binding names the database by the ID in `ALERTS_D1_DATABASE_ID` at build time, so a
+deployment never provisions a second database. Without that variable the binding is local only.
+
+D1 has no roles. Only the Worker binding and an API token with D1 permission reach the database.
+The browser never receives a database credential. There are no user accounts.
+
+D1 limits a row or a bound value to 2 MB, and has no stored procedures. So the Worker stores each
+state value in ordered parts of at most 1 MB, and runs every multi-row change as one D1 batch, which
+D1 executes as one transaction. The chronology commit checks its lease, revision and cursor inside
+that batch through the named constraints of `alerts_guard`; a failed check rolls back every write.
+Cloudflare's Time Travel keeps 30 days of point-in-time recovery on a paid plan.
 
 ### Existing checkpoints after the participation-window fix
 
@@ -73,9 +81,9 @@ source files, logs or browser variables:
 | --- | --- |
 | `APP_ORIGINS` | Comma-separated exact browser origins allowed to call the API, for example `https://safenet.cobuilders.eth.limo,https://safenet.cobuilders.xyz`. See [Allowed origins](#allowed-origins). |
 | `APP_ORIGIN` | Legacy single origin. Still accepted, alone or merged with `APP_ORIGINS`. |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Project REST origin and backend service credential. |
 | `MAINNET_RPC_URL`, `GNOSIS_RPC_URL` | Mainnet reads/contract-wallet verification and finalized Aegis history. Must answer the expected chain ID. |
-| `SUBGRAPH_URL_MAINNET` | Production Mainnet subgraph endpoint; a Studio development endpoint cannot support sustained subscription volume. |
+| `GRAPH_API_KEY` | The Graph API key. Core derives the Mainnet Network gateway URL from it; a Studio development endpoint cannot support sustained subscription volume. |
+| `SUBGRAPH_URL_MAINNET` | Optional. Overrides the Mainnet subgraph URL derived from `GRAPH_API_KEY`. |
 | `REWARDS_BASE_URL` | Optional isolated-fork dataset override. Normally resolve the canonical ENS dataset, with core's repository fallback. |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_NAME` | A dedicated bot token and its username, without `@`. Do not reuse a bot consumed by another getUpdates poller or webhook. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Persistent matching VAPID keypair and valid `mailto:` or HTTPS contact. Keep the private key server-side. |
@@ -107,7 +115,6 @@ Git ignores `.dev.vars`.
 Set the web build's `VITE_ALERTS_API_URL` to the approved service origin. This is public and must
 contain no credentials. Without it, the route explicitly reports that alerts are not configured.
 The public VAPID key is returned by `/config`; the browser never receives provider credentials.
-Supabase account access alone is insufficient: a project URL and service key are required.
 
 ## Authentication and ownership
 
@@ -172,8 +179,8 @@ One transaction saves archive writes, archive deletes, and the checkpoint. Lease
 revision checks reject expired owners and concurrent stale writers. Earlier committed batches survive later failures.
 
 Memory limits apply to each transfer: at most 1,000 SIDs, 64 KiB per archived ceremony, and 8 MiB
-per recovery response, archive write payload, or checkpoint. SQL measures serialized JSON, including spacing,
-so its byte checks can reject a payload slightly below the Worker's compact JSON limit.
+per recovery response, archive write payload, or checkpoint. The data-access layer measures compact JSON,
+with non-ASCII characters escaped, so its byte checks can reject a payload slightly below the archive's limit.
 The checkpoint retains at most 10,000 blocked attestations. Their original ordering and membership snapshots remain intact.
 A single block above 1,000 logs, an oversized ceremony/checkpoint, or a blocked-attestation overflow fails closed.
 These limits do not cap the number of unmatched ceremonies stored across batches.
@@ -182,7 +189,7 @@ There is no verified maximum attestation delay, so cleanup never deletes unmatch
 
 Delivery events have unique subscription/condition keys and a two-minute claim lease. Failures retry
 on later polls. Provider acceptance stops automatic resends. A crash between sending and storing
-acceptance can duplicate a message: providers do not offer an atomic transaction with Supabase.
+acceptance can duplicate a message: providers do not offer an atomic transaction with D1.
 Expired push endpoints and blocked bots disable that subscription until the user recreates it.
 A provider success is **not** receipt confirmation. Browser confirmation follows `showNotification`;
 Telegram confirmation requires the recipient's inline button. Receipt capabilities expire after 24 hours.
@@ -207,8 +214,10 @@ for twelve months; this code does not provision those services.
 `alerts_runs` retains thirteen months of aggregate status, evaluation, provider-acceptance and failure
 counts. Use successful five-minute slots divided by all expected slots for the month-12 uptime report;
 include missing slots as downtime. Export the report through an authenticated operational connection.
-Run `pnpm --filter @cobuilders/safenet-alerts report:uptime <from-UTC-ISO> <until-UTC-ISO>` with the
-existing service credential injected. It pages aggregate runs and reports missing slots as downtime.
+Run `pnpm --filter @cobuilders/safenet-alerts report:uptime <from-UTC-ISO> <until-UTC-ISO>` with
+`CLOUDFLARE_ACCOUNT_ID`, `ALERTS_D1_DATABASE_ID` and a `CLOUDFLARE_API_TOKEN` that can read D1 in the
+environment. It reads `alerts_runs` through the D1 query API, pages aggregate runs and reports missing
+slots as downtime.
 The range must align to five-minute boundaries. It prints no subscription or credential data.
 Do not export wallet rows, chat IDs or push endpoints as evidence. Review retention and provider costs monthly.
 

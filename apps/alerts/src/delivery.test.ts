@@ -5,8 +5,9 @@ import webPush from "web-push"
 import { CONTRACTS } from "@cobuilders/safenet-core"
 import { deliver } from "./delivery.js"
 import { subscriptionInput, type Env, type Subscription } from "./types.js"
+import { noDatabase } from "./testing/database.js"
 
-const env: Env = { APP_ORIGIN: "https://app.test", SUPABASE_URL: "https://db.test", SUPABASE_SERVICE_KEY: "test-only" }
+const env: Env = { APP_ORIGIN: "https://app.test", DB: noDatabase }
 const base: Subscription = { id: crypto.randomUUID(), wallet: CONTRACTS.staking.address, triggers: ["cooldown"], participation: 75, missed: 3,
   channel: { kind: "telegram" }, telegram_chat: "123", status: "unverified", last_delivery: null }
 const payload = { title: "Safenet", body: "Cooldown ready", ack: "receipt" }

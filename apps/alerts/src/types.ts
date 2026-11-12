@@ -16,8 +16,14 @@ type WorkerConfig = import("cf/config").UnwrapConfig<typeof import("../cloudflar
 type ConfiguredEnv = import("cf/config").InferEnv<WorkerConfig>
 /** Configuration-derived bindings. Providers can be absent before provisioning. */
 /** APP_ORIGIN, APP_ORIGINS or both name the allowed browser origins; `allowedOrigins` requires at least one. */
-export type Env = Pick<ConfiguredEnv, "SUPABASE_URL" | "SUPABASE_SERVICE_KEY"> &
-  Partial<Omit<ConfiguredEnv, "SUPABASE_URL" | "SUPABASE_SERVICE_KEY">>
+export type Env = Pick<ConfiguredEnv, "DB"> & Partial<Omit<ConfiguredEnv, "DB">> & {
+  /** Legacy single origin, merged with APP_ORIGINS. Optional, so not a declared (required) secret. */
+  APP_ORIGIN?: string
+  /** Isolated-fork dataset override. Optional, so not a declared (required) secret. */
+  REWARDS_BASE_URL?: string
+  /** Overrides the Mainnet subgraph URL that core derives from GRAPH_API_KEY. Optional. */
+  SUBGRAPH_URL_MAINNET?: string
+}
 export class HttpError extends Error {
   constructor(public status: number, message: string) { super(message) }
 }

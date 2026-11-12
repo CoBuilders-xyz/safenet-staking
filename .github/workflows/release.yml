@@ -49,12 +49,20 @@ jobs:
       - name: Lint and types
         run: pnpm check
       # The subgraph-restricted, spending-capped browser key intentionally becomes public in the CAR.
+      # The service URLs are public repository variables. Unset, the validator list reads SEF's
+      # JSON and the alerts page says alerts are not configured. Change them, for example to a
+      # custom domain, without a code change.
       - name: Release build, CAR and CID
         env:
           VITE_GRAPH_API_KEY: ${{ secrets.GRAPH_API_KEY }}
+          VITE_VALIDATOR_INFO_URL: ${{ vars.VITE_VALIDATOR_INFO_URL }}
+          VITE_ALERTS_API_URL: ${{ vars.VITE_ALERTS_API_URL }}
         run: pnpm --filter @cobuilders/safenet-web release:build
       - name: Record the CID
         id: cid
+        env:
+          VITE_VALIDATOR_INFO_URL: ${{ vars.VITE_VALIDATOR_INFO_URL }}
+          VITE_ALERTS_API_URL: ${{ vars.VITE_ALERTS_API_URL }}
         run: |
           cid="$(cat apps/web/release/CID)"
           echo "cid=$cid" >> "$GITHUB_OUTPUT"
@@ -63,7 +71,10 @@ jobs:
             echo
             echo "\`$cid\`"
             echo
-            echo "Built from \`$GITHUB_SHA\`. Rebuild it with the steps in VERIFY.md."
+            echo "Built from \`$GITHUB_SHA\`. Rebuild it with the steps in VERIFY.md and these inputs:"
+            echo
+            echo "- \`VITE_VALIDATOR_INFO_URL=${VITE_VALIDATOR_INFO_URL}\`"
+            echo "- \`VITE_ALERTS_API_URL=${VITE_ALERTS_API_URL}\`"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload the CAR and the CID
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

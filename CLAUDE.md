@@ -115,7 +115,7 @@ graph-node.toml             EXISTS   graph-node config for two chains at once
 .github/workflows/          EXISTS   CI
 
 apps/api                    EXISTS   validator REST API, Cloudflare Worker; freshness and HTTP probes
-apps/alerts                 EXISTS   signed subscriptions, scheduled poller and delivery, with Supabase
+apps/alerts                 EXISTS   signed subscriptions, scheduled poller and delivery, on Cloudflare D1
 packages/testing            planned  shared fixtures: anvil, RPC mocks, Playwright helpers
 ```
 
@@ -169,6 +169,11 @@ snapshot, publication or index jobs call `page-on-red.yml`.
 `release.yml` runs on a tag `v*` or by hand: its `build` job receives no secret, builds from
 `apps/web/build.env`, packs `apps/web/release/app.car` and prints the CID; its `pin` job runs only
 from `main` or a `v*` tag, needs `PINATA_JWT` and `PINATA_GATEWAY`, and fails when they are empty.
+`workers-deploy.yml` runs only by hand, from `main`, through the protected `production`
+environment: it tests `apps/api` and `apps/alerts`, applies the alerts D1 migrations and deploys
+both Workers with `cf deploy`, on their workers.dev URLs. `DEPLOY.md` lists every input.
+The release build takes the two service URLs, `VITE_VALIDATOR_INFO_URL` and `VITE_ALERTS_API_URL`,
+from repository variables.
 `availability.yml` runs the `availability` script of `apps/web` every six hours, on demand, and
 on a pull request that changes the check or `deployments.json`; it writes the table to the job summary and drives the
 second badge in `README.md`. `deployments.json` at the repository root, documented in `README.md`,

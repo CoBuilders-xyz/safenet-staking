@@ -1,5 +1,5 @@
 import { createPublicClient, decodeEventLog, encodePacked, getAddress, http, keccak256, type Address, type Hex } from "viem"
-import { CHAINS, CONTRACTS, PUBLIC_RPC_URLS, SUBGRAPH_ENDPOINTS, SUBGRAPH_STALE_AFTER_SECONDS,
+import { CHAINS, CONTRACTS, PUBLIC_RPC_URLS, SUBGRAPH_STALE_AFTER_SECONDS, subgraphEndpoints,
   indexedEvent, stakingAbi, merkleDropAbi, rewardProofPath, resolveRewardsSource, readRewardsFile } from "@cobuilders/safenet-core"
 import { mainnetClient } from "./auth.js"
 import type { Chronology, RoundEvent } from "./chronology.js"
@@ -15,6 +15,13 @@ function isLogRangeLimit(error: unknown): boolean {
     if (/query returned more than|too many (?:results|logs)|(?:log response|response|result) size (?:exceeded|too large)|block range[^\n]*(?:exceed|too wide)/i.test(error.message)) return true
   }
   return false
+}
+/**
+ * The Mainnet subgraph: SUBGRAPH_URL_MAINNET when set, else core's Network gateway URL for
+ * GRAPH_API_KEY, else core's Studio default. The URL carries the key, so it is never logged.
+ */
+export function mainnetSubgraphUrl(env: Pick<Env, "SUBGRAPH_URL_MAINNET" | "GRAPH_API_KEY">): string {
+  return subgraphEndpoints({ graphApiKey: env.GRAPH_API_KEY, overrides: { mainnet: env.SUBGRAPH_URL_MAINNET }, allowLocal: false }).mainnet!
 }
 export async function advanceChronology(env: Env, previous: Chronology, db: Database, holder: string) {
   if (previous.archiveVersion !== 1) throw new Error("Chronology archive migration required")
@@ -137,7 +144,7 @@ export async function walletConditions(env: Env, sub: Subscription): Promise<{ e
       let cursor = ""
       let indexedBlock: number | undefined
       for (;;) {
-        const response = await fetch(env.SUBGRAPH_URL_MAINNET || SUBGRAPH_ENDPOINTS.mainnet, {
+        const response = await fetch(mainnetSubgraphUrl(env), {
           method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(10_000),
           body: JSON.stringify({ query: `query($wallet: Bytes!, $cursor: ID!, $block: Block_height) {
             _meta(block: $block) { block { number timestamp } hasIndexingErrors }

@@ -16,13 +16,12 @@ test("uptime counts missing runs and incomplete runs as downtime, without counti
 
 test("uptime pagination includes all rows when the server caps pages below 1000", async () => {
   const rows: PollRun[] = [0, 300_000, 600_000].map(ms => ({ started_at: new Date(ms).toISOString(), completed_at: new Date(ms + 1000).toISOString(), ok: true }))
-  const paths: string[] = []
-  const result = await loadPollRuns({ request: async <T>(path: string) => {
-    paths.push(path)
-    const cursor = new URL(path, "https://unused.test").searchParams.getAll("started_at").find(filter => filter.startsWith("gt."))?.slice(3)
-    return rows.filter(row => !cursor || row.started_at > cursor).slice(0, 1) as T
+  const cursors: string[] = []
+  const result = await loadPollRuns({ runs: async (_from, _until, after) => {
+    cursors.push(after)
+    return rows.filter(row => row.started_at > after).slice(0, 1)
   } }, 0, 900_000)
   assert.deepEqual(result, rows)
-  assert.equal(paths.length, 4)
+  assert.equal(cursors.length, 4)
   assert.equal(uptimeReport(result, 0, 900_000).availabilityPercent, 100)
 })
