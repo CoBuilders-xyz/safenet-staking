@@ -112,11 +112,11 @@ unless the operator allows writes when the server starts.
 
 ## npm CLI and MCP beta
 
-The in-repo version is `0.1.0-beta.1`, the first OIDC publish candidate after the manual `0.1.0-beta.0` bootstrap.
+The in-repo version is `0.1.0-beta.3`.
 Install published betas with `@beta`.
 Publishing uses GitHub Actions OIDC Trusted Publishing, with no permanent npm token.
 Both packages already have Trusted Publishers configured for `publish.yml`.
-Publishing beta.1 moves `beta`; `latest` stays at beta.0 until Augusto removes it from his authenticated session.
+Publishing beta.3 updates the `beta` tag; it does not change `latest`.
 See [NPM-RELEASE.md](NPM-RELEASE.md) for dry-run checks, bootstrap history, manual tag cleanup and release tags.
 
 ## Release

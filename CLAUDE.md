@@ -200,10 +200,10 @@ a dispatch that publishes from a branch other than `main`, and a private reposit
 npm does not publish with provenance. A dispatch with `publish` off, and every pull request that
 changes the workflow or the check, stop before the `publish` job.
 The publish step reads the tarball's version: prereleases use their first identifier (`beta`, `alpha`, `rc`), and stable versions use `latest`.
-The in-repo CLI/MCP version is `0.1.0-beta.1`, the first OIDC publish candidate after the manual beta.0 bootstrap.
-Publishing beta.1 moves `beta`; `latest` stays at beta.0 until Augusto removes it from his authenticated session.
+The in-repo CLI/MCP version is `0.1.0-beta.3`.
+Publishing beta.3 updates the `beta` tag; it does not change `latest`.
 The workflow runs no `npm dist-tag` commands; that Trusted Publisher permission remains disabled.
-Use `cli-v0.1.0-beta.1` / `mcp-v0.1.0-beta.1`, or dispatch with `publish=true`, never both for the same version.
+Use `cli-v0.1.0-beta.3` / `mcp-v0.1.0-beta.3`, or dispatch with `publish=true`, never both for the same version.
 Manual dispatch defaults to `publish=false`.
 
 ## What happens when you edit

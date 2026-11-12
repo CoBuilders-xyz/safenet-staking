@@ -521,9 +521,9 @@ Failed Network queries retry Studio once. The process warns on stderr once per c
 
 ## Beta publishing
 
-The in-repo version is `0.1.0-beta.2`.
+The in-repo version is `0.1.0-beta.3`.
 CI uses npm Trusted Publishing (GitHub OIDC), with dist-tag `beta` and no permanent npm token.
-Publishing beta.2 updates the `beta` tag; it does not change `latest`.
+Publishing beta.3 updates the `beta` tag; it does not change `latest`.
 See [NPM-RELEASE.md](https://github.com/CoBuilders-xyz/safenet-staking/blob/main/NPM-RELEASE.md) for the operator checklist.
 
 Period comparisons use the same subgraph endpoint as claim history, then verify
