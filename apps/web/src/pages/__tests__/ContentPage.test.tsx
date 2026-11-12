@@ -8,6 +8,8 @@ import { i18n } from "@/i18n"
 
 const PLACEHOLDER = "Placeholder. The final text is pending legal review."
 const ENGLISH_ONLY = "This text is only available in English."
+const OPERATOR_ADDRESS = "124 Broadkill Rd #636, Milton, Delaware 19968, United States"
+const OPERATOR_EMAIL = "contact@cobuilders.xyz"
 const TITLES: Record<ContentPageName, string> = {
   imprint: "Imprint",
   terms: "Terms of use",
@@ -68,13 +70,24 @@ describe("ContentPage", () => {
     expect(container.querySelector("[lang='en']")).not.toBeNull()
   })
 
-  it("names the operator and leaves a slot for each detail the lawyer supplies", () => {
+  it("gives the operator's name, address and contact email in the imprint, and leaves the rest open", () => {
     const { container } = renderAt("/imprint")
 
     expect(screen.getByText("Backstage Online LLC")).toBeInTheDocument()
-    for (const slot of ["[TODO: operator registered address]", "[TODO: contact email]", "[TODO: jurisdiction and governing law]"]) {
+    expect(container).toHaveTextContent(OPERATOR_ADDRESS)
+    expect(screen.getByRole("link", { name: OPERATOR_EMAIL })).toHaveAttribute("href", `mailto:${OPERATOR_EMAIL}`)
+    for (const slot of ["[TODO: register and registration number]", "[TODO: jurisdiction and governing law]"]) {
       expect(container).toHaveTextContent(slot)
     }
+  })
+
+  it.each(["terms", "privacy"] as const)("gives the operator's address and contact email in /%s", (name) => {
+    const { container } = renderAt(`/${name}`)
+
+    expect(container).toHaveTextContent(`Backstage Online LLC, ${OPERATOR_ADDRESS}`)
+    expect(screen.getAllByRole("link", { name: OPERATOR_EMAIL }).at(-1)).toHaveAttribute("href", `mailto:${OPERATOR_EMAIL}`)
+    expect(container).not.toHaveTextContent("[TODO: contact email]")
+    expect(container).not.toHaveTextContent("[TODO: operator registered address]")
   })
 
   it("leaves the governing law open in the terms and the data controller open in the privacy policy", () => {

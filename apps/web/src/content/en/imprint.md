@@ -10,13 +10,13 @@ This interface is operated by:
 
 **Backstage Online LLC**
 
-- Registered address: **[TODO: operator registered address]**
+- Address: 124 Broadkill Rd #636, Milton, Delaware 19968, United States
 - Company registration: **[TODO: register and registration number]**
 - Represented by: **[TODO: authorised representative]**
 
 ## Contact
 
-- Email: **[TODO: contact email]**
+- Email: [contact@cobuilders.xyz](mailto:contact@cobuilders.xyz)
 
 ## Jurisdiction
 

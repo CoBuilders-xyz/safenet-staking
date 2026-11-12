@@ -25,8 +25,8 @@ status: placeholder
 While these lines are there, the page shows the notice "Placeholder. The final text is pending
 legal review." Remove the three lines when the final text is in the file.
 
-Each `[TODO: ...]` marks a detail that is still open, such as the registered address, the contact
-email, the governing law and the data controller. Search for `TODO` to find them all.
+Each `[TODO: ...]` marks a detail that is still open, such as the company registration, the
+governing law and the data controller. The operator's name, address and contact email are final. Search for `TODO` to find them all.
 
 The privacy policy states data flows that come from the code. A test in
 `src/pages/__tests__/ContentPage.test.tsx` fails when the policy does not name a host that

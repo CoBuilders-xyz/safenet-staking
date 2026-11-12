@@ -8,7 +8,7 @@ Last updated: **[TODO: date of the final text]**
 
 ## 1. Who we are
 
-This interface is operated by **Backstage Online LLC** ("the operator"). The [Imprint](#/imprint) has the registered address and the contact details.
+This interface is operated by **Backstage Online LLC** ("the operator"). Its address is 124 Broadkill Rd #636, Milton, Delaware 19968, United States. The [Imprint](#/imprint) has the full details.
 
 ## 2. What the interface is
 
@@ -68,4 +68,6 @@ The source code is available under the MIT licence. These terms cover the use of
 
 ## 13. Contact
 
-**[TODO: contact email]**
+Backstage Online LLC, 124 Broadkill Rd #636, Milton, Delaware 19968, United States.
+
+Email: [contact@cobuilders.xyz](mailto:contact@cobuilders.xyz)

@@ -11,8 +11,8 @@ This policy describes the data flows of the Safenet Staking interface. The techn
 ## 1. Data controller
 
 - Data controller: **[TODO: data controller, normally Backstage Online LLC]**
-- Registered address: **[TODO: operator registered address]**
-- Privacy contact: **[TODO: contact email]**
+- Operator: Backstage Online LLC, 124 Broadkill Rd #636, Milton, Delaware 19968, United States
+- Contact: [contact@cobuilders.xyz](mailto:contact@cobuilders.xyz)
 
 ## 2. Summary
 
@@ -110,4 +110,6 @@ This build can call a sanctions screening service on load, but only when a deplo
 
 ## 12. Contact
 
-**[TODO: contact email]**
+Backstage Online LLC, 124 Broadkill Rd #636, Milton, Delaware 19968, United States.
+
+Email: [contact@cobuilders.xyz](mailto:contact@cobuilders.xyz)
