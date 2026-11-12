@@ -12,6 +12,7 @@ export interface Dependencies {
 }
 export function createApp(dependencies: Dependencies = {}) {
   // GITHUB_TOKEN is optional, so the config does not declare it: cf requires every declared secret.
+  // This is the documented exception to generated binding types (apps/api/CLAUDE.md).
   // Without it, GitHub allows 60 unauthenticated requests per hour from the Worker's address.
   const app = new Hono<{ Bindings: Env & { GITHUB_TOKEN?: string } }>()
   const fetcher = dependencies.fetch ?? fetch

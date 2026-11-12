@@ -16,6 +16,11 @@ Run scripts from the root with `pnpm --filter @cobuilders/safenet-api`.
 Run `pnpm check` before every commit. Regenerate `.cloudflare/types` through `cf workers types`;
 never write binding types by hand. `.cloudflare` output is ignored and rebuilt in CI.
 
+One exception: an optional secret. `cf` requires every secret that `cloudflare.config.ts` declares
+(`bindings.secret()` takes no options), so an optional one cannot be declared. Type it next to the
+generated `Env`, as `src/index.ts` does for `GITHUB_TOKEN`, with a comment that says why. Declare
+every required binding in the config.
+
 Keep the validator list a bare array with SEF's snake_case names and fractional rates.
 The reference's hook converts that array to `ValidatorInfo[]`. Labels come only from
 forward-confirmed ENS. Missing ENS means an empty label, never SEF's manually edited label.
