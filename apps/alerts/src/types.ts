@@ -15,8 +15,9 @@ export interface Subscription {
 type WorkerConfig = import("cf/config").UnwrapConfig<typeof import("../cloudflare.config.js").default>["worker"]
 type ConfiguredEnv = import("cf/config").InferEnv<WorkerConfig>
 /** Configuration-derived bindings. Providers can be absent before provisioning. */
-export type Env = Pick<ConfiguredEnv, "APP_ORIGIN" | "SUPABASE_URL" | "SUPABASE_SERVICE_KEY"> &
-  Partial<Omit<ConfiguredEnv, "APP_ORIGIN" | "SUPABASE_URL" | "SUPABASE_SERVICE_KEY">>
+/** APP_ORIGIN, APP_ORIGINS or both name the allowed browser origins; `allowedOrigins` requires at least one. */
+export type Env = Pick<ConfiguredEnv, "SUPABASE_URL" | "SUPABASE_SERVICE_KEY"> &
+  Partial<Omit<ConfiguredEnv, "SUPABASE_URL" | "SUPABASE_SERVICE_KEY">>
 export class HttpError extends Error {
   constructor(public status: number, message: string) { super(message) }
 }

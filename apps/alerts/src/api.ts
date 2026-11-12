@@ -1,5 +1,6 @@
 import { authenticate, challenge, session, type VerifyWallet } from "./auth.js"
 import { Database, digest, randomToken } from "./db.js"
+import { allowedOrigin } from "./origins.js"
 import { HttpError, object, subscriptionInput, type Env, type Subscription } from "./types.js"
 
 async function json(request: Request): Promise<unknown> {
@@ -26,8 +27,8 @@ export async function api(request: Request, env: Env, db = new Database(env), ve
       const healthy = !!run?.ok && !!run.completed_at && Date.now() - Date.parse(run.completed_at) < 15 * 60_000
       return Response.json({ healthy }, { status: healthy ? 200 : 503, headers })
     }
-    if (request.headers.get("Origin") !== env.APP_ORIGIN) throw new HttpError(403, "Origin refused")
-    headers.set("Access-Control-Allow-Origin", env.APP_ORIGIN)
+    const origin = allowedOrigin(env, request.headers.get("Origin"))
+    headers.set("Access-Control-Allow-Origin", origin)
     headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type")
     headers.set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers })
@@ -36,9 +37,9 @@ export async function api(request: Request, env: Env, db = new Database(env), ve
     if (path === "/config" && request.method === "GET") {
       result = { vapidPublicKey: env.VAPID_PUBLIC_KEY ?? null, telegramBot: env.TELEGRAM_BOT_NAME ?? null }
     } else if (path === "/auth/challenge" && request.method === "POST") {
-      result = await challenge(db, env, await json(request))
+      result = await challenge(db, env, origin, await json(request))
     } else if (path === "/auth/verify" && request.method === "POST") {
-      result = await authenticate(db, env, await json(request), verify)
+      result = await authenticate(db, env, origin, await json(request), verify)
     } else if (path === "/delivery/ack" && request.method === "POST") {
       const { ack } = object(await json(request))
       if (typeof ack !== "string" || !/^[\w-]{43}$/.test(ack)) throw new HttpError(400, "Invalid receipt")

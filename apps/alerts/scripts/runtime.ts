@@ -16,7 +16,7 @@ await db.setup()
 const vapid = webPush.generateVAPIDKeys()
 const receiver = webPush.generateVAPIDKeys()
 const env = {
-  APP_ORIGIN: "https://app.test", SUPABASE_URL: "https://database.test", SUPABASE_SERVICE_KEY: "runtime-test-only",
+  APP_ORIGINS: "https://app.test,https://second.test", SUPABASE_URL: "https://database.test", SUPABASE_SERVICE_KEY: "runtime-test-only",
   MAINNET_RPC_URL: "https://rpc.test", GNOSIS_RPC_URL: "https://gnosis.test", SUBGRAPH_URL_MAINNET: "https://graph.test", TELEGRAM_BOT_TOKEN: "runtime-test-only", TELEGRAM_BOT_NAME: "test_bot",
   VAPID_PUBLIC_KEY: vapid.publicKey, VAPID_PRIVATE_KEY: vapid.privateKey, VAPID_SUBJECT: "mailto:test@example.test",
 }
@@ -112,8 +112,10 @@ const mf = new Miniflare(convertV4MiniflareOptions({
 }))
 try {
   assert.equal((await mf.dispatchFetch("https://alerts.test/health")).status, 503)
-  const config = await mf.dispatchFetch("https://alerts.test/config", { headers: { Origin: env.APP_ORIGIN } })
+  const config = await mf.dispatchFetch("https://alerts.test/config", { headers: { Origin: "https://second.test" } })
   assert.equal(config.status, 200)
+  assert.equal(config.headers.get("access-control-allow-origin"), "https://second.test")
+  assert.equal((await mf.dispatchFetch("https://alerts.test/config", { headers: { Origin: "https://evil.test" } })).status, 403)
   assert.equal((await config.json() as { vapidPublicKey: string }).vapidPublicKey, vapid.publicKey)
   const worker = await mf.getWorker()
   assert.equal((await worker.scheduled({ cron: "*/5 * * * *", scheduledTime: new Date() })).outcome, "ok")
