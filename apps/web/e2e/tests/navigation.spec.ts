@@ -82,19 +82,19 @@ test.describe("Navigation", () => {
     await expect(layout.footerTerms).toHaveAttribute("href", "https://terms.test")
 
     const pages = [
-      { link: "Privacy", url: "/#/privacy", title: "Privacy policy", placeholder: true },
-      { link: "Imprint", url: "/#/imprint", title: "Imprint", placeholder: true },
-      { link: "FAQ", url: "/#/faq", title: "Frequently asked questions", placeholder: false },
+      { link: "Privacy", url: "/#/privacy", title: "Privacy policy" },
+      { link: "Imprint", url: "/#/imprint", title: "Imprint" },
+      { link: "FAQ", url: "/#/faq", title: "Frequently asked questions" },
     ]
-    for (const { link, url, title, placeholder } of pages) {
+    for (const { link, url, title } of pages) {
       await layout.footer.getByRole("link", { name: link }).click()
       await expect(page).toHaveURL(url)
       await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible()
-      await expect(page.getByText("Placeholder. The final text is pending legal review.")).toHaveCount(placeholder ? 1 : 0)
+      await expect(page.getByText("Last updated: 12 November 2026")).toBeVisible()
     }
 
     // A link inside a text stays in the app.
-    await page.getByRole("main").getByRole("link", { name: "Terms of use" }).click()
+    await page.getByRole("main").getByRole("link", { name: "Terms of use" }).first().click()
     await expect(page).toHaveURL("/#/terms")
     await expect(page.getByRole("heading", { level: 1, name: "Terms of use" })).toBeVisible()
   })

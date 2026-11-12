@@ -1,32 +1,36 @@
----
-status: placeholder
----
-
 # Imprint
+
+Last updated: 12 November 2026
 
 ## Operator
 
-This interface is operated by:
-
 **Backstage Online LLC**
 
-- Address: 124 Broadkill Rd #636, Milton, Delaware 19968, United States
-- Company registration: **[TODO: register and registration number]**
-- Represented by: **[TODO: authorised representative]**
+124 Broadkill Rd #636, Milton, Delaware 19968, United States
 
 ## Contact
 
-- Email: [contact@cobuilders.xyz](mailto:contact@cobuilders.xyz)
+Email: [contact@cobuilders.xyz](mailto:contact@cobuilders.xyz)
 
-## Jurisdiction
-
-- Governing law and place of jurisdiction: **[TODO: jurisdiction and governing law]**
+Use this address for legal notices, privacy requests and questions about the interface.
 
 ## About this interface
 
-Safenet Staking is an interface to the Safenet staking contracts on Ethereum Mainnet. CoBuilders builds it. The source code is public under the MIT licence.
+Safenet Staking is a non-custodial interface to the Safenet staking contracts on Ethereum Mainnet. It is developed under the CoBuilders name and operated by Backstage Online LLC. The same project publishes a command-line tool (`safenet`) and an MCP server (`safenet-mcp`).
 
-The Safenet contracts, the reward programme and the published reward data belong to the Safe Ecosystem Foundation (SEF). The operator of this interface does not control them.
+The source code is public under the MIT licence.
+
+## Relationship to the Safe Ecosystem Foundation
+
+The Safe Ecosystem Foundation (SEF) publishes the Safenet contracts, the reward programme and the reward data that this interface reads. SEF does not operate this interface. Backstage Online LLC does not control the Safenet contracts, the validators or the distribution of rewards.
+
+Names and marks of third parties belong to their owners.
+
+## Content and links
+
+The interface shows data from public blockchains and from third parties. We prepare it with care, but we do not guarantee that it is complete, correct or current. The [Terms of use](#/terms) govern the use of the interface.
+
+The interface links to external websites. Their operators are responsible for their content. We do not control those websites.
 
 ## Other documents
 

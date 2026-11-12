@@ -48,16 +48,12 @@ describe("ContentPage", () => {
     expect(scrollTo).toHaveBeenCalledWith(0, 0)
   })
 
-  it.each(["imprint", "terms", "privacy"] as const)("marks /%s as placeholder text", (name) => {
-    renderAt(`/${name}`)
-
-    expect(screen.getByRole("note")).toHaveTextContent(PLACEHOLDER)
-  })
-
-  it("does not mark the FAQ as placeholder text", () => {
-    renderAt("/faq")
+  it.each(CONTENT_PAGES)("shows /%s as a finished text: no placeholder notice, no open slot, and its date", (name) => {
+    const { container } = renderAt(`/${name}`)
 
     expect(screen.queryByText(PLACEHOLDER)).toBeNull()
+    expect(container).not.toHaveTextContent("[TODO")
+    expect(screen.getByText("Last updated: 12 November 2026")).toBeInTheDocument()
   })
 
   it("says the text is English only in another language, and marks it as English", async () => {
@@ -65,34 +61,24 @@ describe("ContentPage", () => {
     const { container } = renderAt("/privacy")
 
     expect(screen.getByText("Este texto solo está disponible en inglés.")).toBeInTheDocument()
-    expect(screen.getByText("Texto provisional. El texto final está pendiente de revisión legal.")).toBeInTheDocument()
     expect(screen.getByRole("heading", { level: 1, name: "Privacy policy" }).closest("[lang]")).toHaveAttribute("lang", "en")
     expect(container.querySelector("[lang='en']")).not.toBeNull()
   })
 
-  it("gives the operator's name, address and contact email in the imprint, and leaves the rest open", () => {
-    const { container } = renderAt("/imprint")
-
-    expect(screen.getByText("Backstage Online LLC")).toBeInTheDocument()
-    expect(container).toHaveTextContent(OPERATOR_ADDRESS)
-    expect(screen.getByRole("link", { name: OPERATOR_EMAIL })).toHaveAttribute("href", `mailto:${OPERATOR_EMAIL}`)
-    for (const slot of ["[TODO: register and registration number]", "[TODO: jurisdiction and governing law]"]) {
-      expect(container).toHaveTextContent(slot)
-    }
-  })
-
-  it.each(["terms", "privacy"] as const)("gives the operator's address and contact email in /%s", (name) => {
+  it.each(["imprint", "terms", "privacy"] as const)("gives the operator's name, address and contact email in /%s", (name) => {
     const { container } = renderAt(`/${name}`)
 
-    expect(container).toHaveTextContent(`Backstage Online LLC, ${OPERATOR_ADDRESS}`)
-    expect(screen.getAllByRole("link", { name: OPERATOR_EMAIL }).at(-1)).toHaveAttribute("href", `mailto:${OPERATOR_EMAIL}`)
-    expect(container).not.toHaveTextContent("[TODO: contact email]")
-    expect(container).not.toHaveTextContent("[TODO: operator registered address]")
+    expect(container).toHaveTextContent("Backstage Online LLC")
+    expect(container).toHaveTextContent(OPERATOR_ADDRESS)
+    expect(screen.getAllByRole("link", { name: OPERATOR_EMAIL })[0]).toHaveAttribute("href", `mailto:${OPERATOR_EMAIL}`)
   })
 
-  it("leaves the governing law open in the terms and the data controller open in the privacy policy", () => {
-    expect(renderAt("/terms").container).toHaveTextContent("[TODO: jurisdiction and governing law]")
-    expect(renderAt("/privacy").container).toHaveTextContent("[TODO: data controller")
+  it("marks the governing law in the terms as to be confirmed by counsel", () => {
+    renderAt("/terms")
+
+    const section = screen.getByRole("heading", { name: /Governing law and jurisdiction/ }).nextElementSibling
+    expect(section).toHaveTextContent("This section is to be confirmed by counsel.")
+    expect(section).toHaveTextContent("State of Delaware")
   })
 
   it("names in the privacy policy every third-party host that core gives the browser", () => {
@@ -100,7 +86,7 @@ describe("ContentPage", () => {
 
     const hosts = [...GEO_LOOKUPS.map((l) => l.url), ...DEPLOYMENTS[DEFAULT_CHAIN_ID].rpc, ...IPFS_GATEWAYS].map(host)
     for (const name of hosts) expect(container).toHaveTextContent(name)
-    for (const variable of ["VITE_GEOBLOCK_CACHE_DAYS", "VITE_PLAUSIBLE_DOMAIN", "VITE_SANCTIONS_API_URL"]) {
+    for (const variable of ["VITE_PLAUSIBLE_DOMAIN", "VITE_SANCTIONS_API_URL"]) {
       expect(container).toHaveTextContent(variable)
     }
   })

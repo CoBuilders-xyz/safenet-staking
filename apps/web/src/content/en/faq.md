@@ -1,18 +1,28 @@
 # Frequently asked questions
 
-These answers describe what this interface does. For the rules of Safenet itself, see the [Safe Ecosystem Foundation's documentation](https://docs.safefoundation.org/safenet/) and its [FAQ](https://docs.safefoundation.org/safenet-aegis/resources/faqs).
+Last updated: 12 November 2026
+
+These answers describe what this interface does. For the rules of Safenet itself, see the [Safe Ecosystem Foundation's documentation](https://docs.safefoundation.org/safenet/) and its [FAQ](https://docs.safefoundation.org/safenet-aegis/resources/faqs). The [Terms of use](#/terms) and the [Privacy policy](#/privacy) are the binding texts. If an answer here differs from them, they apply.
 
 ## About this interface
 
 ### What is Safenet Staking?
 
-Safenet Staking is an interface to the Safenet staking contracts on Ethereum Mainnet. You can read the state of the network, delegate SAFE to a validator, undelegate, and claim rewards.
+Safenet Staking is a non-custodial interface to the Safenet staking contracts on Ethereum Mainnet. You can read the state of the network, delegate SAFE to a validator, undelegate, and claim rewards. You sign every transaction with your own wallet.
 
 ### Who operates it?
 
-Backstage Online LLC operates this interface. CoBuilders builds it. The [Imprint](#/imprint) has the details.
+Backstage Online LLC operates this interface. It is developed under the CoBuilders name. The [Imprint](#/imprint) has the address and the contact email.
 
 The Safe Ecosystem Foundation (SEF) publishes the Safenet contracts, the reward programme and the reward data. The operator of this interface does not control them.
+
+### Does it cost anything?
+
+We charge no fee, and the interface adds no fee of ours to your transactions. You pay the Ethereum network fee for each transaction. A validator keeps its commission from the rewards, under the rules of the Safenet programme.
+
+### Is this financial advice?
+
+No. The interface shows public data and prepares the transactions that you ask for. It does not recommend a validator and it does not tell you whether to stake. You make your own decisions.
 
 ### Do I need a wallet?
 
@@ -26,17 +36,17 @@ No, not to read. The Overview and the Validators pages work without a wallet. Yo
 
 ### Why can I not open the interface?
 
-The interface refuses access from restricted countries and for wallet addresses on a sanctions list. It also refuses access when a check cannot give an answer. The [Privacy policy](#/privacy) describes the checks.
+The interface refuses access from restricted countries and for wallet addresses on a sanctions list. It also refuses access when a check cannot give an answer, for example when a country lookup fails. In that case, reload the page later. The [Terms of use](#/terms) say who may use the interface, and the [Privacy policy](#/privacy) describes the checks.
 
 ## Self-custody
 
 ### Does the interface hold my tokens?
 
-No. Your SAFE stays in your wallet until you delegate. Delegated SAFE is in SEF's staking contract, not with the operator. The interface never sees your private keys.
+No. Your SAFE stays in your wallet until you delegate. Delegated SAFE is in the Safenet staking contract on Ethereum, not with the operator. The interface never sees your private keys or your recovery phrase, and it never asks for them.
 
 ### Can the operator move or return my tokens?
 
-No. Only your wallet can sign a transaction for your tokens. The operator cannot reverse a transaction.
+No. Only your wallet can sign a transaction for your tokens. The operator cannot move, freeze or return them, and cannot reverse a transaction. Read each transaction in your wallet before you sign it.
 
 ### What if this interface goes offline?
 
@@ -46,7 +56,7 @@ Your stake is in the staking contract on Ethereum. It does not depend on this in
 
 ### What does "delegate" mean?
 
-To delegate is to stake your SAFE behind a validator that you choose. The interface says Delegate and Undelegate. The contract calls the same actions stake and withdraw.
+To delegate is to stake your SAFE behind a validator that you choose. The interface says Delegate and Undelegate. The contract calls these actions `stake` and `initiateWithdrawal`.
 
 ### How do I delegate?
 
@@ -65,7 +75,7 @@ Withdrawals are paid oldest first. During the unstaking period the SAFE earns no
 
 ### Can I lose my staked SAFE?
 
-SEF's documentation says that staked or delegated SAFE is not currently subject to slashing. A validator that performs badly costs rewards, not the SAFE itself. Smart contracts can still have defects. Read [SEF's documentation](https://docs.safefoundation.org/safenet/) for the current rules.
+Staking has risks. SEF's documentation says that staked or delegated SAFE is not currently subject to slashing: a validator that performs badly costs rewards, not the SAFE itself. That rule can change. Smart contracts can have defects, and a defect can cause a loss. The [Terms of use](#/terms) list the risks. Read [SEF's documentation](https://docs.safefoundation.org/safenet/) for the current rules.
 
 ## Validators
 
@@ -84,8 +94,9 @@ Commission is the share of the rewards on delegated SAFE that the validator keep
 ### Where do the validator figures come from?
 
 - Stake, delegators and history come from the chain and from subgraphs that index it.
-- Names, commission and the published participation rate come from SEF's published data.
-- The interface names the source of its figures. When a source is late or fails, the interface says so and does not show the figure as current.
+- A validator's name is its verified ENS name. Without one, it is the label that SEF publishes.
+- Commission and the published participation rate come from SEF's published data.
+- The interface names the source of its figures. When it detects that a source is late or has failed, it says so.
 
 ## Rewards
 
@@ -105,7 +116,11 @@ The interface compares the reward data with the root stored in the distribution 
 
 ### Are rewards guaranteed?
 
-No. Rewards are not guaranteed and may vary.
+No. Rewards are not guaranteed and may vary. If a validator's participation is below SEF's threshold in a reward period, its delegators earn nothing for that period.
+
+### Is an estimated rate a promise?
+
+No. Where the interface shows an estimated reward rate, such as an APR or an APY, it is an estimate from past or current data. It is not a forecast and not a guarantee. Actual rewards can be lower, or zero.
 
 ## Alerts
 
@@ -121,11 +136,39 @@ Alerts are optional messages about your stake. A deployment of this interface ca
 
 ### How do I receive them?
 
-By Telegram or by browser notification. You sign a message with your wallet to manage your subscriptions. The signature moves no funds and costs no fee.
+By Telegram or by browser notification. You sign a message with your wallet to manage your subscriptions. The signature moves no funds and costs no fee. Alerts can be late or can fail to arrive, so do not rely on them alone.
 
 ### What does the alerts service store?
 
-The service stores your wallet address, your choices and the delivery data for your channel. When you delete a subscription, the service deletes that subscription and its delivery data. Sign-in records contain your wallet address and are deleted after they expire. The [Privacy policy](#/privacy) has the full list.
+The service stores your wallet address, your choices and the delivery data for your channel: a Telegram chat ID or a browser push subscription. When you delete a subscription, the service deletes that subscription and its delivery data. Sign-in records contain your wallet address and are deleted after they expire. The [Privacy policy](#/privacy) has the full list.
+
+## Privacy
+
+### What data does the interface collect about me?
+
+The interface has no accounts and sets no cookies. It sends no analytics. Your browser talks directly to public services such as RPC providers, and those services see your IP address. So does the hosting provider that delivers the interface. The optional alerts service is the only part that keeps a database of user data. The operator also keeps the emails that you send. The [Privacy policy](#/privacy) has the details.
+
+### Why does the interface look up my country?
+
+To refuse access from restricted countries. Your browser asks a lookup service (`api.country.is`, then `ipapi.co`) for the country of your connection. The service sees your IP address. Your browser keeps the country code for 7 days. The operator receives neither your IP address nor the result.
+
+### How do I get my data deleted?
+
+Delete your alert subscriptions on the Alerts page. For any other request, write to [contact@cobuilders.xyz](mailto:contact@cobuilders.xyz). Nobody can delete what is recorded on a public blockchain.
+
+## Command-line tool and MCP server
+
+### What are they?
+
+`safenet` is a command-line tool with the same operations as the interface. `safenet-mcp` is an MCP server that lets an AI agent or another MCP client run those operations. Both are open-source software that you run on your own computer.
+
+### Do they send my private key anywhere?
+
+No. A key or a keystore that you provide is used on your computer to sign, and the signed transaction is sent to the RPC endpoint. The key itself is not sent anywhere. The tools send no usage data to the operator.
+
+### Can an AI agent move my funds through the MCP server?
+
+Only if you allow it. Writes are dry runs unless you turn writes on and provide a signer when you start the server. If you do, the agent can send real transactions with that key, and you are responsible for them. Use a key that holds only what you are willing to risk.
 
 ## More
 

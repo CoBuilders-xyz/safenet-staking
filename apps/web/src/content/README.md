@@ -11,10 +11,14 @@ The texts of four routes of the interface:
 
 `src/pages/ContentPage.tsx` renders them. To change a text, edit its file. No code changes.
 
-## Placeholder status
+## Status of the texts
 
-The imprint, the terms and the privacy policy are placeholder text. Each of these files opens
-with:
+The four texts are drafts written from what the code does. Counsel has not confirmed them. The
+terms mark their governing law and jurisdiction section as "to be confirmed by counsel".
+
+Each text opens with a "Last updated" line. Change the date with every change to the text.
+
+To mark a text as not final, open its file with these lines:
 
 ```
 ---
@@ -22,24 +26,22 @@ status: placeholder
 ---
 ```
 
-While these lines are there, the page shows the notice "Placeholder. The final text is pending
-legal review." Remove the three lines when the final text is in the file.
-
-Each `[TODO: ...]` marks a detail that is still open, such as the company registration, the
-governing law and the data controller. The operator's name, address and contact email are final. Search for `TODO` to find them all.
+The page then shows the notice "Placeholder. The final text is pending legal review." No text
+carries the lines today.
 
 The privacy policy states data flows that come from the code. A test in
 `src/pages/__tests__/ContentPage.test.tsx` fails when the policy does not name a host that
-`packages/core` gives the browser. Keep those statements true when the text changes.
+`packages/core` gives the browser. Keep those statements true when the text or the code changes.
 
-The policy names the default providers. A variable that sets a URL or a provider changes who
-receives the requests: `VITE_RPC_URL` and its fallbacks, `VITE_SUBGRAPH_URL_MAINNET`,
+The policy says that the published interface uses the default providers, with no analytics and
+no sanctions screening service. A variable that sets a URL or a provider changes who receives
+the requests: `VITE_RPC_URL` and its fallbacks, `VITE_SUBGRAPH_URL_MAINNET`,
 `VITE_SUBGRAPH_URL_GNOSIS`, `VITE_GRAPH_API_KEY`, `VITE_IPFS_GATEWAY`, `VITE_REWARDS_BASE_URL`,
 `VITE_VALIDATOR_INFO_URL`, `VITE_ALERTS_API_URL`, `VITE_SANCTIONS_API_URL`,
 `VITE_PLAUSIBLE_DOMAIN` and `VITE_PLAUSIBLE_ENDPOINT`. The table of variables in
 `apps/web/README.md` is the full list. The requests for reward proofs and to the alerts service
-contain the wallet address. When a deployment sets one of these variables, name its providers
-in the policy.
+contain the wallet address. Before a deployment sets one of these variables, name its provider
+in the policy. The policy also states the 7 days that `VITE_GEOBLOCK_CACHE_DAYS` defaults to.
 
 ## Supported Markdown
 
