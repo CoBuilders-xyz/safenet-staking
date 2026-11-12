@@ -18,9 +18,11 @@ export default defineConfig({
     triggers: [triggers.scheduled({ schedule: "*/5 * * * *" })],
     env: {
       DB: bindings.d1({ name: "safenet-alerts", ...(databaseId ? { id: databaseId } : {}) }),
-      APP_ORIGIN: bindings.secret(), APP_ORIGINS: bindings.secret(),
+      // Every declared secret is required at deploy. The optional APP_ORIGIN and REWARDS_BASE_URL
+      // are therefore not declared here; src/types.ts types them.
+      APP_ORIGINS: bindings.secret(),
       MAINNET_RPC_URL: bindings.secret(), GNOSIS_RPC_URL: bindings.secret(), SUBGRAPH_URL_MAINNET: bindings.secret(),
-      REWARDS_BASE_URL: bindings.secret(), TELEGRAM_BOT_TOKEN: bindings.secret(), TELEGRAM_BOT_NAME: bindings.secret(),
+      TELEGRAM_BOT_TOKEN: bindings.secret(), TELEGRAM_BOT_NAME: bindings.secret(),
       VAPID_PUBLIC_KEY: bindings.secret(), VAPID_PRIVATE_KEY: bindings.secret(), VAPID_SUBJECT: bindings.secret(),
     },
   },

@@ -30,7 +30,13 @@ There are two ways:
 
 Terraform supports both. For B, add `cobuilders.xyz` in the Cloudflare dashboard, which imports the
 existing GoDaddy records, check them, then set `zone_name = "cobuilders.xyz"` and `create_zone = false`.
-Terraform then manages only the Safenet records.
+Terraform then manages only the Safenet records. The import copies the existing
+`safenet` CNAME, so bring that record under Terraform before the first apply, or the apply fails on
+a duplicate record:
+
+```sh
+terraform import 'cloudflare_dns_record.web[0]' '<zone_id>/<dns_record_id>'
+```
 
 ## Prerequisites
 
@@ -73,7 +79,7 @@ Secrets:
 | `ALERTS_SUBGRAPH_URL_MAINNET` | Mainnet subgraph query URL, with its key |
 | `TELEGRAM_BOT_TOKEN` | Bot token |
 | `VAPID_PRIVATE_KEY` | VAPID private key |
-| `SAFENET_API_GITHUB_TOKEN` | Optional. A GitHub token with no scope; it raises the rate limit of SEF's data on GitHub |
+| `SAFENET_API_GITHUB_TOKEN` | A fine-grained GitHub token with no permissions. It raises the rate limit for SEF's data on GitHub. `cf` requires every declared secret, so the deploy stops without it |
 
 Variables, which are public:
 

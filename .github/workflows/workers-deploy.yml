@@ -56,9 +56,9 @@ jobs:
           done
           if [ -n "$missing" ]; then echo "::error::Missing secrets:$missing"; exit 1; fi
 
-      # The API reads public subgraph and SEF endpoints from core. GITHUB_TOKEN is optional: it
-      # raises GitHub's rate limit for SEF's data. It is a GitHub token with no scope, not this
-      # workflow's token.
+      # The API reads public subgraph and SEF endpoints from core. Its GITHUB_TOKEN raises GitHub's
+      # rate limit for SEF's data: a GitHub token with no scope, not this workflow's token. cf
+      # requires every declared secret, so the deploy stops without it.
       - name: Check and test the API
         if: inputs.target != 'alerts'
         run: pnpm --filter @cobuilders/safenet-api check && pnpm --filter @cobuilders/safenet-api test
@@ -72,9 +72,8 @@ jobs:
           trap 'rm -f "$secrets"' EXIT
           umask 077
           node -e '
-            const out = {}
-            if (process.env.SAFENET_API_GITHUB_TOKEN) out.GITHUB_TOKEN = process.env.SAFENET_API_GITHUB_TOKEN
-            require("node:fs").writeFileSync(process.argv[1], JSON.stringify(out))
+            if (!process.env.SAFENET_API_GITHUB_TOKEN) { console.error("::error::Missing production secret SAFENET_API_GITHUB_TOKEN"); process.exit(1) }
+            require("node:fs").writeFileSync(process.argv[1], JSON.stringify({ GITHUB_TOKEN: process.env.SAFENET_API_GITHUB_TOKEN }))
           ' "$secrets"
           pnpm exec cf deploy --secrets-file "$secrets" --message "safenet-api ${GITHUB_SHA::12}"
 

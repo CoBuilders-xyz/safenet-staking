@@ -252,15 +252,19 @@ export class Database {
    */
   async loadCeremonies(holder: string, expectedRevision: number, sids: string[]): Promise<Record<string, Ceremony | null> | null> {
     if (!Array.isArray(sids) || sids.length > MAX_ARCHIVE_IDS) throw new Error("archive batch limit")
-    const [, , found] = await this.batch([
+    // Measure the answer in SQL first, and return no payload above the bound: 1,000 ceremonies of
+    // 64 KiB would also exceed D1's 50 MB result limit, which fails instead of shrinking the range.
+    const size = `select 2 + coalesce(sum(length(cast(s.value as blob)) + coalesce(length(cast(c.ceremony as blob)), 4) + 4), 0) as size
+      from json_each(?1) s left join alerts_ceremonies c on c.sid = s.value`
+    const [, , measured, found] = await this.batch([
       this.leaseGuard(holder), this.revisionGuard(expectedRevision),
-      this.sql("select s.value as sid, c.ceremony from json_each(?) s left join alerts_ceremonies c on c.sid = s.value", JSON.stringify(sids)),
+      this.sql(size, JSON.stringify(sids)),
+      this.sql(`select s.value as sid, c.ceremony from json_each(?1) s left join alerts_ceremonies c on c.sid = s.value
+        where (${size}) <= ?2`, JSON.stringify(sids), MAX_TRANSFER_BYTES),
     ])
+    if ((measured!.results[0] as { size: number }).size > MAX_TRANSFER_BYTES) return null
     const result: Record<string, Ceremony | null> = {}
-    let size = 2
     for (const row of found!.results as { sid: string; ceremony: string | null }[]) {
-      size += bytes(row.sid) + (row.ceremony === null ? 4 : bytes(row.ceremony)) + 4
-      if (size > MAX_TRANSFER_BYTES) return null
       result[row.sid] = row.ceremony === null ? null : JSON.parse(row.ceremony) as Ceremony
     }
     return result
