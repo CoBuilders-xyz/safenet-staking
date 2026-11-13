@@ -53,7 +53,7 @@ describe("ContentPage", () => {
 
     expect(screen.queryByText(PLACEHOLDER)).toBeNull()
     expect(container).not.toHaveTextContent("[TODO")
-    expect(screen.getByText("Last updated: 12 November 2026")).toBeInTheDocument()
+    expect(screen.getByText("Last updated: 13 November 2026")).toBeInTheDocument()
   })
 
   it("says the text is English only in another language, and marks it as English", async () => {
@@ -76,8 +76,32 @@ describe("ContentPage", () => {
   it("states the governing law in the terms, with no internal note", () => {
     renderAt("/terms")
 
-    const section = screen.getByRole("heading", { name: /Governing law and jurisdiction/ }).nextElementSibling
+    const section = screen.getByRole("heading", { name: /Governing law/ }).nextElementSibling
     expect(section).toHaveTextContent("The laws of the State of Delaware, United States, govern these terms")
+  })
+
+  it("carries in the terms the clauses the operator's review asked for", () => {
+    const { container } = renderAt("/terms")
+
+    for (const text of [
+      "The Safe Ecosystem Foundation does not operate the Services.",
+      "your relationship is with Backstage Online LLC only",
+      "That grant creates no agency, partnership or joint venture between SEF and us.",
+      "Switzerland (SECO)",
+      "The Services are not an investment product and not a regulated financial service.",
+      "You have no expectation of profit from our efforts.",
+      "Neither you nor we may bring a claim as a plaintiff or a class member in a class, collective or representative action.",
+    ]) {
+      expect(container).toHaveTextContent(text)
+    }
+  })
+
+  it("gives the Delaware registration in the imprint, and says that SEF does not operate the interface", () => {
+    const { container } = renderAt("/imprint")
+
+    expect(container).toHaveTextContent("Registered in the State of Delaware, United States. File Number 3975558.")
+    expect(container).toHaveTextContent("SEF does not operate this interface.")
+    expect(container).toHaveTextContent("That grant creates no agency, partnership or joint venture between SEF and Backstage Online LLC.")
   })
 
   it.each(CONTENT_PAGES)("shows no internal note in /%s", (name) => {

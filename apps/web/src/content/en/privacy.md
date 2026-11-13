@@ -1,6 +1,6 @@
 # Privacy policy
 
-Last updated: 12 November 2026
+Last updated: 13 November 2026
 
 This policy explains what personal data is processed when you use Safenet Staking, why, and what your rights are. It covers the web interface, the alerts service, the public data API, the command-line tool (`safenet`) and the MCP server (`safenet-mcp`). Together they are the "Services".
 
@@ -13,7 +13,7 @@ Contact for every privacy question and request: [contact@cobuilders.xyz](mailto:
 ## 2. Summary
 
 - The Services have no user accounts. We ask for no name, no email address and no password.
-- The interface runs in your browser. Apart from the hosting that delivers its files, the staking pages use no server of ours. Your browser talks directly to third-party services, and each of them sees your IP address.
+- The interface runs in your browser. Your browser talks directly to third-party services, and each of them sees your IP address. The staking pages use two services of ours: the hosting that delivers the files, and our public data API for the list of validators. Neither receives your wallet address.
 - We set no cookies. We run no analytics and no advertising. We do not sell personal data.
 - A blockchain is public. Your wallet address and your transactions are visible to everyone, permanently. Nobody can delete them.
 - The optional alerts service is the only part of the Services that keeps a database of user data. You can delete your subscriptions yourself at any time. Apart from that, we keep the emails that you send us, and our hosting providers process the technical data of requests.
@@ -42,6 +42,7 @@ The interface sets no cookies. It keeps this data in your browser's storage:
 - `language`: your language, after you choose one.
 - Wallet connection state from the wallet library, under keys that start with `wagmi`. It holds, for example, the last wallet that you used.
 - WalletConnect session data, only if you connect with WalletConnect.
+- `terms_accepted`: the version of the Terms of use that you accepted before you connected a wallet, and the time.
 - If you enable browser notifications for alerts: a service worker and the address of the alerts service.
 
 This data stays on your device. We cannot read it. You can delete it in your browser settings at any time.
@@ -50,11 +51,12 @@ This data stays on your device. We cannot read it. You can delete it in your bro
 
 To show data and to prepare transactions, your browser sends requests directly to the services below. Each service receives your IP address, the technical data of the request and the content of the request. We do not receive these requests. Each service processes the data under its own privacy policy.
 
-**Providers of this deployment.** The interface that we publish uses the providers named in this section. It is built with the default settings of the public source code. It does not enable analytics or the separate sanctions screening service that the source code supports (see section 10). If we configure a different provider for RPC, indexed data, reward data or IPFS, we will name it here before we use it.
+**Providers of this deployment.** The interface that we publish uses the providers named in this section and no others. It does not enable analytics or the separate sanctions screening service that the source code supports (see section 10). If we configure a different provider for RPC, indexed data, reward data or IPFS, we will name it here before we use it.
 
 - **Ethereum RPC providers.** The interface reads the chain through public RPC endpoints: `ethereum-rpc.publicnode.com`, `eth.drpc.org` and `1rpc.io`. When a wallet is connected, the requests contain your wallet address. One of these requests asks an on-chain sanctions oracle whether your address is listed.
 - **The Graph.** The interface reads indexed data through The Graph's gateway, `gateway.thegraph.com`. It uses `api.studio.thegraph.com` when the gateway is not configured or fails. Most queries contain no personal data. The query for your reward history contains your wallet address.
-- **SEF's published data.** The interface reads validator data and reward data that the Safe Ecosystem Foundation publishes on GitHub (`raw.githubusercontent.com`) and on IPFS, through the gateways `ipfs.orbitor.dev` and `ipfs.filebase.io`. The request for your reward proof contains your wallet address.
+- **Our public data API.** The interface reads the list of validators from our public data API, which runs on Cloudflare Workers. The request contains no wallet address. Section 8 describes the API.
+- **SEF's published data.** The interface reads reward data that the Safe Ecosystem Foundation publishes on GitHub (`raw.githubusercontent.com`) and on IPFS, through the gateways `ipfs.orbitor.dev` and `ipfs.filebase.io`. The request for your reward proof contains your wallet address. A deployment without our API reads the list of validators from the same GitHub source.
 - **WalletConnect (Reown).** Only if you choose WalletConnect. The connection between the interface and your wallet then goes through Reown's relay network.
 - **Your wallet.** Your wallet software sends your transactions through its own providers. We do not choose or control them.
 - **Safe.** If you open the interface as a Safe App, it runs inside the Safe wallet interface and exchanges messages with it.
@@ -69,7 +71,7 @@ Transactions that you sign are recorded on a public blockchain. We do not contro
 
 ## 7. Alerts service
 
-Alerts are optional. The service applies only where a deployment offers it. It starts to process your data when you sign in to manage alerts, before you subscribe. It runs on Cloudflare Workers and stores its data in a Supabase database.
+Alerts are optional. The service starts to process your data when you sign in on the Alerts page, before you subscribe. It runs on Cloudflare Workers and stores its data in a Cloudflare D1 database.
 
 ### What the service stores
 
@@ -99,14 +101,14 @@ Open the Alerts page, sign in and choose "Delete subscription". The service then
 
 ### Who receives the data
 
-- **Cloudflare** runs the service and **Supabase** hosts its database. They process the data for us. Cloudflare also processes your IP address and the technical data of each request that your browser sends to the service.
+- **Cloudflare** runs the service and hosts its database. It processes the data for us. Cloudflare also processes your IP address and the technical data of each request that your browser sends to the service.
 - **Telegram** receives the alert text and the chat ID for a Telegram subscription.
 - **Your browser's push service**, for example the one of Google, Mozilla, Apple or Microsoft, receives the encrypted notification for a browser subscription. It cannot read the content.
 - The service reads public data through RPC providers, The Graph, GitHub and IPFS gateways. Some of these requests contain your wallet address.
 
 ## 8. Public data API
 
-Where we offer the public data API, it returns public validator and network data. It has no accounts and receives no wallet connection. It runs on Cloudflare Workers.
+The public data API returns public validator and network data. The interface uses it for the list of validators, and anyone can call it. It has no accounts and receives no wallet connection. It runs on Cloudflare Workers.
 
 - Cloudflare processes your IP address and the technical data of each request to deliver the response and to protect the service. Cloudflare's logging is enabled for the API, so Cloudflare can keep request logs. Query strings are removed from them.
 - Our own application logs record the type of route, the duration and, for a failure, an error code. They do not record your IP address.
@@ -179,7 +181,7 @@ Some limits apply:
 
 ## 15. Security
 
-The alerts service stores session tokens, link tokens and receipt tokens as hashes only. Its database accepts requests from the service only, not from browsers. No system is completely secure, and we cannot guarantee the security of data.
+The alerts service stores session tokens, link tokens and receipt tokens as hashes only. Its database is reachable by the service only, not by browsers. No system is completely secure, and we cannot guarantee the security of data.
 
 ## 16. Children
 

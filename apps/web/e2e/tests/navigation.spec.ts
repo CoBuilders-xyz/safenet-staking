@@ -90,7 +90,7 @@ test.describe("Navigation", () => {
       await layout.footer.getByRole("link", { name: link }).click()
       await expect(page).toHaveURL(url)
       await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible()
-      await expect(page.getByText("Last updated: 12 November 2026")).toBeVisible()
+      await expect(page.getByText("Last updated: 13 November 2026")).toBeVisible()
     }
 
     // A link inside a text stays in the app.

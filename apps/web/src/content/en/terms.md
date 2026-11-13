@@ -1,8 +1,8 @@
 # Terms of use
 
-Last updated: 12 November 2026
+Last updated: 13 November 2026
 
-These terms are an agreement between you and Backstage Online LLC ("we", "us"). They govern your use of the Services described below. Read them before you use the Services. If you do not agree, do not use the Services.
+These terms are an agreement between you and Backstage Online LLC ("we", "us"). They govern your use of the Services described below. Read them before you use the Services. The interface asks you to accept them before you connect a wallet. If you do not agree, do not use the Services.
 
 ## 1. Who we are
 
@@ -20,6 +20,8 @@ The "Services" are:
 
 The Services read public data from Ethereum, Gnosis Chain and third parties. They help you prepare transactions for the Safenet staking contracts and the Safenet reward distribution contract. The Safe Ecosystem Foundation (SEF) publishes those contracts, the reward programme and the reward data. We do not.
 
+The Safe Ecosystem Foundation does not operate the Services. Under these terms, your relationship is with Backstage Online LLC only, and not with SEF. SEF supported the development of the Services with a grant. That grant creates no agency, partnership or joint venture between SEF and us. SEF is not a party to these terms and is not responsible for the Services.
+
 ## 3. The Services are non-custodial
 
 - We never hold your SAFE or any other asset. We never have your private keys, your recovery phrase or your wallet password.
@@ -36,7 +38,7 @@ You may use the Services only if all of these statements are true:
 
 - You are at least 18 years old and you have the legal capacity to accept these terms.
 - You are not located in, and not a resident of, a country or territory on the restricted list of the interface, or one that is subject to comprehensive sanctions. The restricted list is part of the public source code, and the interface names your country when it refuses access for that reason.
-- You are not on a sanctions list of the United States, the European Union, the United Kingdom or the United Nations. You are not owned or controlled by a person on such a list. You do not act for one.
+- You are not on a sanctions list of the United States, the European Union, the United Kingdom, Switzerland (SECO) or the United Nations. You are not owned or controlled by a person on such a list. You do not act for one.
 - The use of the Services, and staking through them, is lawful where you are.
 
 The interface applies access checks. It looks up the country of your connection and refuses access from the countries on its restricted list. It reads an on-chain sanctions oracle for the wallet address that you connect and refuses a listed address. It also refuses access when a check cannot give an answer. The command-line tool and the MCP server apply the on-chain check before every write, and the other checks when you enable them.
@@ -58,9 +60,11 @@ You must not:
 - give false information to pass an access check;
 - use the Services in a way that infringes the rights of another person.
 
-## 6. No advice
+## 6. No advice and no investment product
 
 Nothing in the Services is financial, investment, legal or tax advice. Nothing in the Services is an offer or a recommendation to buy, sell, stake or hold any asset. A list of validators and their figures is not a recommendation of any validator. We owe you no fiduciary duty.
+
+The Services are not an investment product and not a regulated financial service. We do not manage your assets and we do not promise a return. You have no expectation of profit from our efforts. Any reward comes from the Safenet programme and depends on the validator that you choose, not on us.
 
 ## 7. Information and estimates
 
@@ -158,9 +162,11 @@ Nothing in these terms excludes or limits liability for fraud, for wilful miscon
 
 To the extent that the law allows, and except where you act as a consumer and mandatory law forbids it, you will indemnify Backstage Online LLC and its members, managers, employees, contractors and contributors against claims, losses and costs, including reasonable legal fees, that result from your breach of these terms, your breach of a law or your infringement of the rights of another person.
 
-## 18. Governing law and jurisdiction
+## 18. Governing law, jurisdiction and class action waiver
 
 The laws of the State of Delaware, United States, govern these terms and any dispute that arises from them or from the Services, without regard to conflict-of-law rules. The state and federal courts located in the State of Delaware have exclusive jurisdiction over such disputes, and you and we accept the jurisdiction of those courts.
+
+To the extent that the law allows, you and we may bring claims against each other only on an individual basis. Neither you nor we may bring a claim as a plaintiff or a class member in a class, collective or representative action.
 
 If you are a consumer, mandatory law of your country of residence can give you the right to bring a claim in your own courts and under your own law. These terms do not take that right away.
 

@@ -1,6 +1,6 @@
 # Frequently asked questions
 
-Last updated: 12 November 2026
+Last updated: 13 November 2026
 
 These answers describe what this interface does. For the rules of Safenet itself, see the [Safe Ecosystem Foundation's documentation](https://docs.safefoundation.org/safenet/) and its [FAQ](https://docs.safefoundation.org/safenet-aegis/resources/faqs). The [Terms of use](#/terms) and the [Privacy policy](#/privacy) are the binding texts. If an answer here differs from them, they apply.
 
@@ -26,7 +26,7 @@ No. The interface shows public data and prepares the transactions that you ask f
 
 ### Do I need a wallet?
 
-No, not to read. The Overview and the Validators pages work without a wallet. You need a wallet to delegate, undelegate or claim.
+No, not to read. The Overview and the Validators pages work without a wallet. You need a wallet to delegate, undelegate or claim. Before you connect one, the interface asks you to accept the [Terms of use](#/terms) and the [Privacy policy](#/privacy).
 
 ### Which wallets work?
 
@@ -94,7 +94,7 @@ Commission is the share of the rewards on delegated SAFE that the validator keep
 ### Where do the validator figures come from?
 
 - Stake, delegators and history come from the chain and from subgraphs that index it.
-- A validator's name is its verified ENS name. Without one, it is the label that SEF publishes.
+- A validator's name is its verified ENS name, where it has one.
 - Commission and the published participation rate come from SEF's published data.
 - The interface names the source of its figures. When it detects that a source is late or has failed, it says so.
 

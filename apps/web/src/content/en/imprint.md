@@ -1,12 +1,14 @@
 # Imprint
 
-Last updated: 12 November 2026
+Last updated: 13 November 2026
 
 ## Operator
 
 **Backstage Online LLC**
 
 124 Broadkill Rd #636, Milton, Delaware 19968, United States
+
+Registered in the State of Delaware, United States. File Number 3975558.
 
 ## Contact
 
@@ -22,7 +24,9 @@ The source code is public under the MIT licence.
 
 ## Relationship to the Safe Ecosystem Foundation
 
-The Safe Ecosystem Foundation (SEF) publishes the Safenet contracts, the reward programme and the reward data that this interface reads. SEF does not operate this interface. Backstage Online LLC does not control the Safenet contracts, the validators or the distribution of rewards.
+The Safe Ecosystem Foundation (SEF) publishes the Safenet contracts, the reward programme and the reward data that this interface reads. Backstage Online LLC does not control the Safenet contracts, the validators or the distribution of rewards.
+
+SEF does not operate this interface. If you use it, your relationship is with Backstage Online LLC only. SEF supported the development of this interface with a grant. That grant creates no agency, partnership or joint venture between SEF and Backstage Online LLC.
 
 Names and marks of third parties belong to their owners.
 

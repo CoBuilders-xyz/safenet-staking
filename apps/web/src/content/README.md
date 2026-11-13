@@ -18,6 +18,11 @@ point belongs in the pull request or the tracker, never in the text.
 
 Each text opens with a "Last updated" line. Change the date with every change to the text.
 
+A visitor accepts the Terms of use before a wallet connects. `TERMS_VERSION` in
+`src/config/terms.ts` is the date of the terms' "Last updated" line, and a test fails when the
+two differ. So a change to `en/terms.md` needs both: the new date in the text and the same date
+in `TERMS_VERSION`. Every visitor is then asked to accept again.
+
 To mark a text as not final, open its file with these lines:
 
 ```
