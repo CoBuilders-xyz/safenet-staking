@@ -131,7 +131,9 @@ Each wallet can hold ten subscriptions. The server derives ownership from the se
 and mutation. The browser cannot supply a wallet owner for another wallet's subscription.
 
 Telegram subscription creation returns a ten-minute, single-use bot link. Only `/start <token>` in
-a private chat can bind the recipient. The browser never supplies a chat ID. A user who loses that
+a private chat can bind the recipient. The Worker reads `/start` on its next Cron run, up to five
+minutes later, and then sends "Linked." to that chat only. An unknown, expired or reused code gets
+no reply. The browser never supplies a chat ID. A user who loses that
 link deletes the unlinked subscription and creates another. The poller does not send to groups,
 unlinked subscriptions or arbitrary recipients. Browser endpoint validation allows known HTTPS push
 providers only and forbids credentials, ports and redirects.

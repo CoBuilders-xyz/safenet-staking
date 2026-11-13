@@ -61,8 +61,15 @@ export async function telegramUpdates(db: Database, env: Env, transport: typeof 
   for (const update of data.result) {
     const message = update.message
     const link = message?.text?.match(/^\/start ([\w-]{43})$/)?.[1]
-    if (link && message?.chat.type === "private") {
-      await db.linkTelegram(await digest(link), String(message.chat.id))
+    // Confirm only a link that bound this chat. An unknown, expired or reused code gets no reply,
+    // so the bot reveals nothing about codes. A failed confirmation does not undo the link.
+    if (link && message?.chat.type === "private" && await db.linkTelegram(await digest(link), String(message.chat.id))) {
+      try {
+        await transport(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(10_000),
+          body: JSON.stringify({ chat_id: message.chat.id, text: "Linked. Safenet alerts for this subscription will arrive in this chat." }),
+        })
+      } catch { /* Never log provider URLs or bodies. */ }
     }
     const callback = update.callback_query
     if (callback?.data && /^[\w-]{43}$/.test(callback.data) && callback.message?.chat.type === "private") {

@@ -151,17 +151,47 @@ test("Telegram linking accepts a private initiated chat only; links expire and a
   try {
     const link = "x".repeat(43)
     const sub = await db.subscribe(account.address, "sig", telegram, await digest(link))
-    let privateChat = false
-    const transport: typeof fetch = async () => Response.json({ ok: true, result: [{ update_id: privateChat ? 2 : 1, message: { text: `/start ${link}`, chat: { id: 123, type: privateChat ? "private" : "group" } } }] })
+    let update: { update_id: number; message: { text: string; chat: { id: number; type: string } } } =
+      { update_id: 1, message: { text: `/start ${link}`, chat: { id: 123, type: "group" } } }
+    const sent: { chat_id: number; text: string }[] = []
+    const transport: typeof fetch = async (input, init) => {
+      if (String(input).endsWith("/sendMessage")) { sent.push(JSON.parse(String(init!.body))); return Response.json({ ok: true }) }
+      return Response.json({ ok: true, result: [update] })
+    }
     await telegramUpdates(db, env, transport)
     assert.equal((await row(db, sub.id))!.telegram_chat, null)
     assert.equal(await db.state("telegram_offset"), 2)
-    privateChat = true
+    update = { update_id: 2, message: { text: `/start ${"y".repeat(43)}`, chat: { id: 123, type: "private" } } }
+    await telegramUpdates(db, env, transport)
+    assert.equal((await row(db, sub.id))!.telegram_chat, null)
+    assert.equal(sent.length, 0) // An unknown code gets no reply.
+    update = { update_id: 3, message: { text: `/start ${link}`, chat: { id: 123, type: "private" } } }
     await telegramUpdates(db, env, transport)
     assert.equal((await row(db, sub.id))!.telegram_chat, "123")
+    assert.deepEqual(sent.map(m => m.chat_id), [123]) // Only the chat that was linked is confirmed.
+    assert.match(sent[0]!.text, /^Linked\./)
+    update = { update_id: 4, message: { text: `/start ${link}`, chat: { id: 456, type: "private" } } }
+    await telegramUpdates(db, env, transport)
+    assert.equal((await row(db, sub.id))!.telegram_chat, "123") // A reused code neither relinks nor replies.
+    assert.equal(sent.length, 1)
     assert.equal(await db.linkTelegram(await digest(link), "456"), false)
     await db.query("update alerts_subscriptions set link_hash = ?, link_expires = ? where id = ?", await digest(link), new Date(0).toISOString(), sub.id)
     assert.equal(await db.linkTelegram(await digest(link), "456"), false)
+  } finally { await db.close() }
+})
+
+test("a failed Telegram confirmation keeps the link and advances the offset", async () => {
+  const db = await TestDatabase.create()
+  try {
+    const link = "z".repeat(43)
+    const sub = await db.subscribe(account.address, "sig", telegram, await digest(link))
+    const transport: typeof fetch = async input => {
+      if (String(input).endsWith("/sendMessage")) throw new Error("Telegram unavailable")
+      return Response.json({ ok: true, result: [{ update_id: 7, message: { text: `/start ${link}`, chat: { id: 123, type: "private" } } }] })
+    }
+    await telegramUpdates(db, env, transport)
+    assert.equal((await row(db, sub.id))!.telegram_chat, "123")
+    assert.equal(await db.state("telegram_offset"), 8)
   } finally { await db.close() }
 })
 
