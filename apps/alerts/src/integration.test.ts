@@ -7,7 +7,7 @@ import { parseSiweMessage } from "viem/siwe"
 import { TestDatabase, noDatabase, at } from "./testing/database.js"
 import { challenge, authenticate } from "./auth.js"
 import { api } from "./api.js"
-import { digest, type Database, type SubscriptionSettings } from "./db.js"
+import { LINK_START_WINDOW, digest, type Database, type SubscriptionSettings } from "./db.js"
 import { poll, adapters } from "./poller.js"
 import { sendEvent, telegramUpdates } from "./delivery.js"
 import { initialChronology, foldChronology } from "./chronology.js"
@@ -185,6 +185,25 @@ test("Telegram linking accepts a private initiated chat only; links expire and a
     assert.equal(await db.linkTelegram(await digest(link), "456"), false)
     await db.query("update alerts_subscriptions set link_hash = ?, link_expires = ? where id = ?", await digest(link), new Date(0).toISOString(), sub.id)
     assert.equal(await db.linkTelegram(await digest(link), "456"), false)
+  } finally { await db.close() }
+})
+
+test("a Start pressed at the end of the ten-minute window still links on the next Cron run", async () => {
+  const db = await TestDatabase.create()
+  try {
+    const link = "w".repeat(43)
+    const sub = await db.subscribe(account.address, "sig", telegram, await digest(link))
+    const { created, expires } = (await db.query<{ created: string; expires: string }>(
+      "select created_at created, link_expires expires from alerts_subscriptions where id = ?", sub.id))[0]!
+    assert.equal(Date.parse(expires) - Date.parse(created), LINK_START_WINDOW + 5 * 60_000)
+    // Start at 9:59, then the Cron run up to five minutes later: 14:59 after creation.
+    const elapsed = LINK_START_WINDOW - 1000 + 5 * 60_000
+    await db.query("update alerts_subscriptions set created_at = ?, link_expires = ? where id = ?",
+      at(-elapsed), new Date(Date.parse(expires) - elapsed).toISOString(), sub.id)
+    const transport: typeof fetch = async input => String(input).endsWith("/sendMessage") ? Response.json({ ok: true })
+      : Response.json({ ok: true, result: [{ update_id: 9, message: { text: `/start ${link}`, chat: { id: 123, type: "private" } } }] })
+    await telegramUpdates(db, env, transport)
+    assert.equal((await row(db, sub.id))!.telegram_chat, "123")
   } finally { await db.close() }
 })
 

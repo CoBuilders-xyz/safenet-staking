@@ -130,10 +130,13 @@ Challenge creation is bounded to ten active challenges per wallet and 1,000 glob
 Each wallet can hold ten subscriptions. The server derives ownership from the session on every read
 and mutation. The browser cannot supply a wallet owner for another wallet's subscription.
 
-Telegram subscription creation returns a ten-minute, single-use bot link. Only `/start <token>` in
-a private chat can bind the recipient. The Worker reads `/start` on its next Cron run, up to five
-minutes later, and then sends "Linked." to that chat only. An unknown, expired or reused code gets
-no reply. The browser never supplies a chat ID. A user who loses that
+Telegram subscription creation returns a single-use bot link. The interface asks the user to press
+Start within ten minutes. Only `/start <token>` in a private chat can bind the recipient. The
+Worker reads `/start` on its next Cron run, up to five minutes later, so the code stays valid for
+fifteen minutes: a Start pressed inside the ten minutes is always processed. The Worker then sends
+"Linked. Safenet alerts for this subscription will arrive in this chat." to that chat only. This
+confirmation is best effort: if Telegram refuses it, the link stays and the alerts page shows
+"Telegram linked". An unknown, expired or reused code gets no reply. The browser never supplies a chat ID. A user who loses that
 link deletes the unlinked subscription and creates another. The poller does not send to groups,
 unlinked subscriptions or arbitrary recipients. Browser endpoint validation allows known HTTPS push
 providers only and forbids credentials, ports and redirects.

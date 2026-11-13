@@ -11,7 +11,12 @@ const MAX_PENDING = 10_000
 
 const LEASE = 16 * 60_000
 const SESSION = 30 * 60_000
-const LINK = 10 * 60_000
+/**
+ * The interface asks for Start within ten minutes. The Worker reads /start on its next Cron run,
+ * up to five minutes later, so the code stays valid for both.
+ */
+export const LINK_START_WINDOW = 10 * 60_000
+const LINK = LINK_START_WINDOW + 5 * 60_000
 const RECEIPT = 24 * 60 * 60_000
 const DELIVERY_LEASE = 2 * 60_000
 const iso = (ms: number) => new Date(ms).toISOString()
