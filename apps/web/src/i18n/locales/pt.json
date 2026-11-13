@@ -746,16 +746,17 @@
     "sendTestPush": "Enviar notificação de teste",
     "sendTestTelegram": "Enviar mensagem de teste",
     "statusPaused": "Em pausa. Nenhum alerta é enviado até você retomar.",
-    "statusPushExpired": "Este navegador não aceita mais notificações. Exclua esta assinatura e assine novamente.",
-    "statusPushUnverified": "Assinatura feita. Envie uma notificação de teste para conferir se este navegador a exibe.",
-    "statusPushVerified": "As notificações chegam a este navegador.",
+    "statusPushExpired": "O navegador com o qual você assinou não aceita mais notificações. Exclua esta assinatura e assine novamente.",
+    "statusPushUnverified": "Assinatura feita. Envie uma notificação de teste: o navegador com o qual você assinou deve exibi-la.",
+    "statusPushVerified": "As notificações chegam ao navegador com o qual você assinou.",
     "statusTelegramBlocked": "O Telegram não aceita mais mensagens para este chat. Exclua esta assinatura e assine novamente.",
     "statusTelegramConnected": "Conectado ao Telegram.",
     "statusTelegramConnectedSince": "Conectado ao Telegram desde {{date}}.",
-    "statusTelegramLinkExpired": "Ainda não conectado. Este link do Telegram expirou. Gere um novo link, abra-o e toque em Iniciar.",
-    "statusTelegramNoLink": "Não conectado. Gere um novo link do Telegram, abra-o e toque em Iniciar.",
-    "statusTelegramWaiting": "Ainda não conectado. Abra o Telegram e toque em Iniciar. Depois de tocar em Iniciar, a conexão pode levar até 5 minutos.",
-    "testSentPush": "Notificação de teste enviada. Este navegador deve exibi-la agora.",
-    "testSentTelegram": "Mensagem de teste enviada. Confira seu chat do Telegram."
+    "statusTelegramLinkExpired": "Ainda não conectado. O link do Telegram expirou. Se você tocou em Iniciar antes disso, aguarde até 5 minutos: esta página se atualiza sozinha. Se não, gere um novo link, abra-o e toque em Iniciar.",
+    "statusTelegramNoLink": "Ainda não conectado. Se você já tocou em Iniciar, aguarde até 5 minutos: esta página se atualiza sozinha. Se não, gere um novo link do Telegram, abra-o e toque em Iniciar.",
+    "statusTelegramWaiting": "Ainda não conectado. Abra o Telegram e toque em Iniciar. Depois de tocar em Iniciar, a conexão pode levar até 5 minutos. Esta página se atualiza sozinha.",
+    "testSentPush": "Notificação de teste enviada. O navegador com o qual você assinou deve exibi-la agora.",
+    "testSentTelegram": "Mensagem de teste enviada. Confira seu chat do Telegram.",
+    "errorUnavailable": "O serviço de alertas está indisponível. Tente mais tarde."
   }
 }

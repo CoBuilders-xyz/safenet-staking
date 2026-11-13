@@ -746,16 +746,17 @@
     "sendTestPush": "Invia notifica di prova",
     "sendTestTelegram": "Invia messaggio di prova",
     "statusPaused": "In pausa. Nessun avviso viene inviato finché non riprendi.",
-    "statusPushExpired": "Questo browser non accetta più notifiche. Elimina questa iscrizione e iscriviti di nuovo.",
-    "statusPushUnverified": "Iscrizione attiva. Invia una notifica di prova per verificare che questo browser la mostri.",
-    "statusPushVerified": "Le notifiche arrivano a questo browser.",
+    "statusPushExpired": "Il browser con cui ti sei iscritto non accetta più notifiche. Elimina questa iscrizione e iscriviti di nuovo.",
+    "statusPushUnverified": "Iscrizione attiva. Invia una notifica di prova: il browser con cui ti sei iscritto dovrebbe mostrarla.",
+    "statusPushVerified": "Le notifiche arrivano al browser con cui ti sei iscritto.",
     "statusTelegramBlocked": "Telegram non accetta più messaggi per questa chat. Elimina questa iscrizione e iscriviti di nuovo.",
     "statusTelegramConnected": "Collegato a Telegram.",
     "statusTelegramConnectedSince": "Collegato a Telegram dal {{date}}.",
-    "statusTelegramLinkExpired": "Ancora non collegato. Questo link Telegram è scaduto. Richiedi un nuovo link, aprilo e premi Avvia.",
-    "statusTelegramNoLink": "Non collegato. Richiedi un nuovo link Telegram, aprilo e premi Avvia.",
-    "statusTelegramWaiting": "Non ancora collegato. Apri Telegram e premi Avvia. Dopo aver premuto Avvia, il collegamento può richiedere fino a 5 minuti.",
-    "testSentPush": "Notifica di prova inviata. Questo browser dovrebbe mostrarla ora.",
-    "testSentTelegram": "Messaggio di prova inviato. Controlla la tua chat Telegram."
+    "statusTelegramLinkExpired": "Ancora non collegato. Il link Telegram è scaduto. Se hai premuto Avvia prima della scadenza, attendi fino a 5 minuti: questa pagina si aggiorna da sola. Altrimenti richiedi un nuovo link, aprilo e premi Avvia.",
+    "statusTelegramNoLink": "Non ancora collegato. Se hai già premuto Avvia, attendi fino a 5 minuti: questa pagina si aggiorna da sola. Altrimenti richiedi un nuovo link Telegram, aprilo e premi Avvia.",
+    "statusTelegramWaiting": "Non ancora collegato. Apri Telegram e premi Avvia. Dopo aver premuto Avvia, il collegamento può richiedere fino a 5 minuti. Questa pagina si aggiorna da sola.",
+    "testSentPush": "Notifica di prova inviata. Il browser con cui ti sei iscritto dovrebbe mostrarla ora.",
+    "testSentTelegram": "Messaggio di prova inviato. Controlla la tua chat Telegram.",
+    "errorUnavailable": "Il servizio di avvisi non è disponibile. Riprova più tardi."
   }
 }

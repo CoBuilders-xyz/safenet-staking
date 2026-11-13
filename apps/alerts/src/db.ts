@@ -180,6 +180,11 @@ export class Database {
     chat, iso(now), linkHash, iso(Math.min(sentAt, now)), iso(now - LINK_PROCESSING_GRACE)) > 0
   }
 
+  /** Whether this Telegram chat already receives alerts for a subscription that can still deliver. */
+  async chatLinked(chat: string): Promise<boolean> {
+    return (await this.all("select 1 from alerts_subscriptions where telegram_chat = ? and status != 'expired' limit 1", chat)).length > 0
+  }
+
   /** Claims an event for delivery. A failed or abandoned claim can be taken again once its lease ends. */
   async reserve(subscriptionId: string, eventKey: string, ackHash: string): Promise<boolean> {
     const now = Date.now()
@@ -270,6 +275,8 @@ export class Database {
       this.sql("update alerts_subscriptions set link_hash = null, link_expires = null where link_expires < ?", iso(Date.parse(now) - LINK_PROCESSING_GRACE)),
       // Keep event keys while subscriptions exist, so that an unclaimed condition does not resend.
       this.sql("update alerts_deliveries set ack_hash = null, ack_expires = null where ack_expires < ?", now),
+      // A test message is no condition: its row only carries the receipt, which lasts a day.
+      this.sql("delete from alerts_deliveries where event_key like 'test:%' and updated_at < ?", iso(Date.parse(now) - RECEIPT)),
       // Thirteen months of aggregate availability evidence; no wallet or endpoint in this table.
       this.sql("delete from alerts_runs where started_at < strftime('%Y-%m-%dT%H:%M:%fZ', ?, '-13 months')", now),
     ])

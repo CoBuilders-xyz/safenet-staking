@@ -46,7 +46,8 @@ async function service(page: Page, options: { fail?: boolean; verify?: boolean; 
   })
   return state
 }
-const waiting = "Not connected yet. Open Telegram and press Start. After you press Start, connecting can take up to 5 minutes."
+const waiting = "Not connected yet. Open Telegram and press Start. After you press Start, connecting can take up to 5 minutes. This page updates by itself."
+const expiredLink = "Still not connected. The Telegram link has expired. If you pressed Start before that, wait up to 5 minutes: this page updates by itself. If not, get a new link, open it and press Start."
 
 test("alerts explains wallet connection and passes accessibility checks", async ({ disconnectedPage: page }) => {
   await page.goto("/#/alerts")
@@ -74,6 +75,8 @@ test("signs, selects all five triggers, shows the Telegram link in its card and 
   const link = card.getByRole("link", { name: "Open Telegram and press Start" })
   await expect(link).toHaveAttribute("href", "https://t.me/test_bot?start=local-test")
   await expect(link).toBeFocused()
+  // A new link would cancel this one, so the card does not offer it while this one can be opened.
+  await expect(card.getByRole("button", { name: "Get a new Telegram link" })).toHaveCount(0)
   await expect(card.getByRole("button", { name: "Send test message" })).toHaveCount(0) // Nothing to test before a chat is linked.
   expect(subscriptions[0]!.triggers).toHaveLength(5)
   expect(subscriptions[0]!.participation).toBe(80)
@@ -125,7 +128,7 @@ test("a lost or expired Telegram link is replaced from the card, without deletin
   await expect(card.getByRole("link", { name: "Open Telegram and press Start" })).toBeVisible()
   // The link expires before Start: the card says so and stops offering the dead link.
   subscriptions[0]!.linkExpiresAt = new Date(Date.now() - 1000).toISOString()
-  await expect(card.getByRole("status")).toHaveText("Still not connected. This Telegram link has expired. Get a new link, open it and press Start.", { timeout: 15_000 })
+  await expect(card.getByRole("status")).toHaveText(expiredLink, { timeout: 15_000 })
   await expect(card.getByRole("link", { name: "Open Telegram and press Start" })).toHaveCount(0)
   await card.getByRole("button", { name: "Get a new Telegram link" }).click()
   await expect(card.getByRole("link", { name: "Open Telegram and press Start" })).toHaveAttribute("href", "https://t.me/test_bot?start=reissued-1")
@@ -133,7 +136,7 @@ test("a lost or expired Telegram link is replaced from the card, without deletin
   // After a reload the page has no link to show, so the card offers a new one.
   await page.reload()
   await page.getByRole("button", { name: "Sign to manage alerts" }).click()
-  await expect(card.getByRole("status")).toHaveText("Not connected. Get a new Telegram link, open it and press Start.")
+  await expect(card.getByRole("status")).toHaveText("Not connected yet. If you already pressed Start, wait up to 5 minutes: this page updates by itself. If not, get a new Telegram link, open it and press Start.")
   await card.getByRole("button", { name: "Get a new Telegram link" }).click()
   await expect(card.getByRole("link", { name: "Open Telegram and press Start" })).toHaveAttribute("href", "https://t.me/test_bot?start=reissued-2")
   expect(calls).toEqual(["telegram-link", "telegram-link"])
@@ -194,7 +197,7 @@ test("service error is accessible on mobile without horizontal overflow", async 
   await page.setViewportSize({ width: 390, height: 844 })
   await service(page, { fail: true })
   await page.goto("/#/alerts")
-  await expect(page.getByRole("alert")).toHaveText("The alerts service did not answer. Check your connection and try again.")
+  await expect(page.getByRole("alert")).toHaveText("The alerts service is unavailable. Try again later.")
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
 
@@ -225,14 +228,14 @@ test("browser subscription saves the selected device endpoint and asks for a tes
   })
   await page.getByRole("button", { name: "Subscribe", exact: true }).click()
   const card = page.getByRole("article")
-  await expect(card.getByRole("status")).toHaveText("Subscribed. Send a test notification to check that this browser shows it.")
+  await expect(card.getByRole("status")).toHaveText("Subscribed. Send a test notification: the browser you subscribed with should show it.")
   expect(subscriptions[0]!.channel).toBe("push")
   await card.getByRole("button", { name: "Send test notification" }).click()
-  await expect(card.getByText("Test notification sent. This browser should show it now.")).toBeVisible()
+  await expect(card.getByText("Test notification sent. The browser you subscribed with should show it now.")).toBeVisible()
   expect(calls).toEqual(["test"])
   // The service worker confirms the notification it showed; the card then says so.
   subscriptions[0]!.status = "verified"
-  await expect(card.getByRole("status").first()).toHaveText("Notifications reach this browser.", { timeout: 20_000 })
+  await expect(card.getByRole("status").first()).toHaveText("Notifications reach the browser you subscribed with.", { timeout: 20_000 })
 })
 
 test("pending Safe approval retries verification of the same signed challenge", async ({ connectedPage: page }) => {

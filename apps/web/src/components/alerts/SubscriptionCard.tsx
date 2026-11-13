@@ -64,13 +64,15 @@ export function SubscriptionCard({ sub, triggers, linkUrl, focusLink, maxSubscri
   if (expired) {
     status = telegram
       ? t("alerts.statusTelegramBlocked", "Telegram no longer accepts messages for this chat. Delete this subscription and subscribe again.")
-      : t("alerts.statusPushExpired", "This browser no longer accepts notifications. Delete this subscription and subscribe again.")
+      : t("alerts.statusPushExpired", "The browser you subscribed with no longer accepts notifications. Delete this subscription and subscribe again.")
   } else if (unlinked) {
+    // A new link cancels the old one, and a Start already sent is read up to 5 minutes later.
+    // So the card offers a new link only when it has none to open, and says to wait first.
     status = openLink
-      ? t("alerts.statusTelegramWaiting", "Not connected yet. Open Telegram and press Start. After you press Start, connecting can take up to 5 minutes.")
-      : linkUrl
-        ? t("alerts.statusTelegramLinkExpired", "Still not connected. This Telegram link has expired. Get a new link, open it and press Start.")
-        : t("alerts.statusTelegramNoLink", "Not connected. Get a new Telegram link, open it and press Start.")
+      ? t("alerts.statusTelegramWaiting", "Not connected yet. Open Telegram and press Start. After you press Start, connecting can take up to 5 minutes. This page updates by itself.")
+      : linkAlive
+        ? t("alerts.statusTelegramNoLink", "Not connected yet. If you already pressed Start, wait up to 5 minutes: this page updates by itself. If not, get a new Telegram link, open it and press Start.")
+        : t("alerts.statusTelegramLinkExpired", "Still not connected. The Telegram link has expired. If you pressed Start before that, wait up to 5 minutes: this page updates by itself. If not, get a new link, open it and press Start.")
   } else if (sub.paused) {
     status = t("alerts.statusPaused", "Paused. No alerts are sent until you resume.")
   } else if (telegram) {
@@ -79,8 +81,8 @@ export function SubscriptionCard({ sub, triggers, linkUrl, focusLink, maxSubscri
       : t("alerts.statusTelegramConnected", "Connected to Telegram.")
   } else {
     status = sub.status === "verified"
-      ? t("alerts.statusPushVerified", "Notifications reach this browser.")
-      : t("alerts.statusPushUnverified", "Subscribed. Send a test notification to check that this browser shows it.")
+      ? t("alerts.statusPushVerified", "Notifications reach the browser you subscribed with.")
+      : t("alerts.statusPushUnverified", "Subscribed. Send a test notification: the browser you subscribed with should show it.")
   }
 
   return <article className="rounded-lg border p-4 space-y-3" aria-busy={busy}>
@@ -96,12 +98,12 @@ export function SubscriptionCard({ sub, triggers, linkUrl, focusLink, maxSubscri
     {error && <p role="alert">{alertErrorMessage(t, error, maxSubscriptions)}</p>}
     {testSent && <p role="status">{telegram
       ? t("alerts.testSentTelegram", "Test message sent. Check your Telegram chat.")
-      : t("alerts.testSentPush", "Test notification sent. This browser should show it now.")}</p>}
+      : t("alerts.testSentPush", "Test notification sent. The browser you subscribed with should show it now.")}</p>}
     <div className="flex flex-wrap gap-2">
       {openLink && <Button asChild>
         <a ref={anchor} href={openLink} target="_blank" rel="noreferrer">{t("alerts.linkTelegram", "Open Telegram and press Start")}</a>
       </Button>}
-      {unlinked && <Button variant={openLink ? "outline" : "default"} disabled={busy}
+      {unlinked && !openLink && <Button disabled={busy}
         onClick={() => void run(async () => onLink(sub.id, (await actions.newLink(sub.id)).telegramUrl))}>
         {t("alerts.newLink", "Get a new Telegram link")}
       </Button>}

@@ -236,6 +236,31 @@ test("the bot answers every private /start, once per chat per poll, and reads Te
     failReplies = true
     assert.deepEqual(await telegramUpdates(db, env, transport), { updates: 1, linked: 0, startBare: 1, startRejected: 0, receipts: 0, replyFailures: 1 })
     assert.equal(await db.state("telegram_offset"), 11)
+    failReplies = false
+    // A chat that already receives alerts is not told to subscribe, whatever it sends.
+    sent.length = 0
+    updates = [message(11, "/start", 11)]
+    await telegramUpdates(db, env, transport)
+    updates = [message(12, `/start ${link}`, 11)] // The same link opened again.
+    await telegramUpdates(db, env, transport)
+    assert.deepEqual(sent.map(m => m.text), [
+      "This chat receives Safenet alerts. Manage them at https://app.test/#/alerts.",
+      "This link has expired or was already used. This chat already receives Safenet alerts. Manage them at https://app.test/#/alerts.",
+    ])
+    // A client that sends the same /start twice in one poll gets "Linked." once, and no rejection after it.
+    const again = "m".repeat(43)
+    const second = await db.subscribe(account.address, "sig", telegram, await digest(again))
+    sent.length = 0
+    updates = [message(13, `/start ${again}`, 12), message(14, `/start ${again}`, 12), message(15, "/start", 12)]
+    assert.deepEqual(await telegramUpdates(db, env, transport), { updates: 3, linked: 1, startBare: 1, startRejected: 1, receipts: 0, replyFailures: 0 })
+    assert.deepEqual(sent.map(m => [m.chat_id, m.text.slice(0, 7)]), [[12, "Linked."]])
+    assert.equal((await row(db, second.id))!.telegram_chat, "12")
+    // At most twenty guidance replies per poll; every update is still read.
+    sent.length = 0
+    updates = Array.from({ length: 25 }, (_, index) => message(20 + index, "/start", 100 + index))
+    assert.equal((await telegramUpdates(db, env, transport))!.startBare, 25)
+    assert.equal(sent.length, 20)
+    assert.equal(await db.state("telegram_offset"), 45)
   } finally { await db.close() }
 })
 
@@ -615,10 +640,15 @@ test("cleanup removes expired authentication, links and receipts, and keeps thir
     await db.query("update alerts_subscriptions set link_expires = ?", at(-LINK_PROCESSING_GRACE - 1000)) // Expired and past the grace period.
     await db.query("update alerts_deliveries set ack_expires = ?", at(-1000))
     await db.query("insert into alerts_runs(started_at) values (?), (?)", at(-400 * 86_400_000), at(-380 * 86_400_000))
+    // A day-old test message row goes; a recent one, and every condition key, stays.
+    await db.reserve(sub.id, "test:old", "old-test")
+    await db.reserve(sub.id, "test:new", "new-test")
+    await db.query("update alerts_deliveries set updated_at = ? where event_key = 'test:old'", at(-25 * 3_600_000))
     await db.cleanup()
+    assert.deepEqual((await db.query<{ event_key: string }>("select event_key from alerts_deliveries order by event_key")).map(item => item.event_key), ["cooldown:1", "test:new"])
     assert.equal((await db.query("select * from alerts_challenges")).length, 0)
     assert.deepEqual(await db.query("select link_hash from alerts_subscriptions"), [{ link_hash: null }])
-    assert.deepEqual(await db.query("select ack_hash, event_key from alerts_deliveries"), [{ ack_hash: null, event_key: "cooldown:1" }])
+    assert.deepEqual(await db.query("select ack_hash, event_key from alerts_deliveries where event_key = 'cooldown:1'"), [{ ack_hash: null, event_key: "cooldown:1" }])
     assert.equal((await db.query("select * from alerts_runs")).length, 1)
   } finally { await db.close() }
 })

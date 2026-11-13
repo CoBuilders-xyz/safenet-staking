@@ -90,6 +90,8 @@ export function parseStart(text: string, botName?: string): StartCommand | null 
   if (!argument) return { kind: "bare" }
   return /^[\w-]{43}$/.test(argument) ? { kind: "code", code: argument } : { kind: "invalid" }
 }
+/** Guidance replies sent in one poll. A poll reads at most 100 updates, and each reply can take ten seconds. */
+const GUIDANCE_PER_POLL = 20
 /** Aggregate counts of one Telegram poll. No chat, code or text. */
 export interface TelegramCounts { updates: number; linked: number; startBare: number; startRejected: number; receipts: number; replyFailures: number }
 
@@ -106,17 +108,23 @@ export async function telegramUpdates(db: Database, env: Env, transport: typeof 
   let page: string | undefined
   try { page = `${allowedOrigins(env)[0]}/#/alerts` } catch { /* The replies then name the page without a link. */ }
   const where = page ? `Open ${page}` : "Open the Alerts page of Safenet"
+  const manage = page ? `Manage them at ${page}` : "Manage them on the Alerts page of Safenet"
+  // What a chat is told depends only on the code's outcome and on that chat's own state.
   const guidance = {
     bare: `This bot sends Safenet alerts. ${where}, subscribe with Telegram, and use the link it shows. The link opens this chat with a one-time code.`,
     rejected: `This link has expired or was already used. ${where} and press "Get a new Telegram link".`,
+    bareLinked: `This chat receives Safenet alerts. ${manage}.`,
+    rejectedLinked: `This link has expired or was already used. This chat already receives Safenet alerts. ${manage}.`,
   }
   const offset = await db.state<number>("telegram_offset")
   const response = await call("getUpdates", { offset: offset ?? 0, limit: 100, timeout: 0, allowed_updates: ["message", "callback_query"] })
   if (!response.ok) throw new Error("Telegram polling unavailable")
   const data = await response.json() as { ok: boolean; result: TelegramUpdate[] }
   if (!data.ok) throw new Error("Telegram polling unavailable")
-  // One guidance reply per chat per poll, so repeated /start cannot make the Worker send in bulk.
+  // One guidance reply per chat per poll, and GUIDANCE_PER_POLL in all, so repeated /start cannot
+  // make the Worker send in bulk or hold back the deliveries that follow this poll.
   const guided = new Set<number>()
+  let guidanceSent = 0
   for (const update of data.result) {
     counts.updates++
     const message = update.message
@@ -128,14 +136,19 @@ export async function telegramUpdates(db: Database, env: Env, transport: typeof 
         message.date === undefined ? undefined : message.date * 1000)
       if (linked) {
         counts.linked++
+        // A client can send the same /start again; the chat that was just told "Linked." gets no second answer.
+        guided.add(message.chat.id)
         await attempt("sendMessage", { chat_id: message.chat.id, text: "Linked. Safenet alerts for this subscription will arrive in this chat." })
       } else {
         // An unknown, expired or reused code gets one neutral reply, so the bot reveals nothing about codes.
         const reason = start.kind === "bare" ? "bare" : "rejected"
         if (reason === "bare") counts.startBare++; else counts.startRejected++
-        if (!guided.has(message.chat.id)) {
+        if (!guided.has(message.chat.id) && guidanceSent < GUIDANCE_PER_POLL) {
           guided.add(message.chat.id)
-          await attempt("sendMessage", { chat_id: message.chat.id, text: guidance[reason], disable_web_page_preview: true })
+          guidanceSent++
+          // A chat that already receives alerts is not told to subscribe: the page shows it as connected.
+          const text = guidance[await db.chatLinked(String(message.chat.id)) ? `${reason}Linked` as const : reason]
+          await attempt("sendMessage", { chat_id: message.chat.id, text, disable_web_page_preview: true })
         }
       }
     }

@@ -746,16 +746,17 @@
     "sendTestPush": "Envoyer une notification de test",
     "sendTestTelegram": "Envoyer un message de test",
     "statusPaused": "En pause. Aucune alerte n’est envoyée tant que vous ne reprenez pas.",
-    "statusPushExpired": "Ce navigateur n’accepte plus les notifications. Supprimez cet abonnement et réabonnez-vous.",
-    "statusPushUnverified": "Abonné. Envoyez une notification de test pour vérifier que ce navigateur l’affiche.",
-    "statusPushVerified": "Les notifications arrivent sur ce navigateur.",
+    "statusPushExpired": "Le navigateur avec lequel vous vous êtes abonné n’accepte plus les notifications. Supprimez cet abonnement et réabonnez-vous.",
+    "statusPushUnverified": "Abonné. Envoyez une notification de test : le navigateur avec lequel vous vous êtes abonné devrait l’afficher.",
+    "statusPushVerified": "Les notifications arrivent sur le navigateur avec lequel vous vous êtes abonné.",
     "statusTelegramBlocked": "Telegram n’accepte plus de messages pour cette conversation. Supprimez cet abonnement et réabonnez-vous.",
     "statusTelegramConnected": "Connecté à Telegram.",
     "statusTelegramConnectedSince": "Connecté à Telegram depuis le {{date}}.",
-    "statusTelegramLinkExpired": "Toujours pas connecté. Ce lien Telegram a expiré. Obtenez un nouveau lien, ouvrez-le et appuyez sur Démarrer.",
-    "statusTelegramNoLink": "Non connecté. Obtenez un nouveau lien Telegram, ouvrez-le et appuyez sur Démarrer.",
-    "statusTelegramWaiting": "Pas encore connecté. Ouvrez Telegram et appuyez sur Démarrer. Après avoir appuyé sur Démarrer, la connexion peut prendre jusqu’à 5 minutes.",
-    "testSentPush": "Notification de test envoyée. Ce navigateur devrait l’afficher maintenant.",
-    "testSentTelegram": "Message de test envoyé. Consultez votre conversation Telegram."
+    "statusTelegramLinkExpired": "Toujours pas connecté. Le lien Telegram a expiré. Si vous avez appuyé sur Démarrer avant, patientez jusqu’à 5 minutes : cette page se met à jour toute seule. Sinon, obtenez un nouveau lien, ouvrez-le et appuyez sur Démarrer.",
+    "statusTelegramNoLink": "Pas encore connecté. Si vous avez déjà appuyé sur Démarrer, patientez jusqu’à 5 minutes : cette page se met à jour toute seule. Sinon, obtenez un nouveau lien Telegram, ouvrez-le et appuyez sur Démarrer.",
+    "statusTelegramWaiting": "Pas encore connecté. Ouvrez Telegram et appuyez sur Démarrer. Après avoir appuyé sur Démarrer, la connexion peut prendre jusqu’à 5 minutes. Cette page se met à jour toute seule.",
+    "testSentPush": "Notification de test envoyée. Le navigateur avec lequel vous vous êtes abonné devrait l’afficher maintenant.",
+    "testSentTelegram": "Message de test envoyé. Consultez votre conversation Telegram.",
+    "errorUnavailable": "Le service d’alertes est indisponible. Réessayez plus tard."
   }
 }

@@ -726,16 +726,17 @@
     "sendTestPush": "发送测试通知",
     "sendTestTelegram": "发送测试消息",
     "statusPaused": "已暂停。恢复之前不会发送提醒。",
-    "statusPushExpired": "此浏览器已不再接受通知。请删除此订阅并重新订阅。",
-    "statusPushUnverified": "已订阅。发送一条测试通知，确认此浏览器能显示。",
-    "statusPushVerified": "通知可以送达此浏览器。",
+    "statusPushExpired": "你订阅时使用的浏览器已不再接受通知。请删除此订阅并重新订阅。",
+    "statusPushUnverified": "已订阅。发送一条测试通知：你订阅时使用的浏览器应会显示。",
+    "statusPushVerified": "通知可以送达你订阅时使用的浏览器。",
     "statusTelegramBlocked": "Telegram 已不再接受发往此聊天的消息。请删除此订阅并重新订阅。",
     "statusTelegramConnected": "已连接 Telegram。",
     "statusTelegramConnectedSince": "自 {{date}} 起已连接 Telegram。",
-    "statusTelegramLinkExpired": "仍未连接。此 Telegram 链接已过期。请获取新链接，打开并点击开始。",
-    "statusTelegramNoLink": "未连接。请获取新的 Telegram 链接，打开并点击开始。",
-    "statusTelegramWaiting": "尚未连接。请打开 Telegram 并点击开始。点击开始后，连接最多可能需要 5 分钟。",
-    "testSentPush": "测试通知已发送。此浏览器现在应会显示。",
-    "testSentTelegram": "测试消息已发送。请查看你的 Telegram 聊天。"
+    "statusTelegramLinkExpired": "仍未连接。Telegram 链接已过期。如果你在过期前已点击开始，请等待最多 5 分钟：本页会自动更新。如果没有，请获取新链接，打开并点击开始。",
+    "statusTelegramNoLink": "尚未连接。如果你已点击开始，请等待最多 5 分钟：本页会自动更新。如果没有，请获取新的 Telegram 链接，打开并点击开始。",
+    "statusTelegramWaiting": "尚未连接。请打开 Telegram 并点击开始。点击开始后，连接最多可能需要 5 分钟。本页会自动更新。",
+    "testSentPush": "测试通知已发送。你订阅时使用的浏览器现在应会显示。",
+    "testSentTelegram": "测试消息已发送。请查看你的 Telegram 聊天。",
+    "errorUnavailable": "提醒服务不可用。请稍后重试。"
   }
 }

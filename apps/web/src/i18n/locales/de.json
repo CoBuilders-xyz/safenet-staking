@@ -736,16 +736,17 @@
     "sendTestPush": "Testbenachrichtigung senden",
     "sendTestTelegram": "Testnachricht senden",
     "statusPaused": "Pausiert. Bis du fortsetzt, werden keine Benachrichtigungen gesendet.",
-    "statusPushExpired": "Dieser Browser nimmt keine Benachrichtigungen mehr an. Lösche dieses Abo und abonniere erneut.",
-    "statusPushUnverified": "Abonniert. Sende eine Testbenachrichtigung, um zu prüfen, ob dieser Browser sie anzeigt.",
-    "statusPushVerified": "Benachrichtigungen erreichen diesen Browser.",
+    "statusPushExpired": "Der Browser, mit dem du abonniert hast, nimmt keine Benachrichtigungen mehr an. Lösche dieses Abo und abonniere erneut.",
+    "statusPushUnverified": "Abonniert. Sende eine Testbenachrichtigung: Der Browser, mit dem du abonniert hast, sollte sie anzeigen.",
+    "statusPushVerified": "Benachrichtigungen erreichen den Browser, mit dem du abonniert hast.",
     "statusTelegramBlocked": "Telegram nimmt für diesen Chat keine Nachrichten mehr an. Lösche dieses Abo und abonniere erneut.",
     "statusTelegramConnected": "Mit Telegram verbunden.",
     "statusTelegramConnectedSince": "Mit Telegram verbunden seit {{date}}.",
-    "statusTelegramLinkExpired": "Noch immer nicht verbunden. Dieser Telegram-Link ist abgelaufen. Hole einen neuen Link, öffne ihn und drücke Start.",
-    "statusTelegramNoLink": "Nicht verbunden. Hole einen neuen Telegram-Link, öffne ihn und drücke Start.",
-    "statusTelegramWaiting": "Noch nicht verbunden. Öffne Telegram und drücke Start. Nach dem Drücken von Start kann das Verbinden bis zu 5 Minuten dauern.",
-    "testSentPush": "Testbenachrichtigung gesendet. Dieser Browser sollte sie jetzt anzeigen.",
-    "testSentTelegram": "Testnachricht gesendet. Sieh in deinem Telegram-Chat nach."
+    "statusTelegramLinkExpired": "Noch immer nicht verbunden. Der Telegram-Link ist abgelaufen. Wenn du davor Start gedrückt hast, warte bis zu 5 Minuten: Diese Seite aktualisiert sich von selbst. Wenn nicht, hole einen neuen Link, öffne ihn und drücke Start.",
+    "statusTelegramNoLink": "Noch nicht verbunden. Wenn du Start schon gedrückt hast, warte bis zu 5 Minuten: Diese Seite aktualisiert sich von selbst. Wenn nicht, hole einen neuen Telegram-Link, öffne ihn und drücke Start.",
+    "statusTelegramWaiting": "Noch nicht verbunden. Öffne Telegram und drücke Start. Nach dem Drücken von Start kann das Verbinden bis zu 5 Minuten dauern. Diese Seite aktualisiert sich von selbst.",
+    "testSentPush": "Testbenachrichtigung gesendet. Der Browser, mit dem du abonniert hast, sollte sie jetzt anzeigen.",
+    "testSentTelegram": "Testnachricht gesendet. Sieh in deinem Telegram-Chat nach.",
+    "errorUnavailable": "Der Benachrichtigungsdienst ist nicht verfügbar. Versuche es später erneut."
   }
 }

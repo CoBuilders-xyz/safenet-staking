@@ -20,6 +20,7 @@ export function alertErrorMessage(t: TFunction, code: AlertErrorCode, maxSubscri
     case "unsupported": return t("alerts.errorUnsupported", "This browser cannot receive notifications here. On iOS, install the app on your home screen first.")
     case "push": return t("alerts.errorPush", "This browser could not be registered for notifications. Try again.")
     case "invalid": return t("alerts.errorInvalid", "The alerts service refused these settings. Check the values and try again.")
-    default: return t("alerts.errorNetwork", "The alerts service did not answer. Check your connection and try again.")
+    case "network": return t("alerts.errorNetwork", "The alerts service did not answer. Check your connection and try again.")
+    default: return t("alerts.errorUnavailable", "The alerts service is unavailable. Try again later.")
   }
 }
