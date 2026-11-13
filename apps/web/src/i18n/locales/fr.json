@@ -757,6 +757,7 @@
     "statusTelegramWaiting": "Pas encore connecté. Ouvrez Telegram et appuyez sur Démarrer. Après avoir appuyé sur Démarrer, la connexion peut prendre jusqu’à 5 minutes. Cette page se met à jour toute seule.",
     "testSentPush": "Notification de test envoyée. Le navigateur avec lequel vous vous êtes abonné devrait l’afficher maintenant.",
     "testSentTelegram": "Message de test envoyé. Consultez votre conversation Telegram.",
-    "errorUnavailable": "Le service d’alertes est indisponible. Réessayez plus tard."
+    "errorUnavailable": "Le service d’alertes est indisponible. Réessayez plus tard.",
+    "newLinkHint": "Un nouveau lien annule le précédent, ainsi qu’un Démarrer déjà envoyé avec lui."
   }
 }

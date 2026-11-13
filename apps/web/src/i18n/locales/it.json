@@ -757,6 +757,7 @@
     "statusTelegramWaiting": "Non ancora collegato. Apri Telegram e premi Avvia. Dopo aver premuto Avvia, il collegamento può richiedere fino a 5 minuti. Questa pagina si aggiorna da sola.",
     "testSentPush": "Notifica di prova inviata. Il browser con cui ti sei iscritto dovrebbe mostrarla ora.",
     "testSentTelegram": "Messaggio di prova inviato. Controlla la tua chat Telegram.",
-    "errorUnavailable": "Il servizio di avvisi non è disponibile. Riprova più tardi."
+    "errorUnavailable": "Il servizio di avvisi non è disponibile. Riprova più tardi.",
+    "newLinkHint": "Un nuovo link annulla il precedente, e anche un Avvia già inviato con quello."
   }
 }

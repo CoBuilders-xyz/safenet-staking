@@ -424,6 +424,15 @@ test("a subscription's own actions: a new Telegram link, pause and resume, and a
       assert.equal(linked.linkExpiresAt, null)
       assert.ok(Math.abs(Date.parse(linked.linkedAt as string) - Date.now()) < 5000)
       assert.deepEqual(await code(await request(`/subscriptions/${created.id}/telegram-link`)), [409, "linked"])
+      // A Cron run that links the chat between the API's read and its update is also reported as
+      // linked, never as a subscription to delete.
+      const racing = await db.subscribe(account.address.toLowerCase(), "sig", telegram, await digest("t".repeat(43)))
+      const reissue = mock.method(db, "reissueLink", async () => {
+        await db.linkTelegram(await digest("t".repeat(43)), "777")
+        return null
+      })
+      try { assert.deepEqual(await code(await request(`/subscriptions/${racing.id}/telegram-link`)), [409, "linked"]) } finally { reissue.mock.restore() }
+      await db.unsubscribe(racing.id, account.address.toLowerCase())
       // The test message goes to the linked chat, without a receipt button, once per minute.
       assert.equal((await request(`/subscriptions/${created.id}/test`)).status, 200)
       assert.equal(sentTo.length, 1)

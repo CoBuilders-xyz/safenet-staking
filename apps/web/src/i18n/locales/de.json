@@ -747,6 +747,7 @@
     "statusTelegramWaiting": "Noch nicht verbunden. Öffne Telegram und drücke Start. Nach dem Drücken von Start kann das Verbinden bis zu 5 Minuten dauern. Diese Seite aktualisiert sich von selbst.",
     "testSentPush": "Testbenachrichtigung gesendet. Der Browser, mit dem du abonniert hast, sollte sie jetzt anzeigen.",
     "testSentTelegram": "Testnachricht gesendet. Sieh in deinem Telegram-Chat nach.",
-    "errorUnavailable": "Der Benachrichtigungsdienst ist nicht verfügbar. Versuche es später erneut."
+    "errorUnavailable": "Der Benachrichtigungsdienst ist nicht verfügbar. Versuche es später erneut.",
+    "newLinkHint": "Ein neuer Link macht den vorherigen ungültig, auch ein damit bereits gesendetes Start."
   }
 }

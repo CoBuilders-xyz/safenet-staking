@@ -88,12 +88,13 @@ export function SubscriptionCard({ sub, triggers, linkUrl, focusLink, maxSubscri
   return <article className="rounded-lg border p-4 space-y-3" aria-busy={busy}>
     <div className="flex flex-wrap items-center gap-2">
       <h3 className="font-medium">{telegram ? t("alerts.telegram", "Telegram") : t("alerts.browser", "Browser notifications")}</h3>
-      {sub.paused && unlinked && <Badge variant="secondary">{t("alerts.pausedBadge", "Paused")}</Badge>}
+      {sub.paused && !expired && <Badge variant="secondary">{t("alerts.pausedBadge", "Paused")}</Badge>}
     </div>
     {triggers}
     <p role="status" className="font-medium">{status}</p>
+    {sub.paused && unlinked && <p>{t("alerts.statusPaused", "Paused. No alerts are sent until you resume.")}</p>}
     {openLink && <p className="text-sm text-muted-foreground">{t("alerts.linkMinutesLeft", "Minutes left on this link: {{minutes}}.", {
-      minutes: Math.max(1, Math.ceil((Date.parse(sub.linkExpiresAt!) - now) / 60_000)).toLocaleString("en"),
+      minutes: Math.max(1, Math.ceil((Date.parse(sub.linkExpiresAt!) - now) / 60_000)),
     })}</p>}
     {error && <p role="alert">{alertErrorMessage(t, error, maxSubscriptions)}</p>}
     {testSent && <p role="status">{telegram
@@ -116,6 +117,7 @@ export function SubscriptionCard({ sub, triggers, linkUrl, focusLink, maxSubscri
       </Button>}
       {!confirmDelete && <Button variant="outline" disabled={busy} onClick={() => setConfirmDelete(true)}>{t("alerts.delete", "Delete subscription")}</Button>}
     </div>
+    {unlinked && !openLink && <p className="text-sm text-muted-foreground">{t("alerts.newLinkHint", "A new link cancels the previous one, and a Start already sent with it.")}</p>}
     {confirmDelete && <div role="group" aria-label={t("alerts.deleteConfirm", "Delete this subscription? Its alerts stop at once.")} className="space-y-2">
       <p>{t("alerts.deleteConfirm", "Delete this subscription? Its alerts stop at once.")}</p>
       <div className="flex flex-wrap gap-2">

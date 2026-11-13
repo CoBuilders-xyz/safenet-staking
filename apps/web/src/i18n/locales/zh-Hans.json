@@ -737,6 +737,7 @@
     "statusTelegramWaiting": "尚未连接。请打开 Telegram 并点击开始。点击开始后，连接最多可能需要 5 分钟。本页会自动更新。",
     "testSentPush": "测试通知已发送。你订阅时使用的浏览器现在应会显示。",
     "testSentTelegram": "测试消息已发送。请查看你的 Telegram 聊天。",
-    "errorUnavailable": "提醒服务不可用。请稍后重试。"
+    "errorUnavailable": "提醒服务不可用。请稍后重试。",
+    "newLinkHint": "新链接会使上一个链接失效，用上一个链接已发送的“开始”也会失效。"
   }
 }

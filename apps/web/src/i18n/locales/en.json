@@ -36,6 +36,7 @@
     "loading": "Loading alerts…",
     "missed": "Consecutive missed signing rounds",
     "newLink": "Get a new Telegram link",
+    "newLinkHint": "A new link cancels the previous one, and a Start already sent with it.",
     "participation": "Participation below my threshold",
     "pause": "Pause",
     "pausedBadge": "Paused",

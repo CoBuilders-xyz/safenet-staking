@@ -79,7 +79,14 @@ export async function api(request: Request, env: Env, db = new Database(env.DB),
           // The new code replaces the old one: only the latest link works.
           const link = randomToken()
           const expiresAt = await db.reissueLink(id, owner.wallet, await digest(link))
-          if (!expiresAt) throw new HttpError(409, "Subscription expired", "expired")
+          if (!expiresAt) {
+            // Nothing matched: a Cron run linked the chat since the read above, or the subscription
+            // expired or was deleted. Say which, so a subscription that just connected is not reported as dead.
+            const current = (await db.subscriptions(owner.wallet)).find(row => row.id === id)
+            if (!current) throw new HttpError(404, "Not found")
+            if (current.telegram_chat && current.status !== "expired") throw new HttpError(409, "Telegram already linked", "linked")
+            throw new HttpError(409, "Subscription expired", "expired")
+          }
           result = { telegramUrl: `https://t.me/${env.TELEGRAM_BOT_NAME}?start=${link}`, expiresAt }
         } else {
           if (sub.status === "expired") throw new HttpError(409, "Subscription expired", "expired")

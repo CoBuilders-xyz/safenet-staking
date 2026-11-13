@@ -17,7 +17,7 @@ const sub: Subscription = { id: crypto.randomUUID(), wallet, triggers: ["cooldow
   channel: { kind: "telegram" }, telegram_chat: null, status: "unverified", last_delivery: null, link_expires: null, linked_at: null, paused: false }
 function transport(options: { stale?: boolean; root?: Hex; claimed?: bigint; registered?: boolean; stake?: bigint; wrongChain?: boolean;
   finalizedAge?: number; registeredAtBlock?: string | null; firstSeenAtBlock?: string; lastUpdatedAtBlock?: string;
-  unavailable?: "cooldown" | "rewards" | "delegations"; secondReady?: boolean } = {}) {
+  unavailable?: "cooldown" | "rewards" | "delegations"; secondReady?: boolean; secondFails?: boolean } = {}) {
   const timestamp = Math.floor(Date.now() / 1000) - (options.finalizedAge ?? 0)
   return mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
@@ -59,6 +59,7 @@ function transport(options: { stale?: boolean; root?: Hex; claimed?: bigint; reg
           if (options.unavailable === "cooldown") return Response.json({ id: request.id, jsonrpc: "2.0", error: { code: -32602, message: "Queue unavailable" } })
           result = encodeFunctionResult({ abi: stakingAbi, functionName: "withdrawalQueues", result: [1n, 2n] })
         }
+        else if (call.functionName === "withdrawalNodes" && options.secondFails && call.args[1] === 2n) return Response.json({ id: request.id, jsonrpc: "2.0", error: { code: -32602, message: "Node unavailable" } })
         else if (call.functionName === "withdrawalNodes") result = encodeFunctionResult({ abi: stakingAbi, functionName: "withdrawalNodes", result:
           call.args[1] === 1n ? [1_000_500_000_000_000_000_000n, BigInt(timestamp), 0n, 2n] : [10n ** 18n, BigInt(timestamp + (options.secondReady ? 0 : 1)), 1n, 0n] })
         else if (call.functionName === "stakes") result = encodeFunctionResult({ abi: stakingAbi, functionName: "stakes", result: options.stake ?? 10n })
@@ -101,6 +102,13 @@ test("withdrawals that are ready together make one cooldown message that names e
     assert.deepEqual(events, [{ trigger: "cooldown", key: "cooldown:1", covers: ["cooldown:1", "cooldown:2"],
       body: "2 withdrawals have finished their cooldown: 1,000.5 SAFE and 1 SAFE. Open Safenet to review and claim." }])
   } finally { mocked.mock.restore() }
+  // A walk that fails part way still announces the withdrawal it verified, and reports the failure.
+  const partial = transport({ secondFails: true })
+  try {
+    const { events, failed } = await walletConditions(env, { ...sub, triggers: ["cooldown"] })
+    assert.deepEqual(events.map(event => event.covers), [["cooldown:1"]])
+    assert.equal(failed, 1)
+  } finally { partial.mock.restore() }
   const safe = 10n ** 18n
   assert.equal(cooldownBody([1n]), "A withdrawal of less than 0.0001 SAFE has finished its cooldown. Open Safenet to review and claim.")
   assert.equal(cooldownBody([1_234_567n * safe + safe / 8n]), "A withdrawal of 1,234,567.125 SAFE has finished its cooldown. Open Safenet to review and claim.")

@@ -757,6 +757,7 @@
     "statusTelegramWaiting": "Todavía no está conectado. Abrí Telegram y pulsá Iniciar. Después de pulsar Iniciar, la conexión puede tardar hasta 5 minutos. Esta página se actualiza sola.",
     "testSentPush": "Notificación de prueba enviada. El navegador con el que te suscribiste debería mostrarla ahora.",
     "testSentTelegram": "Mensaje de prueba enviado. Revisá tu chat de Telegram.",
-    "errorUnavailable": "El servicio de alertas no está disponible. Probá más tarde."
+    "errorUnavailable": "El servicio de alertas no está disponible. Probá más tarde.",
+    "newLinkHint": "Un enlace nuevo cancela el anterior, y el Iniciar que ya hayas enviado con él."
   }
 }

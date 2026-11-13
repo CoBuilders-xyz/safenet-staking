@@ -110,22 +110,23 @@ export async function walletConditions(env: Env, sub: Subscription): Promise<{ e
   const events: Condition[] = []
   let failed = 0
   if (sub.triggers.includes("cooldown")) {
+    const ready: { key: string; amount: bigint }[] = []
     try {
       // Follow contract queue IDs so two equal withdrawals cannot share a deduplication key.
       const [head] = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "withdrawalQueues", args: [wallet], blockNumber: block.number })
       let id = head
       let count = 0
-      const ready: { key: string; amount: bigint }[] = []
       while (id !== 0n) {
         if (++count > 1000) throw new Error("Withdrawal queue exceeds poll budget")
         const [amount, claimableAt, , next] = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "withdrawalNodes", args: [wallet, id], blockNumber: block.number })
         if (amount > 0n && claimableAt <= block.timestamp) ready.push({ key: `cooldown:${id}`, amount })
         id = next
       }
-      // One message for all of them, sent when at least one is new. Each keeps its own key, so a
-      // withdrawal already announced does not cause another message by itself.
-      if (ready.length) events.push({ trigger: "cooldown", key: ready[0]!.key, covers: ready.map(item => item.key), body: cooldownBody(ready.map(item => item.amount)) })
     } catch { failed++ }
+    // One message for all of them, sent when at least one is new. Each keeps its own key, so a
+    // withdrawal already announced does not cause another message by itself. A walk that failed
+    // part way still announces what it verified before the failure.
+    if (ready.length) events.push({ trigger: "cooldown", key: ready[0]!.key, covers: ready.map(item => item.key), body: cooldownBody(ready.map(item => item.amount)) })
   }
   if (sub.triggers.includes("rewards")) {
     try {
