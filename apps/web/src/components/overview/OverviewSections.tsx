@@ -14,7 +14,7 @@ import { useEstimatedApr } from "@/hooks/useEstimatedApr"
 import { findValidator, useValidators } from "@/hooks/useValidators"
 import { hhi } from "@/lib/distribution"
 import type { FigureSource } from "@/lib/figure"
-import { formatTokenAmount, formatUtcDateTime, formatUtcDayLong } from "@/lib/format"
+import { formatTokenAmount, formatUtcDateTime, formatUtcDayLong, formatUtcDayRange } from "@/lib/format"
 import { ChainFreshness } from "./Freshness"
 import { Distribution } from "./Distribution"
 import { FigureValue, OverviewSection } from "./OverviewSection"
@@ -140,18 +140,18 @@ export function HeadlineStats() {
           source={fromMainnet}
         />
         <Stat
-          label={t("overview.headline.estimatedApr", "Estimated APR (based on last reward period)")}
+          label={t("overview.headline.estimatedApr", "Estimated APR")}
           figure={apr}
           format={(v) => `${(v.apr * 100).toFixed(1)}%`}
           detail={(v) => (
             <Trans
               i18nKey="overview.headline.estimatedAprDetail"
-              defaults="Reward period {{from}} to {{to}}, annualized, before validator commission. <term>How it is estimated</term>"
-              values={{ from: dayOf(v.periodStart), to: dayOf(v.periodEnd - 86_400) }}
+              defaults="Last reward period ({{period}}), before validator commission. <term>How it is estimated</term>"
+              values={{ period: formatUtcDayRange(v.periodStart * 1000, (v.periodEnd - 86_400) * 1000) }}
               components={{ term: <Term term="estimatedApr" children={null} /> }}
             />
           )}
-          source={() => t("overview.headline.estimatedAprSource", "SEF's rewards file and the Mainnet subgraph")}
+          source={() => t("overview.headline.estimatedAprSource", "Source: SEF rewards file, Mainnet subgraph.")}
         />
         <Stat
           label={t("overview.headline.activeValidators", "Active validators")}

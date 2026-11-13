@@ -250,10 +250,10 @@ describe("OverviewPage", () => {
 
   it("shows the estimated APR of the last reward period, gross, with its source and how it is estimated", () => {
     renderPage()
-    const apr = screen.getByRole("group", { name: "Estimated APR (based on last reward period)" })
+    const apr = screen.getByRole("group", { name: "Estimated APR" })
     expect(within(apr).getByText("7.4%")).toBeInTheDocument()
-    expect(apr).toHaveTextContent("Reward period Tue 13 Oct 2026 to Mon 26 Oct 2026, annualized, before validator commission.")
-    expect(apr).toHaveTextContent("SEF's rewards file and the Mainnet subgraph")
+    expect(apr).toHaveTextContent("Last reward period (13–26 Oct), before validator commission.")
+    expect(apr).toHaveTextContent("Source: SEF rewards file, Mainnet subgraph.")
     expect(within(apr).getByRole("button", { name: "How it is estimated" })).toBeInTheDocument()
     // A rate, not a compounded yield, and still no SAFE price.
     expect(screen.queryByText(/APY|price/i)).not.toBeInTheDocument()
@@ -262,7 +262,7 @@ describe("OverviewPage", () => {
   it("says why there is no estimated APR, and shows no number", () => {
     mocks.apr.mockReturnValue({ state: "unavailable", reason: "The Mainnet subgraph has not indexed the end of the reward period yet." })
     renderPage()
-    const apr = screen.getByRole("group", { name: "Estimated APR (based on last reward period)" })
+    const apr = screen.getByRole("group", { name: "Estimated APR" })
     expect(apr).toHaveTextContent("Unavailable")
     expect(apr).toHaveTextContent("The Mainnet subgraph has not indexed the end of the reward period yet.")
     expect(apr).not.toHaveTextContent("%")

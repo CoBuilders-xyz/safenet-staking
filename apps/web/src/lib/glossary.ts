@@ -44,6 +44,6 @@ export function definition(term: GlossaryTerm, unstakingPeriod?: bigint | number
     case "slashing":
       return i18n.t("onboarding.slashingTakesPartOfAStakeAsAPenalty", "Slashing takes part of a stake as a penalty. SAFE staked or delegated is not currently subject to slashing: a validator that performs badly costs rewards, not the SAFE itself.")
     case "estimatedApr":
-      return i18n.t("onboarding.estimatedAprDefinition", "An estimate from past rewards, not a promise. Source: SEF's published rewards file and the Mainnet subgraph. It is SEF's validator and delegator rewards for the last reward period, sentinel rewards excluded, divided by the average total SAFE staked in that period, then multiplied by 365 days over the period's length, with no compounding. It is before validator commission: delegators receive it less their validator's commission. Future rewards vary with total stake, validator participation and commission, and are not guaranteed.")
+      return i18n.t("onboarding.estimatedAprDefinition", "Based on the last reward period: staker rewards divided by the average SAFE staked, annualized. No compounding, before validator commission. Past rewards, not a guarantee.")
   }
 }

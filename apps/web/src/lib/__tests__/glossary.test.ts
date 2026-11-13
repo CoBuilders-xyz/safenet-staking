@@ -28,10 +28,10 @@ describe("glossary", () => {
     expect(definition("slashing")).toContain("not currently subject to slashing")
   })
 
-  it("calls the estimated APR an estimate, before commission and not guaranteed", () => {
+  it("says the estimated APR uses past rewards, without compounding, before commission, and is not a guarantee", () => {
     const text = definition("estimatedApr")
-    expect(text).toContain("not a promise")
-    expect(text).toContain("before validator commission")
-    expect(text).toContain("not guaranteed")
+    expect(text).toContain("last reward period")
+    expect(text).toContain("No compounding, before validator commission")
+    expect(text).toContain("not a guarantee")
   })
 })

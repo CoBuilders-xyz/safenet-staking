@@ -119,6 +119,19 @@ export function formatUtcDayLong(ms: number): string {
 }
 
 /**
+ * Two UTC days as a short range, both included: "13–26 Oct", "27 Oct–9 Nov", and with years
+ * only when the range crosses one, "29 Dec 2026–11 Jan 2027".
+ */
+export function formatUtcDayRange(fromMs: number, toMs: number): string {
+  const a = new Date(fromMs)
+  const b = new Date(toMs)
+  const day = (d: Date) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`
+  if (a.getUTCFullYear() !== b.getUTCFullYear()) return `${day(a)} ${a.getUTCFullYear()}–${day(b)} ${b.getUTCFullYear()}`
+  if (a.getUTCMonth() !== b.getUTCMonth()) return `${day(a)}–${day(b)}`
+  return `${a.getUTCDate()}–${day(b)}`
+}
+
+/**
  * Format an ISO timestamp in UTC, e.g. "Tue 22 Sep 2026, 00:00 UTC".
  * Built by hand rather than with Intl, whose month abbreviations vary by runtime.
  */

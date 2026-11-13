@@ -36,7 +36,7 @@ test.describe("Network Overview", () => {
     await stakeHistory.getByRole("button", { name: "7 days" }).click()
     await expect(stakeHistory.getByRole("button", { name: "7 days" })).toHaveAttribute("aria-pressed", "true")
     // The mocked rewards file ends in Beta, so the estimate is withheld with its reason, never a number.
-    const apr = page.getByRole("group", { name: "Estimated APR (based on last reward period)" })
+    const apr = page.getByRole("group", { name: "Estimated APR", exact: true })
     await expect(apr).toContainText("Unavailable")
     await expect(apr).toContainText("The rewards file read holds no complete Aegis reward period yet.")
 
