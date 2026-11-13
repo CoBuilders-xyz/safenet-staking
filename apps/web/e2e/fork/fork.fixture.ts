@@ -5,7 +5,7 @@
 import { test as base, type Page } from "@playwright/test"
 import type { Address } from "viem"
 import { createEthereumProviderScript } from "../mocks/ethereum-provider"
-import { seedInjectedConnection, stubGeoCheck } from "../fixtures/base.fixture"
+import { seedInjectedConnection, seedTermsAcceptance, stubGeoCheck } from "../fixtures/base.fixture"
 import { CHAIN_ID_HEX } from "../fixtures/test-data"
 import { ANVIL_URL, chainTime, defaultAccount, fundGas, revert, snapshot } from "./chain"
 
@@ -46,6 +46,7 @@ export const test = base.extend<ForkFixtures>({
 async function connect(page: Page, account: Address): Promise<void> {
   await page.addInitScript(createEthereumProviderScript({ chainIdHex: CHAIN_ID_HEX, accounts: [account], rpcUrl: ANVIL_URL }))
   await seedInjectedConnection(page)
+  await seedTermsAcceptance(page)
   await stubGeoCheck(page)
   // Anvil's clock starts at the fork block, days behind the wall clock, and the interface
   // compares claimable times with `Date.now()`. So the page runs on the chain's time, which

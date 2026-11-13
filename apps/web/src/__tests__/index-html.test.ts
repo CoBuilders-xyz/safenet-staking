@@ -30,4 +30,14 @@ describe("index.html", () => {
       expect(isLegal.test(hash), hash).toBe(contentPageAt(pathname) !== undefined)
     }
   })
+
+  it("describes the interface in neutral words, with no promise of rewards", () => {
+    const manifest = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../public/manifest.json"), "utf8")) as { description: string }
+    const descriptions = [...html.matchAll(/<meta (?:name|property)="(?:description|og:description|twitter:description)" content="([^"]+)"/g)].map((m) => m[1])
+
+    expect(descriptions).toHaveLength(3)
+    for (const text of [...descriptions, manifest.description]) {
+      expect(text).toBe("Non-custodial interface to the Safenet staking contracts.")
+    }
+  })
 })

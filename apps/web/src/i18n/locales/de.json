@@ -229,6 +229,7 @@
     },
     "hero": {
       "openDashboard": "Meinen Stake verwalten",
+      "seeTerms": "Siehe Bedingungen.",
       "title": "Netzwerkübersicht"
     },
     "reason": {
@@ -546,7 +547,13 @@
     "connectionFailed": "Verbindung fehlgeschlagen",
     "connectionHelp": "Wallet-Verbindung fehlgeschlagen. Öffnen Sie sie und versuchen Sie es erneut.",
     "disconnect": "Trennen",
-    "switchTo": "Zu {{name}} wechseln"
+    "switchTo": "Zu {{name}} wechseln",
+    "terms": {
+      "agree": "Zustimmen und verbinden",
+      "body": "Mit dem Verbinden stimmen Sie den <terms>Nutzungsbedingungen</terms> und der <privacy>Datenschutzerklärung</privacy> zu.",
+      "cancel": "Abbrechen",
+      "title": "Vor dem Verbinden"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "Alle Auszahlungen beansprucht",

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { chooseRestriction, type Restriction } from "@/lib/restriction"
 import { Analytics } from "@/components/Analytics"
 import { useAutoConnect } from "@/hooks/useAutoConnect"
+import { useTermsAccepted } from "@/lib/termsAcceptance"
 import { useSanctionsCheck } from "@/hooks/useSanctionsCheck"
 import { useGeoblockCheck } from "@/hooks/useGeoblockCheck"
 import { useWalletSanctionsCheck } from "@/hooks/useWalletSanctionsCheck"
@@ -202,7 +203,7 @@ function OpenPages() {
 function Shell() {
   const { pathname } = useLocation()
   const open = contentPageAt(pathname) !== undefined
-  useAutoConnect(!open)
+  useAutoConnect(!open, useTermsAccepted())
   return open ? <OpenPages /> : <GatedApp />
 }
 

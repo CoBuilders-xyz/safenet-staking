@@ -165,6 +165,15 @@ page, and `ConnectButton` shows "Switch to Ethereum", or "Wrong network" when th
 switch. Reads do not go through the wallet, so figures stay correct; `TxButton` disables every
 transaction.
 
+A wallet connects only after the visitor accepts the Terms of use and the Privacy policy.
+`ConnectButton` opens `TermsDialog`, loaded on demand, before it connects or opens its menu.
+`src/lib/termsAcceptance.ts` keeps `{ version, acceptedAt }` in `localStorage` under
+`terms_accepted`; `TERMS_VERSION` in `src/config/terms.ts` is the date of the terms' "Last
+updated" line, held to it by a test, so a change to the terms asks every visitor again. Without
+a current acceptance `useAutoConnect` restores no session, and inside Safe, where the button is
+otherwise hidden, it shows until the terms are accepted and the Safe connector then connects.
+The e2e fixtures seed the acceptance (`termsAccepted`, true by default).
+
 
 ### Contract integration
 

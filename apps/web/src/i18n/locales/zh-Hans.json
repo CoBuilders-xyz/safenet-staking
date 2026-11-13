@@ -224,6 +224,7 @@
     },
     "hero": {
       "openDashboard": "管理我的质押",
+      "seeTerms": "参阅条款。",
       "title": "网络概览"
     },
     "reason": {
@@ -536,7 +537,13 @@
     "connectionFailed": "连接失败",
     "connectionHelp": "无法连接钱包，请打开钱包后重试。",
     "disconnect": "断开连接",
-    "switchTo": "切换到 {{name}}"
+    "switchTo": "切换到 {{name}}",
+    "terms": {
+      "agree": "同意并连接",
+      "body": "连接即表示您同意<terms>使用条款</terms>和<privacy>隐私政策</privacy>。",
+      "cancel": "取消",
+      "title": "连接之前"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "已领取所有提取",

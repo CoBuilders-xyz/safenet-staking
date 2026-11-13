@@ -1,5 +1,6 @@
 import { Trans, useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
+import { LegalLink } from "@/components/LegalLink"
 import { HistoryChart } from "@/components/overview/HistoryCharts"
 import { PageHero } from "@/components/PageHero"
 import { Term } from "@/components/ui/term"
@@ -29,6 +30,10 @@ export function OverviewPage() {
         <Button asChild variant="outline" className="mt-6">
           <Link to="/dashboard">{t("overview.hero.openDashboard", "Manage my stake")}</Link>
         </Button>
+        <p className="mt-3 text-xs text-muted-foreground">
+          {t("dashboard.rewardsAreNotGuaranteedAndMayVary", "Rewards are not guaranteed and may vary.")}{" "}
+          <LegalLink page="terms" className="underline hover:text-foreground transition-colors">{t("overview.hero.seeTerms", "See Terms.")}</LegalLink>
+        </p>
       </PageHero>
       <SectionBoundary title={t("overview.freshness.title", "Data freshness")}>
         <FreshnessPanel />

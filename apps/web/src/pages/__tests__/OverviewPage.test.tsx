@@ -126,6 +126,15 @@ describe("OverviewPage", () => {
     expect(within(screen.getByRole("region", { name: "Last 30 days" })).getByText("884")).toBeInTheDocument()
   })
 
+  it("says beside the main action that rewards are not guaranteed, with a link to the terms", () => {
+    renderPage()
+
+    const line = screen.getByText(/Rewards are not guaranteed and may vary\./)
+    expect(line).toHaveTextContent("Rewards are not guaranteed and may vary. See Terms.")
+    expect(within(line).getByRole("link", { name: "See Terms." })).toHaveAttribute("href", "/terms")
+    expect(screen.getByRole("link", { name: "Manage my stake" }).parentElement).toContainElement(line)
+  })
+
   it("names the source each section actually used", () => {
     renderPage()
     const rewards = screen.getByRole("region", { name: "Rewards" })

@@ -234,6 +234,7 @@
     },
     "hero": {
       "openDashboard": "Gestionar mi stake",
+      "seeTerms": "Ver los Términos.",
       "title": "Resumen de la red"
     },
     "reason": {
@@ -556,7 +557,13 @@
     "connectionFailed": "Falló la conexión",
     "connectionHelp": "No se pudo conectar la wallet. Abrila y volvé a intentarlo.",
     "disconnect": "Desconectar",
-    "switchTo": "Cambiar a {{name}}"
+    "switchTo": "Cambiar a {{name}}",
+    "terms": {
+      "agree": "Aceptar y conectar",
+      "body": "Al conectar, aceptás los <terms>Términos de uso</terms> y la <privacy>Política de privacidad</privacy>.",
+      "cancel": "Cancelar",
+      "title": "Antes de conectar"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "Se reclamaron todos los retiros",

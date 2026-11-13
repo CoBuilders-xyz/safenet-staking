@@ -234,6 +234,7 @@
     },
     "hero": {
       "openDashboard": "Gerenciar meu stake",
+      "seeTerms": "Ver os Termos.",
       "title": "Visão geral da rede"
     },
     "reason": {
@@ -556,7 +557,13 @@
     "connectionFailed": "Falha na conexão",
     "connectionHelp": "Não foi possível conectar a carteira. Abra-a e tente novamente.",
     "disconnect": "Desconectar",
-    "switchTo": "Mudar para {{name}}"
+    "switchTo": "Mudar para {{name}}",
+    "terms": {
+      "agree": "Aceitar e conectar",
+      "body": "Ao conectar, você aceita os <terms>Termos de uso</terms> e a <privacy>Política de privacidade</privacy>.",
+      "cancel": "Cancelar",
+      "title": "Antes de conectar"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "Todos os saques resgatados",

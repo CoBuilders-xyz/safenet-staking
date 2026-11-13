@@ -1,7 +1,7 @@
 {
   "name": "Safenet Staking",
   "short_name": "Safenet Staking",
-  "description": "Stake SAFE to participate in Safenet.",
+  "description": "Non-custodial interface to the Safenet staking contracts.",
   "iconPath": "android-chrome-192x192.png",
   "icons": [
     {

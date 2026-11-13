@@ -234,6 +234,7 @@
     },
     "hero": {
       "openDashboard": "Gestisci il mio stake",
+      "seeTerms": "Vedi le Condizioni.",
       "title": "Panoramica della rete"
     },
     "reason": {
@@ -556,7 +557,13 @@
     "connectionFailed": "Connessione non riuscita",
     "connectionHelp": "Impossibile collegare il wallet. Aprilo e riprova.",
     "disconnect": "Disconnetti",
-    "switchTo": "Passa a {{name}}"
+    "switchTo": "Passa a {{name}}",
+    "terms": {
+      "agree": "Accetta e collega",
+      "body": "Collegando il wallet, accetti i <terms>Termini di utilizzo</terms> e l’<privacy>Informativa sulla privacy</privacy>.",
+      "cancel": "Annulla",
+      "title": "Prima di collegare"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "Tutti i prelievi riscattati",

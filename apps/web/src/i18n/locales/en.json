@@ -280,6 +280,7 @@
     },
     "hero": {
       "openDashboard": "Manage my stake",
+      "seeTerms": "See Terms.",
       "title": "Network overview"
     },
     "reason": {
@@ -664,7 +665,13 @@
     "connectionFailed": "Connection failed",
     "connectionHelp": "Could not connect to your wallet. Open it and try again.",
     "disconnect": "Disconnect",
-    "switchTo": "Switch to {{name}}"
+    "switchTo": "Switch to {{name}}",
+    "terms": {
+      "agree": "Agree and connect",
+      "body": "By connecting, you agree to the <terms>Terms of use</terms> and the <privacy>Privacy policy</privacy>.",
+      "cancel": "Cancel",
+      "title": "Before you connect"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "All withdrawals claimed",

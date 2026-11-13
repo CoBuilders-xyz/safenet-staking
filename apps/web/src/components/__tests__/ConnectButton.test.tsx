@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { MemoryRouter } from "react-router-dom"
 import { ConnectButton } from "../wallet/ConnectButton"
 import { TEST_ACCOUNTS } from "@/__tests__/test-data"
+import { TERMS_ACCEPTANCE_STORAGE_KEY, TERMS_VERSION } from "@/config/terms"
+import { acceptTerms, resetTermsAcceptanceForTests } from "@/lib/termsAcceptance"
 
 const mockConnect = vi.fn()
 const mockDisconnect = vi.fn()
@@ -32,6 +35,11 @@ vi.mock("@/config/chains", () => ({
 describe("ConnectButton", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // The terms are accepted already, so a click connects as it always did. The describe block
+    // at the end covers a visitor who has not accepted them.
+    localStorage.removeItem(TERMS_ACCEPTANCE_STORAGE_KEY)
+    resetTermsAcceptanceForTests()
+    acceptTerms()
     // Simulate injected wallet provider so browserWallet connector is included
     window.ethereum = {} as unknown as typeof window.ethereum
     mockUseConnect.mockReturnValue({
@@ -132,5 +140,103 @@ describe("ConnectButton", () => {
 
     await user.click(screen.getByRole("button", { name: "Disconnect" }))
     expect(mockDisconnect).toHaveBeenCalled()
+  })
+})
+
+describe("ConnectButton, before the terms are accepted", () => {
+  const connectors = [
+    { id: "browserWallet", uid: "bw-1", name: "Browser Wallet" },
+    { id: "walletConnect", uid: "wc-1", name: "WalletConnect" },
+  ]
+
+  const renderButton = () =>
+    render(
+      <MemoryRouter>
+        <ConnectButton />
+      </MemoryRouter>,
+    )
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.removeItem(TERMS_ACCEPTANCE_STORAGE_KEY)
+    resetTermsAcceptanceForTests()
+    window.ethereum = {} as unknown as typeof window.ethereum
+    mockUseAccount.mockReturnValue({ isConnected: false, address: undefined, chain: undefined })
+    mockUseConnect.mockReturnValue({ connect: mockConnect, connectors: [connectors[0]], error: null })
+  })
+
+  it("asks for the Terms of use and the Privacy policy, with a link to each, and connects nothing yet", async () => {
+    renderButton()
+    await userEvent.click(screen.getByRole("button", { name: "Connect Wallet" }))
+
+    const dialog = await screen.findByRole("dialog", { name: "Before you connect" })
+    expect(dialog).toHaveTextContent("By connecting, you agree to the Terms of use and the Privacy policy.")
+    const terms = screen.getByRole("link", { name: "Terms of use" })
+    expect(terms).toHaveAttribute("href", "/terms")
+    expect(terms).toHaveAttribute("target", "_blank")
+    const privacy = screen.getByRole("link", { name: "Privacy policy" })
+    expect(privacy).toHaveAttribute("href", "/privacy")
+    expect(privacy).toHaveAttribute("target", "_blank")
+    expect(mockConnect).not.toHaveBeenCalled()
+    expect(localStorage.getItem(TERMS_ACCEPTANCE_STORAGE_KEY)).toBeNull()
+  })
+
+  it("records the accepted version and connects when the visitor agrees", async () => {
+    renderButton()
+    await userEvent.click(screen.getByRole("button", { name: "Connect Wallet" }))
+    await userEvent.click(await screen.findByRole("button", { name: "Agree and connect" }))
+
+    expect(mockConnect).toHaveBeenCalledTimes(1)
+    expect(mockConnect.mock.calls[0]![0]).toEqual({ connector: connectors[0] })
+    const record = JSON.parse(localStorage.getItem(TERMS_ACCEPTANCE_STORAGE_KEY)!)
+    expect(record.version).toBe(TERMS_VERSION)
+    expect(Number.isNaN(Date.parse(record.acceptedAt))).toBe(false)
+    expect(screen.queryByRole("dialog")).toBeNull()
+  })
+
+  it("does not ask again once accepted", async () => {
+    renderButton()
+    await userEvent.click(screen.getByRole("button", { name: "Connect Wallet" }))
+    await userEvent.click(await screen.findByRole("button", { name: "Agree and connect" }))
+    await userEvent.click(screen.getByRole("button", { name: "Connect Wallet" }))
+
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(mockConnect).toHaveBeenCalledTimes(2)
+  })
+
+  it("connects nothing and records nothing when the visitor cancels, and asks again next time", async () => {
+    renderButton()
+    await userEvent.click(screen.getByRole("button", { name: "Connect Wallet" }))
+    await userEvent.click(await screen.findByRole("button", { name: "Cancel" }))
+
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(mockConnect).not.toHaveBeenCalled()
+    expect(localStorage.getItem(TERMS_ACCEPTANCE_STORAGE_KEY)).toBeNull()
+
+    await userEvent.click(screen.getByRole("button", { name: "Connect Wallet" }))
+    expect(await screen.findByRole("dialog", { name: "Before you connect" })).toBeInTheDocument()
+  })
+
+  it("asks again when the accepted version is not the current one", async () => {
+    localStorage.setItem(TERMS_ACCEPTANCE_STORAGE_KEY, JSON.stringify({ version: "2000-01-01", acceptedAt: "2000-01-01T00:00:00.000Z" }))
+    renderButton()
+    await userEvent.click(screen.getByRole("button", { name: "Connect Wallet" }))
+
+    expect(await screen.findByRole("dialog", { name: "Before you connect" })).toBeInTheDocument()
+    expect(mockConnect).not.toHaveBeenCalled()
+  })
+
+  it("opens the wallet menu after the visitor agrees, when there is more than one wallet", async () => {
+    mockUseConnect.mockReturnValue({ connect: mockConnect, connectors, error: null })
+    renderButton()
+    await userEvent.click(screen.getByRole("button", { name: "Connect Wallet" }))
+
+    expect(screen.queryByRole("menu")).toBeNull()
+    await userEvent.click(await screen.findByRole("button", { name: "Agree and connect" }))
+
+    expect(screen.getByRole("menu")).toBeInTheDocument()
+    expect(mockConnect).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole("menuitem", { name: "WalletConnect" }))
+    expect(mockConnect.mock.calls[0]![0]).toEqual({ connector: connectors[1] })
   })
 })

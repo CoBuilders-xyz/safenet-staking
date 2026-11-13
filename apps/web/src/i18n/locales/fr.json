@@ -234,6 +234,7 @@
     },
     "hero": {
       "openDashboard": "Gérer mon stake",
+      "seeTerms": "Voir les Conditions.",
       "title": "Aperçu du réseau"
     },
     "reason": {
@@ -556,7 +557,13 @@
     "connectionFailed": "Échec de la connexion",
     "connectionHelp": "Impossible de connecter le portefeuille. Ouvrez-le et réessayez.",
     "disconnect": "Déconnecter",
-    "switchTo": "Passer à {{name}}"
+    "switchTo": "Passer à {{name}}",
+    "terms": {
+      "agree": "Accepter et connecter",
+      "body": "En connectant votre portefeuille, vous acceptez les <terms>Conditions d’utilisation</terms> et la <privacy>Politique de confidentialité</privacy>.",
+      "cancel": "Annuler",
+      "title": "Avant de connecter"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "Tous les retraits ont été réclamés",
