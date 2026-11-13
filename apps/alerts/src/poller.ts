@@ -1,11 +1,17 @@
 import { Database } from "./db.js"
 import { initialChronology, memberCondition, type Chronology } from "./chronology.js"
 import { advanceChronology, walletConditions, type Condition } from "./sources.js"
-import { sendEvent, telegramUpdates } from "./delivery.js"
+import { sendEvent, telegramUpdates, type TelegramCounts } from "./delivery.js"
 import type { Env } from "./types.js"
 
-export const adapters = { advanceChronology, walletConditions, sendEvent, telegramUpdates }
-export async function poll(env: Env, db = new Database(env.DB), io = adapters) {
+export interface Adapters {
+  advanceChronology: typeof advanceChronology
+  walletConditions: typeof walletConditions
+  sendEvent: typeof sendEvent
+  telegramUpdates: (db: Database, env: Env) => Promise<TelegramCounts | undefined | void>
+}
+export const adapters: Adapters = { advanceChronology, walletConditions, sendEvent, telegramUpdates }
+export async function poll(env: Env, db = new Database(env.DB), io: Adapters = adapters) {
   const holder = crypto.randomUUID()
   if (!await db.lockRun(holder)) return
   const started = new Date().toISOString()
@@ -15,7 +21,8 @@ export async function poll(env: Env, db = new Database(env.DB), io = adapters) {
     await db.startRun(started)
     // A Telegram outage must not prevent delivery to already subscribed browsers.
     // Keep the run unhealthy so the failed linking/receipt poll remains visible.
-    try { await io.telegramUpdates(db, env) } catch { failed++ }
+    let telegram: TelegramCounts | undefined | void
+    try { telegram = await io.telegramUpdates(db, env) } catch { failed++ }
     let chronology: Awaited<ReturnType<typeof advanceChronology>> | undefined
     let chronologyFailed = false
     let cursor = await db.state<string>("subscription_cursor") ?? ""
@@ -30,7 +37,7 @@ export async function poll(env: Env, db = new Database(env.DB), io = adapters) {
           // Deliver independent chain conditions before attempting Gnosis indexing.
           const pending: Condition[] = []
           for (const event of events) {
-            const outcome = await io.sendEvent(db, env, sub, event.key, event.body)
+            const outcome = await io.sendEvent(db, env, sub, event.key, event.body, undefined, event.covers)
             if (outcome === "accepted") accepted++
             if (outcome === "failed" || outcome === "expired") failed++
           }
@@ -58,7 +65,7 @@ export async function poll(env: Env, db = new Database(env.DB), io = adapters) {
             }
           }
           for (const event of pending) {
-            const outcome = await io.sendEvent(db, env, sub, event.key, event.body)
+            const outcome = await io.sendEvent(db, env, sub, event.key, event.body, undefined, event.covers)
             if (outcome === "accepted") accepted++
             if (outcome === "failed" || outcome === "expired") failed++
           }
@@ -79,7 +86,7 @@ export async function poll(env: Env, db = new Database(env.DB), io = adapters) {
     await db.cleanup()
     await db.finishRun(started, { ok: failed === 0, evaluated, accepted, failed })
     // Aggregate-only logs: no wallets, endpoints, signatures, chat IDs or upstream errors.
-    console.log(JSON.stringify({ event: "alerts_poll", evaluated, accepted, failed }))
+    console.log(JSON.stringify({ event: "alerts_poll", evaluated, accepted, failed, ...(telegram ? { telegram } : {}) }))
   } finally {
     await db.releaseRun(holder)
   }

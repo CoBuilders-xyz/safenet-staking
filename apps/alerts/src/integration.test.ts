@@ -1,4 +1,4 @@
-import { test } from "node:test"
+import { test, mock } from "node:test"
 import assert from "node:assert/strict"
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
 import { verifyMessage } from "viem"
@@ -9,7 +9,7 @@ import { challenge, authenticate } from "./auth.js"
 import { api } from "./api.js"
 import { LINK_PROCESSING_GRACE, LINK_START_WINDOW, digest, type Database, type SubscriptionSettings } from "./db.js"
 import { poll, adapters } from "./poller.js"
-import { sendEvent, telegramUpdates } from "./delivery.js"
+import { parseStart, sendEvent, telegramUpdates } from "./delivery.js"
 import { initialChronology, foldChronology } from "./chronology.js"
 import type { Env, Subscription } from "./types.js"
 
@@ -160,7 +160,7 @@ test("Telegram linking accepts a private initiated chat only; links expire and a
     const link = "x".repeat(43)
     const sub = await db.subscribe(account.address, "sig", telegram, await digest(link))
     let update: { update_id: number; message: { text: string; chat: { id: number; type: string } } } =
-      { update_id: 1, message: { text: `/start ${link}`, chat: { id: 123, type: "group" } } }
+      { update_id: 1, message: { text: `/start ${link}`, chat: { id: -123, type: "group" } } }
     const sent: { chat_id: number; text: string }[] = []
     const transport: typeof fetch = async (input, init) => {
       if (String(input).endsWith("/sendMessage")) { sent.push(JSON.parse(String(init!.body))); return Response.json({ ok: true }) }
@@ -169,22 +169,301 @@ test("Telegram linking accepts a private initiated chat only; links expire and a
     await telegramUpdates(db, env, transport)
     assert.equal((await row(db, sub.id))!.telegram_chat, null)
     assert.equal(await db.state("telegram_offset"), 2)
+    assert.equal(sent.length, 0) // A group gets neither a link nor a reply.
     update = { update_id: 2, message: { text: `/start ${"y".repeat(43)}`, chat: { id: 123, type: "private" } } }
-    await telegramUpdates(db, env, transport)
+    assert.deepEqual(await telegramUpdates(db, env, transport), { updates: 1, linked: 0, startBare: 0, startRejected: 1, receipts: 0, replyFailures: 0 })
     assert.equal((await row(db, sub.id))!.telegram_chat, null)
-    assert.equal(sent.length, 0) // An unknown code gets no reply.
+    assert.match(sent[0]!.text, /^This link has expired or was already used\. Open https:\/\/app\.test\/#\/alerts and press "Get a new Telegram link"\.$/)
     update = { update_id: 3, message: { text: `/start ${link}`, chat: { id: 123, type: "private" } } }
-    await telegramUpdates(db, env, transport)
-    assert.equal((await row(db, sub.id))!.telegram_chat, "123")
-    assert.deepEqual(sent.map(m => m.chat_id), [123]) // Only the chat that was linked is confirmed.
-    assert.match(sent[0]!.text, /^Linked\./)
+    assert.deepEqual(await telegramUpdates(db, env, transport), { updates: 1, linked: 1, startBare: 0, startRejected: 0, receipts: 0, replyFailures: 0 })
+    const linked = (await db.subscriptions(account.address))[0]!
+    assert.equal(linked.telegram_chat, "123")
+    assert.ok(Math.abs(Date.parse(linked.linked_at!) - Date.now()) < 5000)
+    assert.equal(linked.link_expires, null)
+    assert.deepEqual(sent.map(m => m.chat_id), [123, 123])
+    assert.match(sent[1]!.text, /^Linked\./)
     update = { update_id: 4, message: { text: `/start ${link}`, chat: { id: 456, type: "private" } } }
     await telegramUpdates(db, env, transport)
-    assert.equal((await row(db, sub.id))!.telegram_chat, "123") // A reused code neither relinks nor replies.
-    assert.equal(sent.length, 1)
+    assert.equal((await row(db, sub.id))!.telegram_chat, "123") // A reused code does not relink.
+    // The sender of a reused code gets the same reply as for an unknown one, and learns nothing else.
+    assert.deepEqual(sent[2], { ...sent[0]!, chat_id: 456 })
     assert.equal(await db.linkTelegram(await digest(link), "456"), false)
     await db.query("update alerts_subscriptions set link_hash = ?, link_expires = ? where id = ?", await digest(link), new Date(0).toISOString(), sub.id)
     assert.equal(await db.linkTelegram(await digest(link), "456"), false)
+  } finally { await db.close() }
+})
+
+test("the bot answers every private /start, once per chat per poll, and reads Telegram's command forms", async () => {
+  assert.deepEqual(parseStart("/start"), { kind: "bare" })
+  assert.deepEqual(parseStart("  /START  "), { kind: "bare" })
+  assert.deepEqual(parseStart(`/start@Test_Bot \n ${"k".repeat(43)} `, "test_bot"), { kind: "code", code: "k".repeat(43) })
+  assert.deepEqual(parseStart(`/Start ${"k".repeat(43)}`), { kind: "code", code: "k".repeat(43) })
+  assert.deepEqual(parseStart("/start short"), { kind: "invalid" })
+  assert.deepEqual(parseStart(`/start ${"k".repeat(43)} extra`), { kind: "invalid" })
+  assert.equal(parseStart(`/start@other_bot ${"k".repeat(43)}`, "test_bot"), null)
+  assert.equal(parseStart("/started"), null)
+  assert.equal(parseStart("hello"), null)
+  const db = await TestDatabase.create()
+  try {
+    const link = "k".repeat(43)
+    const sub = await db.subscribe(account.address, "sig", telegram, await digest(link))
+    const message = (update_id: number, text: string, id: number, type = "private") => ({ update_id, message: { text, chat: { id, type } } })
+    const sent: { chat_id: number; text: string }[] = []
+    let updates: unknown[] = [
+      message(1, "/start", 7), message(2, "/start", 7), message(3, "/start nonsense", 7), // One reply for chat 7.
+      message(4, "/start", 8), message(5, "hello", 9), message(6, "/start", -5, "supergroup"), message(7, "/start", 5, "group"),
+      message(8, `/start@other_bot ${link}`, 10), message(9, `/START@TEST_BOT   ${link}`, 11),
+    ]
+    let failReplies = false
+    const transport: typeof fetch = async (input, init) => {
+      if (String(input).endsWith("/sendMessage")) {
+        if (failReplies) throw new Error("Telegram unavailable")
+        sent.push(JSON.parse(String(init!.body)))
+        return Response.json({ ok: true })
+      }
+      return Response.json({ ok: true, result: updates })
+    }
+    const counts = await telegramUpdates(db, env, transport)
+    assert.deepEqual(counts, { updates: 9, linked: 1, startBare: 3, startRejected: 1, receipts: 0, replyFailures: 0 })
+    assert.deepEqual(sent.map(m => m.chat_id), [7, 8, 11])
+    assert.match(sent[0]!.text, /^This bot sends Safenet alerts\. Open https:\/\/app\.test\/#\/alerts, subscribe with Telegram/)
+    assert.equal(sent[1]!.text, sent[0]!.text)
+    assert.match(sent[2]!.text, /^Linked\./)
+    assert.equal((await row(db, sub.id))!.telegram_chat, "11")
+    assert.equal(await db.state("telegram_offset"), 10)
+    // A reply that cannot be sent is counted, and the update is still consumed.
+    updates = [message(10, "/start", 7)]
+    failReplies = true
+    assert.deepEqual(await telegramUpdates(db, env, transport), { updates: 1, linked: 0, startBare: 1, startRejected: 0, receipts: 0, replyFailures: 1 })
+    assert.equal(await db.state("telegram_offset"), 11)
+    failReplies = false
+    // A chat that already receives alerts is not told to subscribe, whatever it sends.
+    sent.length = 0
+    updates = [message(11, "/start", 11)]
+    await telegramUpdates(db, env, transport)
+    updates = [message(12, `/start ${link}`, 11)] // The same link opened again.
+    await telegramUpdates(db, env, transport)
+    assert.deepEqual(sent.map(m => m.text), [
+      "This chat is linked to Safenet alerts. Manage them at https://app.test/#/alerts.",
+      "This link has expired or was already used. This chat is already linked to Safenet alerts. Manage them at https://app.test/#/alerts. For a subscription that is not connected yet, press \"Get a new Telegram link\" there.",
+    ])
+    // A client that sends the same /start twice in one poll gets "Linked." once, and no rejection after it.
+    const again = "m".repeat(43)
+    const second = await db.subscribe(account.address, "sig", telegram, await digest(again))
+    sent.length = 0
+    updates = [message(13, `/start ${again}`, 12), message(14, `/start ${again}`, 12), message(15, "/start", 12)]
+    assert.deepEqual(await telegramUpdates(db, env, transport), { updates: 3, linked: 1, startBare: 1, startRejected: 1, receipts: 0, replyFailures: 0 })
+    assert.deepEqual(sent.map(m => [m.chat_id, m.text.slice(0, 7)]), [[12, "Linked."]])
+    assert.equal((await row(db, second.id))!.telegram_chat, "12")
+    // At most twenty guidance replies per poll; every update is still read.
+    sent.length = 0
+    updates = Array.from({ length: 25 }, (_, index) => message(20 + index, "/start", 100 + index))
+    assert.equal((await telegramUpdates(db, env, transport))!.startBare, 25)
+    assert.equal(sent.length, 20)
+    assert.equal(await db.state("telegram_offset"), 45)
+  } finally { await db.close() }
+})
+
+test("a confirmed receipt is written into the Telegram message, because the button's answer can come too late", async () => {
+  const db = await TestDatabase.create()
+  try {
+    const sub = await db.subscribe(account.address, "sig", telegram, "link")
+    await db.query("update alerts_subscriptions set telegram_chat = '123' where id = ?", sub.id)
+    let ack = ""
+    await sendEvent(db, env, { ...sub, telegram_chat: "123" }, "cooldown:1", "ready", async (_env, _sub, payload) => { ack = payload.ack; return "accepted" })
+    const calls: { method: string; body: Record<string, unknown> }[] = []
+    let chat = 999
+    const transport: typeof fetch = async (input, init) => {
+      const method = String(input).split("/").at(-1)!
+      if (method === "getUpdates") return Response.json({ ok: true, result: [{ update_id: calls.length + 1,
+        callback_query: { id: "query", data: ack, message: { message_id: 55, text: "Safenet\nready", chat: { id: chat, type: "private" } } } }] })
+      calls.push({ method, body: JSON.parse(String(init!.body)) })
+      // Telegram refuses a late answer. The receipt and the edit do not depend on it.
+      return method === "answerCallbackQuery" ? new Response(null, { status: 400 }) : Response.json({ ok: true })
+    }
+    // Another chat cannot confirm it, and its message is not edited.
+    assert.equal((await telegramUpdates(db, env, transport))!.receipts, 0)
+    assert.deepEqual(calls.map(call => call.method), ["answerCallbackQuery"])
+    chat = 123
+    assert.deepEqual(await telegramUpdates(db, env, transport), { updates: 1, linked: 0, startBare: 0, startRejected: 0, receipts: 1, replyFailures: 0 })
+    assert.deepEqual(calls.slice(1).map(call => call.method), ["answerCallbackQuery", "editMessageText"])
+    assert.deepEqual(calls[2]!.body, { chat_id: 123, message_id: 55, text: "Safenet\nready\n\nReceipt confirmed." })
+    assert.equal((await row(db, sub.id))!.status, "verified")
+    // The button is still there when the edit did not arrive. The next press writes the confirmation
+    // again, and counts no second receipt. Another chat gets nothing.
+    calls.length = 0
+    assert.equal((await telegramUpdates(db, env, transport))!.receipts, 0)
+    assert.deepEqual(calls.map(call => call.method), ["answerCallbackQuery", "editMessageText"])
+    chat = 999
+    calls.length = 0
+    await telegramUpdates(db, env, transport)
+    assert.deepEqual(calls.map(call => call.method), ["answerCallbackQuery"])
+  } finally { await db.close() }
+})
+
+test("slow Telegram replies stop at a shared time budget; every update is still read and linked", async () => {
+  const db = await TestDatabase.create()
+  const clock = mock.method(Date, "now", () => time)
+  let time = 1_800_000_000_000
+  try {
+    clock.mock.mockImplementation(() => time)
+    const links = ["r".repeat(43), "s".repeat(43)]
+    const subs = [await db.subscribe(account.address, "sig", telegram, await digest(links[0]!)), await db.subscribe(account.address, "sig", telegram, await digest(links[1]!))]
+    let replies = 0
+    const transport: typeof fetch = async input => {
+      if (String(input).endsWith("/getUpdates")) return Response.json({ ok: true, result: [
+        ...Array.from({ length: 8 }, (_, index) => ({ update_id: index + 1, message: { text: "/start", chat: { id: 500 + index, type: "private" } } })),
+        ...links.map((link, index) => ({ update_id: 9 + index, message: { text: `/start ${link}`, date: Math.floor(1_800_000_000_000 / 1000), chat: { id: 600 + index, type: "private" } } })),
+      ] })
+      replies++
+      time += 5000 // Each reply uses its whole five seconds.
+      throw new Error("Telegram timeout")
+    }
+    const counts = await telegramUpdates(db, env, transport)
+    assert.equal(replies, 6) // Thirty seconds of replies, then none.
+    assert.deepEqual(counts, { updates: 10, linked: 2, startBare: 8, startRejected: 0, receipts: 0, replyFailures: 10 })
+    for (const [index, sub] of subs.entries()) assert.equal((await row(db, sub.id))!.telegram_chat, String(600 + index))
+    assert.equal(await db.state("telegram_offset"), 11)
+  } finally { clock.mock.restore(); await db.close() }
+})
+
+test("migration 0003 upgrades a database that already holds subscriptions", async () => {
+  const db = await TestDatabase.create(file => file < "0003")
+  try {
+    const wallet = CONTRACTS.staking.address.toLowerCase()
+    await db.query(`insert into alerts_subscriptions(id, wallet, signature_hash, triggers, participation, missed, channel, telegram_chat, status, created_at)
+      values ('old', ?, 'sig', '["cooldown"]', 75, 3, '{"kind":"telegram"}', '123', 'verified', ?)`, wallet, at(-86_400_000))
+    await db.migrate(file => file >= "0003")
+    const [old] = await db.subscriptions(wallet)
+    assert.deepEqual({ linked: old!.telegram_chat, linked_at: old!.linked_at, paused: old!.paused, status: old!.status },
+      { linked: "123", linked_at: null, paused: false, status: "verified" })
+    assert.deepEqual((await db.activeSubscriptions("", 50)).map(sub => sub.id), ["old"])
+    assert.equal(await db.claimTest("old", wallet), true)
+    await assert.rejects(db.query("update alerts_subscriptions set paused = 2"))
+  } finally { await db.close() }
+})
+
+test("several ready events go out as one message; each keeps its own key, and only a new one sends again", async () => {
+  const db = await TestDatabase.create()
+  try {
+    const sub = await db.subscribe(account.address, "sig", telegram, "link")
+    const acks: string[] = []
+    const send = async (_env: Env, _sub: Subscription, payload: { ack: string }) => { acks.push(payload.ack); return "accepted" as const }
+    assert.equal(await sendEvent(db, env, sub, "cooldown:1", "three", send, ["cooldown:1", "cooldown:2", "cooldown:3"]), "accepted")
+    assert.equal(acks.length, 1)
+    assert.deepEqual(await db.query("select event_key, state from alerts_deliveries order by event_key"),
+      [1, 2, 3].map(id => ({ event_key: `cooldown:${id}`, state: "accepted" })))
+    assert.equal(await sendEvent(db, env, sub, "cooldown:1", "three", send, ["cooldown:1", "cooldown:2", "cooldown:3"]), "duplicate")
+    assert.equal(await sendEvent(db, env, sub, "cooldown:1", "four", send, ["cooldown:1", "cooldown:2", "cooldown:3", "cooldown:4"]), "accepted")
+    assert.equal(acks.length, 2)
+    // The one receipt of a message confirms delivery for the subscription.
+    assert.equal(await db.acknowledge(await digest(acks[0]!)), true)
+    assert.equal((await row(db, sub.id))!.status, "verified")
+    // A failed message frees every key it covered for the next attempt.
+    assert.equal(await sendEvent(db, env, sub, "cooldown:5", "two", async () => "failed", ["cooldown:5", "cooldown:6"]), "failed")
+    await db.query("update alerts_deliveries set lease_until = ? where state = 'failed'", at(-1000))
+    assert.equal(await sendEvent(db, env, sub, "cooldown:5", "two", send, ["cooldown:5", "cooldown:6"]), "accepted")
+    assert.equal((await db.query("select * from alerts_deliveries where state = 'accepted' and attempts = 2")).length, 2)
+  } finally { await db.close() }
+})
+
+test("the poll log carries Telegram counts and nothing that identifies a chat", async () => {
+  const db = await TestDatabase.create()
+  const lines: string[] = []
+  const log = mock.method(console, "log", (line: string) => { lines.push(line) })
+  try {
+    const link = "q".repeat(43)
+    await db.subscribe(account.address, "sig", telegram, await digest(link))
+    await poll(env, db, { ...adapters, walletConditions: async () => ({ failed: 0, validators: [], events: [] }),
+      telegramUpdates: (database, configured) => telegramUpdates(database, configured, async input => String(input).endsWith("/getUpdates")
+        ? Response.json({ ok: true, result: [{ update_id: 1, message: { text: `/start ${link}`, chat: { id: 987654321987, type: "private" } } }] })
+        : Response.json({ ok: true })) })
+    const entry = lines.map(line => JSON.parse(line) as Record<string, unknown>).find(line => line.event === "alerts_poll")!
+    assert.deepEqual(entry, { event: "alerts_poll", evaluated: 1, accepted: 0, failed: 0,
+      telegram: { updates: 1, linked: 1, startBare: 0, startRejected: 0, receipts: 0, replyFailures: 0 } })
+    assert.equal(lines.join("").includes("987654321987") || lines.join("").includes(link), false)
+  } finally { log.mock.restore(); await db.close() }
+})
+
+test("a subscription's own actions: a new Telegram link, pause and resume, and a test message", async () => {
+  const db = await TestDatabase.create()
+  try {
+    const c = await challenge(db, env, origin, { wallet: account.address })
+    const { token } = await authenticate(db, env, origin, { id: c.id, signature: await account.signMessage({ message: c.message }) }, verifyMessage)
+    const sentTo: { url: string; body: Record<string, unknown> }[] = []
+    const provider = mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      sentTo.push({ url: String(input), body: JSON.parse(String(init!.body)) })
+      return Response.json({ ok: true })
+    })
+    try {
+      const request = (path: string, method = "POST", body?: unknown) => api(new Request(`https://alerts.test${path}`, {
+        method, headers: { Origin: origin, Authorization: `Bearer ${token}`, ...(body ? { "Content-Type": "application/json" } : {}) },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      }), env, db)
+      const list = async () => (await (await request("/subscriptions", "GET")).json() as Record<string, unknown>[])[0]!
+      const code = async (response: Response) => [response.status, (await response.json() as { code: string }).code]
+      const created = await (await request("/subscriptions", "POST", { triggers: ["cooldown"], participation: 75, missed: 3, channel: { kind: "telegram" } })).json() as { id: string; telegramUrl: string; expiresAt: string }
+      const first = new URL(created.telegramUrl).searchParams.get("start")!
+      const pending = await list()
+      assert.equal(pending.linked, false)
+      assert.equal(pending.linkedAt, null)
+      assert.ok(Date.parse(pending.linkExpiresAt as string) > Date.now())
+      // Each link is returned with its own expiry, the one the list shows while that link is the current one.
+      assert.equal(created.expiresAt, pending.linkExpiresAt)
+      // Not linked yet: no test message. Another wallet's ID answers like an unknown one.
+      assert.deepEqual(await code(await request(`/subscriptions/${created.id}/test`)), [409, "not_linked"])
+      const other = await db.subscribe(CONTRACTS.staking.address.toLowerCase(), "other", telegram, "other")
+      for (const action of ["telegram-link", "pause", "resume", "test"]) assert.deepEqual(await code(await request(`/subscriptions/${other.id}/${action}`)), [404, "not_found"])
+      // A new link replaces the old code.
+      const reissued = await (await request(`/subscriptions/${created.id}/telegram-link`)).json() as { telegramUrl: string; expiresAt: string }
+      const second = new URL(reissued.telegramUrl).searchParams.get("start")!
+      assert.match(reissued.telegramUrl, /^https:\/\/t\.me\/test_bot\?start=[\w-]{43}$/)
+      assert.notEqual(second, first)
+      assert.equal((await list()).linkExpiresAt, reissued.expiresAt)
+      assert.equal(await db.linkTelegram(await digest(first), "123"), false)
+      assert.equal(await db.linkTelegram(await digest(second), "123"), true)
+      const linked = await list()
+      assert.equal(linked.linked, true)
+      assert.equal(linked.linkExpiresAt, null)
+      assert.ok(Math.abs(Date.parse(linked.linkedAt as string) - Date.now()) < 5000)
+      assert.deepEqual(await code(await request(`/subscriptions/${created.id}/telegram-link`)), [409, "linked"])
+      // A Cron run that links the chat between the API's read and its update is also reported as
+      // linked, never as a subscription to delete.
+      const racing = await db.subscribe(account.address.toLowerCase(), "sig", telegram, await digest("t".repeat(43)))
+      const reissue = mock.method(db, "reissueLink", async () => {
+        await db.linkTelegram(await digest("t".repeat(43)), "777")
+        return null
+      })
+      try { assert.deepEqual(await code(await request(`/subscriptions/${racing.id}/telegram-link`)), [409, "linked"]) } finally { reissue.mock.restore() }
+      await db.unsubscribe(racing.id, account.address.toLowerCase())
+      // The test message goes to the linked chat, without a receipt button, once per minute.
+      assert.equal((await request(`/subscriptions/${created.id}/test`)).status, 200)
+      assert.equal(sentTo.length, 1)
+      assert.match(sentTo[0]!.url, /\/sendMessage$/)
+      assert.equal(sentTo[0]!.body.chat_id, "123")
+      assert.match(sentTo[0]!.body.text as string, /test message/)
+      assert.equal("reply_markup" in sentTo[0]!.body, false)
+      assert.deepEqual(await code(await request(`/subscriptions/${created.id}/test`)), [429, "rate"])
+      assert.equal(sentTo.length, 1)
+      // Paused: listed as paused and skipped by the poller. Resumed: evaluated again.
+      assert.deepEqual(await (await request(`/subscriptions/${created.id}/pause`)).json(), { paused: true })
+      assert.equal((await list()).paused, true)
+      assert.equal((await db.activeSubscriptions("", 50)).some(sub => sub.id === created.id), false)
+      assert.deepEqual(await (await request(`/subscriptions/${created.id}/resume`)).json(), { paused: false })
+      assert.equal((await db.activeSubscriptions("", 50)).some(sub => sub.id === created.id), true)
+      // A browser subscription has no Telegram link.
+      const push = await db.subscribe(account.address.toLowerCase(), "sig", { triggers: ["cooldown"], participation: 75, missed: 3,
+        channel: { kind: "push", endpoint: "https://fcm.googleapis.com/test", keys: {} } }, "push-link")
+      assert.deepEqual(await code(await request(`/subscriptions/${push.id}/telegram-link`)), [400, "invalid"])
+      // The eleventh subscription is refused with its own code, not as an outage.
+      for (let i = 0; i < 8; i++) await db.subscribe(account.address.toLowerCase(), "sig", telegram, `fill-${i}`)
+      assert.deepEqual(await code(await request("/subscriptions", "POST", { triggers: ["cooldown"], participation: 75, missed: 3, channel: { kind: "telegram" } })), [409, "limit"])
+      // Telegram refusing the chat expires the subscription.
+      provider.mock.mockImplementation(async () => new Response(null, { status: 403 }))
+      await db.query("update alerts_subscriptions set tested_at = null")
+      assert.deepEqual(await code(await request(`/subscriptions/${created.id}/test`)), [409, "expired"])
+      assert.equal((await list()).status, "expired")
+    } finally { provider.mock.restore() }
   } finally { await db.close() }
 })
 
@@ -423,10 +702,15 @@ test("cleanup removes expired authentication, links and receipts, and keeps thir
     await db.query("update alerts_subscriptions set link_expires = ?", at(-LINK_PROCESSING_GRACE - 1000)) // Expired and past the grace period.
     await db.query("update alerts_deliveries set ack_expires = ?", at(-1000))
     await db.query("insert into alerts_runs(started_at) values (?), (?)", at(-400 * 86_400_000), at(-380 * 86_400_000))
+    // A day-old test message row goes; a recent one, and every condition key, stays.
+    await db.reserve(sub.id, "test:old", "old-test")
+    await db.reserve(sub.id, "test:new", "new-test")
+    await db.query("update alerts_deliveries set updated_at = ? where event_key = 'test:old'", at(-25 * 3_600_000))
     await db.cleanup()
+    assert.deepEqual((await db.query<{ event_key: string }>("select event_key from alerts_deliveries order by event_key")).map(item => item.event_key), ["cooldown:1", "test:new"])
     assert.equal((await db.query("select * from alerts_challenges")).length, 0)
     assert.deepEqual(await db.query("select link_hash from alerts_subscriptions"), [{ link_hash: null }])
-    assert.deepEqual(await db.query("select ack_hash, event_key from alerts_deliveries"), [{ ack_hash: null, event_key: "cooldown:1" }])
+    assert.deepEqual(await db.query("select ack_hash, event_key from alerts_deliveries where event_key = 'cooldown:1'"), [{ ack_hash: null, event_key: "cooldown:1" }])
     assert.equal((await db.query("select * from alerts_runs")).length, 1)
   } finally { await db.close() }
 })

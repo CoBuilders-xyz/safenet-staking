@@ -2,7 +2,7 @@ import { test, mock } from "node:test"
 import assert from "node:assert/strict"
 import { decodeFunctionData, encodeFunctionResult, encodePacked, keccak256, numberToHex, encodeAbiParameters, encodeEventTopics, type AbiEvent, type Hex } from "viem"
 import { CHAINS, CONTRACTS, NETWORK_SUBGRAPH_IDS, SUBGRAPH_ENDPOINTS, merkleDropAbi, stakingAbi, indexedEvent } from "@cobuilders/safenet-core"
-import { advanceChronology, mainnetSubgraphUrl, walletConditions } from "./sources.js"
+import { advanceChronology, cooldownBody, mainnetSubgraphUrl, walletConditions } from "./sources.js"
 import { TestDatabase, noDatabase } from "./testing/database.js"
 import { initialChronology, type Chronology } from "./chronology.js"
 import type { Env, Subscription } from "./types.js"
@@ -14,10 +14,10 @@ const finalizedHash = keccak256(encodePacked(["string"], ["finalized block 100"]
 const env: Env = { APP_ORIGIN: "https://app.test", DB: noDatabase,
   MAINNET_RPC_URL: "https://rpc.test", REWARDS_BASE_URL: "https://proof.test", SUBGRAPH_URL_MAINNET: "https://graph.test" }
 const sub: Subscription = { id: crypto.randomUUID(), wallet, triggers: ["cooldown", "rewards", "deregistered"], participation: 75, missed: 3,
-  channel: { kind: "telegram" }, telegram_chat: null, status: "unverified", last_delivery: null }
+  channel: { kind: "telegram" }, telegram_chat: null, status: "unverified", last_delivery: null, link_expires: null, linked_at: null, paused: false }
 function transport(options: { stale?: boolean; root?: Hex; claimed?: bigint; registered?: boolean; stake?: bigint; wrongChain?: boolean;
   finalizedAge?: number; registeredAtBlock?: string | null; firstSeenAtBlock?: string; lastUpdatedAtBlock?: string;
-  unavailable?: "cooldown" | "rewards" | "delegations" } = {}) {
+  unavailable?: "cooldown" | "rewards" | "delegations"; secondReady?: boolean; secondFails?: boolean } = {}) {
   const timestamp = Math.floor(Date.now() / 1000) - (options.finalizedAge ?? 0)
   return mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
@@ -59,8 +59,9 @@ function transport(options: { stale?: boolean; root?: Hex; claimed?: bigint; reg
           if (options.unavailable === "cooldown") return Response.json({ id: request.id, jsonrpc: "2.0", error: { code: -32602, message: "Queue unavailable" } })
           result = encodeFunctionResult({ abi: stakingAbi, functionName: "withdrawalQueues", result: [1n, 2n] })
         }
+        else if (call.functionName === "withdrawalNodes" && options.secondFails && call.args[1] === 2n) return Response.json({ id: request.id, jsonrpc: "2.0", error: { code: -32602, message: "Node unavailable" } })
         else if (call.functionName === "withdrawalNodes") result = encodeFunctionResult({ abi: stakingAbi, functionName: "withdrawalNodes", result:
-          call.args[1] === 1n ? [10n, BigInt(timestamp), 0n, 2n] : [10n, BigInt(timestamp + 1), 1n, 0n] })
+          call.args[1] === 1n ? [1_000_500_000_000_000_000_000n, BigInt(timestamp), 0n, 2n] : [10n ** 18n, BigInt(timestamp + (options.secondReady ? 0 : 1)), 1n, 0n] })
         else if (call.functionName === "stakes") result = encodeFunctionResult({ abi: stakingAbi, functionName: "stakes", result: options.stake ?? 10n })
         else if (call.functionName === "isValidator") result = encodeFunctionResult({ abi: stakingAbi, functionName: "isValidator", result: options.registered ?? false })
         else assert.fail("Unexpected contract read")
@@ -76,6 +77,8 @@ test("sources use one finalized block; cooldown boundaries, real Merkle proof an
     const { events, validators } = await walletConditions(env, sub)
     assert.deepEqual(events.map(e => e.trigger), ["cooldown", "rewards", "deregistered"])
     assert.equal(events[0]!.key, "cooldown:1")
+    assert.deepEqual(events[0]!.covers, ["cooldown:1"])
+    assert.equal(events[0]!.body, "A withdrawal of 1,000.5 SAFE has finished its cooldown. Open Safenet to review and claim.")
     assert.match(events[2]!.key, /:80$/)
     assert.deepEqual(validators, [validator])
   } finally { mocked.mock.restore() }
@@ -91,6 +94,27 @@ test("the delegation query pins the finalized block by hash, where graph-node re
     assert.equal(graph.length, 1)
     assert.deepEqual(JSON.parse(String(graph[0]!.arguments[1]!.body)).variables.block, { hash: finalizedHash })
   } finally { mocked.mock.restore() }
+})
+test("withdrawals that are ready together make one cooldown message that names each amount", async () => {
+  const mocked = transport({ secondReady: true })
+  try {
+    const { events } = await walletConditions(env, { ...sub, triggers: ["cooldown"] })
+    assert.deepEqual(events, [{ trigger: "cooldown", key: "cooldown:1", covers: ["cooldown:1", "cooldown:2"],
+      body: "2 withdrawals have finished their cooldown: 1,000.5 SAFE and 1 SAFE. Open Safenet to review and claim." }])
+  } finally { mocked.mock.restore() }
+  // A walk that fails part way still announces the withdrawal it verified, and reports the failure.
+  const partial = transport({ secondFails: true })
+  try {
+    const { events, failed } = await walletConditions(env, { ...sub, triggers: ["cooldown"] })
+    assert.deepEqual(events.map(event => event.covers), [["cooldown:1"]])
+    assert.equal(failed, 1)
+  } finally { partial.mock.restore() }
+  const safe = 10n ** 18n
+  assert.equal(cooldownBody([1n]), "A withdrawal of less than 0.0001 SAFE has finished its cooldown. Open Safenet to review and claim.")
+  assert.equal(cooldownBody([1_234_567n * safe + safe / 8n]), "A withdrawal of 1,234,567.125 SAFE has finished its cooldown. Open Safenet to review and claim.")
+  assert.equal(cooldownBody([safe, 2n * safe, 3n * safe]), "3 withdrawals have finished their cooldown: 1 SAFE, 2 SAFE and 3 SAFE. Open Safenet to review and claim.")
+  assert.equal(cooldownBody(Array.from({ length: 7 }, () => safe)),
+    "7 withdrawals have finished their cooldown: 1 SAFE, 1 SAFE, 1 SAFE, 1 SAFE, 1 SAFE and 2 more. Open Safenet to review and claim.")
 })
 test("stale roots, fully claimed rewards, zero stakes and registered validators cannot produce false alerts", async () => {
   for (const options of [{ root: keccak256(encodePacked(["uint256"], [1n])), stake: 0n }, { claimed: 100n, registered: true }]) {

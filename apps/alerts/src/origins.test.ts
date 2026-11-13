@@ -90,7 +90,7 @@ test("a challenge issued for one origin cannot be redeemed from another, and sta
     const signature = await account.signMessage({ message: c.message })
     const replay = await call("/auth/verify", xyz, env, { id: c.id, signature }, db)
     assert.equal(replay.status, 401)
-    assert.deepEqual(await replay.json(), { error: "Challenge origin mismatch" })
+    assert.deepEqual(await replay.json(), { error: "Challenge origin mismatch", code: "session" })
     const unlisted = await call("/auth/verify", "https://evil.test", env, { id: c.id, signature }, db)
     assert.equal(unlisted.status, 403)
     assert.equal((await db.challenge(c.id))!.used, false)
