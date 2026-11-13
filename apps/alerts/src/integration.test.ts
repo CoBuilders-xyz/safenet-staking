@@ -79,6 +79,14 @@ test("API isolates wallets, refuses wrong origins, revokes deleted subscriptions
     assert.equal(list[0]!.participation, 75)
     assert.equal(list[0]!.channel, "telegram")
     for (const secret of ["signature_hash", "telegram_chat", "link_hash", "wallet"]) assert.equal(secret in list[0]!, false)
+    assert.equal(list[0]!.linked, false)
+    // After /start binds a chat, the list says linked, as a boolean, and still never the chat ID.
+    const code = new URL(telegramUrl).searchParams.get("start")!
+    assert.equal(await db.linkTelegram(await digest(code), "987654321987"), true)
+    const linked = (await (await request("/subscriptions")).json() as Record<string, unknown>[])[0]!
+    assert.equal(linked.linked, true)
+    assert.equal(linked.status, "unverified") // Linked is not delivery confirmation.
+    assert.equal(JSON.stringify(linked).includes("987654321987"), false)
     const other = await db.subscribe(CONTRACTS.staking.address.toLowerCase(), "other", telegram, "other")
     await request(`/subscriptions/${other.id}`, "DELETE")
     assert.ok(await row(db, other.id))
