@@ -74,7 +74,8 @@ describe("DashboardPage", () => {
     renderPage()
 
     expect(screen.getByText("Stake your SAFE")).toBeInTheDocument()
-    expect(screen.getByText(/Earn rewards for helping secure/)).toBeInTheDocument()
+    expect(screen.getByText(/Your positions in the/)).toHaveTextContent("Your positions in the Safenet staking contracts")
+    expect(screen.queryByText(/Earn rewards/)).toBeNull()
   })
 
   it("renders all child sections when connected", () => {

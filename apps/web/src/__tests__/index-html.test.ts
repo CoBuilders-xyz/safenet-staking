@@ -40,4 +40,11 @@ describe("index.html", () => {
       expect(text).toBe("Non-custodial interface to the Safenet staking contracts.")
     }
   })
+
+  it("describes the preview image by the neutral text it carries", () => {
+    const alts = [...html.matchAll(/<meta (?:name|property)="(?:og:image:alt|twitter:image:alt)" content="([^"]+)"/g)].map((m) => m[1])
+
+    expect(alts).toEqual(Array(2).fill("Safenet staking: non-custodial interface to the Safenet staking contracts"))
+    expect(html).not.toMatch(/earn rewards/i)
+  })
 })

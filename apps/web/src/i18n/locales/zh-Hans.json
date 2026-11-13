@@ -97,7 +97,7 @@
     "confirmStake": "确认委托",
     "disconnectWallet": "断开钱包",
     "hero": {
-      "dashboard": "通过帮助保护 <network>Safenet</network> 赚取<rewards>奖励</rewards>",
+      "dashboard": "您在 <network>Safenet</network> <staking>质押</staking>合约中的持仓",
       "overview": "<network>Safenet</network> 的<staking>质押</staking>和共识状态。无需钱包。",
       "rewards": "领取你的 Safenet <rewards>奖励</rewards>并与链上数据核对",
       "validators": "选择一个<validator>验证者</validator>来<staking>委托</staking>你的 SAFE",

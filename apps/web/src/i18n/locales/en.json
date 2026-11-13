@@ -130,7 +130,7 @@
     "confirmStake": "Confirm stake",
     "disconnectWallet": "Disconnect wallet",
     "hero": {
-      "dashboard": "Earn <rewards>rewards</rewards> for helping secure <network>Safenet</network>",
+      "dashboard": "Your positions in the <network>Safenet</network> <staking>staking</staking> contracts",
       "overview": "The state of <network>Safenet</network> <staking>staking</staking> and consensus. No wallet needed.",
       "rewards": "Claim your Safenet <rewards>rewards</rewards> and check them against the chain",
       "validators": "Select a <validator>validator</validator> to <staking>stake</staking> your SAFE tokens",

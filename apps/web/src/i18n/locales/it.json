@@ -97,7 +97,7 @@
     "confirmStake": "Conferma delega",
     "disconnectWallet": "Disconnetti wallet",
     "hero": {
-      "dashboard": "Ottieni <rewards>ricompense</rewards> contribuendo alla sicurezza di <network>Safenet</network>",
+      "dashboard": "Le tue posizioni nei contratti di <staking>staking</staking> di <network>Safenet</network>",
       "overview": "Lo stato dello <staking>staking</staking> e del consenso di <network>Safenet</network>. Non serve un wallet.",
       "rewards": "Richiedi le tue <rewards>ricompense</rewards> Safenet e verificale sulla blockchain",
       "validators": "Scegli un <validator>validatore</validator> a cui <staking>delegare</staking> i tuoi SAFE",

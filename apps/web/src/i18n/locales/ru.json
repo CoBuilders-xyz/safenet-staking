@@ -97,7 +97,7 @@
     "confirmStake": "Подтвердить делегирование",
     "disconnectWallet": "Отключить кошелёк",
     "hero": {
-      "dashboard": "Получайте <rewards>награды</rewards>, помогая защищать <network>Safenet</network>",
+      "dashboard": "Ваши позиции в контрактах <staking>стейкинга</staking> <network>Safenet</network>",
       "overview": "Состояние <staking>стейкинга</staking> и консенсуса <network>Safenet</network>. Кошелёк не нужен.",
       "rewards": "Получайте свои <rewards>награды</rewards> Safenet и сверяйте их с блокчейном",
       "validators": "Выберите <validator>валидатора</validator> для <staking>делегирования</staking> SAFE",

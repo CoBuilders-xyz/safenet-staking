@@ -23,7 +23,7 @@ export function DashboardPage() {
     <div className="space-y-6">
       <PageHero
         title={t("dashboard.stakeYourSafe", "Stake your SAFE")}
-        subtitle={<Trans i18nKey="onboarding.hero.dashboard" defaults="Earn <rewards>rewards</rewards> for helping secure <network>Safenet</network>" components={{ rewards: <Term term="rewards" children={null} />, network: <Term term="safenet" children={null} /> }} />}
+        subtitle={<Trans i18nKey="onboarding.hero.dashboard" defaults="Your positions in the <network>Safenet</network> <staking>staking</staking> contracts" components={{ network: <Term term="safenet" children={null} />, staking: <Term term="staking" children={null} /> }} />}
       >
         <p className="mt-4 text-xs text-muted-foreground">
           {t("dashboard.rewardsAreNotGuaranteedAndMayVary", "Rewards are not guaranteed and may vary.")}{" "}
