@@ -1,5 +1,5 @@
 import { authenticate, challenge, session, type VerifyWallet } from "./auth.js"
-import { Database, digest, randomToken } from "./db.js"
+import { Database, MAX_SUBSCRIPTIONS, digest, randomToken } from "./db.js"
 import { sendTest } from "./delivery.js"
 import { allowedOrigin } from "./origins.js"
 import { HttpError, object, subscriptionInput, type Env } from "./types.js"
@@ -35,7 +35,7 @@ export async function api(request: Request, env: Env, db = new Database(env.DB),
     const path = new URL(request.url).pathname
     let result: unknown
     if (path === "/config" && request.method === "GET") {
-      result = { vapidPublicKey: env.VAPID_PUBLIC_KEY ?? null, telegramBot: env.TELEGRAM_BOT_NAME ?? null }
+      result = { vapidPublicKey: env.VAPID_PUBLIC_KEY ?? null, telegramBot: env.TELEGRAM_BOT_NAME ?? null, maxSubscriptions: MAX_SUBSCRIPTIONS }
     } else if (path === "/auth/challenge" && request.method === "POST") {
       result = await challenge(db, env, origin, await json(request))
     } else if (path === "/auth/verify" && request.method === "POST") {

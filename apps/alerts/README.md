@@ -131,17 +131,31 @@ Each wallet can hold ten subscriptions. The server derives ownership from the se
 and mutation. The browser cannot supply a wallet owner for another wallet's subscription.
 
 Telegram subscription creation returns a single-use bot link. The interface asks the user to press
-Start within ten minutes. Only `/start <token>` in a private chat can bind the recipient. The Worker
-reads `/start` on a later Cron run: normally the next one, up to five minutes later, or later when a
-poll still holds the lease. So the ten minutes are checked against the time Telegram stamps on the
+Start within ten minutes. Only `/start <code>` in a private chat can bind the recipient;
+`/start@<bot> <code>`, any letter case and extra whitespace are read the same way. The Worker reads
+`/start` on a later Cron run: normally the next one, up to five minutes later, or later when a poll
+still holds the lease. So the ten minutes are checked against the time Telegram stamps on the
 `/start` message, not the time the Worker reads it. A code sent in time is honoured if the Worker
-reads it up to an hour after it expired; cleanup keeps it until then. The Worker then sends "Linked.
-Safenet alerts for this subscription will arrive in this chat." to that chat only. This confirmation
-is best effort: if Telegram refuses it, the link stays and the alerts page shows "Telegram linked".
-An unknown, expired or reused code gets no reply. The browser never supplies a chat ID. A user who
-loses that link deletes the unlinked subscription and creates another. The poller does not send to
-groups, unlinked subscriptions or arbitrary recipients. Browser endpoint validation allows known
-HTTPS push providers only and forbids credentials, ports and redirects.
+reads it up to an hour after it expired; cleanup keeps it until then. The browser never supplies a
+chat ID.
+
+The bot answers every `/start` in a private chat. A code that links gets "Linked. Safenet alerts for
+this subscription will arrive in this chat." A bare `/start` gets a pointer to the Alerts page. An
+unknown, expired or reused code gets one neutral reply that says to get a new link, so the bot
+reveals nothing about codes. Guidance goes out once per chat per poll. Each reply is best effort: if
+Telegram refuses it, the link stays, and the alerts page shows the state. The bot never replies in a
+group, and the poller does not send to groups, unlinked subscriptions or arbitrary recipients.
+
+`POST /subscriptions/:id/telegram-link` issues a new link for the wallet's own Telegram subscription
+that has no chat yet. It replaces the previous code, so a lost or expired link needs no new
+subscription. `POST /subscriptions/:id/pause` and `/resume` stop and restart evaluation; a condition
+that is still true after a resume is sent then. `POST /subscriptions/:id/test` sends one test
+message, at most one per minute: Telegram gets it without a receipt button, and a browser gets it
+with a receipt, so showing it confirms delivery. The list returns `linked`, `linkedAt`,
+`linkExpiresAt` and `paused`, never a chat ID or a code. An error answer carries a `code` beside its
+text, and the interface chooses its message from the code; the subscription limit answers 409
+`limit`. Browser endpoint validation allows known HTTPS push providers only and forbids credentials,
+ports and redirects.
 
 Deleting a subscription removes its delivery token and event history through a foreign-key cascade.
 Expired authentication records are cleaned each poll. Operational run records contain only counts.
@@ -156,7 +170,9 @@ Mainnet finalized blocks may trail by 13–19 minutes normally; a 30-minute age 
 finality. Subgraph freshness remains bounded separately. Withdrawal, reward and delegation source
 failures mark the run unhealthy but do not discard verified conditions from independent sources.
 
-* **Cooldown:** walk contract withdrawal IDs; alert for each positive amount past `claimableAt`.
+* **Cooldown:** walk contract withdrawal IDs; a positive amount past `claimableAt` is ready. One
+  message covers every ready withdrawal and names each amount, at most five. It is sent when at
+  least one of them is new: each withdrawal keeps its own delivery key.
 * **Rewards:** resolve core's canonical dataset; verify the Merkle proof, current on-chain root and
   cumulative claimed amount. Missing, stale-root or invalid proofs cannot produce an alert.
 * **Deregistered:** notify a delegator whose validator is no longer registered. The subgraph's
@@ -200,6 +216,13 @@ acceptance can duplicate a message: providers do not offer an atomic transaction
 Expired push endpoints and blocked bots disable that subscription until the user recreates it.
 A provider success is **not** receipt confirmation. Browser confirmation follows `showNotification`;
 Telegram confirmation requires the recipient's inline button. Receipt capabilities expire after 24 hours.
+The Worker reads a button press on its next Cron run, after Telegram has stopped waiting for the
+answer. So it also writes "Receipt confirmed." into the message. A message that covers several
+events carries one receipt, recorded on the first of them.
+
+The poll log line `alerts_poll` carries counts only: subscriptions evaluated, deliveries accepted
+and failed, and for Telegram the updates read, chats linked, bare and rejected `/start` messages,
+receipts and failed replies. It never carries a wallet, a chat, a code or a message text.
 
 The Cron lease lasts 16 minutes, beyond the Worker's 15-minute execution limit.
 A poll stops between subscriptions after ten minutes and saves its

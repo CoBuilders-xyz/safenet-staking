@@ -20,6 +20,7 @@ export const LINK_START_WINDOW = 10 * 60_000
 export const LINK_PROCESSING_GRACE = 60 * 60_000
 const RECEIPT = 24 * 60 * 60_000
 const DELIVERY_LEASE = 2 * 60_000
+export const MAX_SUBSCRIPTIONS = 10
 /** One test message per subscription per minute: each one is a provider request. */
 const TEST_INTERVAL = 60_000
 const iso = (ms: number) => new Date(ms).toISOString()
@@ -131,14 +132,14 @@ export class Database {
   async subscriptions(wallet: string): Promise<Subscription[]> {
     return (await this.all<SubscriptionRow>("select * from alerts_subscriptions where wallet = ? order by created_at, rowid", wallet)).map(subscription)
   }
-  /** At most ten subscriptions per wallet, checked in the same statement that inserts. */
+  /** At most MAX_SUBSCRIPTIONS per wallet, checked in the same statement that inserts. */
   async subscribe(wallet: string, signatureHash: string, settings: SubscriptionSettings, linkHash: string): Promise<Subscription> {
     const now = Date.now()
     const [row] = await this.all<SubscriptionRow>(`insert into alerts_subscriptions(id, wallet, signature_hash, triggers,
       participation, missed, channel, link_hash, link_expires, created_at)
-      select ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10 where (select count(*) from alerts_subscriptions where wallet = ?2) < 10
+      select ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10 where (select count(*) from alerts_subscriptions where wallet = ?2) < ?11
       returning *`, crypto.randomUUID(), wallet, signatureHash, JSON.stringify(settings.triggers), settings.participation,
-    settings.missed, JSON.stringify(settings.channel), linkHash, iso(now + LINK_START_WINDOW), iso(now))
+    settings.missed, JSON.stringify(settings.channel), linkHash, iso(now + LINK_START_WINDOW), iso(now), MAX_SUBSCRIPTIONS)
     if (!row) throw new HttpError(409, "Subscription limit reached", "limit")
     return subscription(row)
   }

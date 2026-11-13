@@ -291,6 +291,24 @@ test("several ready events go out as one message; each keeps its own key, and on
   } finally { await db.close() }
 })
 
+test("the poll log carries Telegram counts and nothing that identifies a chat", async () => {
+  const db = await TestDatabase.create()
+  const lines: string[] = []
+  const log = mock.method(console, "log", (line: string) => { lines.push(line) })
+  try {
+    const link = "q".repeat(43)
+    await db.subscribe(account.address, "sig", telegram, await digest(link))
+    await poll(env, db, { ...adapters, walletConditions: async () => ({ failed: 0, validators: [], events: [] }),
+      telegramUpdates: (database, configured) => telegramUpdates(database, configured, async input => String(input).endsWith("/getUpdates")
+        ? Response.json({ ok: true, result: [{ update_id: 1, message: { text: `/start ${link}`, chat: { id: 987654321987, type: "private" } } }] })
+        : Response.json({ ok: true })) })
+    const entry = lines.map(line => JSON.parse(line) as Record<string, unknown>).find(line => line.event === "alerts_poll")!
+    assert.deepEqual(entry, { event: "alerts_poll", evaluated: 1, accepted: 0, failed: 0,
+      telegram: { updates: 1, linked: 1, startBare: 0, startRejected: 0, receipts: 0, replyFailures: 0 } })
+    assert.equal(lines.join("").includes("987654321987") || lines.join("").includes(link), false)
+  } finally { log.mock.restore(); await db.close() }
+})
+
 test("a subscription's own actions: a new Telegram link, pause and resume, and a test message", async () => {
   const db = await TestDatabase.create()
   try {
