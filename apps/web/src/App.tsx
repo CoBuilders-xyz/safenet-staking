@@ -1,7 +1,7 @@
 import { i18n } from "@/i18n"
 import { lazy, useEffect, useRef, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
-import { HashRouter, Routes, Route } from "react-router-dom"
+import { HashRouter, Routes, Route, useLocation } from "react-router-dom"
 import { useAccount, useDisconnect } from "wagmi"
 import { Layout } from "@/components/layout/Layout"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
@@ -11,11 +11,14 @@ import { Button } from "@/components/ui/button"
 import { chooseRestriction, type Restriction } from "@/lib/restriction"
 import { Analytics } from "@/components/Analytics"
 import { useAutoConnect } from "@/hooks/useAutoConnect"
+import { useTermsGuard } from "@/hooks/useTermsGuard"
+import { useTermsAccepted } from "@/lib/termsAcceptance"
 import { useSanctionsCheck } from "@/hooks/useSanctionsCheck"
 import { useGeoblockCheck } from "@/hooks/useGeoblockCheck"
 import { useWalletSanctionsCheck } from "@/hooks/useWalletSanctionsCheck"
 import { useToast } from "@/hooks/useToast"
 import { pageImports, routeImportFor, routeContentImport } from "@/routes"
+import { CONTENT_PAGES, contentPageAt } from "@/config/legal"
 import Loader2 from "lucide-react/dist/esm/icons/loader-2"
 
 // The first page's code loads while the gates are still answering, rather than after them.
@@ -30,6 +33,7 @@ const ValidatorDetailPage = lazy(pageImports.ValidatorDetail)
 const WithdrawalsPage = lazy(pageImports.Withdrawals)
 const RewardsPage = lazy(pageImports.Rewards)
 const AlertsPage = lazy(pageImports.Alerts)
+const ContentPage = lazy(pageImports.Content)
 const NotFoundPage = lazy(pageImports.NotFound)
 
 /** Preload all route chunks so IPFS-hosted builds are warm. */
@@ -124,13 +128,11 @@ function WalletSanctionsGate({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-function App() {
+/** Every page but the legal ones: closed until each access check has answered and allowed. */
+function GatedApp() {
   useTranslation()
-  useAutoConnect()
   const sanctions = useSanctionsCheck()
   const geo = useGeoblockCheck()
-
-  useEffect(() => preloadWhenIdle(), [])
 
   if (sanctions.isLoading || geo.isLoading) {
     return (
@@ -160,7 +162,7 @@ function App() {
   }
 
   return (
-    <HashRouter>
+    <>
       <Analytics />
       <DisconnectWatcher />
       <WalletSanctionsGate>
@@ -177,6 +179,44 @@ function App() {
           </Route>
         </Routes>
       </WalletSanctionsGate>
+    </>
+  )
+}
+
+/**
+ * The imprint, the terms, the privacy policy and the FAQ. A visitor must be able to read them
+ * whatever the access checks would answer, so they render outside the gates and start none of
+ * them: no country lookup, no sanctions request and no wallet.
+ */
+function OpenPages() {
+  return (
+    <Routes>
+      <Route element={<Layout standalone />}>
+        {CONTENT_PAGES.map(name => (
+          <Route key={name} path={`/${name}`} element={<ErrorBoundary><ContentPage name={name} /></ErrorBoundary>} />
+        ))}
+      </Route>
+    </Routes>
+  )
+}
+
+/** Chooses by the route alone, before any check runs: a legal page, or the gated interface. */
+function Shell() {
+  const { pathname } = useLocation()
+  const open = contentPageAt(pathname) !== undefined
+  const termsAccepted = useTermsAccepted()
+  useAutoConnect(!open, termsAccepted)
+  useTermsGuard(termsAccepted)
+  return open ? <OpenPages /> : <GatedApp />
+}
+
+function App() {
+  useTranslation()
+  useEffect(() => preloadWhenIdle(), [])
+
+  return (
+    <HashRouter>
+      <Shell />
       <Toaster />
     </HashRouter>
   )

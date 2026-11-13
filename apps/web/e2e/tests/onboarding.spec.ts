@@ -9,7 +9,7 @@ import { REWARD_PROOFS, VALIDATORS } from "../fixtures/test-data"
 /** Where each term appears, and words its explanation must hold. */
 const TERMS_BY_SCREEN = [
   { path: "/", terms: [["Safenet", "transaction-security network"], ["staking", "staking contract behind a validator"]] },
-  { path: "/#/dashboard", terms: [["rewards", "you claim them"], ["Safenet", "transaction-security network"]] },
+  { path: "/#/dashboard", terms: [["Safenet", "transaction-security network"], ["staking", "staking contract behind a validator"]] },
   { path: "/#/validators", terms: [["validator", "attests results"], ["stake", "staking contract behind a validator"], ["Commission", "validator keeps"]] },
   { path: `/#/validators/${VALIDATORS.validatorA}`, terms: [["Commission", "validator keeps"]] },
   // The mocked staking contract's withdrawDelay is seven days.

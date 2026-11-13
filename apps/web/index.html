@@ -3,8 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://api.country.is" crossorigin />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data: https://fonts.reown.com; connect-src 'self' https: http: wss: ws:; img-src 'self' data: blob: https:; frame-src 'self' https://verify.walletconnect.org https://verify.walletconnect.com; object-src 'none';" />
+    <script>
+      // Connect early to the location service of the access checks. The legal pages open
+      // without those checks, so on them the browser does not contact the service.
+      if (!/^#\/+(imprint|terms|privacy|faq)\/*(\?|$)/i.test(location.hash)) {
+        var preconnect = document.createElement('link')
+        preconnect.rel = 'preconnect'
+        preconnect.href = 'https://api.country.is'
+        preconnect.crossOrigin = 'anonymous'
+        document.head.appendChild(preconnect)
+      }
+    </script>
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
@@ -12,19 +22,20 @@
     <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#000000" />
     <link rel="manifest" href="/manifest.json" />
     <title>Safenet Staking</title>
-    <meta name="description" content="Delegate your SAFE tokens to validators and earn rewards." />
+    <meta name="description" content="Non-custodial interface to the Safenet staking contracts." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="%VITE_APP_URL%" />
     <meta property="og:title" content="Safenet Staking" />
-    <meta property="og:description" content="Delegate your SAFE tokens to validators and earn rewards." />
+    <meta property="og:description" content="Non-custodial interface to the Safenet staking contracts." />
     <meta property="og:image" content="%VITE_APP_URL%/og-image.jpg" />
     <meta property="og:image:width" content="2400" />
     <meta property="og:image:height" content="1260" />
-    <meta property="og:image:alt" content="Safenet Staking: stake your SAFE and earn rewards for helping secure the network" />
+    <meta property="og:image:alt" content="Safenet staking: non-custodial interface to the Safenet staking contracts" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Safenet Staking" />
-    <meta name="twitter:description" content="Delegate your SAFE tokens to validators and earn rewards." />
+    <meta name="twitter:description" content="Non-custodial interface to the Safenet staking contracts." />
     <meta name="twitter:image" content="%VITE_APP_URL%/og-image.jpg" />
+    <meta name="twitter:image:alt" content="Safenet staking: non-custodial interface to the Safenet staking contracts" />
   </head>
   <body>
     <script>

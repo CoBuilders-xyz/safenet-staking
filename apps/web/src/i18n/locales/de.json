@@ -64,6 +64,7 @@
     "documentation": "Dokumentation",
     "faq": "FAQ",
     "imprint": "Impressum",
+    "operatedBy": "Betrieben von {{operator}}",
     "privacy": "Datenschutz",
     "terms": "Nutzungsbedingungen"
   },
@@ -81,6 +82,10 @@
     },
     "openMenu": "Menü öffnen"
   },
+  "legal": {
+    "englishOnly": "Dieser Text ist nur auf Englisch verfügbar.",
+    "placeholderNotice": "Platzhalter. Der endgültige Text wird noch rechtlich geprüft."
+  },
   "onboarding": {
     "accessCheckFailed": "Zugriffsprüfung fehlgeschlagen",
     "back": "Zurück",
@@ -92,7 +97,7 @@
     "confirmStake": "Delegation bestätigen",
     "disconnectWallet": "Wallet trennen",
     "hero": {
-      "dashboard": "Verdiene <rewards>Belohnungen</rewards>, indem du <network>Safenet</network> absicherst",
+      "dashboard": "Ihre Positionen in den <staking>Staking</staking>-Verträgen von <network>Safenet</network>",
       "overview": "Der Stand von <staking>Staking</staking> und Konsens in <network>Safenet</network>. Keine Wallet erforderlich.",
       "rewards": "Fordere deine Safenet-<rewards>Belohnungen</rewards> an und prüfe sie anhand der Blockchain",
       "validators": "Wähle einen <validator>Validator</validator>, um deine SAFE zu <staking>delegieren</staking>",
@@ -224,6 +229,7 @@
     },
     "hero": {
       "openDashboard": "Meinen Stake verwalten",
+      "seeTerms": "Siehe Bedingungen.",
       "title": "Netzwerkübersicht"
     },
     "reason": {
@@ -541,7 +547,13 @@
     "connectionFailed": "Verbindung fehlgeschlagen",
     "connectionHelp": "Wallet-Verbindung fehlgeschlagen. Öffnen Sie sie und versuchen Sie es erneut.",
     "disconnect": "Trennen",
-    "switchTo": "Zu {{name}} wechseln"
+    "switchTo": "Zu {{name}} wechseln",
+    "terms": {
+      "agree": "Zustimmen und verbinden",
+      "body": "Mit dem Verbinden stimmen Sie den <terms>Nutzungsbedingungen</terms> und der <privacy>Datenschutzerklärung</privacy> zu.",
+      "cancel": "Abbrechen",
+      "title": "Vor dem Verbinden"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "Alle Auszahlungen beansprucht",

@@ -64,6 +64,7 @@
     "documentation": "Documentação",
     "faq": "Perguntas frequentes",
     "imprint": "Informações legais",
+    "operatedBy": "Operado por {{operator}}",
     "privacy": "Privacidade",
     "terms": "Termos"
   },
@@ -81,6 +82,10 @@
     },
     "openMenu": "Abrir menu"
   },
+  "legal": {
+    "englishOnly": "Este texto está disponível apenas em inglês.",
+    "placeholderNotice": "Texto provisório. O texto final aguarda revisão jurídica."
+  },
   "onboarding": {
     "accessCheckFailed": "Falha na verificação de acesso",
     "back": "Voltar",
@@ -92,7 +97,7 @@
     "confirmStake": "Confirmar delegação",
     "disconnectWallet": "Desconectar carteira",
     "hero": {
-      "dashboard": "Ganhe <rewards>recompensas</rewards> por ajudar a proteger a <network>Safenet</network>",
+      "dashboard": "Suas posições nos contratos de <staking>staking</staking> da <network>Safenet</network>",
       "overview": "O estado do <staking>staking</staking> e do consenso da <network>Safenet</network>. Não precisa de carteira.",
       "rewards": "Resgate suas <rewards>recompensas</rewards> da Safenet e confira os dados na blockchain",
       "validators": "Escolha um <validator>validador</validator> para <staking>delegar</staking> seus SAFE",
@@ -229,6 +234,7 @@
     },
     "hero": {
       "openDashboard": "Gerenciar meu stake",
+      "seeTerms": "Ver os Termos.",
       "title": "Visão geral da rede"
     },
     "reason": {
@@ -551,7 +557,13 @@
     "connectionFailed": "Falha na conexão",
     "connectionHelp": "Não foi possível conectar a carteira. Abra-a e tente novamente.",
     "disconnect": "Desconectar",
-    "switchTo": "Mudar para {{name}}"
+    "switchTo": "Mudar para {{name}}",
+    "terms": {
+      "agree": "Aceitar e conectar",
+      "body": "Ao conectar, você aceita os <terms>Termos de uso</terms> e a <privacy>Política de privacidade</privacy>.",
+      "cancel": "Cancelar",
+      "title": "Antes de conectar"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "Todos os saques resgatados",

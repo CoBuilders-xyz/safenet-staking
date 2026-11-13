@@ -32,7 +32,8 @@ export class LayoutPage {
     this.connectButton = page.getByRole("button", { name: "Connect Wallet" })
     this.disconnectButton = page.getByRole("button", { name: "Disconnect" })
     this.logo = page.locator("header").getByRole("link").first()
-    this.footerTerms = page.getByRole("link", { name: "Terms" })
+    // Scoped and exact: the Overview also links "See Terms.".
+    this.footerTerms = this.footer.getByRole("link", { name: "Terms", exact: true })
     this.footerDocs = page.getByRole("link", { name: "Documentation" })
     this.footerFaq = page.getByRole("link", { name: "FAQ" })
     this.languageSelect = page.locator("header").getByRole("combobox")

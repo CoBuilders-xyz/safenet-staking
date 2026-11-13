@@ -62,8 +62,10 @@ The tooltip provider preloads beside the first page while access checks run, the
 route content. This avoids an extra network round trip after the gates pass. The header uses no tooltip,
 so its positioning code is not needed while the app starts. All route explanations share the
 same provider, preserving hover timing and keyboard/touch behavior.
-The document preconnects to the location service used by the access gate. Its connection can
-start before JavaScript executes; Lighthouse identified about 95 ms of potential savings.
+The document preconnects to the location service used by the access gate, from an inline script
+in `index.html` that skips the legal pages, which open without that gate. The connection still
+starts before the application's JavaScript executes; Lighthouse identified about 95 ms of
+potential savings.
 
 ## Integrated Lighthouse measurements — 2026-10-28
 

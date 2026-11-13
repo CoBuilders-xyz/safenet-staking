@@ -9,6 +9,16 @@ import { createRpcHandler } from "../mocks/rpc-handler"
 import { createMockChainState, applyMockTx, type MockChainState } from "../mocks/mock-chain-state"
 import { createMockSubgraphState, createSubgraphHandler, type MockSubgraphState } from "../mocks/subgraph-handler"
 import { CHAIN_ID_HEX, WRONG_CHAIN_ID_HEX, TEST_USER } from "./test-data"
+import { TERMS_ACCEPTANCE_STORAGE_KEY, TERMS_VERSION } from "../../src/config/terms"
+
+export type TestOptions = {
+  /**
+   * Whether the browser has already accepted the current Terms of use, as a returning visitor
+   * has. True by default, so a test connects without the dialog that asks; the specs of that
+   * dialog set it to false.
+   */
+  termsAccepted: boolean
+}
 
 export type TestFixtures = {
   /** Mutable mock chain state (balances, stakes, withdrawals, rewards) for this test. */
@@ -27,12 +37,15 @@ export type TestFixtures = {
 
 interface SetupPageOptions {
   connected: boolean
+  termsAccepted: boolean
   chainIdHex?: string
   supportsBatching?: boolean
 }
 
 async function setupPage(page: Page, options: SetupPageOptions, state: MockChainState, subgraph: MockSubgraphState): Promise<Page> {
-  const { connected, chainIdHex = CHAIN_ID_HEX, supportsBatching } = options
+  const { connected, termsAccepted, chainIdHex = CHAIN_ID_HEX, supportsBatching } = options
+
+  if (termsAccepted) await seedTermsAcceptance(page)
 
   // Bridge eth_sendTransaction (handled entirely inside the injected browser script,
   // see ethereum-provider.ts) back into the Node-side mock chain state, so RPC reads
@@ -140,6 +153,19 @@ export async function seedInjectedConnection(page: Page): Promise<void> {
   })
 }
 
+/**
+ * Seed the acceptance of the current Terms of use, as a returning visitor has it. Without it the
+ * app restores no wallet session and asks before it connects one.
+ */
+export async function seedTermsAcceptance(page: Page): Promise<void> {
+  await page.addInitScript(
+    ({ key, version }) => {
+      localStorage.setItem(key, JSON.stringify({ version, acceptedAt: "2026-01-01T00:00:00.000Z" }))
+    },
+    { key: TERMS_ACCEPTANCE_STORAGE_KEY, version: TERMS_VERSION },
+  )
+}
+
 /** Mock geo-check APIs so the app renders instead of showing RestrictedScreen. */
 export async function stubGeoCheck(page: Page): Promise<void> {
   await page.route("**/api.country.is**", async (route) => {
@@ -154,7 +180,8 @@ export async function stubGeoCheck(page: Page): Promise<void> {
   })
 }
 
-export const test = base.extend<TestFixtures>({
+export const test = base.extend<TestFixtures & TestOptions>({
+  termsAccepted: [true, { option: true }],
   // eslint-disable-next-line no-empty-pattern -- Playwright fixture API requires this signature
   mockChainState: async ({}, use) => {
     await use(createMockChainState()) // eslint-disable-line react-hooks/rules-of-hooks -- Playwright fixture API, not a React hook
@@ -163,20 +190,20 @@ export const test = base.extend<TestFixtures>({
   mockSubgraph: async ({}, use) => {
     await use(createMockSubgraphState()) // eslint-disable-line react-hooks/rules-of-hooks -- Playwright fixture API, not a React hook
   },
-  connectedPage: async ({ page, mockChainState, mockSubgraph }, use) => {
-    const p = await setupPage(page, { connected: true }, mockChainState, mockSubgraph)
+  connectedPage: async ({ page, mockChainState, mockSubgraph, termsAccepted }, use) => {
+    const p = await setupPage(page, { connected: true, termsAccepted }, mockChainState, mockSubgraph)
     await use(p) // eslint-disable-line react-hooks/rules-of-hooks -- Playwright fixture API, not a React hook
   },
-  disconnectedPage: async ({ page, mockChainState, mockSubgraph }, use) => {
-    const p = await setupPage(page, { connected: false }, mockChainState, mockSubgraph)
+  disconnectedPage: async ({ page, mockChainState, mockSubgraph, termsAccepted }, use) => {
+    const p = await setupPage(page, { connected: false, termsAccepted }, mockChainState, mockSubgraph)
     await use(p) // eslint-disable-line react-hooks/rules-of-hooks -- Playwright fixture API, not a React hook
   },
-  wrongNetworkPage: async ({ page, mockChainState, mockSubgraph }, use) => {
-    const p = await setupPage(page, { connected: true, chainIdHex: WRONG_CHAIN_ID_HEX }, mockChainState, mockSubgraph)
+  wrongNetworkPage: async ({ page, mockChainState, mockSubgraph, termsAccepted }, use) => {
+    const p = await setupPage(page, { connected: true, termsAccepted, chainIdHex: WRONG_CHAIN_ID_HEX }, mockChainState, mockSubgraph)
     await use(p) // eslint-disable-line react-hooks/rules-of-hooks -- Playwright fixture API, not a React hook
   },
-  batchingPage: async ({ page, mockChainState, mockSubgraph }, use) => {
-    const p = await setupPage(page, { connected: true, supportsBatching: true }, mockChainState, mockSubgraph)
+  batchingPage: async ({ page, mockChainState, mockSubgraph, termsAccepted }, use) => {
+    const p = await setupPage(page, { connected: true, termsAccepted, supportsBatching: true }, mockChainState, mockSubgraph)
     await use(p) // eslint-disable-line react-hooks/rules-of-hooks -- Playwright fixture API, not a React hook
   },
 })

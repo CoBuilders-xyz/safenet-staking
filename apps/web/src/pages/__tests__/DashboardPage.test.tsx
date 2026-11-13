@@ -3,6 +3,8 @@ import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { DashboardPage } from "../DashboardPage"
+import { TERMS_ACCEPTANCE_STORAGE_KEY } from "@/config/terms"
+import { acceptTerms, resetTermsAcceptanceForTests } from "@/lib/termsAcceptance"
 
 const { mockUseAccount, mockConnect, mockToast, safeApp } = vi.hoisted(() => ({
   mockUseAccount: vi.fn(),
@@ -64,13 +66,16 @@ describe("DashboardPage", () => {
     mockConnect.mockReset()
     mockToast.mockReset()
     safeApp.value = false
+    localStorage.removeItem(TERMS_ACCEPTANCE_STORAGE_KEY)
+    resetTermsAcceptanceForTests()
   })
 
   it("renders heading and description", () => {
     renderPage()
 
     expect(screen.getByText("Stake your SAFE")).toBeInTheDocument()
-    expect(screen.getByText(/Earn rewards for helping secure/)).toBeInTheDocument()
+    expect(screen.getByText(/Your positions in the/)).toHaveTextContent("Your positions in the Safenet staking contracts")
+    expect(screen.queryByText(/Earn rewards/)).toBeNull()
   })
 
   it("renders all child sections when connected", () => {
@@ -97,9 +102,19 @@ describe("DashboardPage", () => {
     }
   })
 
+  it("inside a Safe App, asks for the terms through the connect button before it offers the Safe retry", () => {
+    mockUseAccount.mockReturnValue({ isConnected: false })
+    safeApp.value = true
+    renderPage()
+
+    expect(screen.getByRole("button", { name: "Connect Wallet" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Connect Safe" })).not.toBeInTheDocument()
+  })
+
   it("offers a Safe retry instead of the wallet menu inside a Safe App", async () => {
     mockUseAccount.mockReturnValue({ isConnected: false })
     safeApp.value = true
+    acceptTerms()
     renderPage()
 
     expect(screen.queryByRole("button", { name: "Connect Wallet" })).not.toBeInTheDocument()
@@ -114,6 +129,7 @@ describe("DashboardPage", () => {
   it("disables the Safe retry while the automatic connection is still running", () => {
     mockUseAccount.mockReturnValue({ isConnected: false, isConnecting: true })
     safeApp.value = true
+    acceptTerms()
     renderPage()
 
     expect(screen.getByRole("button", { name: "Connect Safe" })).toBeDisabled()

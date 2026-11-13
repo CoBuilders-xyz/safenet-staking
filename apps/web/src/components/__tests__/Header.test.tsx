@@ -76,4 +76,21 @@ describe("Header", () => {
     await user.click(screen.getByLabelText("Open menu"))
     expect(screen.getByLabelText("Close menu")).toBeInTheDocument()
   })
+
+  it("standalone, for the legal pages: no navigation and no wallet control, and one link back", () => {
+    render(
+      <MemoryRouter initialEntries={["/privacy"]}>
+        <Header standalone />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole("link", { name: "Back to Overview" })).toHaveAttribute("href", "/")
+    expect(screen.getByRole("combobox", { name: "Language" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Switch to dark mode" })).toBeInTheDocument()
+    for (const name of ["My stake", "Validators", "Withdrawals", "Rewards", "Alerts"]) {
+      expect(screen.queryByRole("link", { name })).toBeNull()
+    }
+    expect(screen.queryByRole("button", { name: "Connect Wallet" })).toBeNull()
+    expect(screen.queryByRole("button", { name: "Open menu" })).toBeNull()
+  })
 })

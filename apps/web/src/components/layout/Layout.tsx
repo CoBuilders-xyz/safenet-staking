@@ -19,14 +19,29 @@ const tickStyle = {
   )`,
 } as const
 
-export function Layout() {
+/**
+ * The skip link moves focus to the page's content. As a plain fragment link it would change the
+ * hash, which is the route here: the router would then leave the page, and from a legal page it
+ * would start the access checks.
+ */
+function skipToMain(event: React.MouseEvent<HTMLAnchorElement>) {
+  event.preventDefault()
+  document.getElementById("main-content")?.focus()
+}
+
+interface LayoutProps {
+  /** For the legal pages, which open without the access checks: no app navigation, no wallet. */
+  standalone?: boolean
+}
+
+export function Layout({ standalone = false }: LayoutProps) {
   const { t } = useTranslation()
   return (
     <div className="flex min-h-screen flex-col">
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:px-4 focus:py-2 focus:text-foreground">
+      <a href="#main-content" onClick={skipToMain} className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:px-4 focus:py-2 focus:text-foreground">
         {t("shell.skipToContent", "Skip to main content")}
       </a>
-      <Header />
+      <Header standalone={standalone} />
       <div className="relative flex-1">
         {/* Decorative tick marks + vertical delimiter */}
         <div className="hidden xl:block absolute left-0 top-0 bottom-0 w-[50px] border-r border-border pointer-events-none z-10" aria-hidden="true">
@@ -41,8 +56,8 @@ export function Layout() {
             style={tickStyle}
           />
         </div>
-        <main id="main-content" className="container mx-auto max-w-5xl px-4 py-8">
-          <WrongNetworkNotice />
+        <main id="main-content" tabIndex={-1} className="container mx-auto max-w-5xl px-4 py-8 focus:outline-none">
+          {!standalone && <WrongNetworkNotice />}
           {/* A full screen tall, so the footer stays below the fold until the page arrives and
               is not pushed down by it: on a phone that push was the largest layout shift. */}
           <Suspense

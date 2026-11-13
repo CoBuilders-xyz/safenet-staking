@@ -64,6 +64,7 @@
     "documentation": "Documentación",
     "faq": "Preguntas frecuentes",
     "imprint": "Aviso legal",
+    "operatedBy": "Operado por {{operator}}",
     "privacy": "Privacidad",
     "terms": "Términos"
   },
@@ -81,6 +82,10 @@
     },
     "openMenu": "Abrir menú"
   },
+  "legal": {
+    "englishOnly": "Este texto solo está disponible en inglés.",
+    "placeholderNotice": "Texto provisional. El texto final está pendiente de revisión legal."
+  },
   "onboarding": {
     "accessCheckFailed": "Falló la verificación de acceso",
     "back": "Volver",
@@ -92,7 +97,7 @@
     "confirmStake": "Confirmar delegación",
     "disconnectWallet": "Desconectar wallet",
     "hero": {
-      "dashboard": "Ganá <rewards>recompensas</rewards> por ayudar a proteger <network>Safenet</network>",
+      "dashboard": "Tus posiciones en los contratos de <staking>staking</staking> de <network>Safenet</network>",
       "overview": "El estado del <staking>staking</staking> y el consenso de <network>Safenet</network>. No necesitás una wallet.",
       "rewards": "Reclamá tus <rewards>recompensas</rewards> de Safenet y contrastalas con la cadena",
       "validators": "Elegí un <validator>validador</validator> para <staking>delegar</staking> tus SAFE",
@@ -229,6 +234,7 @@
     },
     "hero": {
       "openDashboard": "Gestionar mi stake",
+      "seeTerms": "Ver los Términos.",
       "title": "Resumen de la red"
     },
     "reason": {
@@ -551,7 +557,13 @@
     "connectionFailed": "Falló la conexión",
     "connectionHelp": "No se pudo conectar la wallet. Abrila y volvé a intentarlo.",
     "disconnect": "Desconectar",
-    "switchTo": "Cambiar a {{name}}"
+    "switchTo": "Cambiar a {{name}}",
+    "terms": {
+      "agree": "Aceptar y conectar",
+      "body": "Al conectar, aceptás los <terms>Términos de uso</terms> y la <privacy>Política de privacidad</privacy>.",
+      "cancel": "Cancelar",
+      "title": "Antes de conectar"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "Se reclamaron todos los retiros",

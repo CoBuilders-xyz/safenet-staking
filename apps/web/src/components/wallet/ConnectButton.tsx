@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next"
-import { useRef, useState, useEffect, useCallback } from "react"
+import { lazy, Suspense, useRef, useState, useEffect, useCallback } from "react"
 import { useAccount, useConnect, useDisconnect } from "wagmi"
 import { Button } from "@/components/ui/button"
 import { truncateAddress, formatTokenAmount } from "@/lib/format"
@@ -12,6 +12,10 @@ import Copy from "lucide-react/dist/esm/icons/copy"
 import ArrowUpRight from "lucide-react/dist/esm/icons/arrow-up-right"
 import { SafeTokenBadge } from "@/components/ui/SafeTokenBadge"
 import { isSafeApp } from "@/lib/safe"
+import { acceptTerms, useTermsAccepted } from "@/lib/termsAcceptance"
+
+// Radix's dialog stays out of the entry bundle: it loads when a visitor is first asked.
+const TermsDialog = lazy(() => import("./TermsDialog"))
 
 function ConnectWalletButton({ onClick, ref: buttonRef, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { ref?: React.Ref<HTMLButtonElement> }) {
   const { t } = useTranslation()
@@ -44,6 +48,9 @@ export function ConnectButton() {
   const { wrongNetwork, canSwitch, switchToActive } = useNetworkSwitch()
   const { data: balance } = useTokenBalance()
   const { toast } = useToast()
+  const termsAccepted = useTermsAccepted()
+  // What the visitor asked for before agreeing to the terms; it runs once they agree.
+  const [afterTerms, setAfterTerms] = useState<(() => void) | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -118,13 +125,55 @@ export function ConnectButton() {
   )
 
   if (!isConnected) {
-    // In iframe, Safe auto-connect handles connection — no button needed
-    if (isSafeApp) return null
+    // In iframe, Safe auto-connect handles connection — no button needed. It waits for the terms
+    // to be accepted (useAutoConnect), so until then the button is what asks for them.
+    if (isSafeApp && termsAccepted) return null
+
+    /** Runs `action` under accepted terms: at once, or after the dialog that asks for them. */
+    const underTerms = (action: () => void) => {
+      if (termsAccepted) action()
+      else setAfterTerms(() => action)
+    }
+    // The dialog has no trigger of its own to give focus back to, so the button takes it.
+    const focusButton = () => requestAnimationFrame(() => triggerRef.current?.focus())
+    const opensMenu = !isSafeApp && connectors.length > 1
+    const termsDialog = afterTerms && (
+      <Suspense fallback={null}>
+        <TermsDialog
+          open
+          onCancel={() => {
+            setAfterTerms(null)
+            focusButton()
+          }}
+          onAccept={() => {
+            const action = afterTerms
+            setAfterTerms(null)
+            acceptTerms()
+            action()
+            // The wallet menu, when it opens next, takes focus to its first item itself.
+            if (!opensMenu) focusButton()
+          }}
+        />
+      </Suspense>
+    )
+
+    if (isSafeApp) {
+      // Accepting is all it takes here: the Safe connector then connects by itself.
+      return (
+        <>
+          <ConnectWalletButton ref={triggerRef} onClick={() => underTerms(() => {})} />
+          {termsDialog}
+        </>
+      )
+    }
 
     // Single connector: connect directly without menu
     if (connectors.length === 1) {
       return (
-        <ConnectWalletButton onClick={() => connect({ connector: connectors[0] })} />
+        <>
+          <ConnectWalletButton ref={triggerRef} onClick={() => underTerms(() => connect({ connector: connectors[0] }))} />
+          {termsDialog}
+        </>
       )
     }
 
@@ -132,10 +181,11 @@ export function ConnectButton() {
       <div className="relative" ref={menuRef} role="none" onKeyDown={handleKeyDown}>
         <ConnectWalletButton
           ref={triggerRef}
-          onClick={() => setMenuOpen((v) => !v)}
+          onClick={() => (menuOpen ? setMenuOpen(false) : underTerms(() => setMenuOpen(true)))}
           aria-haspopup="true"
           aria-expanded={menuOpen}
         />
+        {termsDialog}
         {menuOpen && (
           <div
             className="absolute right-0 top-full mt-2 w-56 rounded-lg border bg-popover text-popover-foreground p-2 shadow-lg z-50"
@@ -150,7 +200,8 @@ export function ConnectButton() {
                 className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none transition-colors text-left"
                 onClick={() => {
                   setMenuOpen(false)
-                  connect({ connector })
+                  // Asked again here: the acceptance can end while the menu is open, in another tab.
+                  underTerms(() => connect({ connector }))
                 }}
               >
                 {connector.icon && (

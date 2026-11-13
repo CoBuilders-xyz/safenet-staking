@@ -96,7 +96,7 @@ holds those constants equal to the `programme.*` keys. Render the translated key
 
 ### Routing (`src/App.tsx`)
 
-`HashRouter`. Seven routes under a shared `Layout` (header, footer, `<Outlet />`), each page
+`HashRouter`. The routes sit under a shared `Layout` (header, footer, `<Outlet />`), each page
 wrapped in `ErrorBoundary`:
 
 - `/` → `OverviewPage`: Network Overview, no wallet needed. Headline figures, stake distribution,
@@ -114,11 +114,24 @@ wrapped in `ErrorBoundary`:
   a batching wallet
 - `/rewards` → `RewardsPage`: Your rewards, Claim, Claim & Stake, Programme, and Verifiability,
   the on-chain root checked against SEF's published one
+- `/imprint`, `/terms`, `/privacy`, `/faq` → `ContentPage`: the Markdown texts in `src/content/en`,
+  parsed by `src/lib/markdown.ts` into elements, never HTML. `src/content/README.md` has the
+  supported subset and the placeholder status. The footer links to them through `LegalLink`,
+  which prefers `VITE_TERMS_URL`, `VITE_PRIVACY_URL` or `VITE_IMPRINT_URL` when set. The footer
+  names the operator from `src/config/legal.ts`. These four routes render outside the gates
+  (`OpenPages` in `App.tsx`), so a blocked visitor can read them, the restricted screen links to
+  them, and they start no country lookup, no sanctions request and no wallet connection. Their
+  `Layout` is `standalone`: no navigation, no wallet control, one link back
 - `*` → `NotFoundPage`
 
 Pages are lazy-loaded with `React.lazy()` from `src/routes.ts`. The page of the URL opened starts
 loading at once, alongside the gates (`routeImportFor`); the others preload after the `load`
 event, when the browser is idle.
+
+`Shell` in `App.tsx` chooses by the route alone, through `contentPageAt` in `src/config/legal.ts`:
+a legal page, or `GatedApp`, which holds every other route behind the gates. The script in
+`index.html` that preconnects to the location service skips the same four routes; a test in
+`src/__tests__/index-html.test.ts` holds it to the list.
 
 App-level gates, each rendering `RestrictedScreen` with a `Restriction` (`src/lib/restriction.ts`):
 the gate, and whether it refused or could not answer. Each hook returns `allowed`, `isLoading` and
@@ -151,6 +164,15 @@ connector cannot) and the switch itself. `WrongNetworkNotice`, in `Layout`, then
 page, and `ConnectButton` shows "Switch to Ethereum", or "Wrong network" when the wallet cannot
 switch. Reads do not go through the wallet, so figures stay correct; `TxButton` disables every
 transaction.
+
+A wallet connects only after the visitor accepts the Terms of use and the Privacy policy.
+`ConnectButton` opens `TermsDialog`, loaded on demand, before it connects or opens its menu.
+`src/lib/termsAcceptance.ts` keeps `{ version, acceptedAt }` in `localStorage` under
+`terms_accepted`; `TERMS_VERSION` in `src/config/terms.ts` is the date of the terms' "Last
+updated" line, held to it by a test, so a change to the terms asks every visitor again. Without
+a current acceptance `useAutoConnect` restores no session, and inside Safe, where the button is
+otherwise hidden, it shows until the terms are accepted and the Safe connector then connects.
+The e2e fixtures seed the acceptance (`termsAccepted`, true by default).
 
 
 ### Contract integration

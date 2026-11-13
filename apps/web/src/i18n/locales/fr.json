@@ -64,6 +64,7 @@
     "documentation": "Documentation",
     "faq": "FAQ",
     "imprint": "Mentions légales",
+    "operatedBy": "Exploité par {{operator}}",
     "privacy": "Confidentialité",
     "terms": "Conditions"
   },
@@ -81,6 +82,10 @@
     },
     "openMenu": "Ouvrir le menu"
   },
+  "legal": {
+    "englishOnly": "Ce texte est disponible uniquement en anglais.",
+    "placeholderNotice": "Texte provisoire. Le texte définitif est en attente de révision juridique."
+  },
   "onboarding": {
     "accessCheckFailed": "Échec du contrôle d’accès",
     "back": "Retour",
@@ -92,7 +97,7 @@
     "confirmStake": "Confirmer la délégation",
     "disconnectWallet": "Déconnecter le portefeuille",
     "hero": {
-      "dashboard": "Gagnez des <rewards>récompenses</rewards> en contribuant à sécuriser <network>Safenet</network>",
+      "dashboard": "Vos positions dans les contrats de <staking>staking</staking> de <network>Safenet</network>",
       "overview": "L’état du <staking>staking</staking> et du consensus de <network>Safenet</network>. Aucun portefeuille nécessaire.",
       "rewards": "Réclamez vos <rewards>récompenses</rewards> Safenet et vérifiez-les sur la chaîne",
       "validators": "Choisissez un <validator>validateur</validator> pour <staking>déléguer</staking> vos SAFE",
@@ -229,6 +234,7 @@
     },
     "hero": {
       "openDashboard": "Gérer mon stake",
+      "seeTerms": "Voir les Conditions.",
       "title": "Aperçu du réseau"
     },
     "reason": {
@@ -551,7 +557,13 @@
     "connectionFailed": "Échec de la connexion",
     "connectionHelp": "Impossible de connecter le portefeuille. Ouvrez-le et réessayez.",
     "disconnect": "Déconnecter",
-    "switchTo": "Passer à {{name}}"
+    "switchTo": "Passer à {{name}}",
+    "terms": {
+      "agree": "Accepter et connecter",
+      "body": "En connectant votre portefeuille, vous acceptez les <terms>Conditions d’utilisation</terms> et la <privacy>Politique de confidentialité</privacy>.",
+      "cancel": "Annuler",
+      "title": "Avant de connecter"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "Tous les retraits ont été réclamés",

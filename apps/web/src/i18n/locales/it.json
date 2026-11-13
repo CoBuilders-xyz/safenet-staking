@@ -64,6 +64,7 @@
     "documentation": "Documentazione",
     "faq": "FAQ",
     "imprint": "Note legali",
+    "operatedBy": "Gestito da {{operator}}",
     "privacy": "Privacy",
     "terms": "Termini"
   },
@@ -81,6 +82,10 @@
     },
     "openMenu": "Aprire il menu"
   },
+  "legal": {
+    "englishOnly": "Questo testo è disponibile solo in inglese.",
+    "placeholderNotice": "Testo provvisorio. Il testo definitivo è in attesa di revisione legale."
+  },
   "onboarding": {
     "accessCheckFailed": "Verifica dell’accesso non riuscita",
     "back": "Indietro",
@@ -92,7 +97,7 @@
     "confirmStake": "Conferma delega",
     "disconnectWallet": "Disconnetti wallet",
     "hero": {
-      "dashboard": "Ottieni <rewards>ricompense</rewards> contribuendo alla sicurezza di <network>Safenet</network>",
+      "dashboard": "Le tue posizioni nei contratti di <staking>staking</staking> di <network>Safenet</network>",
       "overview": "Lo stato dello <staking>staking</staking> e del consenso di <network>Safenet</network>. Non serve un wallet.",
       "rewards": "Richiedi le tue <rewards>ricompense</rewards> Safenet e verificale sulla blockchain",
       "validators": "Scegli un <validator>validatore</validator> a cui <staking>delegare</staking> i tuoi SAFE",
@@ -229,6 +234,7 @@
     },
     "hero": {
       "openDashboard": "Gestisci il mio stake",
+      "seeTerms": "Vedi le Condizioni.",
       "title": "Panoramica della rete"
     },
     "reason": {
@@ -551,7 +557,13 @@
     "connectionFailed": "Connessione non riuscita",
     "connectionHelp": "Impossibile collegare il wallet. Aprilo e riprova.",
     "disconnect": "Disconnetti",
-    "switchTo": "Passa a {{name}}"
+    "switchTo": "Passa a {{name}}",
+    "terms": {
+      "agree": "Accetta e collega",
+      "body": "Collegando il wallet, accetti i <terms>Termini di utilizzo</terms> e l’<privacy>Informativa sulla privacy</privacy>.",
+      "cancel": "Annulla",
+      "title": "Prima di collegare"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "Tutti i prelievi riscattati",

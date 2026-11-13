@@ -97,7 +97,7 @@ COB-566 explicitly permits `VITE_GRAPH_API_KEY` as a public, subgraph-restricted
 | `VITE_APP_URL` | Canonical URL for the `og:url`, `og:image` and `twitter:image` tags in `index.html`, absolute, no trailing slash | The tags carry no origin |
 | `VITE_DOCS_URL` | Footer documentation link | Safe Foundation's Safenet documentation, set in `src/components/layout/Footer.tsx` |
 | `VITE_ALERTS_API_URL` | Public Alerts Worker origin; see [Alerts provisioning](../alerts/README.md) | Alerts displays that the service is not configured |
-| `VITE_TERMS_URL`, `VITE_PRIVACY_URL`, `VITE_IMPRINT_URL` | Footer links | Hidden |
+| `VITE_TERMS_URL`, `VITE_PRIVACY_URL`, `VITE_IMPRINT_URL` | An external document that replaces the in-app page in the footer link and the terms link on My stake | The in-app pages `/#/terms`, `/#/privacy` and `/#/imprint`; see `src/content/README.md` |
 
 `GRAPH_NODE_PORT` from `.env.ports` reaches the app as `VITE_GRAPH_NODE_PORT` through
 `vite.config.ts`. `packages/core` uses it only for a chain whose default endpoint is a local

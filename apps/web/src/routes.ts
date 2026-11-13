@@ -1,3 +1,5 @@
+import { contentPageAt } from "@/config/legal"
+
 /** Preloaded beside the first page so its tooltip provider adds no later network round trip. */
 export const routeContentImport = () => import("@/components/layout/RouteContent")
 
@@ -16,6 +18,8 @@ export const pageImports = {
   Rewards: () => import("@/pages/RewardsPage")
     .then(m => ({ default: m.RewardsPage })),
   Alerts: () => import("@/pages/AlertsPage").then(m => ({ default: m.AlertsPage })),
+  Content: () => import("@/pages/ContentPage")
+    .then(m => ({ default: m.ContentPage })),
   NotFound: () => import("@/pages/NotFoundPage")
     .then(m => ({ default: m.NotFoundPage })),
 }
@@ -30,5 +34,6 @@ export function routeImportFor(hash: string): () => Promise<unknown> {
   if (path === "/withdrawals") return pageImports.Withdrawals
   if (path === "/rewards") return pageImports.Rewards
   if (path === "/alerts") return pageImports.Alerts
+  if (contentPageAt(path)) return pageImports.Content
   return pageImports.NotFound
 }

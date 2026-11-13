@@ -64,6 +64,7 @@
     "documentation": "Документация",
     "faq": "Вопросы и ответы",
     "imprint": "Выходные данные",
+    "operatedBy": "Оператор: {{operator}}",
     "privacy": "Конфиденциальность",
     "terms": "Условия"
   },
@@ -81,6 +82,10 @@
     },
     "openMenu": "Открыть меню"
   },
+  "legal": {
+    "englishOnly": "Этот текст доступен только на английском языке.",
+    "placeholderNotice": "Временный текст. Окончательный текст ожидает юридической проверки."
+  },
   "onboarding": {
     "accessCheckFailed": "Ошибка проверки доступа",
     "back": "Назад",
@@ -92,7 +97,7 @@
     "confirmStake": "Подтвердить делегирование",
     "disconnectWallet": "Отключить кошелёк",
     "hero": {
-      "dashboard": "Получайте <rewards>награды</rewards>, помогая защищать <network>Safenet</network>",
+      "dashboard": "Ваши позиции в контрактах <staking>стейкинга</staking> <network>Safenet</network>",
       "overview": "Состояние <staking>стейкинга</staking> и консенсуса <network>Safenet</network>. Кошелёк не нужен.",
       "rewards": "Получайте свои <rewards>награды</rewards> Safenet и сверяйте их с блокчейном",
       "validators": "Выберите <validator>валидатора</validator> для <staking>делегирования</staking> SAFE",
@@ -234,6 +239,7 @@
     },
     "hero": {
       "openDashboard": "Управлять моим стейком",
+      "seeTerms": "См. Условия.",
       "title": "Обзор сети"
     },
     "reason": {
@@ -561,7 +567,13 @@
     "connectionFailed": "Ошибка подключения",
     "connectionHelp": "Не удалось подключить кошелёк. Откройте его и попробуйте снова.",
     "disconnect": "Отключить",
-    "switchTo": "Переключиться на {{name}}"
+    "switchTo": "Переключиться на {{name}}",
+    "terms": {
+      "agree": "Принять и подключить",
+      "body": "Подключая кошелёк, вы принимаете <terms>Условия использования</terms> и <privacy>Политику конфиденциальности</privacy>.",
+      "cancel": "Отмена",
+      "title": "Перед подключением"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "Все выводы получены",

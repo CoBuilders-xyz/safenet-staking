@@ -64,6 +64,7 @@
     "documentation": "文档",
     "faq": "常见问题",
     "imprint": "法律声明",
+    "operatedBy": "由 {{operator}} 运营",
     "privacy": "隐私",
     "terms": "条款"
   },
@@ -81,6 +82,10 @@
     },
     "openMenu": "打开菜单"
   },
+  "legal": {
+    "englishOnly": "本文仅提供英文版。",
+    "placeholderNotice": "占位文本。最终文本有待法律审核。"
+  },
   "onboarding": {
     "accessCheckFailed": "访问检查失败",
     "back": "返回",
@@ -92,7 +97,7 @@
     "confirmStake": "确认委托",
     "disconnectWallet": "断开钱包",
     "hero": {
-      "dashboard": "通过帮助保护 <network>Safenet</network> 赚取<rewards>奖励</rewards>",
+      "dashboard": "您在 <network>Safenet</network> <staking>质押</staking>合约中的持仓",
       "overview": "<network>Safenet</network> 的<staking>质押</staking>和共识状态。无需钱包。",
       "rewards": "领取你的 Safenet <rewards>奖励</rewards>并与链上数据核对",
       "validators": "选择一个<validator>验证者</validator>来<staking>委托</staking>你的 SAFE",
@@ -219,6 +224,7 @@
     },
     "hero": {
       "openDashboard": "管理我的质押",
+      "seeTerms": "参阅条款。",
       "title": "网络概览"
     },
     "reason": {
@@ -531,7 +537,13 @@
     "connectionFailed": "连接失败",
     "connectionHelp": "无法连接钱包，请打开钱包后重试。",
     "disconnect": "断开连接",
-    "switchTo": "切换到 {{name}}"
+    "switchTo": "切换到 {{name}}",
+    "terms": {
+      "agree": "同意并连接",
+      "body": "连接即表示您同意<terms>使用条款</terms>和<privacy>隐私政策</privacy>。",
+      "cancel": "取消",
+      "title": "连接之前"
+    }
   },
   "withdrawals": {
     "allWithdrawalsClaimed": "已领取所有提取",
