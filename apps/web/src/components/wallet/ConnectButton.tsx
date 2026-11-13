@@ -134,14 +134,20 @@ export function ConnectButton() {
       if (termsAccepted) action()
       else setAfterTerms(() => action)
     }
+    // The dialog has no trigger of its own to give focus back to, so the button takes it. A
+    // menu that opens next moves it on to its first item.
+    const closeTermsDialog = () => {
+      setAfterTerms(null)
+      requestAnimationFrame(() => triggerRef.current?.focus())
+    }
     const termsDialog = afterTerms && (
       <Suspense fallback={null}>
         <TermsDialog
           open
-          onCancel={() => setAfterTerms(null)}
+          onCancel={closeTermsDialog}
           onAccept={() => {
             const action = afterTerms
-            setAfterTerms(null)
+            closeTermsDialog()
             acceptTerms()
             action()
           }}
@@ -153,7 +159,7 @@ export function ConnectButton() {
       // Accepting is all it takes here: the Safe connector then connects by itself.
       return (
         <>
-          <ConnectWalletButton onClick={() => underTerms(() => {})} />
+          <ConnectWalletButton ref={triggerRef} onClick={() => underTerms(() => {})} />
           {termsDialog}
         </>
       )
@@ -163,7 +169,7 @@ export function ConnectButton() {
     if (connectors.length === 1) {
       return (
         <>
-          <ConnectWalletButton onClick={() => underTerms(() => connect({ connector: connectors[0] }))} />
+          <ConnectWalletButton ref={triggerRef} onClick={() => underTerms(() => connect({ connector: connectors[0] }))} />
           {termsDialog}
         </>
       )

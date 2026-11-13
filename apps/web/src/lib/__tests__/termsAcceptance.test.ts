@@ -33,6 +33,14 @@ describe("the terms acceptance", () => {
     }
   })
 
+  it("counts for the visit when storage refuses the write and still holds an older record", () => {
+    localStorage.setItem(TERMS_ACCEPTANCE_STORAGE_KEY, JSON.stringify({ version: "2000-01-01", acceptedAt: "x" }))
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked") })
+
+    acceptTerms()
+    expect(hasAcceptedTerms()).toBe(true)
+  })
+
   it("lasts for the visit when storage is unavailable", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked") })
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked") })

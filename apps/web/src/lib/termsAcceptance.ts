@@ -18,10 +18,12 @@ let inMemory: string | null = null
 const listeners = new Set<() => void>()
 
 function read(): string | null {
+  // What this page accepted comes first: a write that storage refused leaves an older record there.
+  if (inMemory !== null) return inMemory
   try {
-    return localStorage.getItem(TERMS_ACCEPTANCE_STORAGE_KEY) ?? inMemory
+    return localStorage.getItem(TERMS_ACCEPTANCE_STORAGE_KEY)
   } catch {
-    return inMemory
+    return null
   }
 }
 

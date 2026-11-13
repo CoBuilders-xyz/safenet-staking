@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { ConnectButton } from "../wallet/ConnectButton"
@@ -212,6 +212,8 @@ describe("ConnectButton, before the terms are accepted", () => {
     expect(screen.queryByRole("dialog")).toBeNull()
     expect(mockConnect).not.toHaveBeenCalled()
     expect(localStorage.getItem(TERMS_ACCEPTANCE_STORAGE_KEY)).toBeNull()
+    // Focus returns to the button that opened the dialog.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Connect Wallet" })).toHaveFocus())
 
     await userEvent.click(screen.getByRole("button", { name: "Connect Wallet" }))
     expect(await screen.findByRole("dialog", { name: "Before you connect" })).toBeInTheDocument()
