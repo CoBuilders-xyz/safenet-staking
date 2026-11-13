@@ -227,7 +227,7 @@
       "attestationsDetail_other": "Mittelwert über {{count}} vollständige Tage, Spanne {{min}} bis {{max}}",
       "attestationsPerDay": "Attestierungen pro Tag",
       "estimatedApr": "Geschätzter APR",
-      "estimatedAprDetail": "Letzte Belohnungsperiode ({{period}}), vor der Provision des Validators. <term>So wird geschätzt</term>",
+      "estimatedAprDetail": "Letzte Belohnungsperiode ({{period}}), vor der Provision des Validators. Schätzung, keine Garantie. <term>So wird geschätzt</term>",
       "estimatedAprSource": "Quelle: Belohnungsdatei von SEF, Mainnet-Subgraph.",
       "gnosisSource": "Gnosis-Subgraph, vollständige UTC-Tage {{from}} bis {{to}}",
       "gnosisSourceBeta": "{{beta}}. Gnosis-Subgraph, vollständige UTC-Tage.",

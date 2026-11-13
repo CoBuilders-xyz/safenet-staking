@@ -224,7 +224,7 @@
       "attestationsDetail_other": "{{count}} 个完整日的平均值，范围 {{min}} 至 {{max}}",
       "attestationsPerDay": "每日证明数",
       "estimatedApr": "估算 APR",
-      "estimatedAprDetail": "上一个奖励周期（{{period}}），未扣除验证者佣金。<term>估算方法</term>",
+      "estimatedAprDetail": "上一个奖励周期（{{period}}），未扣除验证者佣金。仅为估算，并非保证。<term>估算方法</term>",
       "estimatedAprSource": "来源：SEF 奖励文件、Mainnet subgraph。",
       "gnosisSource": "Gnosis 子图，{{from}} 至 {{to}} 的完整 UTC 日",
       "gnosisSourceBeta": "{{beta}}。Gnosis 子图，完整 UTC 日。",

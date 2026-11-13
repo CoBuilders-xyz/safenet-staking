@@ -278,7 +278,7 @@
       "attestationsDetail_other": "Mean over {{count}} complete days, range {{min}} to {{max}}",
       "attestationsPerDay": "Attestations per day",
       "estimatedApr": "Estimated APR",
-      "estimatedAprDetail": "Last reward period ({{period}}), before validator commission. <term>How it is estimated</term>",
+      "estimatedAprDetail": "Last reward period ({{period}}), before validator commission. Estimate, not a guarantee. <term>How it is estimated</term>",
       "estimatedAprSource": "Source: SEF rewards file, Mainnet subgraph.",
       "gnosisSource": "Gnosis subgraph, complete UTC days {{from}} to {{to}}",
       "gnosisSourceBeta": "{{beta}}. Gnosis subgraph, complete UTC days.",

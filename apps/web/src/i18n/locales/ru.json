@@ -233,7 +233,7 @@
       "attestationsDetail_other": "Среднее за {{count}} полного дня, диапазон от {{min}} до {{max}}",
       "attestationsPerDay": "Аттестаций в день",
       "estimatedApr": "Оценочный APR",
-      "estimatedAprDetail": "Последний период вознаграждений ({{period}}), до комиссии валидатора. <term>Как рассчитывается оценка</term>",
+      "estimatedAprDetail": "Последний период вознаграждений ({{period}}), до комиссии валидатора. Оценка, а не гарантия. <term>Как рассчитывается оценка</term>",
       "estimatedAprSource": "Источник: файл вознаграждений SEF, subgraph Mainnet.",
       "gnosisSource": "Сабграф Gnosis, полные сутки UTC с {{from}} по {{to}}",
       "gnosisSourceBeta": "{{beta}}. Сабграф Gnosis, полные сутки UTC.",

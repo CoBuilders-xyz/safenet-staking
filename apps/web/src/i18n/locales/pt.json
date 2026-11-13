@@ -230,7 +230,7 @@
       "attestationsDetail_other": "Média de {{count}} dias completos, intervalo de {{min}} a {{max}}",
       "attestationsPerDay": "Atestações por dia",
       "estimatedApr": "APR estimado",
-      "estimatedAprDetail": "Último período de recompensas ({{period}}), antes da comissão do validador. <term>Como é estimado</term>",
+      "estimatedAprDetail": "Último período de recompensas ({{period}}), antes da comissão do validador. Estimativa, não uma garantia. <term>Como é estimado</term>",
       "estimatedAprSource": "Fonte: arquivo de recompensas da SEF, subgraph da Mainnet.",
       "gnosisSource": "Subgrafo da Gnosis, dias UTC completos de {{from}} a {{to}}",
       "gnosisSourceBeta": "{{beta}}. Subgrafo da Gnosis, dias UTC completos.",

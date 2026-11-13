@@ -252,7 +252,7 @@ describe("OverviewPage", () => {
     renderPage()
     const apr = screen.getByRole("group", { name: "Estimated APR" })
     expect(within(apr).getByText("7.4%")).toBeInTheDocument()
-    expect(apr).toHaveTextContent("Last reward period (13–26 Oct), before validator commission.")
+    expect(apr).toHaveTextContent("Last reward period (13–26 Oct), before validator commission. Estimate, not a guarantee.")
     expect(apr).toHaveTextContent("Source: SEF rewards file, Mainnet subgraph.")
     expect(within(apr).getByRole("button", { name: "How it is estimated" })).toBeInTheDocument()
     // A rate, not a compounded yield, and still no SAFE price.

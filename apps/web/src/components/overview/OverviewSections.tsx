@@ -146,7 +146,7 @@ export function HeadlineStats() {
           detail={(v) => (
             <Trans
               i18nKey="overview.headline.estimatedAprDetail"
-              defaults="Last reward period ({{period}}), before validator commission. <term>How it is estimated</term>"
+              defaults="Last reward period ({{period}}), before validator commission. Estimate, not a guarantee. <term>How it is estimated</term>"
               values={{ period: formatUtcDayRange(v.periodStart * 1000, (v.periodEnd - 86_400) * 1000) }}
               components={{ term: <Term term="estimatedApr" children={null} /> }}
             />

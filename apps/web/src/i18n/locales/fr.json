@@ -230,7 +230,7 @@
       "attestationsDetail_other": "Moyenne sur {{count}} jours complets, de {{min}} à {{max}}",
       "attestationsPerDay": "Attestations par jour",
       "estimatedApr": "APR estimé",
-      "estimatedAprDetail": "Dernière période de récompenses ({{period}}), avant la commission du validateur. <term>Comment il est estimé</term>",
+      "estimatedAprDetail": "Dernière période de récompenses ({{period}}), avant la commission du validateur. Estimation, pas une garantie. <term>Comment il est estimé</term>",
       "estimatedAprSource": "Source : fichier de récompenses de la SEF, subgraph Mainnet.",
       "gnosisSource": "Subgraph Gnosis, jours UTC complets du {{from}} au {{to}}",
       "gnosisSourceBeta": "{{beta}}. Subgraph Gnosis, jours UTC complets.",
