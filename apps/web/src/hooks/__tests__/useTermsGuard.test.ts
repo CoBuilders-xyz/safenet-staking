@@ -3,29 +3,43 @@ import { renderHook } from "@testing-library/react"
 import { useTermsGuard } from "../useTermsGuard"
 
 const disconnect = vi.fn()
-const account = vi.hoisted(() => ({ isConnected: false }))
+const state = vi.hoisted(() => ({ connections: [] as { connector: { id: string } }[] }))
 vi.mock("wagmi", () => ({
-  useAccount: () => ({ isConnected: account.isConnected }),
+  useConnections: () => state.connections,
   useDisconnect: () => ({ disconnect }),
 }))
 
+const browserWallet = { connector: { id: "browserWallet" } }
+const discovered = { connector: { id: "io.metamask" } }
+
 beforeEach(() => {
   disconnect.mockClear()
-  account.isConnected = false
+  state.connections = []
 })
 
 describe("useTermsGuard", () => {
-  it("drops a connection the wallet made by itself while the terms are not accepted", () => {
+  it("drops every connection a wallet made by itself while the terms are not accepted", () => {
     const { rerender } = renderHook(({ accepted }) => useTermsGuard(accepted), { initialProps: { accepted: false } })
     expect(disconnect).not.toHaveBeenCalled()
 
-    account.isConnected = true
+    // One wallet, registered twice: as the browser wallet and through EIP-6963 discovery.
+    state.connections = [browserWallet, discovered]
     rerender({ accepted: false })
-    expect(disconnect).toHaveBeenCalledTimes(1)
+    expect(disconnect.mock.calls.map(([arg]) => arg)).toEqual([{ connector: browserWallet.connector }, { connector: discovered.connector }])
   })
 
-  it("leaves a connection alone under accepted terms", () => {
-    account.isConnected = true
+  it("drops the connection that is left when wagmi falls back to it", () => {
+    state.connections = [browserWallet, discovered]
+    const { rerender } = renderHook(() => useTermsGuard(false))
+    disconnect.mockClear()
+
+    state.connections = [discovered]
+    rerender()
+    expect(disconnect).toHaveBeenCalledWith({ connector: discovered.connector })
+  })
+
+  it("leaves connections alone under accepted terms", () => {
+    state.connections = [browserWallet]
     renderHook(() => useTermsGuard(true))
 
     expect(disconnect).not.toHaveBeenCalled()

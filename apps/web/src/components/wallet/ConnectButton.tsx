@@ -134,22 +134,24 @@ export function ConnectButton() {
       if (termsAccepted) action()
       else setAfterTerms(() => action)
     }
-    // The dialog has no trigger of its own to give focus back to, so the button takes it. A
-    // menu that opens next moves it on to its first item.
-    const closeTermsDialog = () => {
-      setAfterTerms(null)
-      requestAnimationFrame(() => triggerRef.current?.focus())
-    }
+    // The dialog has no trigger of its own to give focus back to, so the button takes it.
+    const focusButton = () => requestAnimationFrame(() => triggerRef.current?.focus())
+    const opensMenu = !isSafeApp && connectors.length > 1
     const termsDialog = afterTerms && (
       <Suspense fallback={null}>
         <TermsDialog
           open
-          onCancel={closeTermsDialog}
+          onCancel={() => {
+            setAfterTerms(null)
+            focusButton()
+          }}
           onAccept={() => {
             const action = afterTerms
-            closeTermsDialog()
+            setAfterTerms(null)
             acceptTerms()
             action()
+            // The wallet menu, when it opens next, takes focus to its first item itself.
+            if (!opensMenu) focusButton()
           }}
         />
       </Suspense>

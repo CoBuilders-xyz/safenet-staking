@@ -238,6 +238,10 @@ describe("ConnectButton, before the terms are accepted", () => {
 
     expect(screen.getByRole("menu")).toBeInTheDocument()
     expect(mockConnect).not.toHaveBeenCalled()
+    // Focus is on the first wallet and stays there, so Enter picks it.
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Browser Wallet" })).toHaveFocus())
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+    expect(screen.getByRole("menuitem", { name: "Browser Wallet" })).toHaveFocus()
     await userEvent.click(screen.getByRole("menuitem", { name: "WalletConnect" }))
     expect(mockConnect.mock.calls[0]![0]).toEqual({ connector: connectors[1] })
   })

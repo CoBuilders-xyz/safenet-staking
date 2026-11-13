@@ -13,12 +13,13 @@ export interface TermsAcceptance {
 }
 
 // Storage can be unavailable, as in a sandboxed or third-party iframe. The acceptance then lasts
-// until the page closes.
+// until the page closes. Set only when a write failed: while storage works, it alone decides, so
+// another tab that clears or replaces the record is followed.
 let inMemory: string | null = null
 const listeners = new Set<() => void>()
 
 function read(): string | null {
-  // What this page accepted comes first: a write that storage refused leaves an older record there.
+  // A write that storage refused can leave an older record there, so this page's own comes first.
   if (inMemory !== null) return inMemory
   try {
     return localStorage.getItem(TERMS_ACCEPTANCE_STORAGE_KEY)
@@ -39,12 +40,12 @@ export function hasAcceptedTerms(): boolean {
 }
 
 export function acceptTerms(now: Date = new Date()): void {
-  const record: TermsAcceptance = { version: TERMS_VERSION, acceptedAt: now.toISOString() }
-  inMemory = JSON.stringify(record)
+  const record = JSON.stringify({ version: TERMS_VERSION, acceptedAt: now.toISOString() } satisfies TermsAcceptance)
   try {
-    localStorage.setItem(TERMS_ACCEPTANCE_STORAGE_KEY, inMemory)
+    localStorage.setItem(TERMS_ACCEPTANCE_STORAGE_KEY, record)
+    inMemory = null
   } catch {
-    // Storage unavailable: kept in memory.
+    inMemory = record
   }
   for (const listener of listeners) listener()
 }

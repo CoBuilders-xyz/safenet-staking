@@ -33,6 +33,16 @@ describe("the terms acceptance", () => {
     }
   })
 
+  it("follows storage while it works: a record cleared or replaced elsewhere ends the acceptance", () => {
+    acceptTerms()
+    localStorage.setItem(TERMS_ACCEPTANCE_STORAGE_KEY, JSON.stringify({ version: "2000-01-01", acceptedAt: "x" }))
+    expect(hasAcceptedTerms()).toBe(false)
+
+    acceptTerms()
+    localStorage.removeItem(TERMS_ACCEPTANCE_STORAGE_KEY)
+    expect(hasAcceptedTerms()).toBe(false)
+  })
+
   it("counts for the visit when storage refuses the write and still holds an older record", () => {
     localStorage.setItem(TERMS_ACCEPTANCE_STORAGE_KEY, JSON.stringify({ version: "2000-01-01", acceptedAt: "x" }))
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked") })

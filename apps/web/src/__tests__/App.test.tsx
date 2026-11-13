@@ -26,6 +26,7 @@ vi.mock("@/components/Analytics", () => ({ Analytics: () => null }))
 vi.mock("@/pages/OverviewPage", () => ({ OverviewPage: () => <h1>Network overview</h1> }))
 vi.mock("wagmi", () => ({
   useAccount: () => ({ isConnected: false }),
+  useConnections: () => [],
   useDisconnect: () => ({ disconnect: vi.fn() }),
 }))
 
