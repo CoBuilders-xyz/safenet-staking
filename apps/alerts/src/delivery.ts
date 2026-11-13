@@ -173,9 +173,10 @@ export async function telegramUpdates(db: Database, env: Env, transport: typeof 
       // Telegram stops waiting for this answer after a few seconds, and a Cron run can come minutes
       // later. So the confirmation is also written into the message, where it stays visible.
       // Telegram refuses a late answer; that is expected, so it is not counted as a failed reply.
-      if (Date.now() < replyDeadline) {
+      const left = replyDeadline - Date.now()
+      if (left > 0) {
         try {
-          await call("answerCallbackQuery", { callback_query_id: callback.id, text: confirmed ? "Receipt confirmed." : "This receipt has expired." }, 5000)
+          await call("answerCallbackQuery", { callback_query_id: callback.id, text: confirmed ? "Receipt confirmed." : "This receipt has expired." }, Math.min(left, 5000))
         } catch { /* The receipt is already recorded. */ }
       }
       const text = callback.message.text

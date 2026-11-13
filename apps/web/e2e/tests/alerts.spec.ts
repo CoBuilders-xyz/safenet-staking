@@ -137,6 +137,7 @@ test("a lost or expired Telegram link is replaced from the card, without deletin
   await expect(card.getByRole("link", { name: "Open Telegram and press Start" })).toHaveCount(0)
   await card.getByRole("button", { name: "Get a new Telegram link" }).click()
   await expect(card.getByRole("link", { name: "Open Telegram and press Start" })).toHaveAttribute("href", "https://t.me/test_bot?start=reissued-1")
+  await expect(card.getByRole("link", { name: "Open Telegram and press Start" })).toBeFocused() // The button that was focused has left the card.
   await expect(card.getByRole("status")).toHaveText(waiting)
   // After a reload the page has no link to show, so the card offers a new one.
   await page.reload()

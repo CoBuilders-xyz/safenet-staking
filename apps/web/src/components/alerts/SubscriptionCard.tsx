@@ -52,9 +52,12 @@ export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscripti
   const linkAlive = linkPending(sub, now)
   const openLink = linkAlive && link?.expiresAt === sub.linkExpiresAt ? link.url : undefined
   const anchor = useRef<HTMLAnchorElement>(null)
+  // The link takes the focus when it appears: after the subscription is created, and after
+  // "Get a new Telegram link", whose button leaves the card.
+  const [issuedHere, setIssuedHere] = useState(false)
   useEffect(() => {
-    if (focusLink && openLink) anchor.current?.focus()
-  }, [focusLink, openLink])
+    if ((focusLink || issuedHere) && openLink) anchor.current?.focus()
+  }, [focusLink, issuedHere, openLink])
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true); setError(null); setTestSent(false)
@@ -109,6 +112,7 @@ export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscripti
         onClick={() => void run(async () => {
           const issued = await actions.newLink(sub.id)
           onLink(sub.id, { url: issued.telegramUrl, expiresAt: issued.expiresAt })
+          setIssuedHere(true)
         })}>
         {t("alerts.newLink", "Get a new Telegram link")}
       </Button>}
