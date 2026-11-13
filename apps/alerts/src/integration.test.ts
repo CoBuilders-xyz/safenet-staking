@@ -330,14 +330,15 @@ test("slow Telegram replies stop at a shared time budget; every update is still 
 test("migration 0003 upgrades a database that already holds subscriptions", async () => {
   const db = await TestDatabase.create(file => file < "0003")
   try {
+    const wallet = CONTRACTS.staking.address.toLowerCase()
     await db.query(`insert into alerts_subscriptions(id, wallet, signature_hash, triggers, participation, missed, channel, telegram_chat, status, created_at)
-      values ('old', '0xabc', 'sig', '["cooldown"]', 75, 3, '{"kind":"telegram"}', '123', 'verified', ?)`, at(-86_400_000))
+      values ('old', ?, 'sig', '["cooldown"]', 75, 3, '{"kind":"telegram"}', '123', 'verified', ?)`, wallet, at(-86_400_000))
     await db.migrate(file => file >= "0003")
-    const [old] = await db.subscriptions("0xabc")
+    const [old] = await db.subscriptions(wallet)
     assert.deepEqual({ linked: old!.telegram_chat, linked_at: old!.linked_at, paused: old!.paused, status: old!.status },
       { linked: "123", linked_at: null, paused: false, status: "verified" })
     assert.deepEqual((await db.activeSubscriptions("", 50)).map(sub => sub.id), ["old"])
-    assert.equal(await db.claimTest("old", "0xabc"), true)
+    assert.equal(await db.claimTest("old", wallet), true)
     await assert.rejects(db.query("update alerts_subscriptions set paused = 2"))
   } finally { await db.close() }
 })
@@ -401,12 +402,14 @@ test("a subscription's own actions: a new Telegram link, pause and resume, and a
       }), env, db)
       const list = async () => (await (await request("/subscriptions", "GET")).json() as Record<string, unknown>[])[0]!
       const code = async (response: Response) => [response.status, (await response.json() as { code: string }).code]
-      const created = await (await request("/subscriptions", "POST", { triggers: ["cooldown"], participation: 75, missed: 3, channel: { kind: "telegram" } })).json() as { id: string; telegramUrl: string }
+      const created = await (await request("/subscriptions", "POST", { triggers: ["cooldown"], participation: 75, missed: 3, channel: { kind: "telegram" } })).json() as { id: string; telegramUrl: string; expiresAt: string }
       const first = new URL(created.telegramUrl).searchParams.get("start")!
       const pending = await list()
       assert.equal(pending.linked, false)
       assert.equal(pending.linkedAt, null)
       assert.ok(Date.parse(pending.linkExpiresAt as string) > Date.now())
+      // Each link is returned with its own expiry, the one the list shows while that link is the current one.
+      assert.equal(created.expiresAt, pending.linkExpiresAt)
       // Not linked yet: no test message. Another wallet's ID answers like an unknown one.
       assert.deepEqual(await code(await request(`/subscriptions/${created.id}/test`)), [409, "not_linked"])
       const other = await db.subscribe(CONTRACTS.staking.address.toLowerCase(), "other", telegram, "other")

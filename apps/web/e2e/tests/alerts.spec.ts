@@ -6,9 +6,13 @@ interface Subscription {
   id: string; channel: string; triggers: string[]; participation: number; missed: number
   status: string; linked: boolean; linkedAt: string | null; linkExpiresAt: string | null; paused: boolean; lastDelivery: null
 }
-interface Service { subscriptions: Subscription[]; calls: string[]; refuse: Record<string, { status: number; code: string }> }
+interface Service {
+  subscriptions: Subscription[]; calls: string[]; refuse: Record<string, { status: number; code: string }>
+  /** The next new-link request issues the code and then loses its answer. */
+  loseLinkAnswer: boolean
+}
 async function service(page: Page, options: { fail?: boolean; verify?: boolean; max?: number } = {}): Promise<Service> {
-  const state: Service = { subscriptions: [], calls: [], refuse: {} }
+  const state: Service = { subscriptions: [], calls: [], refuse: {}, loseLinkAnswer: false }
   let links = 0
   await page.route("https://mock-alerts.test/**", async route => {
     const request = route.request()
@@ -29,6 +33,7 @@ async function service(page: Page, options: { fail?: boolean; verify?: boolean; 
       if (name === "pause" || name === "resume") { sub.paused = name === "pause"; return route.fulfill({ headers, json: { paused: sub.paused } }) }
       if (name === "test") return route.fulfill({ headers, json: { sent: true } })
       sub.linkExpiresAt = new Date(Date.now() + 600_000).toISOString()
+      if (state.loseLinkAnswer) { state.loseLinkAnswer = false; return route.abort() }
       return route.fulfill({ headers, json: { telegramUrl: `https://t.me/test_bot?start=reissued-${++links}`, expiresAt: sub.linkExpiresAt } })
     }
     if (request.method() === "DELETE") state.subscriptions.splice(0)
@@ -40,7 +45,7 @@ async function service(page: Page, options: { fail?: boolean; verify?: boolean; 
       const id = `subscription-${state.subscriptions.length + 1}`
       state.subscriptions.push({ ...data, id, channel: data.channel.kind, status: options.verify ? "verified" : "unverified", linked: !telegram,
         linkedAt: null, linkExpiresAt: telegram ? new Date(Date.now() + 600_000).toISOString() : null, paused: false, lastDelivery: null })
-      return route.fulfill({ headers, json: { id, telegramUrl: telegram ? "https://t.me/test_bot?start=local-test" : null } })
+      return route.fulfill({ headers, json: { id, telegramUrl: telegram ? "https://t.me/test_bot?start=local-test" : null, expiresAt: state.subscriptions.at(-1)!.linkExpiresAt } })
     }
     return route.fulfill({ headers, json: state.subscriptions })
   })
@@ -141,6 +146,26 @@ test("a lost or expired Telegram link is replaced from the card, without deletin
   await expect(card.getByRole("link", { name: "Open Telegram and press Start" })).toHaveAttribute("href", "https://t.me/test_bot?start=reissued-2")
   expect(calls).toEqual(["telegram-link", "telegram-link"])
   expect(subscriptions).toHaveLength(1)
+})
+
+test("a new link whose answer is lost does not revive the old link", async ({ connectedPage: page }) => {
+  const service_ = await service(page)
+  await page.goto("/#/alerts")
+  await page.getByRole("button", { name: "Sign to manage alerts" }).click()
+  await page.getByRole("button", { name: "Subscribe", exact: true }).click()
+  const card = page.getByRole("article")
+  await expect(card.getByRole("link", { name: "Open Telegram and press Start" })).toBeVisible()
+  service_.subscriptions[0]!.linkExpiresAt = new Date(Date.now() - 1000).toISOString()
+  await expect(card.getByRole("status")).toHaveText(expiredLink, { timeout: 15_000 })
+  // The service issues the new code, which cancels the first link, but its answer never arrives.
+  service_.loseLinkAnswer = true
+  await card.getByRole("button", { name: "Get a new Telegram link" }).click()
+  await expect(card.getByRole("alert")).toHaveText("The alerts service did not answer. Check your connection and try again.")
+  // The list now shows the new code's expiry. The first link is dead, so the card must not offer it.
+  await expect(card.getByRole("status")).toHaveText("Not connected yet. If you already pressed Start, wait up to 5 minutes: this page updates by itself. If not, get a new Telegram link, open it and press Start.")
+  await expect(card.getByRole("link", { name: "Open Telegram and press Start" })).toHaveCount(0)
+  await card.getByRole("button", { name: "Get a new Telegram link" }).click()
+  await expect(card.getByRole("link", { name: "Open Telegram and press Start" })).toHaveAttribute("href", "https://t.me/test_bot?start=reissued-1")
 })
 
 test("each failure has its own message, and the form closes at the subscription limit", async ({ connectedPage: page }) => {

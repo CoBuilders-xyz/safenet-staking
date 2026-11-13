@@ -6,7 +6,7 @@ import { PageHero } from "@/components/PageHero"
 import { Button } from "@/components/ui/button"
 import { ConnectButton } from "@/components/wallet/ConnectButton"
 import { SubscriptionCard } from "@/components/alerts/SubscriptionCard"
-import { alertErrorCode, alertRequest, alertsApi, browserChannel, useAlerts, type AlertErrorCode, type AlertTrigger } from "@/hooks/useAlerts"
+import { alertErrorCode, alertRequest, alertsApi, browserChannel, useAlerts, type AlertErrorCode, type AlertTrigger, type TelegramLink } from "@/hooks/useAlerts"
 import { currentLanguage } from "@/i18n"
 import { alertErrorMessage } from "@/lib/alertMessages"
 
@@ -30,7 +30,7 @@ function ConnectedAlerts({ address }: { address: Address }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<AlertErrorCode | null>(null)
   // Telegram links issued in this page session, by subscription. The API returns a link only once.
-  const [links, setLinks] = useState<Record<string, string>>({})
+  const [links, setLinks] = useState<Record<string, TelegramLink>>({})
   const [created, setCreated] = useState<string | null>(null)
   const labels = {
     cooldown: t("alerts.cooldown", "Cooldown ready to claim"),
@@ -47,10 +47,11 @@ function ConnectedAlerts({ address }: { address: Address }) {
     event.preventDefault()
     void run(async () => {
       const delivery = channel === "telegram" ? { kind: "telegram" } : await browserChannel(alerts.config.data?.vapidPublicKey ?? "")
-      const result = await alertRequest<{ id: string; telegramUrl: string | null }>("/subscriptions", alerts.token,
+      const result = await alertRequest<{ id: string; telegramUrl: string | null; expiresAt: string | null }>("/subscriptions", alerts.token,
         { triggers: selected, participation: selected.includes("participation") ? participation : 75,
           missed: selected.includes("missed") ? missed : 3, channel: delivery })
-      if (result.telegramUrl) setLinks(known => ({ ...known, [result.id]: result.telegramUrl! }))
+      const { telegramUrl, expiresAt } = result
+      if (telegramUrl && expiresAt) setLinks(known => ({ ...known, [result.id]: { url: telegramUrl, expiresAt } }))
       setCreated(result.id)
       await alerts.refresh()
     })
@@ -69,8 +70,8 @@ function ConnectedAlerts({ address }: { address: Address }) {
     {alerts.token && <>
       {subscriptions?.length === 0 && <p>{t("alerts.empty", "You have no alert subscriptions.")}</p>}
       {!!subscriptions?.length && <section aria-label={t("alerts.subscriptions", "Your subscriptions")} className="space-y-4">
-        {subscriptions.map(sub => <SubscriptionCard key={sub.id} sub={sub} linkUrl={links[sub.id]} focusLink={created === sub.id}
-          maxSubscriptions={maxSubscriptions} actions={alerts} onLink={(id, url) => { setLinks(known => ({ ...known, [id]: url })); void alerts.refresh() }}
+        {subscriptions.map(sub => <SubscriptionCard key={sub.id} sub={sub} link={links[sub.id]} focusLink={created === sub.id}
+          maxSubscriptions={maxSubscriptions} actions={alerts} onLink={(id, link) => { setLinks(known => ({ ...known, [id]: link })); void alerts.refresh() }}
           triggers={<ul className="list-disc pl-5">{sub.triggers.map(trigger => <li key={trigger}>{labels[trigger]}{trigger === "participation" ? ` (${new Intl.NumberFormat(currentLanguage(), { style: "percent", maximumFractionDigits: 1 }).format(sub.participation / 100)})` : trigger === "missed" ? ` (${sub.missed.toLocaleString(currentLanguage())})` : ""}</li>)}</ul>} />)}
       </section>}
       <form onSubmit={save} className="space-y-5">

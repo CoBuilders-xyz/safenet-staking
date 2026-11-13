@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { alertErrorCode, linkPending, type AlertErrorCode, type AlertSubscription } from "@/hooks/useAlerts"
+import { alertErrorCode, linkPending, type AlertErrorCode, type AlertSubscription, type TelegramLink } from "@/hooks/useAlerts"
 import { alertErrorMessage } from "@/lib/alertMessages"
 import { formatUtcDayLong } from "@/lib/format"
 
@@ -18,26 +18,27 @@ function useNow(active: boolean): number {
 }
 
 interface Actions {
-  newLink: (id: string) => Promise<{ telegramUrl: string }>
+  newLink: (id: string) => Promise<{ telegramUrl: string; expiresAt: string }>
   sendTest: (id: string) => Promise<unknown>
   setPaused: (id: string, paused: boolean) => Promise<unknown>
   remove: (id: string) => Promise<unknown>
 }
 
 /**
- * One subscription: what it watches, one status line, and its own actions. `linkUrl` is the
+ * One subscription: what it watches, one status line, and its own actions. `link` is the
  * Telegram link issued in this page session; the API never returns a link again, so after a
- * reload the card offers a new one.
+ * reload the card offers a new one. The card opens `link` only while the subscription's current
+ * code is that link's own, by its expiry: a newer code makes this link dead.
  */
-export function SubscriptionCard({ sub, triggers, linkUrl, focusLink, maxSubscriptions, actions, onLink }: {
+export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscriptions, actions, onLink }: {
   sub: AlertSubscription
   triggers: ReactNode
-  linkUrl: string | undefined
+  link: TelegramLink | undefined
   /** Move focus to the Telegram link once, after the subscription was created. */
   focusLink: boolean
   maxSubscriptions: number
   actions: Actions
-  onLink: (id: string, url: string) => void
+  onLink: (id: string, link: TelegramLink) => void
 }) {
   const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
@@ -49,7 +50,7 @@ export function SubscriptionCard({ sub, triggers, linkUrl, focusLink, maxSubscri
   const unlinked = telegram && !sub.linked && !expired
   const now = useNow(unlinked)
   const linkAlive = linkPending(sub, now)
-  const openLink = linkAlive ? linkUrl : undefined
+  const openLink = linkAlive && link?.expiresAt === sub.linkExpiresAt ? link.url : undefined
   const anchor = useRef<HTMLAnchorElement>(null)
   useEffect(() => {
     if (focusLink && openLink) anchor.current?.focus()
@@ -105,7 +106,10 @@ export function SubscriptionCard({ sub, triggers, linkUrl, focusLink, maxSubscri
         <a ref={anchor} href={openLink} target="_blank" rel="noreferrer">{t("alerts.linkTelegram", "Open Telegram and press Start")}</a>
       </Button>}
       {unlinked && !openLink && <Button disabled={busy}
-        onClick={() => void run(async () => onLink(sub.id, (await actions.newLink(sub.id)).telegramUrl))}>
+        onClick={() => void run(async () => {
+          const issued = await actions.newLink(sub.id)
+          onLink(sub.id, { url: issued.telegramUrl, expiresAt: issued.expiresAt })
+        })}>
         {t("alerts.newLink", "Get a new Telegram link")}
       </Button>}
       {!expired && !unlinked && <Button variant="outline" disabled={busy}

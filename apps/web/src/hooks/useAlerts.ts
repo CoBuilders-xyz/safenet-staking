@@ -101,6 +101,8 @@ export function useAlerts(address: Address) {
   const setPaused = (id: string, paused: boolean) => action<{ paused: boolean }>(id, paused ? "pause" : "resume")
   return { config, subscriptions, token, sign, refresh, remove, newLink, sendTest, setPaused, pendingVerification }
 }
+/** A Telegram link issued in this page session, with the expiry of its own code. */
+export interface TelegramLink { url: string; expiresAt: string }
 /** A Telegram subscription whose link can still complete: no chat yet, and the link has not expired. */
 export function linkPending(sub: AlertSubscription, now: number): boolean {
   return sub.channel === "telegram" && !sub.linked && sub.status !== "expired" && !!sub.linkExpiresAt && Date.parse(sub.linkExpiresAt) > now

@@ -60,7 +60,10 @@ export async function api(request: Request, env: Env, db = new Database(env.DB),
         if (settings.channel.kind === "push" && (!env.VAPID_PRIVATE_KEY || !env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT)) throw new HttpError(503, "Push unavailable", "push_unavailable")
         const link = randomToken()
         const created = await db.subscribe(owner.wallet, owner.signature_hash, settings, await digest(link))
-        result = { id: created.id, telegramUrl: settings.channel.kind === "telegram" ? `https://t.me/${env.TELEGRAM_BOT_NAME}?start=${link}` : null }
+        const telegram = settings.channel.kind === "telegram"
+        // The link's own expiry goes with it, so the interface can tell this link from a later one.
+        result = { id: created.id, telegramUrl: telegram ? `https://t.me/${env.TELEGRAM_BOT_NAME}?start=${link}` : null,
+          expiresAt: telegram ? created.link_expires : null }
       } else if (/^\/subscriptions\/[\da-f-]{36}$/.test(path) && request.method === "DELETE") {
         await db.unsubscribe(path.split("/")[2]!, owner.wallet)
         result = { removed: true }
