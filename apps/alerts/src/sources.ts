@@ -140,22 +140,22 @@ export async function walletConditions(env: Env, sub: Subscription): Promise<{ e
   const validators: Address[] = []
   if (sub.triggers.some(t => ["deregistered", "participation", "missed"].includes(t))) {
     try {
-      // Pin all pagination to one indexed block. Verify each position and status on chain.
+      // Pin all pagination to the finalized block, by hash: graph-node returns a null
+      // _meta.block.timestamp for a block pinned by number. Verify each position and status on chain.
       let cursor = ""
-      let indexedBlock: number | undefined
       for (;;) {
         const response = await fetch(mainnetSubgraphUrl(env), {
           method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(10_000),
           body: JSON.stringify({ query: `query($wallet: Bytes!, $cursor: ID!, $block: Block_height) {
             _meta(block: $block) { block { number timestamp } hasIndexingErrors }
             delegations(first: 100, orderBy: id, orderDirection: asc, block: $block, where: {staker: $wallet, amount_gt: "0", id_gt: $cursor}) { id validator { id registeredAtBlock firstSeenAtBlock } }
-          }`, variables: { wallet: wallet.toLowerCase(), cursor, block: indexedBlock ? { number: indexedBlock } : { number: Number(block.number) } } }),
+          }`, variables: { wallet: wallet.toLowerCase(), cursor, block: { hash: block.hash } } }),
         })
         if (!response.ok) throw new Error("Delegation index unavailable")
-        const json = await response.json() as { errors?: unknown; data?: { _meta: { block: { number: number; timestamp: number }; hasIndexingErrors: boolean }; delegations: { id: string; validator: { id: Address; registeredAtBlock: string | null; firstSeenAtBlock: string } }[] } }
+        const json = await response.json() as { errors?: unknown; data?: { _meta: { block: { number: number; timestamp: number | null }; hasIndexingErrors: boolean }; delegations: { id: string; validator: { id: Address; registeredAtBlock: string | null; firstSeenAtBlock: string } }[] } }
         const data = json.data
-        if (json.errors || !data || data._meta.hasIndexingErrors || Number(block.timestamp) - data._meta.block.timestamp > SUBGRAPH_STALE_AFTER_SECONDS) throw new Error("Delegation index stale")
-        indexedBlock = data._meta.block.number
+        if (json.errors || !data || data._meta.hasIndexingErrors || data._meta.block.number !== Number(block.number)
+          || typeof data._meta.block.timestamp !== "number" || Number(block.timestamp) - data._meta.block.timestamp > SUBGRAPH_STALE_AFTER_SECONDS) throw new Error("Delegation index stale")
         for (const row of data.delegations) {
           const validator = getAddress(row.validator.id)
           const stake = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "stakes", args: [wallet, validator], blockNumber: block.number })
