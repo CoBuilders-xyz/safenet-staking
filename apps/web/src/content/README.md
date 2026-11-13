@@ -13,8 +13,8 @@ The texts of four routes of the interface:
 
 ## Status of the texts
 
-The four texts are drafts written from what the code does. Counsel has not confirmed them. The
-terms mark their governing law and jurisdiction section as "to be confirmed by counsel".
+The four texts are written from what the code does. A page shows no internal note: an open
+point belongs in the pull request or the tracker, never in the text.
 
 Each text opens with a "Last updated" line. Change the date with every change to the text.
 

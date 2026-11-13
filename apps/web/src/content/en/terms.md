@@ -160,7 +160,7 @@ To the extent that the law allows, and except where you act as a consumer and ma
 
 ## 18. Governing law and jurisdiction
 
-**This section is to be confirmed by counsel.** The laws of the State of Delaware, United States, govern these terms and any dispute that arises from them or from the Services, without regard to conflict-of-law rules. The state and federal courts located in the State of Delaware have exclusive jurisdiction over such disputes, and you and we accept the jurisdiction of those courts.
+The laws of the State of Delaware, United States, govern these terms and any dispute that arises from them or from the Services, without regard to conflict-of-law rules. The state and federal courts located in the State of Delaware have exclusive jurisdiction over such disputes, and you and we accept the jurisdiction of those courts.
 
 If you are a consumer, mandatory law of your country of residence can give you the right to bring a claim in your own courts and under your own law. These terms do not take that right away.
 

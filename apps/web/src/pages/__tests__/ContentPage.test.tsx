@@ -73,12 +73,17 @@ describe("ContentPage", () => {
     expect(screen.getAllByRole("link", { name: OPERATOR_EMAIL })[0]).toHaveAttribute("href", `mailto:${OPERATOR_EMAIL}`)
   })
 
-  it("marks the governing law in the terms as to be confirmed by counsel", () => {
+  it("states the governing law in the terms, with no internal note", () => {
     renderAt("/terms")
 
     const section = screen.getByRole("heading", { name: /Governing law and jurisdiction/ }).nextElementSibling
-    expect(section).toHaveTextContent("This section is to be confirmed by counsel.")
-    expect(section).toHaveTextContent("State of Delaware")
+    expect(section).toHaveTextContent("The laws of the State of Delaware, United States, govern these terms")
+  })
+
+  it.each(CONTENT_PAGES)("shows no internal note in /%s", (name) => {
+    const { container } = renderAt(`/${name}`)
+
+    expect(container.textContent).not.toMatch(/to be confirmed|counsel|\bTBD\b|\bTODO\b|placeholder|pending legal/i)
   })
 
   it("names in the privacy policy every third-party host that core gives the browser", () => {
