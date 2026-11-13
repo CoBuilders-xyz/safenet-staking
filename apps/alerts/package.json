@@ -15,8 +15,8 @@
   },
   "dependencies": {
     "@cobuilders/safenet-core": "workspace:*",
-    "viem": "2.46.2",
-    "web-push": "3.6.7"
+    "viem": "2.57.17",
+    "web-push": "4.0.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "2.0.0-beta.v.8",
