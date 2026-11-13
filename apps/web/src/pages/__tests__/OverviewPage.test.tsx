@@ -23,12 +23,14 @@ const mocks = vi.hoisted(() => ({
   days: vi.fn(),
   consensus: vi.fn(),
   validators: vi.fn(),
+  apr: vi.fn(),
 }))
 vi.mock("@/hooks/useNetworkTotals", () => ({ useNetworkTotals: () => mocks.network(), useNetworkQuery: () => mocks.networkQuery() }))
 vi.mock("@/hooks/useValidatorStakes", () => ({ useValidatorStakes: () => mocks.stakes() }))
 vi.mock("@/hooks/useRewardsOverview", () => ({ useRewardsOverview: () => mocks.rewards() }))
 vi.mock("@/hooks/useRecentDays", () => ({ RECENT_DAYS: 30, useRecentDays: () => mocks.days() }))
 vi.mock("@/hooks/useConsensusFigures", () => ({ useConsensusFigures: () => mocks.consensus() }))
+vi.mock("@/hooks/useEstimatedApr", () => ({ useEstimatedApr: () => mocks.apr() }))
 vi.mock("@/hooks/useValidators", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks/useValidators")>()),
   useValidators: () => mocks.validators(),
@@ -75,6 +77,19 @@ function live() {
     snapshotReason: undefined,
     betaOnly: false,
   })
+  mocks.apr.mockReturnValue(
+    ready(
+      {
+        ok: true,
+        apr: 0.073857,
+        periodStart: Date.UTC(2026, 9, 13) / 1000,
+        periodEnd: Date.UTC(2026, 9, 27) / 1000,
+        rewards: 192_307n * SAFE,
+        averageStaked: 67_884_032n * SAFE,
+      },
+      "sef",
+    ),
+  )
 }
 
 function renderPage() {
@@ -242,9 +257,24 @@ describe("OverviewPage", () => {
     expect(within(validators).getByText("Not available")).toBeInTheDocument()
   })
 
-  it("shows no APY and no SAFE price", () => {
+  it("shows the estimated APR of the last reward period, gross, with its source and how it is estimated", () => {
     renderPage()
-    expect(screen.queryByText(/APY|APR|price/i)).not.toBeInTheDocument()
+    const apr = screen.getByRole("group", { name: "Estimated APR" })
+    expect(within(apr).getByText("7.4%")).toBeInTheDocument()
+    expect(apr).toHaveTextContent("Last reward period (13–26 Oct), before validator commission. Estimate, not a guarantee.")
+    expect(apr).toHaveTextContent("Source: SEF rewards file, Mainnet subgraph.")
+    expect(within(apr).getByRole("button", { name: "How it is estimated" })).toBeInTheDocument()
+    // A rate, not a compounded yield, and still no SAFE price.
+    expect(screen.queryByText(/APY|price/i)).not.toBeInTheDocument()
+  })
+
+  it("says why there is no estimated APR, and shows no number", () => {
+    mocks.apr.mockReturnValue({ state: "unavailable", reason: "The Mainnet subgraph has not indexed the end of the reward period yet." })
+    renderPage()
+    const apr = screen.getByRole("group", { name: "Estimated APR" })
+    expect(apr).toHaveTextContent("Unavailable")
+    expect(apr).toHaveTextContent("The Mainnet subgraph has not indexed the end of the reward period yet.")
+    expect(apr).not.toHaveTextContent("%")
   })
 
   it("says, in a plain sentence, when figures come from the contracts and the snapshot", () => {

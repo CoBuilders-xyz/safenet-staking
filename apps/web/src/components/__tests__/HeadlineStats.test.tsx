@@ -13,6 +13,7 @@ vi.mock("@cobuilders/safenet-core", async (importOriginal) => ({
 vi.mock("@/hooks/useNetworkTotals", () => ({
   useNetworkTotals: () => ({ totalStaked: { state: "loading" }, validatorCounts: { state: "loading" } }),
 }))
+vi.mock("@/hooks/useEstimatedApr", () => ({ useEstimatedApr: () => ({ state: "loading" }) }))
 
 const DAY = 86_400
 /** Beta's last day, from core; no programme date is typed here. */

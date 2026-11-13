@@ -35,7 +35,10 @@ test.describe("Network Overview", () => {
     await expect(attestationHistory.getByRole("table")).toContainText("4,800")
     await stakeHistory.getByRole("button", { name: "7 days" }).click()
     await expect(stakeHistory.getByRole("button", { name: "7 days" })).toHaveAttribute("aria-pressed", "true")
-    await expect(page.getByText(/estimated APY/i)).toHaveCount(0)
+    // The mocked rewards file ends in Beta, so the estimate is withheld with its reason, never a number.
+    const apr = page.getByRole("group", { name: "Estimated APR", exact: true })
+    await expect(apr).toContainText("Unavailable")
+    await expect(apr).toContainText("The rewards file read holds no complete Aegis reward period yet.")
 
     const distribution = page.getByRole("region", { name: "Stake distribution" })
     // 7,000 and 5,345 of 12,345: 56.7% and 43.3%, so HHI 3,215 + 1,875.

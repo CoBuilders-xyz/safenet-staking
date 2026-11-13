@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { formatDuration, formatParticipation, formatTokenAmount, isRounded, parseAmount, presetAmount, truncateAddress, formatCountdown, formatUtcDateTime, formatUtcDayLong } from "../format"
+import { formatDuration, formatParticipation, formatTokenAmount, isRounded, parseAmount, presetAmount, truncateAddress, formatCountdown, formatUtcDateTime, formatUtcDayLong, formatUtcDayRange } from "../format"
 
 describe("formatTokenAmount", () => {
   it("formats zero", () => {
@@ -175,5 +175,13 @@ describe("formatDuration", () => {
     expect(formatDuration(90 * 60 + 5)).toBe("1 hour 30 minutes 5 seconds")
     expect(formatDuration(1)).toBe("1 second")
     expect(formatDuration(0)).toBe("no time")
+  })
+})
+
+describe("formatUtcDayRange", () => {
+  it("writes the month once inside a month, both months across two, and years across a year", () => {
+    expect(formatUtcDayRange(Date.UTC(2026, 9, 13), Date.UTC(2026, 9, 26))).toBe("13–26 Oct")
+    expect(formatUtcDayRange(Date.UTC(2026, 9, 27), Date.UTC(2026, 10, 9))).toBe("27 Oct–9 Nov")
+    expect(formatUtcDayRange(Date.UTC(2026, 11, 29), Date.UTC(2027, 0, 11))).toBe("29 Dec 2026–11 Jan 2027")
   })
 })

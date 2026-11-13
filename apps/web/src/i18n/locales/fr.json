@@ -96,6 +96,7 @@
     "commission": "Commission",
     "confirmStake": "Confirmer la délégation",
     "disconnectWallet": "Déconnecter le portefeuille",
+    "estimatedAprDefinition": "Basé sur la dernière période de récompenses : récompenses de staking divisées par la moyenne des SAFE stakés, annualisées. Sans capitalisation, avant la commission du validateur. Récompenses passées, pas une garantie.",
     "hero": {
       "dashboard": "Vos positions dans les contrats de <staking>staking</staking> de <network>Safenet</network>",
       "overview": "L’état du <staking>staking</staking> et du consensus de <network>Safenet</network>. Aucun portefeuille nécessaire.",
@@ -174,6 +175,23 @@
       "minutesSeconds": "{{m}} min {{s}} s",
       "seconds": "{{n}} s"
     },
+    "apr": {
+      "reason": {
+        "invalidAmount": "Un montant du fichier de récompenses de la SEF ou du subgraph n'est pas un nombre entier de wei.",
+        "invalidPeriodEnd": "Le fichier de récompenses de la SEF ne termine pas sa période à minuit UTC.",
+        "misalignedPeriod": "Le fichier de récompenses de la SEF se termine à une date qui n'est pas une limite de période de récompenses.",
+        "noDailyStake": "{{why}} L'estimation a besoin du total staké quotidien du subgraph.",
+        "noPeriodYet": "Le fichier de récompenses lu ne contient encore aucune période de récompenses Aegis complète.",
+        "noRewards": "Le fichier de récompenses de la SEF n'indique aucune récompense de staking pour Aegis.",
+        "noSentinelTotal": "Le fichier de récompenses de la SEF ne sépare pas les récompenses des sentinelles de celles du staking.",
+        "noStake": "Aucun SAFE n'était staké pendant la période de récompenses.",
+        "noStakeBeforePeriod": "Le subgraph Mainnet ne contient aucun total staké au début de la période de récompenses.",
+        "notIndexed": "Le subgraph Mainnet n'a pas encore indexé la fin de la période de récompenses.",
+        "outsideBudget": "Les récompenses de staking publiées par la SEF diffèrent de l'allocation par période de récompenses, donc la méthode de cette estimation ne tient plus.",
+        "periodInFuture": "Le fichier de récompenses de la SEF indique une période de récompenses qui n'est pas encore terminée.",
+        "stale": "La dernière période de récompenses de la SEF s'est terminée il y a trop longtemps pour décrire le taux actuel."
+      }
+    },
     "betaWindow": "Beta, du {{from}} au {{to}}",
     "common": {
       "unavailable": "Indisponible"
@@ -216,6 +234,9 @@
       "attestationsDetail_one": "Moyenne sur {{count}} jour complet, de {{min}} à {{max}}",
       "attestationsDetail_other": "Moyenne sur {{count}} jours complets, de {{min}} à {{max}}",
       "attestationsPerDay": "Attestations par jour",
+      "estimatedApr": "APR estimé",
+      "estimatedAprDetail": "Dernière période de récompenses ({{period}}), avant la commission du validateur. Estimation, pas une garantie. <term>Comment il est estimé</term>",
+      "estimatedAprSource": "Source : fichier de récompenses de la SEF, subgraph Mainnet.",
       "gnosisSource": "Subgraph Gnosis, jours UTC complets du {{from}} au {{to}}",
       "gnosisSourceBeta": "{{beta}}. Subgraph Gnosis, jours UTC complets.",
       "latency": "Latence d'attestation",

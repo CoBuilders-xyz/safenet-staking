@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { REWARD_PARTICIPATION_THRESHOLD } from "@cobuilders/safenet-core"
 import { definition, unstakingPeriodText, type GlossaryTerm } from "../glossary"
 
-const TERMS: GlossaryTerm[] = ["safenet", "staking", "validator", "commission", "unstakingPeriod", "rewards", "slashing"]
+const TERMS: GlossaryTerm[] = ["safenet", "staking", "validator", "commission", "unstakingPeriod", "rewards", "slashing", "estimatedApr"]
 
 describe("glossary", () => {
   it("defines every term in plain sentences", () => {
@@ -26,5 +26,12 @@ describe("glossary", () => {
 
   it("says staked SAFE is not currently subject to slashing, as SEF's risks page does", () => {
     expect(definition("slashing")).toContain("not currently subject to slashing")
+  })
+
+  it("says the estimated APR uses past rewards, without compounding, before commission, and is not a guarantee", () => {
+    const text = definition("estimatedApr")
+    expect(text).toContain("last reward period")
+    expect(text).toContain("No compounding, before validator commission")
+    expect(text).toContain("not a guarantee")
   })
 })

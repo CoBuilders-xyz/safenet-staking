@@ -69,6 +69,13 @@ describe("parseRewardsLatest", () => {
     expect(parseRewardsLatest(LIVE_2026_10_22)).toEqual(LIVE_2026_10_22)
   })
 
+  it("accepts the first Aegis file, which adds sentinelTokenTotal, and rejects a malformed one", () => {
+    const aegis = { ...LIVE_2026_10_22, rewardsUntil: "2026-10-27T00:00:00.000Z", sentinelTokenTotal: "30769230769230769230768" }
+    expect(parseRewardsLatest(aegis)).toEqual(aegis)
+    expect(() => parseRewardsLatest({ ...aegis, sentinelTokenTotal: "30769.2" })).toThrow("Invalid rewards file format")
+    expect(() => parseRewardsLatest({ ...aegis, sentinelTokenTotal: 30769 })).toThrow("Invalid rewards file format")
+  })
+
   it.each(Object.keys(LIVE_2026_10_22))("rejects the live file without %s", (field) => {
     const rest: Record<string, unknown> = { ...LIVE_2026_10_22 }
     delete rest[field]

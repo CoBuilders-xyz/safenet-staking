@@ -25,7 +25,8 @@ export function parseRewardsLatest(data: unknown): SefRewardsLatest {
     typeof o.merkleRoot === "string" && BYTES32.test(o.merkleRoot) &&
     isIsoDate(o.rewardsUntil) &&
     typeof o.tokenTotal === "string" && DECIMAL.test(o.tokenTotal) &&
-    typeof o.unpaidAmount === "string" && DECIMAL.test(o.unpaidAmount)
+    typeof o.unpaidAmount === "string" && DECIMAL.test(o.unpaidAmount) &&
+    (o.sentinelTokenTotal === undefined || (typeof o.sentinelTokenTotal === "string" && DECIMAL.test(o.sentinelTokenTotal)))
   if (!valid) throw new Error("Invalid rewards file format")
   return o as unknown as SefRewardsLatest
 }

@@ -52,10 +52,17 @@ export interface SefRewardsLatest {
   merkleRoot: string
   /** ISO 8601. */
   rewardsUntil: string
-  /** Decimal string, in wei. */
+  /** Decimal string, in wei. Cumulative over Beta and Aegis, sentinel rewards included. */
   tokenTotal: string
   /** Decimal string, in wei. */
   unpaidAmount: string
+  /**
+   * Decimal string, in wei: the part of `tokenTotal` paid to sentinels, not to stakers. SEF does
+   * not document the field. It first appeared in the first Aegis file, rewardsUntil 2026-10-27,
+   * at 30,769.23 SAFE, which is SEP 56's 800,000 SAFE a year for sentinels over 26 periods. That
+   * it is cumulative, like `tokenTotal`, is an inference from that one file. Absent from Beta's.
+   */
+  sentinelTokenTotal?: string
 }
 
 /**
@@ -166,6 +173,23 @@ export const AEGIS_START_DAY: UtcDay = "2026-10-13"
 
 /** Aegis distributes rewards once per reward period of this many days. */
 export const REWARD_PERIOD_DAYS = 14
+
+/**
+ * `tokenTotal` of Beta's final rewards file, in wei: rewardsUntil 2026-10-06, written by
+ * safe-fndn/safenet-data commit 32d2f9e and unchanged since. Aegis rewards are what SEF's
+ * cumulative `tokenTotal` adds on top of it.
+ */
+export const BETA_FINAL_REWARDS_TOKEN_TOTAL = 4_499_987_774_807_670_271_201_970n
+
+/**
+ * What SafeDAO allocates to validator and delegator rewards over 12 months of Aegis, in wei:
+ * 5,000,000 SAFE, in SEP 56, as SEF's rewards page states it (SEF_DOCS.rewards, read on
+ * 2026-11-11). Sentinel rewards are a separate allocation.
+ */
+export const AEGIS_STAKER_REWARDS_PER_YEAR = 5_000_000n * 10n ** 18n
+
+/** Reward periods in SEF's 12 months: the 5,000,000 SAFE are split into this many. */
+export const REWARD_PERIODS_PER_YEAR = 26
 
 /**
  * The participation a validator needs in a reward period. Below it, in SEF's words, "both the

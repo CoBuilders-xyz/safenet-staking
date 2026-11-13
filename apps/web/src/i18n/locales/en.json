@@ -129,6 +129,7 @@
     "commission": "Commission",
     "confirmStake": "Confirm stake",
     "disconnectWallet": "Disconnect wallet",
+    "estimatedAprDefinition": "Based on the last reward period: staker rewards divided by the average SAFE staked, annualized. No compounding, before validator commission. Past rewards, not a guarantee.",
     "hero": {
       "dashboard": "Your positions in the <network>Safenet</network> <staking>staking</staking> contracts",
       "overview": "The state of <network>Safenet</network> <staking>staking</staking> and consensus. No wallet needed.",
@@ -206,6 +207,23 @@
       "minutesSeconds": "{{m}} min {{s}} s",
       "seconds": "{{n}} s"
     },
+    "apr": {
+      "reason": {
+        "invalidAmount": "An amount in SEF's rewards file or the subgraph is not a whole number of wei.",
+        "invalidPeriodEnd": "SEF's rewards file does not end its period at a UTC midnight.",
+        "misalignedPeriod": "SEF's rewards file ends at a date that is not a reward period boundary.",
+        "noDailyStake": "{{why}} The estimate needs the subgraph's daily total staked.",
+        "noPeriodYet": "The rewards file read holds no complete Aegis reward period yet.",
+        "noRewards": "SEF's rewards file shows no staker rewards for Aegis.",
+        "noSentinelTotal": "SEF's rewards file does not separate sentinel rewards from staker rewards.",
+        "noStake": "No SAFE was staked during the reward period.",
+        "noStakeBeforePeriod": "The Mainnet subgraph holds no total staked from the start of the reward period.",
+        "notIndexed": "The Mainnet subgraph has not indexed the end of the reward period yet.",
+        "outsideBudget": "SEF's published staker rewards differ from the allocation per reward period, so the method behind this estimate no longer holds.",
+        "periodInFuture": "SEF's rewards file names a reward period that has not ended yet.",
+        "stale": "SEF's latest reward period ended too long ago to describe the current rate."
+      }
+    },
     "betaWindow": "Beta, {{from}} to {{to}}",
     "boundary": {
       "unavailable": "Unavailable. {{reason}}"
@@ -264,6 +282,9 @@
       "attestationsDetail_one": "Mean over {{count}} complete days, range {{min}} to {{max}}",
       "attestationsDetail_other": "Mean over {{count}} complete days, range {{min}} to {{max}}",
       "attestationsPerDay": "Attestations per day",
+      "estimatedApr": "Estimated APR",
+      "estimatedAprDetail": "Last reward period ({{period}}), before validator commission. Estimate, not a guarantee. <term>How it is estimated</term>",
+      "estimatedAprSource": "Source: SEF rewards file, Mainnet subgraph.",
       "gnosisSource": "Gnosis subgraph, complete UTC days {{from}} to {{to}}",
       "gnosisSourceBeta": "{{beta}}. Gnosis subgraph, complete UTC days.",
       "latency": "Attestation latency",
