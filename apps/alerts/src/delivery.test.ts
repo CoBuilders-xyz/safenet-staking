@@ -9,7 +9,7 @@ import { noDatabase } from "./testing/database.js"
 
 const env: Env = { APP_ORIGIN: "https://app.test", DB: noDatabase }
 const base: Subscription = { id: crypto.randomUUID(), wallet: CONTRACTS.staking.address, triggers: ["cooldown"], participation: 75, missed: 3,
-  channel: { kind: "telegram" }, telegram_chat: "123", status: "unverified", last_delivery: null }
+  channel: { kind: "telegram" }, telegram_chat: "123", status: "unverified", last_delivery: null, link_expires: null, linked_at: null, paused: false }
 const payload = { title: "Safenet", body: "Cooldown ready", ack: "receipt" }
 
 test("Telegram sends only to the linked recipient, with receipt confirmation; provider rejection stays failed", async () => {

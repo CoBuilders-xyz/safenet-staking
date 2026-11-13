@@ -1,4 +1,4 @@
-import { createPublicClient, decodeEventLog, encodePacked, getAddress, http, keccak256, type Address, type Hex } from "viem"
+import { createPublicClient, decodeEventLog, encodePacked, formatUnits, getAddress, http, keccak256, type Address, type Hex } from "viem"
 import { CHAINS, CONTRACTS, PUBLIC_RPC_URLS, SUBGRAPH_STALE_AFTER_SECONDS, subgraphEndpoints,
   indexedEvent, stakingAbi, merkleDropAbi, rewardProofPath, resolveRewardsSource, readRewardsFile } from "@cobuilders/safenet-core"
 import { mainnetClient } from "./auth.js"
@@ -78,7 +78,24 @@ export async function advanceChronology(env: Env, previous: Chronology, db: Data
   }
   return { state, current: BigInt(state.cursor) === head.number, time: Number(head.timestamp) }
 }
-export interface Condition { trigger: Trigger; key: string; body: string }
+/** `covers` lists every event key one message stands for, `key` first. Absent, the message covers `key` alone. */
+export interface Condition { trigger: Trigger; key: string; body: string; covers?: string[] }
+
+/** SAFE has 18 decimals. Whole tokens with at most four decimals, rounded down: "1,000.5 SAFE". */
+function safe(amount: bigint): string {
+  const [whole, fraction = ""] = formatUnits(amount, 18).split(".") as [string, string?]
+  const decimals = fraction.slice(0, 4).replace(/0+$/, "")
+  if (whole === "0" && !decimals && amount > 0n) return "less than 0.0001 SAFE"
+  return `${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${decimals ? `.${decimals}` : ""} SAFE`
+}
+/** One message for every withdrawal that can be claimed now. It names at most five amounts. */
+export function cooldownBody(amounts: bigint[]): string {
+  if (amounts.length === 1) return `A withdrawal of ${safe(amounts[0]!)} has finished its cooldown. Open Safenet to review and claim.`
+  const named = amounts.slice(0, 5).map(safe)
+  const rest = amounts.length - named.length
+  const list = rest ? `${named.join(", ")} and ${rest} more` : `${named.slice(0, -1).join(", ")} and ${named.at(-1)}`
+  return `${amounts.length} withdrawals have finished their cooldown: ${list}. Open Safenet to review and claim.`
+}
 
 // Mainnet finality normally trails by 2–3 epochs (about 13–19 minutes).
 // Allow that lag plus margin; the subgraph's 15-minute bound is not a finality bound.
@@ -98,12 +115,16 @@ export async function walletConditions(env: Env, sub: Subscription): Promise<{ e
       const [head] = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "withdrawalQueues", args: [wallet], blockNumber: block.number })
       let id = head
       let count = 0
+      const ready: { key: string; amount: bigint }[] = []
       while (id !== 0n) {
         if (++count > 1000) throw new Error("Withdrawal queue exceeds poll budget")
         const [amount, claimableAt, , next] = await client.readContract({ address: CONTRACTS.staking.address, abi: stakingAbi, functionName: "withdrawalNodes", args: [wallet, id], blockNumber: block.number })
-        if (amount > 0n && claimableAt <= block.timestamp) events.push({ trigger: "cooldown", key: `cooldown:${id}`, body: "A withdrawal cooldown has ended. Open Safenet to review and claim." })
+        if (amount > 0n && claimableAt <= block.timestamp) ready.push({ key: `cooldown:${id}`, amount })
         id = next
       }
+      // One message for all of them, sent when at least one is new. Each keeps its own key, so a
+      // withdrawal already announced does not cause another message by itself.
+      if (ready.length) events.push({ trigger: "cooldown", key: ready[0]!.key, covers: ready.map(item => item.key), body: cooldownBody(ready.map(item => item.amount)) })
     } catch { failed++ }
   }
   if (sub.triggers.includes("rewards")) {

@@ -1,5 +1,5 @@
 import type { Ceremony, Chronology } from "./chronology.js"
-import type { Subscription, Trigger, Channel } from "./types.js"
+import { HttpError, type Subscription, type Trigger, type Channel } from "./types.js"
 
 /** D1 limits a string, a BLOB and a row to 2 MB. Stay well below it for one bound value or one stored part. */
 const PART_BYTES = 1_000_000
@@ -20,6 +20,8 @@ export const LINK_START_WINDOW = 10 * 60_000
 export const LINK_PROCESSING_GRACE = 60 * 60_000
 const RECEIPT = 24 * 60 * 60_000
 const DELIVERY_LEASE = 2 * 60_000
+/** One test message per subscription per minute: each one is a provider request. */
+const TEST_INTERVAL = 60_000
 const iso = (ms: number) => new Date(ms).toISOString()
 /** SQLite's current time, in the same format as Date.toISOString. */
 const SQL_NOW = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
@@ -67,11 +69,13 @@ async function guarded<T>(operation: Promise<T>): Promise<T> {
 interface SubscriptionRow {
   id: string; wallet: string; triggers: string; participation: number; missed: number; channel: string
   telegram_chat: string | null; status: Subscription["status"]; last_delivery: string | null
+  link_expires: string | null; linked_at: string | null; paused: number
 }
 const subscription = (row: SubscriptionRow): Subscription => ({
   id: row.id, wallet: row.wallet, triggers: JSON.parse(row.triggers) as Trigger[], participation: row.participation,
   missed: row.missed, channel: JSON.parse(row.channel) as Channel, telegram_chat: row.telegram_chat,
-  status: row.status, last_delivery: row.last_delivery,
+  status: row.status, last_delivery: row.last_delivery, link_expires: row.link_expires, linked_at: row.linked_at,
+  paused: row.paused === 1,
 })
 export interface SubscriptionSettings { triggers: Trigger[]; participation: number; missed: number; channel: unknown }
 export interface PollRun { started_at: string; completed_at: string | null; ok: boolean }
@@ -135,24 +139,44 @@ export class Database {
       select ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10 where (select count(*) from alerts_subscriptions where wallet = ?2) < 10
       returning *`, crypto.randomUUID(), wallet, signatureHash, JSON.stringify(settings.triggers), settings.participation,
     settings.missed, JSON.stringify(settings.channel), linkHash, iso(now + LINK_START_WINDOW), iso(now))
-    if (!row) throw new Error("Subscription limit reached")
+    if (!row) throw new HttpError(409, "Subscription limit reached", "limit")
     return subscription(row)
   }
   /** Removes the wallet's own subscription only. Its delivery history goes with it. */
   async unsubscribe(id: string, wallet: string) {
     await this.run("delete from alerts_subscriptions where id = ? and wallet = ?", id, wallet)
   }
-  /** Subscriptions the poller evaluates, in id order after `after`. */
+  /**
+   * A new link code for the wallet's own Telegram subscription that has no chat yet. It replaces
+   * the previous code. Returns when the new code expires, or null when nothing matched.
+   */
+  async reissueLink(id: string, wallet: string, linkHash: string): Promise<string | null> {
+    const expires = iso(Date.now() + LINK_START_WINDOW)
+    return await this.run(`update alerts_subscriptions set link_hash = ?, link_expires = ?
+      where id = ? and wallet = ? and telegram_chat is null and status != 'expired' and json_extract(channel, '$.kind') = 'telegram'`,
+    linkHash, expires, id, wallet) > 0 ? expires : null
+  }
+  /** Pauses or resumes the wallet's own subscription. False when it is not the wallet's. */
+  async setPaused(id: string, wallet: string, paused: boolean): Promise<boolean> {
+    return await this.run("update alerts_subscriptions set paused = ? where id = ? and wallet = ?", paused ? 1 : 0, id, wallet) > 0
+  }
+  /** Claims the subscription's one test message per minute. False while the last one is too recent. */
+  async claimTest(id: string, wallet: string): Promise<boolean> {
+    const now = Date.now()
+    return await this.run("update alerts_subscriptions set tested_at = ? where id = ? and wallet = ? and (tested_at is null or tested_at < ?)",
+      iso(now), id, wallet, iso(now - TEST_INTERVAL)) > 0
+  }
+  /** Subscriptions the poller evaluates, in id order after `after`. A paused one is skipped. */
   async activeSubscriptions(after: string, limit: number): Promise<Subscription[]> {
-    return (await this.all<SubscriptionRow>("select * from alerts_subscriptions where status != 'expired' and id > ? order by id limit ?",
+    return (await this.all<SubscriptionRow>("select * from alerts_subscriptions where status != 'expired' and paused = 0 and id > ? order by id limit ?",
       after, limit)).map(subscription)
   }
   /** `sentAt` is when Telegram received /start. A time after now is treated as now. */
   async linkTelegram(linkHash: string, chat: string, sentAt = Date.now()): Promise<boolean> {
     const now = Date.now()
-    return await this.run(`update alerts_subscriptions set telegram_chat = ?, link_hash = null, link_expires = null
+    return await this.run(`update alerts_subscriptions set telegram_chat = ?, linked_at = ?, link_hash = null, link_expires = null
       where link_hash = ? and link_expires > ? and link_expires > ? and json_extract(channel, '$.kind') = 'telegram'`,
-    chat, linkHash, iso(Math.min(sentAt, now)), iso(now - LINK_PROCESSING_GRACE)) > 0
+    chat, iso(now), linkHash, iso(Math.min(sentAt, now)), iso(now - LINK_PROCESSING_GRACE)) > 0
   }
 
   /** Claims an event for delivery. A failed or abandoned claim can be taken again once its lease ends. */
