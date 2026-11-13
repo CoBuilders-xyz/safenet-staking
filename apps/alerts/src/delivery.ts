@@ -45,7 +45,7 @@ export async function sendEvent(db: Database, env: Env, sub: Subscription, key: 
 
 interface TelegramUpdate {
   update_id: number
-  message?: { text?: string; chat: { id: number; type: string } }
+  message?: { text?: string; date?: number; chat: { id: number; type: string } }
   callback_query?: { id: string; data?: string; message?: { chat: { id: number; type: string } } }
 }
 export async function telegramUpdates(db: Database, env: Env, transport: typeof fetch = fetch) {
@@ -63,7 +63,8 @@ export async function telegramUpdates(db: Database, env: Env, transport: typeof 
     const link = message?.text?.match(/^\/start ([\w-]{43})$/)?.[1]
     // Confirm only a link that bound this chat. An unknown, expired or reused code gets no reply,
     // so the bot reveals nothing about codes. A failed confirmation does not undo the link.
-    if (link && message?.chat.type === "private" && await db.linkTelegram(await digest(link), String(message.chat.id))) {
+    if (link && message?.chat.type === "private" && await db.linkTelegram(await digest(link), String(message.chat.id),
+      message.date === undefined ? undefined : message.date * 1000)) {
       try {
         await transport(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
           method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(10_000),

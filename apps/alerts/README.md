@@ -131,15 +131,17 @@ Each wallet can hold ten subscriptions. The server derives ownership from the se
 and mutation. The browser cannot supply a wallet owner for another wallet's subscription.
 
 Telegram subscription creation returns a single-use bot link. The interface asks the user to press
-Start within ten minutes. Only `/start <token>` in a private chat can bind the recipient. The
-Worker reads `/start` on its next Cron run, up to five minutes later, so the code stays valid for
-fifteen minutes: a Start pressed inside the ten minutes is always processed. The Worker then sends
-"Linked. Safenet alerts for this subscription will arrive in this chat." to that chat only. This
-confirmation is best effort: if Telegram refuses it, the link stays and the alerts page shows
-"Telegram linked". An unknown, expired or reused code gets no reply. The browser never supplies a chat ID. A user who loses that
-link deletes the unlinked subscription and creates another. The poller does not send to groups,
-unlinked subscriptions or arbitrary recipients. Browser endpoint validation allows known HTTPS push
-providers only and forbids credentials, ports and redirects.
+Start within ten minutes. Only `/start <token>` in a private chat can bind the recipient. The Worker
+reads `/start` on a later Cron run: normally the next one, up to five minutes later, or later when a
+poll still holds the lease. So the ten minutes are checked against the time Telegram stamps on the
+`/start` message, not the time the Worker reads it. A code sent in time is honoured if the Worker
+reads it up to an hour after it expired; cleanup keeps it until then. The Worker then sends "Linked.
+Safenet alerts for this subscription will arrive in this chat." to that chat only. This confirmation
+is best effort: if Telegram refuses it, the link stays and the alerts page shows "Telegram linked".
+An unknown, expired or reused code gets no reply. The browser never supplies a chat ID. A user who
+loses that link deletes the unlinked subscription and creates another. The poller does not send to
+groups, unlinked subscriptions or arbitrary recipients. Browser endpoint validation allows known
+HTTPS push providers only and forbids credentials, ports and redirects.
 
 Deleting a subscription removes its delivery token and event history through a foreign-key cascade.
 Expired authentication records are cleaned each poll. Operational run records contain only counts.

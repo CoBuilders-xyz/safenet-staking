@@ -12,11 +12,12 @@ const MAX_PENDING = 10_000
 const LEASE = 16 * 60_000
 const SESSION = 30 * 60_000
 /**
- * The interface asks for Start within ten minutes. The Worker reads /start on its next Cron run,
- * up to five minutes later, so the code stays valid for both.
+ * A Telegram link code must be sent within ten minutes, by the time Telegram stamps on the /start
+ * message. The Worker reads /start on a later Cron run, which a poll still holding the lease can
+ * delay, so a code sent in time is honoured if processed up to an hour after it expired.
  */
 export const LINK_START_WINDOW = 10 * 60_000
-const LINK = LINK_START_WINDOW + 5 * 60_000
+export const LINK_PROCESSING_GRACE = 60 * 60_000
 const RECEIPT = 24 * 60 * 60_000
 const DELIVERY_LEASE = 2 * 60_000
 const iso = (ms: number) => new Date(ms).toISOString()
@@ -133,7 +134,7 @@ export class Database {
       participation, missed, channel, link_hash, link_expires, created_at)
       select ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10 where (select count(*) from alerts_subscriptions where wallet = ?2) < 10
       returning *`, crypto.randomUUID(), wallet, signatureHash, JSON.stringify(settings.triggers), settings.participation,
-    settings.missed, JSON.stringify(settings.channel), linkHash, iso(now + LINK), iso(now))
+    settings.missed, JSON.stringify(settings.channel), linkHash, iso(now + LINK_START_WINDOW), iso(now))
     if (!row) throw new Error("Subscription limit reached")
     return subscription(row)
   }
@@ -146,9 +147,12 @@ export class Database {
     return (await this.all<SubscriptionRow>("select * from alerts_subscriptions where status != 'expired' and id > ? order by id limit ?",
       after, limit)).map(subscription)
   }
-  async linkTelegram(linkHash: string, chat: string): Promise<boolean> {
+  /** `sentAt` is when Telegram received /start. A time after now is treated as now. */
+  async linkTelegram(linkHash: string, chat: string, sentAt = Date.now()): Promise<boolean> {
+    const now = Date.now()
     return await this.run(`update alerts_subscriptions set telegram_chat = ?, link_hash = null, link_expires = null
-      where link_hash = ? and link_expires > ? and json_extract(channel, '$.kind') = 'telegram'`, chat, linkHash, iso(Date.now())) > 0
+      where link_hash = ? and link_expires > ? and link_expires > ? and json_extract(channel, '$.kind') = 'telegram'`,
+    chat, linkHash, iso(Math.min(sentAt, now)), iso(now - LINK_PROCESSING_GRACE)) > 0
   }
 
   /** Claims an event for delivery. A failed or abandoned claim can be taken again once its lease ends. */
@@ -237,7 +241,8 @@ export class Database {
     await this.batch([
       this.sql("delete from alerts_challenges where expires_at < ?", now),
       this.sql("delete from alerts_sessions where expires_at < ?", now),
-      this.sql("update alerts_subscriptions set link_hash = null, link_expires = null where link_expires < ?", now),
+      // Keep an expired code through the grace period: a /start sent in time may not be read yet.
+      this.sql("update alerts_subscriptions set link_hash = null, link_expires = null where link_expires < ?", iso(Date.parse(now) - LINK_PROCESSING_GRACE)),
       // Keep event keys while subscriptions exist, so that an unclaimed condition does not resend.
       this.sql("update alerts_deliveries set ack_hash = null, ack_expires = null where ack_expires < ?", now),
       // Thirteen months of aggregate availability evidence; no wallet or endpoint in this table.
