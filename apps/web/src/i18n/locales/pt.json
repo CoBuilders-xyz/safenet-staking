@@ -713,6 +713,8 @@
     "expired": "A entrega expirou. Exclua e assine novamente.",
     "unverified": "Assinado — entrega não verificada. A confirmação aparece quando uma notificação chega ao navegador ou você confirma no Telegram.",
     "unlinked": "Abra o link do Telegram e toque em Iniciar em dez minutos. Se perdeu o link, exclua e assine novamente.",
+    "telegramPending": "Aguardando a vinculação do Telegram. Depois de tocar em Iniciar, pode levar até 5 minutos.",
+    "telegramLinked": "Telegram vinculado. Os alertas chegam ao seu chat privado com o bot.",
     "delete": "Excluir assinatura",
     "linkTelegram": "Abrir Telegram e tocar em Iniciar",
     "chooseTriggers": "Escolha os gatilhos",

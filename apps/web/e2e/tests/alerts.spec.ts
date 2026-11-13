@@ -49,6 +49,8 @@ test("signs, selects all five triggers, links Telegram, shows unverified deliver
   await page.getByRole("button", { name: "Subscribe", exact: true }).click()
   await expect(page.getByText(/Subscribed — delivery unverified/)).toBeVisible()
   await expect(page.getByRole("link", { name: "Open Telegram and press Start" })).toHaveAttribute("href", /https:\/\/t.me\/test_bot/)
+  await expect(page.getByText("Waiting for the Telegram link. After you press Start, this can take up to 5 minutes.")).toBeVisible()
+  await expect(page.getByText("Telegram linked", { exact: false })).toHaveCount(0)
   expect(subscriptions[0]!.triggers).toHaveLength(5)
   expect(subscriptions[0]!.participation).toBe(80)
   expect(subscriptions[0]!.missed).toBe(4)
@@ -56,6 +58,19 @@ test("signs, selects all five triggers, links Telegram, shows unverified deliver
   expect(scan.violations.filter(v => v.impact === "serious" || v.impact === "critical")).toEqual([])
   await page.getByRole("button", { name: "Delete subscription" }).click()
   await expect(page.getByText("You have no alert subscriptions.")).toBeVisible()
+})
+
+test("a pending Telegram link turns into a linked confirmation while delivery stays unverified", async ({ connectedPage: page }) => {
+  const subscriptions = await service(page)
+  await page.goto("/#/alerts")
+  await page.getByRole("button", { name: "Sign to manage alerts" }).click()
+  await page.getByRole("button", { name: "Subscribe", exact: true }).click()
+  await expect(page.getByText("Waiting for the Telegram link. After you press Start, this can take up to 5 minutes.")).toBeVisible()
+  subscriptions[0]!.linked = true // The Worker's Cron run binds the chat; the page polls while the link is pending.
+  await expect(page.getByText("Telegram linked. Alerts go to your private chat with the bot.")).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText("Waiting for the Telegram link", { exact: false })).toHaveCount(0)
+  await expect(page.getByText("Open the Telegram link and press Start within ten minutes", { exact: false })).toHaveCount(0)
+  await expect(page.getByText(/Subscribed — delivery unverified/)).toBeVisible()
 })
 
 test("cleared thresholds do not invalidate a subscription after their triggers are removed", async ({ connectedPage: page }) => {

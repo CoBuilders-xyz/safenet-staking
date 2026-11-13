@@ -713,6 +713,8 @@
     "expired": "La entrega venció. Borrá la suscripción y suscribite otra vez.",
     "unverified": "Suscripto: entrega sin verificar. Se confirma cuando llega una notificación a este navegador o confirmás recepción en Telegram.",
     "unlinked": "Abrí el enlace de Telegram y pulsá Iniciar antes de diez minutos. Si perdiste el enlace, borrá y suscribite otra vez.",
+    "telegramPending": "Esperando la vinculación de Telegram. Después de pulsar Iniciar, puede tardar hasta 5 minutos.",
+    "telegramLinked": "Telegram vinculado. Las alertas llegan a tu chat privado con el bot.",
     "delete": "Borrar suscripción",
     "linkTelegram": "Abrir Telegram y pulsar Iniciar",
     "chooseTriggers": "Elegí los disparadores",

@@ -7,7 +7,7 @@ import { parseSiweMessage } from "viem/siwe"
 import { TestDatabase, noDatabase, at } from "./testing/database.js"
 import { challenge, authenticate } from "./auth.js"
 import { api } from "./api.js"
-import { digest, type Database, type SubscriptionSettings } from "./db.js"
+import { LINK_PROCESSING_GRACE, LINK_START_WINDOW, digest, type Database, type SubscriptionSettings } from "./db.js"
 import { poll, adapters } from "./poller.js"
 import { sendEvent, telegramUpdates } from "./delivery.js"
 import { initialChronology, foldChronology } from "./chronology.js"
@@ -79,6 +79,14 @@ test("API isolates wallets, refuses wrong origins, revokes deleted subscriptions
     assert.equal(list[0]!.participation, 75)
     assert.equal(list[0]!.channel, "telegram")
     for (const secret of ["signature_hash", "telegram_chat", "link_hash", "wallet"]) assert.equal(secret in list[0]!, false)
+    assert.equal(list[0]!.linked, false)
+    // After /start binds a chat, the list says linked, as a boolean, and still never the chat ID.
+    const code = new URL(telegramUrl).searchParams.get("start")!
+    assert.equal(await db.linkTelegram(await digest(code), "987654321987"), true)
+    const linked = (await (await request("/subscriptions")).json() as Record<string, unknown>[])[0]!
+    assert.equal(linked.linked, true)
+    assert.equal(linked.status, "unverified") // Linked is not delivery confirmation.
+    assert.equal(JSON.stringify(linked).includes("987654321987"), false)
     const other = await db.subscribe(CONTRACTS.staking.address.toLowerCase(), "other", telegram, "other")
     await request(`/subscriptions/${other.id}`, "DELETE")
     assert.ok(await row(db, other.id))
@@ -151,17 +159,77 @@ test("Telegram linking accepts a private initiated chat only; links expire and a
   try {
     const link = "x".repeat(43)
     const sub = await db.subscribe(account.address, "sig", telegram, await digest(link))
-    let privateChat = false
-    const transport: typeof fetch = async () => Response.json({ ok: true, result: [{ update_id: privateChat ? 2 : 1, message: { text: `/start ${link}`, chat: { id: 123, type: privateChat ? "private" : "group" } } }] })
+    let update: { update_id: number; message: { text: string; chat: { id: number; type: string } } } =
+      { update_id: 1, message: { text: `/start ${link}`, chat: { id: 123, type: "group" } } }
+    const sent: { chat_id: number; text: string }[] = []
+    const transport: typeof fetch = async (input, init) => {
+      if (String(input).endsWith("/sendMessage")) { sent.push(JSON.parse(String(init!.body))); return Response.json({ ok: true }) }
+      return Response.json({ ok: true, result: [update] })
+    }
     await telegramUpdates(db, env, transport)
     assert.equal((await row(db, sub.id))!.telegram_chat, null)
     assert.equal(await db.state("telegram_offset"), 2)
-    privateChat = true
+    update = { update_id: 2, message: { text: `/start ${"y".repeat(43)}`, chat: { id: 123, type: "private" } } }
+    await telegramUpdates(db, env, transport)
+    assert.equal((await row(db, sub.id))!.telegram_chat, null)
+    assert.equal(sent.length, 0) // An unknown code gets no reply.
+    update = { update_id: 3, message: { text: `/start ${link}`, chat: { id: 123, type: "private" } } }
     await telegramUpdates(db, env, transport)
     assert.equal((await row(db, sub.id))!.telegram_chat, "123")
+    assert.deepEqual(sent.map(m => m.chat_id), [123]) // Only the chat that was linked is confirmed.
+    assert.match(sent[0]!.text, /^Linked\./)
+    update = { update_id: 4, message: { text: `/start ${link}`, chat: { id: 456, type: "private" } } }
+    await telegramUpdates(db, env, transport)
+    assert.equal((await row(db, sub.id))!.telegram_chat, "123") // A reused code neither relinks nor replies.
+    assert.equal(sent.length, 1)
     assert.equal(await db.linkTelegram(await digest(link), "456"), false)
     await db.query("update alerts_subscriptions set link_hash = ?, link_expires = ? where id = ?", await digest(link), new Date(0).toISOString(), sub.id)
     assert.equal(await db.linkTelegram(await digest(link), "456"), false)
+  } finally { await db.close() }
+})
+
+test("a Start sent inside the ten-minute window links even when a busy poll delays the Cron run", async () => {
+  const db = await TestDatabase.create()
+  try {
+    const start = async (link: string, sentAgo: number, chat: number) => telegramUpdates(db, env, async input =>
+      String(input).endsWith("/sendMessage") ? Response.json({ ok: true })
+        : Response.json({ ok: true, result: [{ update_id: chat, message: { text: `/start ${link}`,
+          date: Math.floor((Date.now() - sentAgo) / 1000), chat: { id: chat, type: "private" } } }] }))
+    // Created 40 minutes ago, so the code expired 30 minutes ago.
+    const created = async (link: string) => {
+      const sub = await db.subscribe(account.address, "sig", telegram, await digest(link))
+      await db.query("update alerts_subscriptions set created_at = ?, link_expires = ? where id = ?", at(-40 * 60_000), at(-40 * 60_000 + LINK_START_WINDOW), sub.id)
+      return sub
+    }
+    const inTime = await created("a".repeat(43))
+    const late = await created("b".repeat(43))
+    await db.cleanup() // An expired code survives cleanup during the grace period.
+    await start("a".repeat(43), 40 * 60_000 - LINK_START_WINDOW + 2000, 101) // Sent at 9:58; read 30 minutes later.
+    await start("b".repeat(43), 40 * 60_000 - LINK_START_WINDOW - 2000, 102) // Sent at 10:02.
+    assert.equal((await row(db, inTime.id))!.telegram_chat, "101")
+    assert.equal((await row(db, late.id))!.telegram_chat, null)
+    // Past the grace period, a code sent in time is refused and cleanup removes it.
+    const stale = await created("c".repeat(43))
+    await db.query("update alerts_subscriptions set link_expires = ? where id = ?", at(-LINK_PROCESSING_GRACE - 1000), stale.id)
+    await start("c".repeat(43), LINK_PROCESSING_GRACE + 2 * 60_000, 103)
+    assert.equal((await row(db, stale.id))!.telegram_chat, null)
+    await db.cleanup()
+    assert.equal((await db.query<{ link_hash: string | null }>("select link_hash from alerts_subscriptions where id = ?", stale.id))[0]!.link_hash, null)
+  } finally { await db.close() }
+})
+
+test("a failed Telegram confirmation keeps the link and advances the offset", async () => {
+  const db = await TestDatabase.create()
+  try {
+    const link = "z".repeat(43)
+    const sub = await db.subscribe(account.address, "sig", telegram, await digest(link))
+    const transport: typeof fetch = async input => {
+      if (String(input).endsWith("/sendMessage")) throw new Error("Telegram unavailable")
+      return Response.json({ ok: true, result: [{ update_id: 7, message: { text: `/start ${link}`, chat: { id: 123, type: "private" } } }] })
+    }
+    await telegramUpdates(db, env, transport)
+    assert.equal((await row(db, sub.id))!.telegram_chat, "123")
+    assert.equal(await db.state("telegram_offset"), 8)
   } finally { await db.close() }
 })
 
@@ -352,7 +420,7 @@ test("cleanup removes expired authentication, links and receipts, and keeps thir
     await db.reserve(sub.id, "cooldown:1", "receipt")
     await challenge(db, env, origin, { wallet: account.address })
     await db.query("update alerts_challenges set expires_at = ?", at(-1000))
-    await db.query("update alerts_subscriptions set link_expires = ?", at(-1000))
+    await db.query("update alerts_subscriptions set link_expires = ?", at(-LINK_PROCESSING_GRACE - 1000)) // Expired and past the grace period.
     await db.query("update alerts_deliveries set ack_expires = ?", at(-1000))
     await db.query("insert into alerts_runs(started_at) values (?), (?)", at(-400 * 86_400_000), at(-380 * 86_400_000))
     await db.cleanup()

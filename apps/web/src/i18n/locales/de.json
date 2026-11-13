@@ -703,6 +703,8 @@
     "expired": "Zustellung abgelaufen. Lösche das Abonnement und abonniere erneut.",
     "unverified": "Abonniert — Zustellung unbestätigt. Bestätigung erfolgt nach Empfang im Browser oder deiner Empfangsbestätigung in Telegram.",
     "unlinked": "Öffne den Telegram-Link und drücke innerhalb von zehn Minuten Start. Bei verlorenem Link löschen und erneut abonnieren.",
+    "telegramPending": "Warte auf die Telegram-Verknüpfung. Nach dem Drücken von Start kann das bis zu 5 Minuten dauern.",
+    "telegramLinked": "Telegram verknüpft. Benachrichtigungen kommen in deinen privaten Chat mit dem Bot.",
     "delete": "Abonnement löschen",
     "linkTelegram": "Telegram öffnen und Start drücken",
     "chooseTriggers": "Auslöser wählen",

@@ -10,6 +10,7 @@ import type { Env, Subscription } from "./types.js"
 const wallet = CONTRACTS.safeToken.address
 const validator = CONTRACTS.staking.address
 const leaf = keccak256(encodePacked(["address", "uint256"], [wallet, 100n]))
+const finalizedHash = keccak256(encodePacked(["string"], ["finalized block 100"]))
 const env: Env = { APP_ORIGIN: "https://app.test", DB: noDatabase,
   MAINNET_RPC_URL: "https://rpc.test", REWARDS_BASE_URL: "https://proof.test", SUBGRAPH_URL_MAINNET: "https://graph.test" }
 const sub: Subscription = { id: crypto.randomUUID(), wallet, triggers: ["cooldown", "rewards", "deregistered"], participation: 75, missed: 3,
@@ -29,8 +30,10 @@ function transport(options: { stale?: boolean; root?: Hex; claimed?: bigint; reg
       const body = JSON.parse(String(init!.body))
       assert.match(body.query, /registeredAtBlock firstSeenAtBlock/)
       assert.equal(body.variables.wallet, wallet.toLowerCase())
-      assert.equal(body.variables.block.number, 100)
-      return Response.json({ data: { _meta: { block: { number: 100, timestamp: options.stale ? 1 : timestamp }, hasIndexingErrors: false },
+      // graph-node returns a null _meta timestamp for a block pinned by number, and fills it by hash.
+      const byHash = body.variables.block.hash === finalizedHash
+      if (!byHash) assert.equal(body.variables.block.number, 100)
+      return Response.json({ data: { _meta: { block: { number: 100, timestamp: byHash ? options.stale ? 1 : timestamp : null }, hasIndexingErrors: false },
         delegations: [{ id: "position", validator: { id: validator, registeredAtBlock: options.registeredAtBlock === undefined ? "80" : options.registeredAtBlock,
           firstSeenAtBlock: options.firstSeenAtBlock ?? "70",
           lastUpdatedAtBlock: options.lastUpdatedAtBlock ?? "90" } }] } })
@@ -41,7 +44,7 @@ function transport(options: { stale?: boolean; root?: Hex; claimed?: bigint; reg
     if (request.method === "eth_chainId") result = numberToHex(options.wrongChain ? CHAINS.gnosis.id : CHAINS.mainnet.id)
     else if (request.method === "eth_getBlockByNumber") {
       assert.equal(request.params[0], "finalized")
-      result = { number: numberToHex(100), timestamp: numberToHex(timestamp), transactions: [] }
+      result = { number: numberToHex(100), hash: finalizedHash, timestamp: numberToHex(timestamp), transactions: [] }
     } else if (request.method === "eth_call") {
       assert.equal(request.params[1], numberToHex(100))
       const data = request.params[0].data as Hex
@@ -75,6 +78,18 @@ test("sources use one finalized block; cooldown boundaries, real Merkle proof an
     assert.equal(events[0]!.key, "cooldown:1")
     assert.match(events[2]!.key, /:80$/)
     assert.deepEqual(validators, [validator])
+  } finally { mocked.mock.restore() }
+})
+test("the delegation query pins the finalized block by hash, where graph-node returns the indexed timestamp", async () => {
+  // Pinned by number, graph-node answers _meta.block.timestamp: null; the mock does the same.
+  const mocked = transport()
+  try {
+    const { validators, failed } = await walletConditions(env, { ...sub, triggers: ["participation"] })
+    assert.deepEqual(validators, [validator])
+    assert.equal(failed, 0)
+    const graph = mocked.mock.calls.filter(call => String(call.arguments[0]).startsWith("https://graph.test"))
+    assert.equal(graph.length, 1)
+    assert.deepEqual(JSON.parse(String(graph[0]!.arguments[1]!.body)).variables.block, { hash: finalizedHash })
   } finally { mocked.mock.restore() }
 })
 test("stale roots, fully claimed rewards, zero stakes and registered validators cannot produce false alerts", async () => {

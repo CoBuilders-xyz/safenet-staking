@@ -25,6 +25,8 @@
     "subscriptions": "Your subscriptions",
     "telegram": "Telegram",
     "telegramHelp": "After saving, link your private Telegram chat. We send only to the chat you link.",
+    "telegramLinked": "Telegram linked. Alerts go to your private chat with the bot.",
+    "telegramPending": "Waiting for the Telegram link. After you press Start, this can take up to 5 minutes.",
     "threshold": "Participation threshold (%)",
     "title": "Alerts",
     "unavailable": "Alerts are not configured on this deployment. Your wallet remains connected.",
