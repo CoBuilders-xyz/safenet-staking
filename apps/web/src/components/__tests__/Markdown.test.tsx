@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { Markdown } from "../Markdown"
@@ -42,5 +42,23 @@ describe("Markdown", () => {
     expect(screen.queryByRole("link")).toBeNull()
     expect(container.textContent).toContain('<img src=x onerror="alert(1)">')
     expect(container.textContent).toContain("[x](javascript:alert(1))")
+  })
+
+  it("sends a link to a legal page to the operator's own document when its URL is set", async () => {
+    vi.stubEnv("VITE_TERMS_URL", "https://example.com/terms")
+    vi.resetModules()
+    const { Markdown: Fresh } = await import("../Markdown")
+    render(
+      <MemoryRouter>
+        <Fresh blocks={parseMarkdown("[Terms](#/terms) and [Privacy](#/privacy) and [Rewards](#/rewards)").blocks} />
+      </MemoryRouter>,
+    )
+    vi.unstubAllEnvs()
+
+    const terms = screen.getByRole("link", { name: "Terms" })
+    expect(terms).toHaveAttribute("href", "https://example.com/terms")
+    expect(terms).toHaveAttribute("target", "_blank")
+    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy")
+    expect(screen.getByRole("link", { name: "Rewards" })).toHaveAttribute("href", "/rewards")
   })
 })

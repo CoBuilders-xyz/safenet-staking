@@ -200,7 +200,8 @@ export function ConnectButton() {
                 className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none transition-colors text-left"
                 onClick={() => {
                   setMenuOpen(false)
-                  connect({ connector })
+                  // Asked again here: the acceptance can end while the menu is open, in another tab.
+                  underTerms(() => connect({ connector }))
                 }}
               >
                 {connector.icon && (

@@ -93,9 +93,18 @@ test.describe("Navigation", () => {
       await expect(page.getByText("Last updated: 13 November 2026")).toBeVisible()
     }
 
-    // A link inside a text stays in the app.
-    await page.getByRole("main").getByRole("link", { name: "Terms of use" }).first().click()
-    await expect(page).toHaveURL("/#/terms")
-    await expect(page.getByRole("heading", { level: 1, name: "Terms of use" })).toBeVisible()
+    // A link inside a text follows the same rule: the terms go to the URL that is set, and a
+    // page with no URL set stays in the app.
+    const inText = page.getByRole("main")
+    await expect(inText.getByRole("link", { name: "Terms of use" }).first()).toHaveAttribute("href", "https://terms.test")
+    await inText.getByRole("link", { name: "Privacy policy" }).first().click()
+    await expect(page).toHaveURL("/#/privacy")
+    await expect(page.getByRole("heading", { level: 1, name: "Privacy policy" })).toBeVisible()
+
+    // The skip link moves focus to the text and leaves the route alone.
+    await page.getByRole("link", { name: "Skip to main content" }).focus()
+    await page.keyboard.press("Enter")
+    await expect(page.locator("main")).toBeFocused()
+    await expect(page).toHaveURL("/#/privacy")
   })
 })

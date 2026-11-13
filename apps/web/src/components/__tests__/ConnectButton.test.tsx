@@ -245,4 +245,20 @@ describe("ConnectButton, before the terms are accepted", () => {
     await userEvent.click(screen.getByRole("menuitem", { name: "WalletConnect" }))
     expect(mockConnect.mock.calls[0]![0]).toEqual({ connector: connectors[1] })
   })
+
+  it("asks again at the wallet menu when the acceptance ended while the menu was open", async () => {
+    mockUseConnect.mockReturnValue({ connect: mockConnect, connectors, error: null })
+    acceptTerms()
+    renderButton()
+    await userEvent.click(screen.getByRole("button", { name: "Connect Wallet" }))
+    expect(screen.getByRole("menu")).toBeInTheDocument()
+
+    // Another tab cleared the record.
+    localStorage.removeItem(TERMS_ACCEPTANCE_STORAGE_KEY)
+    window.dispatchEvent(new StorageEvent("storage", { key: TERMS_ACCEPTANCE_STORAGE_KEY }))
+    await userEvent.click(screen.getByRole("menuitem", { name: "WalletConnect" }))
+
+    expect(mockConnect).not.toHaveBeenCalled()
+    expect(await screen.findByRole("dialog", { name: "Before you connect" })).toBeInTheDocument()
+  })
 })

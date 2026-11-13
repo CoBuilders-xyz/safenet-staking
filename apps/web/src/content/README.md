@@ -75,6 +75,6 @@ translated note that says so. A translation needs its own files and a change in
 
 ## Another operator
 
-`VITE_TERMS_URL`, `VITE_PRIVACY_URL` and `VITE_IMPRINT_URL` replace the in-app page in the footer
-link and in the terms link on My stake. The operator's name is `OPERATOR_NAME` in
-`src/config/legal.ts`.
+`VITE_TERMS_URL`, `VITE_PRIVACY_URL` and `VITE_IMPRINT_URL` replace the in-app page in every link
+to it: the footer, the dialog that asks for the terms, the notices on the pages, and the links
+inside these texts. The operator's name is `OPERATOR_NAME` in `src/config/legal.ts`.

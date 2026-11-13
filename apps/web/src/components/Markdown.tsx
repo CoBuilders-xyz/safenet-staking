@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { Link } from "react-router-dom"
+import { LEGAL_URL_OVERRIDES, contentPageAt } from "@/config/legal"
 import type { Block, Inline } from "@/lib/markdown"
 
 const linkClass = "underline underline-offset-2 hover:text-primary transition-colors"
@@ -15,13 +16,18 @@ function renderInline(nodes: Inline[]): ReactNode[] {
         return <strong key={index} className="font-semibold">{renderInline(node.children)}</strong>
       case "em":
         return <em key={index}>{renderInline(node.children)}</em>
-      case "link":
+      case "link": {
         // `#/terms` is a route of this app. Every other address the parser lets through is absolute.
-        return node.href.startsWith("#/") ? (
-          <Link key={index} to={node.href.slice(1)} className={linkClass}>{renderInline(node.children)}</Link>
+        const route = node.href.startsWith("#/") ? node.href.slice(1) : undefined
+        // An operator's own document replaces the in-app page here too, as in every other link to it.
+        const page = route === undefined ? undefined : contentPageAt(route)
+        const href = (page && LEGAL_URL_OVERRIDES[page]) ?? (route === undefined ? node.href : undefined)
+        return href === undefined ? (
+          <Link key={index} to={route!} className={linkClass}>{renderInline(node.children)}</Link>
         ) : (
-          <a key={index} href={node.href} target="_blank" rel="noopener noreferrer" className={linkClass}>{renderInline(node.children)}</a>
+          <a key={index} href={href} target="_blank" rel="noopener noreferrer" className={linkClass}>{renderInline(node.children)}</a>
         )
+      }
     }
   })
 }
