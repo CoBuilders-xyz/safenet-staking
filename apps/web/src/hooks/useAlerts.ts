@@ -41,7 +41,9 @@ export function useAlerts(address: Address) {
   const token = session?.token
   const subscriptions = useQuery({
     queryKey: ["alerts", address, token], enabled: !!token, retry: false, gcTime: 0,
-    queryFn: () => alertRequest<AlertSubscription[]>("/subscriptions", token), refetchInterval: 15_000,
+    queryFn: () => alertRequest<AlertSubscription[]>("/subscriptions", token),
+    // The Worker links a Telegram chat on its next Cron run, so poll faster while a link is pending.
+    refetchInterval: query => query.state.data?.some(sub => sub.channel === "telegram" && !sub.linked) ? 10_000 : 15_000,
   })
   const sign = async () => {
     let pending = pendingSignature.current

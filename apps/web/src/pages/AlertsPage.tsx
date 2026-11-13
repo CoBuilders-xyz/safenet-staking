@@ -62,9 +62,11 @@ function ConnectedAlerts({ address }: { address: Address }) {
         {alerts.subscriptions.data.map(sub => <article key={sub.id} className="rounded-lg border p-4 space-y-3">
           <p className="font-medium">{sub.channel === "telegram" ? t("alerts.telegram", "Telegram") : t("alerts.browser", "Browser notifications")}</p>
           <ul className="list-disc pl-5">{sub.triggers.map(trigger => <li key={trigger}>{labels[trigger]}{trigger === "participation" ? ` (${new Intl.NumberFormat(currentLanguage(), { style: "percent", maximumFractionDigits: 1 }).format(sub.participation / 100)})` : trigger === "missed" ? ` (${sub.missed.toLocaleString(currentLanguage())})` : ""}</li>)}</ul>
+          {sub.channel === "telegram" && <p role="status" className="font-medium">{sub.linked
+            ? t("alerts.telegramLinked", "Telegram linked. Alerts go to your private chat with the bot.")
+            : t("alerts.telegramPending", "Waiting for the Telegram link. After you press Start, this can take up to 5 minutes.")}</p>}
           <p role="status">{sub.status === "verified" ? t("alerts.verified", "Delivery confirmed") : sub.status === "expired" ? t("alerts.expired", "Delivery expired. Delete and subscribe again.") : t("alerts.unverified", "Subscribed — delivery unverified. Confirmation appears after a notification reaches this browser or you confirm receipt in Telegram.")}</p>
           {!sub.linked && <p>{t("alerts.unlinked", "Open the Telegram link and press Start within ten minutes. If the link is lost, delete and subscribe again.")}</p>}
-          {!sub.linked && <p>{t("alerts.linkDelay", "After you press Start, linking can take up to 5 minutes. The bot then confirms in the chat.")}</p>}
           <Button variant="outline" disabled={busy} onClick={() => void run(() => alerts.remove(sub.id))}>{t("alerts.delete", "Delete subscription")}</Button>
         </article>)}
       </section>}
