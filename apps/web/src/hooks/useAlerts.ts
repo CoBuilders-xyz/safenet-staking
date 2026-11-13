@@ -98,7 +98,11 @@ export function linkPending(sub: AlertSubscription, now: number): boolean {
   return sub.channel === "telegram" && !sub.linked && sub.status !== "expired" && !!sub.linkExpiresAt && Date.parse(sub.linkExpiresAt) > now
 }
 
+/** Registers this browser for push. A browser failure with no cause of its own is reported as "push". */
 export async function browserChannel(vapidKey: string) {
+  try { return await registerBrowser(vapidKey) } catch (error) { throw error instanceof AlertError ? error : new AlertError("push") }
+}
+async function registerBrowser(vapidKey: string) {
   if (!isSecureContext || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) throw new AlertError("unsupported")
   if (await Notification.requestPermission() !== "granted") throw new AlertError("permission")
   const base = import.meta.env.BASE_URL

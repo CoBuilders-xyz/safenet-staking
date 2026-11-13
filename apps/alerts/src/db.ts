@@ -221,6 +221,12 @@ export class Database {
     return received!.meta.changes > 0
   }
 
+  /** Whether this receipt was already recorded for a subscription linked to `chat`. */
+  async receiptRecorded(ackHash: string, chat: string): Promise<boolean> {
+    return (await this.all(`select 1 from alerts_deliveries where ack_hash = ? and state = 'received'
+      and subscription in (select id from alerts_subscriptions where telegram_chat = ?) limit 1`, ackHash, chat)).length > 0
+  }
+
   async state<T>(key: string): Promise<T | undefined> {
     const rows = await this.all<{ value: string }>("select value from alerts_state where key = ? order by part", key)
     return rows.length ? JSON.parse(rows.map(row => row.value).join("")) as T : undefined

@@ -90,20 +90,28 @@ export function parseStart(text: string, botName?: string): StartCommand | null 
   if (!argument) return { kind: "bare" }
   return /^[\w-]{43}$/.test(argument) ? { kind: "code", code: argument } : { kind: "invalid" }
 }
-/** Guidance replies sent in one poll. A poll reads at most 100 updates, and each reply can take ten seconds. */
+/** All best-effort Telegram replies of one poll together. The poll itself may run for ten minutes. */
+const REPLY_BUDGET = 30_000
+const RECEIPT_NOTE = "Receipt confirmed."
+/** Guidance replies sent in one poll. A poll reads at most 100 updates. */
 const GUIDANCE_PER_POLL = 20
 /** Aggregate counts of one Telegram poll. No chat, code or text. */
 export interface TelegramCounts { updates: number; linked: number; startBare: number; startRejected: number; receipts: number; replyFailures: number }
 
 export async function telegramUpdates(db: Database, env: Env, transport: typeof fetch = fetch): Promise<TelegramCounts | undefined> {
   if (!env.TELEGRAM_BOT_TOKEN) return
-  const call = (method: string, body: unknown) => transport(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(10_000), body: JSON.stringify(body),
+  const call = (method: string, body: unknown, timeout = 10_000) => transport(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(timeout), body: JSON.stringify(body),
   })
   const counts: TelegramCounts = { updates: 0, linked: 0, startBare: 0, startRejected: 0, receipts: 0, replyFailures: 0 }
-  // Replies and message edits are best effort: a failed one never undoes a link or a receipt.
+  // Replies, answers and message edits are best effort: a failed one never undoes a link or a
+  // receipt. They share one time budget, so a slow Telegram cannot hold back the deliveries that
+  // follow this poll. Past the budget, updates are still read and recorded, without replies.
+  const replyDeadline = Date.now() + REPLY_BUDGET
   const attempt = async (method: string, body: unknown) => {
-    try { if (!(await call(method, body)).ok) counts.replyFailures++ } catch { counts.replyFailures++ /* Never log provider URLs or bodies. */ }
+    const left = replyDeadline - Date.now()
+    if (left <= 0) { counts.replyFailures++; return }
+    try { if (!(await call(method, body, Math.min(left, 5000))).ok) counts.replyFailures++ } catch { counts.replyFailures++ /* Never log provider URLs or bodies. */ }
   }
   let page: string | undefined
   try { page = `${allowedOrigins(env)[0]}/#/alerts` } catch { /* The replies then name the page without a link. */ }
@@ -155,16 +163,23 @@ export async function telegramUpdates(db: Database, env: Env, transport: typeof 
     const callback = update.callback_query
     if (callback?.data && /^[\w-]{43}$/.test(callback.data) && callback.message?.chat.type === "private") {
       // The random capability can acknowledge only its own event, and only from its bound chat.
-      const received = await db.acknowledge(await digest(callback.data), String(callback.message.chat.id))
+      const hash = await digest(callback.data), chat = String(callback.message.chat.id)
+      const received = await db.acknowledge(hash, chat)
       if (received) counts.receipts++
+      // A button still on the message means the edit below did not reach it, so a later press of a
+      // receipt this chat already confirmed writes the confirmation again.
+      const confirmed = received || await db.receiptRecorded(hash, chat)
       // Telegram stops waiting for this answer after a few seconds, and a Cron run can come minutes
       // later. So the confirmation is also written into the message, where it stays visible.
-      try {
-        await call("answerCallbackQuery", { callback_query_id: callback.id, text: received ? "Receipt confirmed." : "This receipt was already confirmed or has expired." })
-      } catch { /* Telegram refuses a late answer; the receipt is already recorded. */ }
-      if (received && callback.message.message_id !== undefined && callback.message.text) {
-        await attempt("editMessageText", { chat_id: callback.message.chat.id, message_id: callback.message.message_id,
-          text: `${callback.message.text}\n\nReceipt confirmed.` })
+      // Telegram refuses a late answer; that is expected, so it is not counted as a failed reply.
+      if (Date.now() < replyDeadline) {
+        try {
+          await call("answerCallbackQuery", { callback_query_id: callback.id, text: confirmed ? "Receipt confirmed." : "This receipt has expired." }, 5000)
+        } catch { /* The receipt is already recorded. */ }
+      }
+      const text = callback.message.text
+      if (confirmed && callback.message.message_id !== undefined && text && !text.endsWith(RECEIPT_NOTE)) {
+        await attempt("editMessageText", { chat_id: callback.message.chat.id, message_id: callback.message.message_id, text: `${text}\n\n${RECEIPT_NOTE}` })
       }
     }
     await db.saveState("telegram_offset", update.update_id + 1)
