@@ -12,6 +12,7 @@
     "error": "Could not complete the request. Check delivery permissions, retry, or sign again if your session expired. Safe signatures require threshold approval.",
     "expired": "Delivery expired. Delete and subscribe again.",
     "intro": "Choose wallet alerts. Sign a message to manage subscriptions. No account or custody is required.",
+    "linkDelay": "After you press Start, linking can take up to 5 minutes. The bot then confirms in the chat.",
     "linkTelegram": "Open Telegram and press Start",
     "loading": "Loading alerts…",
     "missed": "Consecutive missed signing rounds",

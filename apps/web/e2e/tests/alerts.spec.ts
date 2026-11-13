@@ -49,6 +49,7 @@ test("signs, selects all five triggers, links Telegram, shows unverified deliver
   await page.getByRole("button", { name: "Subscribe", exact: true }).click()
   await expect(page.getByText(/Subscribed — delivery unverified/)).toBeVisible()
   await expect(page.getByRole("link", { name: "Open Telegram and press Start" })).toHaveAttribute("href", /https:\/\/t.me\/test_bot/)
+  await expect(page.getByText("After you press Start, linking can take up to 5 minutes. The bot then confirms in the chat.")).toBeVisible()
   expect(subscriptions[0]!.triggers).toHaveLength(5)
   expect(subscriptions[0]!.participation).toBe(80)
   expect(subscriptions[0]!.missed).toBe(4)

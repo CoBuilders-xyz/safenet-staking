@@ -713,6 +713,7 @@
     "expired": "La livraison a expiré. Supprimez l’abonnement et réabonnez-vous.",
     "unverified": "Abonné — livraison non vérifiée. La confirmation apparaît après réception dans ce navigateur ou confirmation dans Telegram.",
     "unlinked": "Ouvrez le lien Telegram et appuyez sur Démarrer dans les dix minutes. Lien perdu ? Supprimez et réabonnez-vous.",
+    "linkDelay": "Après avoir appuyé sur Démarrer, la liaison peut prendre jusqu’à 5 minutes. Le bot confirme ensuite dans la conversation.",
     "delete": "Supprimer l’abonnement",
     "linkTelegram": "Ouvrir Telegram et appuyer sur Démarrer",
     "chooseTriggers": "Choisissez les déclencheurs",
