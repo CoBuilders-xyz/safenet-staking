@@ -244,8 +244,8 @@ test("the bot answers every private /start, once per chat per poll, and reads Te
     updates = [message(12, `/start ${link}`, 11)] // The same link opened again.
     await telegramUpdates(db, env, transport)
     assert.deepEqual(sent.map(m => m.text), [
-      "This chat receives Safenet alerts. Manage them at https://app.test/#/alerts.",
-      "This link has expired or was already used. This chat already receives Safenet alerts. Manage them at https://app.test/#/alerts.",
+      "This chat is linked to Safenet alerts. Manage them at https://app.test/#/alerts.",
+      "This link has expired or was already used. This chat is already linked to Safenet alerts. Manage them at https://app.test/#/alerts. For a subscription that is not connected yet, press \"Get a new Telegram link\" there.",
     ])
     // A client that sends the same /start twice in one poll gets "Linked." once, and no rejection after it.
     const again = "m".repeat(43)

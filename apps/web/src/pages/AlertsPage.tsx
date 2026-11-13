@@ -70,7 +70,7 @@ function ConnectedAlerts({ address }: { address: Address }) {
       {subscriptions?.length === 0 && <p>{t("alerts.empty", "You have no alert subscriptions.")}</p>}
       {!!subscriptions?.length && <section aria-label={t("alerts.subscriptions", "Your subscriptions")} className="space-y-4">
         {subscriptions.map(sub => <SubscriptionCard key={sub.id} sub={sub} linkUrl={links[sub.id]} focusLink={created === sub.id}
-          maxSubscriptions={maxSubscriptions} actions={alerts} onLink={(id, url) => setLinks(known => ({ ...known, [id]: url }))}
+          maxSubscriptions={maxSubscriptions} actions={alerts} onLink={(id, url) => { setLinks(known => ({ ...known, [id]: url })); void alerts.refresh() }}
           triggers={<ul className="list-disc pl-5">{sub.triggers.map(trigger => <li key={trigger}>{labels[trigger]}{trigger === "participation" ? ` (${new Intl.NumberFormat(currentLanguage(), { style: "percent", maximumFractionDigits: 1 }).format(sub.participation / 100)})` : trigger === "missed" ? ` (${sub.missed.toLocaleString(currentLanguage())})` : ""}</li>)}</ul>} />)}
       </section>}
       <form onSubmit={save} className="space-y-5">

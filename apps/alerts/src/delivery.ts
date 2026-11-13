@@ -107,7 +107,7 @@ export async function telegramUpdates(db: Database, env: Env, transport: typeof 
   // Replies, answers and message edits are best effort: a failed one never undoes a link or a
   // receipt. They share one time budget, so a slow Telegram cannot hold back the deliveries that
   // follow this poll. Past the budget, updates are still read and recorded, without replies.
-  const replyDeadline = Date.now() + REPLY_BUDGET
+  let replyDeadline = Date.now() + REPLY_BUDGET
   const attempt = async (method: string, body: unknown) => {
     const left = replyDeadline - Date.now()
     if (left <= 0) { counts.replyFailures++; return }
@@ -121,14 +121,15 @@ export async function telegramUpdates(db: Database, env: Env, transport: typeof 
   const guidance = {
     bare: `This bot sends Safenet alerts. ${where}, subscribe with Telegram, and use the link it shows. The link opens this chat with a one-time code.`,
     rejected: `This link has expired or was already used. ${where} and press "Get a new Telegram link".`,
-    bareLinked: `This chat receives Safenet alerts. ${manage}.`,
-    rejectedLinked: `This link has expired or was already used. This chat already receives Safenet alerts. ${manage}.`,
+    bareLinked: `This chat is linked to Safenet alerts. ${manage}.`,
+    rejectedLinked: `This link has expired or was already used. This chat is already linked to Safenet alerts. ${manage}. For a subscription that is not connected yet, press "Get a new Telegram link" there.`,
   }
   const offset = await db.state<number>("telegram_offset")
   const response = await call("getUpdates", { offset: offset ?? 0, limit: 100, timeout: 0, allowed_updates: ["message", "callback_query"] })
   if (!response.ok) throw new Error("Telegram polling unavailable")
   const data = await response.json() as { ok: boolean; result: TelegramUpdate[] }
   if (!data.ok) throw new Error("Telegram polling unavailable")
+  replyDeadline = Date.now() + REPLY_BUDGET // The budget is for the replies, not for reading the updates.
   // One guidance reply per chat per poll, and GUIDANCE_PER_POLL in all, so repeated /start cannot
   // make the Worker send in bulk or hold back the deliveries that follow this poll.
   const guided = new Set<number>()

@@ -83,12 +83,20 @@ export function useAlerts(address: Address) {
   }
   const refresh = () => client.invalidateQueries({ queryKey: ["alerts", address] })
   const remove = async (id: string) => { await alertRequest(`/subscriptions/${id}`, token, undefined, "DELETE"); await refresh() }
-  const action = async <T,>(id: string, name: "telegram-link" | "pause" | "resume" | "test") => {
-    // A refusal can mean the list is out of date (already linked, expired, deleted), so refresh either way.
-    try { return await alertRequest<T>(`/subscriptions/${id}/${name}`, token, undefined, "POST") } finally { await refresh() }
+  const action = async <T,>(id: string, name: "telegram-link" | "pause" | "resume" | "test", refreshAfter = true) => {
+    // A refusal can mean the list is out of date (already linked, expired, deleted), so refresh then too.
+    let failed = true
+    try {
+      const answer = await alertRequest<T>(`/subscriptions/${id}/${name}`, token, undefined, "POST")
+      failed = false
+      return answer
+    } finally { if (failed || refreshAfter) await refresh() }
   }
-  /** A new Telegram link for a subscription that has no chat yet. It replaces the previous link. */
-  const newLink = (id: string) => action<{ telegramUrl: string; expiresAt: string }>(id, "telegram-link")
+  /**
+   * A new Telegram link for a subscription that has no chat yet. It replaces the previous link.
+   * The caller stores the link and then refreshes, so the card never pairs the new expiry with an old link.
+   */
+  const newLink = (id: string) => action<{ telegramUrl: string; expiresAt: string }>(id, "telegram-link", false)
   const sendTest = (id: string) => action<{ sent: true }>(id, "test")
   const setPaused = (id: string, paused: boolean) => action<{ paused: boolean }>(id, paused ? "pause" : "resume")
   return { config, subscriptions, token, sign, refresh, remove, newLink, sendTest, setPaused, pendingVerification }
