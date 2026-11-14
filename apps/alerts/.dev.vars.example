@@ -15,6 +15,8 @@ APP_ORIGINS=http://localhost:5173,https://safenet.cobuilders.eth.limo,https://sa
 # REWARDS_BASE_URL=
 # TELEGRAM_BOT_TOKEN=
 # TELEGRAM_BOT_NAME=
+# 32 to 256 characters of A-Z, a-z, 0-9, _ and -. Telegram sends it with every webhook request.
+# TELEGRAM_WEBHOOK_SECRET=
 # VAPID_PUBLIC_KEY=
 # VAPID_PRIVATE_KEY=
 # VAPID_SUBJECT=

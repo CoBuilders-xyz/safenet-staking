@@ -161,7 +161,7 @@ test("archive write failure rolls back deletions and checkpoint, and the poller 
     await db.subscribe(staker, "test", { triggers: ["missed", "participation"], missed: 1, participation: 100,
       channel: { kind: "push", endpoint: "https://fcm.googleapis.com/test", keys: {} } }, "test")
     let sent = 0
-    await poll(env, db, { ...adapters, telegramUpdates: async () => {},
+    await poll(env, db, { ...adapters, webhookHealth: async () => {},
       walletConditions: async () => ({ events: [], validators: [CONTRACTS.staking.address], failed: 0 }),
       advanceChronology: async (_env, state, database, owner) => ({ current: true, time: now,
         state: await persistChronologyBatch(database, owner, state, [

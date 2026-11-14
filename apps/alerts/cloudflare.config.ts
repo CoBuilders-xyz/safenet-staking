@@ -24,6 +24,8 @@ export default defineConfig({
       APP_ORIGINS: bindings.secret(),
       MAINNET_RPC_URL: bindings.secret(), GNOSIS_RPC_URL: bindings.secret(), GRAPH_API_KEY: bindings.secret(),
       TELEGRAM_BOT_TOKEN: bindings.secret(), TELEGRAM_BOT_NAME: bindings.secret(),
+      // What Telegram sends with each update to POST /telegram/webhook, as given to setWebhook.
+      TELEGRAM_WEBHOOK_SECRET: bindings.secret(),
       VAPID_PUBLIC_KEY: bindings.secret(), VAPID_PRIVATE_KEY: bindings.secret(), VAPID_SUBJECT: bindings.secret(),
     },
   },

@@ -1,16 +1,17 @@
 import { Database } from "./db.js"
 import { initialChronology, memberCondition, type Chronology } from "./chronology.js"
 import { advanceChronology, walletConditions, type Condition } from "./sources.js"
-import { sendEvent, telegramUpdates, type TelegramCounts } from "./delivery.js"
+import { sendEvent } from "./delivery.js"
+import { webhookHealth, type WebhookHealth } from "./telegram.js"
 import type { Env } from "./types.js"
 
 export interface Adapters {
   advanceChronology: typeof advanceChronology
   walletConditions: typeof walletConditions
   sendEvent: typeof sendEvent
-  telegramUpdates: (db: Database, env: Env) => Promise<TelegramCounts | undefined | void>
+  webhookHealth: (env: Env) => Promise<WebhookHealth | undefined | void>
 }
-export const adapters: Adapters = { advanceChronology, walletConditions, sendEvent, telegramUpdates }
+export const adapters: Adapters = { advanceChronology, walletConditions, sendEvent, webhookHealth }
 export async function poll(env: Env, db = new Database(env.DB), io: Adapters = adapters) {
   const holder = crypto.randomUUID()
   if (!await db.lockRun(holder)) return
@@ -19,10 +20,14 @@ export async function poll(env: Env, db = new Database(env.DB), io: Adapters = a
   let evaluated = 0, accepted = 0, failed = 0
   try {
     await db.startRun(started)
-    // A Telegram outage must not prevent delivery to already subscribed browsers.
-    // Keep the run unhealthy so the failed linking/receipt poll remains visible.
-    let telegram: TelegramCounts | undefined | void
-    try { telegram = await io.telegramUpdates(db, env) } catch { failed++ }
+    // Telegram pushes /start and receipts to the webhook; this run only checks that they arrive.
+    // A webhook that is not registered, or whose deliveries fail, stops every new link, so it keeps
+    // the run unhealthy. It never prevents delivery to subscriptions that are already connected.
+    let telegram: WebhookHealth | undefined | void
+    try {
+      telegram = await io.webhookHealth(env)
+      if (telegram && (!telegram.registered || telegram.failing)) failed++
+    } catch { failed++ }
     let chronology: Awaited<ReturnType<typeof advanceChronology>> | undefined
     let chronologyFailed = false
     let cursor = await db.state<string>("subscription_cursor") ?? ""

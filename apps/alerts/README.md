@@ -21,7 +21,8 @@ pnpm check
 `test` applies the migrations to a fresh D1 database in workerd, through Miniflare, for each test.
 No query is mocked. It verifies real EOA signatures,
 atomic nonce consumption, expiry, wallet isolation, role restrictions, notification deduplication,
-private Telegram linking, chronological misses and Web Push payload decryption.
+private Telegram linking through the webhook, its secret check and its handling of repeated updates,
+chronological misses and Web Push payload decryption.
 `test` also runs `test:runtime`, which builds with `cf` and runs the artifact in workerd, with isolated mock providers.
 The web E2E tests mock the alert API and wallet. These tests do **not** prove real delivery,
 real Safe threshold signing, a deployed D1 database, or fork-triggered acceptance.
@@ -85,7 +86,8 @@ source files, logs or browser variables:
 | `GRAPH_API_KEY` | The Graph API key. Core derives the Mainnet Network gateway URL from it; a Studio development endpoint cannot support sustained subscription volume. |
 | `SUBGRAPH_URL_MAINNET` | Optional. Overrides the Mainnet subgraph URL derived from `GRAPH_API_KEY`. |
 | `REWARDS_BASE_URL` | Optional isolated-fork dataset override. Normally resolve the canonical ENS dataset, with core's repository fallback. |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_NAME` | A dedicated bot token and its username, without `@`. Do not reuse a bot consumed by another getUpdates poller or webhook. |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_NAME` | A dedicated bot token and its username, without `@`. A bot has one webhook: do not reuse a bot that another service reads. |
+| `TELEGRAM_WEBHOOK_SECRET` | What Telegram sends with every update, as given to `setWebhook`: 32 to 256 characters of `A-Z`, `a-z`, `0-9`, `_` and `-`. See [Telegram webhook](#telegram-webhook). |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Persistent matching VAPID keypair and valid `mailto:` or HTTPS contact. Keep the private key server-side. |
 
 ### Allowed origins
@@ -132,34 +134,90 @@ and mutation. The browser cannot supply a wallet owner for another wallet's subs
 
 Telegram subscription creation returns a single-use bot link. The interface asks the user to press
 Start within ten minutes. Only `/start <code>` in a private chat can bind the recipient;
-`/start@<bot> <code>`, any letter case and extra whitespace are read the same way. The Worker reads
-`/start` on a later Cron run: normally the next one, up to five minutes later, or later when a poll
-still holds the lease. So the ten minutes are checked against the time Telegram stamps on the
-`/start` message, not the time the Worker reads it. A code sent in time is honoured if the Worker
-reads it up to an hour after it expired; cleanup keeps it until then. The browser never supplies a
-chat ID.
+`/start@<bot> <code>`, any letter case and extra whitespace are read the same way. Telegram sends
+`/start` to the Worker's webhook at once, and the Worker links the chat in that same request, so the
+alerts page, which reads the list every 1.5 seconds while a link is pending, shows the connection
+within about two seconds. The ten minutes are checked against the time Telegram stamps on the
+`/start` message, not the time the Worker receives it: Telegram repeats a delivery that failed, so a
+code sent in time is honoured if it arrives up to an hour after it expired, and cleanup keeps it
+until then. The browser never supplies a chat ID.
 
-The bot answers every `/start` in a private chat. A code that links gets "Linked. Safenet alerts for
-this subscription will arrive in this chat." A bare `/start` gets a pointer to the Alerts page. An
-unknown, expired or reused code gets one neutral reply that says to get a new link, so the bot
-reveals nothing about codes. Guidance goes out once per chat per poll. Each reply is best effort: if
-Telegram refuses it, the link stays, and the alerts page shows the state. The bot never replies in a
-group, and the poller does not send to groups, unlinked subscriptions or arbitrary recipients.
+The bot answers every `/start` in a private chat, in the same request. A code that links gets
+"Linked. Safenet alerts for this subscription will arrive in this chat.", with a pointer back to the
+Alerts page. The same link opened again in the chat it linked gets "Already linked."; the Worker
+recognises it by the hash of the used code, which it keeps for an hour. A bare `/start` gets a
+pointer to the Alerts page. An unknown, expired or reused code gets one neutral reply that says to
+get a new link, so the bot reveals nothing about codes. Guidance replies are bounded to five per
+chat per minute; the count is kept under a keyed hash of the chat ID, never the ID. A link
+confirmation is not bounded, because a code works once. Each reply is best effort: if Telegram
+refuses it, the link stays, and the alerts page shows the state. The bot never replies in a group,
+and the poller does not send to groups, unlinked subscriptions or arbitrary recipients.
 
 `POST /subscriptions/:id/telegram-link` issues a new link for the wallet's own Telegram subscription
 that has no chat yet. It replaces the previous code, so a lost or expired link needs no new
 subscription. `POST /subscriptions/:id/pause` and `/resume` stop and restart evaluation; a condition
 that is still true after a resume is sent then. `POST /subscriptions/:id/test` sends one test
-message, at most one per minute: Telegram gets it without a receipt button, and a browser gets it
-with a receipt, so showing it confirms delivery. The list returns `linked`, `linkedAt`,
-`linkExpiresAt` and `paused`, never a chat ID or a code. An error answer carries a `code` beside its
-text, and the interface chooses its message from the code; the subscription limit answers 409
-`limit`. Browser endpoint validation allows known HTTPS push providers only and forbids credentials,
+message at once, at most one per subscription per minute: Telegram gets it without a receipt button,
+and a browser gets it with a receipt, so showing it confirms delivery. It answers
+`{ sent, retryAfter }`; inside the minute it answers 429 `rate` with `retryAfter`, the seconds left.
+The list returns `linked`, `linkedAt`, `linkExpiresAt`, `paused` and `testRetryAfter`, never a chat
+ID or a code. `testRetryAfter` is in seconds, not a time, because the browser's clock can differ
+from the Worker's. An error answer carries a `code` beside its text, and the interface chooses its
+message from the code; the subscription limit answers 409 `limit`.
+
+A wallet cannot hold the same alerts twice on the same destination: the same triggers, in any
+order, with the thresholds of the triggers that use one, on Telegram or on one browser endpoint.
+The second request answers 409 `duplicate`, and the check is part of the statement that inserts.
+A subscription that can no longer deliver does not count, so it can be replaced. Two browsers can
+hold the same alerts. Two Telegram chats cannot hold the same alerts for one wallet: the chat is
+not known when the subscription is created. Browser endpoint validation allows known HTTPS push providers only and forbids credentials,
 ports and redirects.
 
 Deleting a subscription removes its delivery token and event history through a foreign-key cascade.
 Expired authentication records are cleaned each poll. Operational run records contain only counts.
 The service worker caches only the API location, under its own deployment scope.
+
+## Telegram webhook
+
+Telegram pushes each update to `POST /telegram/webhook`. The Worker never calls `getUpdates`, and
+Telegram refuses that call while a webhook is registered.
+
+**What the endpoint accepts.** Telegram sends the secret given to `setWebhook` in the header
+`X-Telegram-Bot-Api-Secret-Token`. The Worker compares it with `TELEGRAM_WEBHOOK_SECRET` in constant
+time, on SHA-256 digests of both values, before it reads the body or the database. Anything else
+answers 401 with no body. Without a usable secret (32 to 256 characters of the allowed alphabet) or
+without a bot token, the endpoint answers 503 to every request, `/config` reports no Telegram bot,
+and the interface offers no Telegram subscription. The route has no CORS and needs no `Origin`.
+A body over 64 kB, or one that is not an update, answers 200 and is dropped, so Telegram does not
+send it again.
+
+**Repeated deliveries.** Telegram repeats an update until it gets a 2xx answer. The Worker claims
+each update by its `update_id` in `alerts_telegram_updates`: an update already handled answers 200
+and does nothing; one that another request still handles answers 503 with `Retry-After`; a claim
+left by a request that died is taken over after 60 seconds. If handling fails, the Worker gives the
+claim back and answers 500, and the next delivery is handled. Linking and receipts are idempotent,
+so a delivery repeated after a partial failure completes without a second link or receipt. Cleanup
+removes update IDs after two days. All Telegram calls of one update share eight seconds.
+
+**Commands.** `scripts/telegram-webhook.ts` holds the three operator commands. Each reads
+`TELEGRAM_BOT_TOKEN` from the environment, and `.env.local` at the repository root when it exists.
+None prints the token or the secret.
+
+```sh
+# Register <ALERTS_URL>/telegram/webhook. Also needs TELEGRAM_WEBHOOK_SECRET and ALERTS_URL.
+pnpm --filter @cobuilders/safenet-alerts telegram:webhook set
+# Print what Telegram holds: the URL, the update kinds, the updates waiting, the last error.
+pnpm --filter @cobuilders/safenet-alerts telegram:webhook info
+# Remove the webhook and keep the waiting updates, to go back to a Worker version that polls.
+pnpm --filter @cobuilders/safenet-alerts telegram:webhook delete
+```
+
+`set` sends `url`, `secret_token`, `allowed_updates=["message","callback_query"]` and
+`drop_pending_updates=true`, then reads the registration back and fails unless Telegram holds this
+URL. Dropped updates are `/start` messages sent while nothing listened; the alerts page offers a new
+link for those. `ALERTS_URL` is the Worker's origin, such as
+`https://safenet-alerts.<subdomain>.workers.dev`. `DEPLOY.md` has the order for production, where
+the deploy workflow can run `set` itself, and the rollback.
 
 ## Conditions and delivery semantics
 
@@ -216,20 +274,27 @@ acceptance can duplicate a message: providers do not offer an atomic transaction
 Expired push endpoints and blocked bots disable that subscription until the user recreates it.
 A provider success is **not** receipt confirmation. Browser confirmation follows `showNotification`;
 Telegram confirmation requires the recipient's inline button. Receipt capabilities expire after 24 hours.
-The Worker reads a button press on its next Cron run, after Telegram has stopped waiting for the
-answer. So it also writes "Receipt confirmed." into the message. A message that covers several
-events carries one receipt, recorded on the first of them.
+Telegram sends a button press to the webhook at once. The Worker records the receipt and calls
+`answerCallbackQuery` in that same request, so the button never stays on "loading"; a press that
+confirms nothing is answered too. It also writes "Receipt confirmed." into the message, which
+removes the button. A message that covers several events carries one receipt, recorded on the first
+of them.
 
 The poll log line `alerts_poll` carries counts only: subscriptions evaluated, deliveries accepted
-and failed, and for Telegram the updates read, chats linked, bare and rejected `/start` messages,
-receipts and failed replies. It never carries a wallet, a chat, a code or a message text.
+and failed, and for Telegram whether the webhook is registered, how many updates wait, and whether
+deliveries to it fail. Each webhook update logs one line, `alerts_telegram_update`, with its outcome
+(`linked`, `already_linked`, `start_bare`, `start_rejected`, `receipt`, `receipt_repeated`,
+`receipt_refused`, `ignored` or `error`) and whether a reply failed. No line carries a wallet, a
+chat, a code, a message text, the bot token or the webhook secret. A refused request logs nothing.
 
 The Cron lease lasts 16 minutes, beyond the Worker's 15-minute execution limit.
 A poll stops between subscriptions after ten minutes and saves its
 position, so subsequent invocations continue rather than starving later subscriptions. Gnosis warmup,
 RPC errors and delivery failures appear in aggregate run health. A subgraph/chain failure is not a
 successful zero-result evaluation.
-Telegram polling failures keep the run unhealthy but do not stop browser deliveries.
+Each poll asks Telegram, with `getWebhookInfo`, whether updates reach the Worker. A webhook that is
+not registered on `/telegram/webhook`, updates that wait behind an error of the last ten minutes, or
+a failed check keeps the run unhealthy, because no new chat can link then. It never stops a delivery.
 Use a Workers Paid plan. Free-plan CPU and subrequest limits cannot support this poller.
 Validate backfill duration and subscription volume against the selected plan before release.
 
@@ -261,7 +326,9 @@ without a provider-aware redaction mechanism. No upstream response body or excep
 2. Apply the schema there and configure the dedicated bot, VAPID and providers.
 3. Start a new isolated Anvil fork on unused ports. Leave the existing manual QA fork and its stake untouched.
 4. Point only the isolated alert service at that fork and its matching proof/subgraph data.
-5. Sign the wallet challenge, subscribe both channels, press Start in the private bot chat, and grant browser permission.
+5. Register the webhook for that environment ([Telegram webhook](#telegram-webhook)). Sign the wallet
+   challenge, subscribe both channels, press Start in the private bot chat, and grant browser
+   permission. The Telegram card must show Connected within seconds; send it a test notification.
 6. Trigger a real fork condition, such as a withdrawal becoming claimable. For finality-based reads, mine sufficient extra blocks.
 7. Invoke Cron. Capture the condition's chain evidence, Telegram receipt confirmation and browser notification confirmation.
 8. Invoke Cron again and prove no duplicate. Delete both test subscriptions and retain redacted evidence in Linear COB-587.

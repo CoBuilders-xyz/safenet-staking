@@ -13,8 +13,8 @@ const LEASE = 16 * 60_000
 const SESSION = 30 * 60_000
 /**
  * A Telegram link code must be sent within ten minutes, by the time Telegram stamps on the /start
- * message. The Worker reads /start on a later Cron run, which a poll still holding the lease can
- * delay, so a code sent in time is honoured if processed up to an hour after it expired.
+ * message. Telegram delivers /start to the webhook within seconds, and repeats a delivery that
+ * failed, so a code sent in time is honoured if processed up to an hour after it expired.
  */
 export const LINK_START_WINDOW = 10 * 60_000
 export const LINK_PROCESSING_GRACE = 60 * 60_000
@@ -22,7 +22,16 @@ const RECEIPT = 24 * 60 * 60_000
 const DELIVERY_LEASE = 2 * 60_000
 export const MAX_SUBSCRIPTIONS = 10
 /** One test message per subscription per minute: each one is a provider request. */
-const TEST_INTERVAL = 60_000
+export const TEST_INTERVAL = 60_000
+/** A webhook request answers within seconds. A claim older than this belongs to a request that died. */
+const UPDATE_LEASE = 60_000
+/** Telegram repeats a failed delivery for up to a day. Keep handled update IDs for two. */
+const UPDATE_RETENTION = 2 * 24 * 60 * 60_000
+/** Guidance replies to one chat: at most REPLY_LIMIT in each REPLY_WINDOW. */
+const REPLY_WINDOW = 60_000
+const REPLY_LIMIT = 5
+/** A linked subscription keeps the hash of its consumed code this long, to recognise the same /start sent again. */
+const LINKED_CODE_RETENTION = 60 * 60_000
 const iso = (ms: number) => new Date(ms).toISOString()
 /** SQLite's current time, in the same format as Date.toISOString. */
 const SQL_NOW = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
@@ -70,13 +79,13 @@ async function guarded<T>(operation: Promise<T>): Promise<T> {
 interface SubscriptionRow {
   id: string; wallet: string; triggers: string; participation: number; missed: number; channel: string
   telegram_chat: string | null; status: Subscription["status"]; last_delivery: string | null
-  link_expires: string | null; linked_at: string | null; paused: number
+  link_expires: string | null; linked_at: string | null; paused: number; tested_at: string | null
 }
 const subscription = (row: SubscriptionRow): Subscription => ({
   id: row.id, wallet: row.wallet, triggers: JSON.parse(row.triggers) as Trigger[], participation: row.participation,
   missed: row.missed, channel: JSON.parse(row.channel) as Channel, telegram_chat: row.telegram_chat,
   status: row.status, last_delivery: row.last_delivery, link_expires: row.link_expires, linked_at: row.linked_at,
-  paused: row.paused === 1,
+  paused: row.paused === 1, tested_at: row.tested_at,
 })
 export interface SubscriptionSettings { triggers: Trigger[]; participation: number; missed: number; channel: unknown }
 export interface PollRun { started_at: string; completed_at: string | null; ok: boolean }
@@ -132,16 +141,32 @@ export class Database {
   async subscriptions(wallet: string): Promise<Subscription[]> {
     return (await this.all<SubscriptionRow>("select * from alerts_subscriptions where wallet = ? order by created_at, rowid", wallet)).map(subscription)
   }
-  /** At most MAX_SUBSCRIPTIONS per wallet, checked in the same statement that inserts. */
+  /**
+   * At most MAX_SUBSCRIPTIONS per wallet, and no second subscription with the same alerts on the
+   * same destination, both checked in the statement that inserts. The same alerts are the same
+   * triggers in any order, with the thresholds of the triggers that use one. The destination is
+   * Telegram, or one browser endpoint. A subscription that can no longer deliver does not count.
+   */
   async subscribe(wallet: string, signatureHash: string, settings: SubscriptionSettings, linkHash: string): Promise<Subscription> {
     const now = Date.now()
+    const channel = isObject(settings.channel) ? settings.channel : {}
+    const sorted = (column: string) => `(select json_group_array(value) from (select value from json_each(${column}) order by value))`
+    const same = `s.wallet = ?2 and s.status != 'expired' and json_extract(s.channel, '$.kind') = ?12
+      and ${sorted("s.triggers")} = ${sorted("?4")}
+      and (?13 = 0 or s.participation = ?5) and (?14 = 0 or s.missed = ?6)
+      and (?15 is null or json_extract(s.channel, '$.endpoint') = ?15)`
     const [row] = await this.all<SubscriptionRow>(`insert into alerts_subscriptions(id, wallet, signature_hash, triggers,
       participation, missed, channel, link_hash, link_expires, created_at)
       select ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10 where (select count(*) from alerts_subscriptions where wallet = ?2) < ?11
+        and not exists (select 1 from alerts_subscriptions s where ${same})
       returning *`, crypto.randomUUID(), wallet, signatureHash, JSON.stringify(settings.triggers), settings.participation,
-    settings.missed, JSON.stringify(settings.channel), linkHash, iso(now + LINK_START_WINDOW), iso(now), MAX_SUBSCRIPTIONS)
-    if (!row) throw new HttpError(409, "Subscription limit reached", "limit")
-    return subscription(row)
+    settings.missed, JSON.stringify(settings.channel), linkHash, iso(now + LINK_START_WINDOW), iso(now), MAX_SUBSCRIPTIONS,
+    typeof channel.kind === "string" ? channel.kind : null, settings.triggers.includes("participation") ? 1 : 0,
+    settings.triggers.includes("missed") ? 1 : 0, typeof channel.endpoint === "string" ? channel.endpoint : null)
+    if (row) return subscription(row)
+    const [{ count }] = await this.all<{ count: number }>("select count(*) as count from alerts_subscriptions where wallet = ?", wallet) as [{ count: number }]
+    if (count >= MAX_SUBSCRIPTIONS) throw new HttpError(409, "Subscription limit reached", "limit")
+    throw new HttpError(409, "Subscription already exists", "duplicate")
   }
   /** Removes the wallet's own subscription only. Its delivery history goes with it. */
   async unsubscribe(id: string, wallet: string) {
@@ -172,12 +197,21 @@ export class Database {
     return (await this.all<SubscriptionRow>("select * from alerts_subscriptions where status != 'expired' and paused = 0 and id > ? order by id limit ?",
       after, limit)).map(subscription)
   }
-  /** `sentAt` is when Telegram received /start. A time after now is treated as now. */
+  /**
+   * Binds the chat to the subscription that holds this code and has no chat yet. `sentAt` is when
+   * Telegram received /start; a time after now is treated as now. The consumed code stays on the
+   * row, without an expiry, so `linkedWith` can recognise the same /start sent again.
+   */
   async linkTelegram(linkHash: string, chat: string, sentAt = Date.now()): Promise<boolean> {
     const now = Date.now()
-    return await this.run(`update alerts_subscriptions set telegram_chat = ?, linked_at = ?, link_hash = null, link_expires = null
-      where link_hash = ? and link_expires > ? and link_expires > ? and json_extract(channel, '$.kind') = 'telegram'`,
+    return await this.run(`update alerts_subscriptions set telegram_chat = ?, linked_at = ?, link_expires = null
+      where link_hash = ? and telegram_chat is null and link_expires > ? and link_expires > ? and json_extract(channel, '$.kind') = 'telegram'`,
     chat, iso(now), linkHash, iso(Math.min(sentAt, now)), iso(now - LINK_PROCESSING_GRACE)) > 0
+  }
+  /** Whether this code already linked this same chat: the person opened the link, or sent /start, twice. */
+  async linkedWith(linkHash: string, chat: string): Promise<boolean> {
+    return (await this.all("select 1 from alerts_subscriptions where link_hash = ? and telegram_chat = ? and status != 'expired' limit 1",
+      linkHash, chat)).length > 0
   }
 
   /** Whether this Telegram chat already receives alerts for a subscription that can still deliver. */
@@ -225,6 +259,39 @@ export class Database {
   async receiptRecorded(ackHash: string, chat: string): Promise<boolean> {
     return (await this.all(`select 1 from alerts_deliveries where ack_hash = ? and state = 'received'
       and subscription in (select id from alerts_subscriptions where telegram_chat = ?) limit 1`, ackHash, chat)).length > 0
+  }
+
+  /**
+   * Takes a Telegram update for this request. "done" when an earlier delivery of it was handled,
+   * "busy" while another request still holds it. A claim left by a request that died is taken over
+   * once its lease ends.
+   */
+  async claimUpdate(updateId: number): Promise<"claimed" | "done" | "busy"> {
+    const now = Date.now()
+    const claimed = await this.run(`insert into alerts_telegram_updates(update_id, state, lease_until, received_at) values (?1, 'processing', ?2, ?3)
+      on conflict(update_id) do update set lease_until = excluded.lease_until, received_at = excluded.received_at
+      where alerts_telegram_updates.state = 'processing' and alerts_telegram_updates.lease_until < ?3`,
+    updateId, iso(now + UPDATE_LEASE), iso(now)) > 0
+    if (claimed) return "claimed"
+    const [row] = await this.all<{ state: string }>("select state from alerts_telegram_updates where update_id = ?", updateId)
+    return row?.state === "done" ? "done" : "busy"
+  }
+  async finishUpdate(updateId: number) {
+    await this.run("update alerts_telegram_updates set state = 'done' where update_id = ?", updateId)
+  }
+  /** Gives the update back after a failure, so Telegram's next delivery of it is handled. */
+  async releaseUpdate(updateId: number) {
+    await this.run("delete from alerts_telegram_updates where update_id = ? and state = 'processing'", updateId)
+  }
+  /** Counts one guidance reply to this chat. False when the chat already got REPLY_LIMIT in the window. */
+  async allowReply(chatKey: string): Promise<boolean> {
+    const now = Date.now()
+    return await this.run(`insert into alerts_telegram_replies(chat, window_start, count) values (?1, ?2, 1)
+      on conflict(chat) do update set
+        count = case when alerts_telegram_replies.window_start < ?3 then 1 else alerts_telegram_replies.count + 1 end,
+        window_start = case when alerts_telegram_replies.window_start < ?3 then ?2 else alerts_telegram_replies.window_start end
+      where alerts_telegram_replies.window_start < ?3 or alerts_telegram_replies.count < ?4`,
+    chatKey, iso(now), iso(now - REPLY_WINDOW), REPLY_LIMIT) > 0
   }
 
   async state<T>(key: string): Promise<T | undefined> {
@@ -277,8 +344,13 @@ export class Database {
     await this.batch([
       this.sql("delete from alerts_challenges where expires_at < ?", now),
       this.sql("delete from alerts_sessions where expires_at < ?", now),
-      // Keep an expired code through the grace period: a /start sent in time may not be read yet.
+      // Keep an expired code through the grace period: a /start sent in time may not be delivered yet.
       this.sql("update alerts_subscriptions set link_hash = null, link_expires = null where link_expires < ?", iso(Date.parse(now) - LINK_PROCESSING_GRACE)),
+      // A consumed code is only kept to recognise the same /start sent again soon after.
+      this.sql("update alerts_subscriptions set link_hash = null where telegram_chat is not null and link_hash is not null and (linked_at is null or linked_at < ?)",
+        iso(Date.parse(now) - LINKED_CODE_RETENTION)),
+      this.sql("delete from alerts_telegram_updates where received_at < ?", iso(Date.parse(now) - UPDATE_RETENTION)),
+      this.sql("delete from alerts_telegram_replies where window_start < ?", iso(Date.parse(now) - REPLY_WINDOW)),
       // Keep event keys while subscriptions exist, so that an unclaimed condition does not resend.
       this.sql("update alerts_deliveries set ack_hash = null, ack_expires = null where ack_expires < ?", now),
       // A test message is no condition: its row only carries the receipt, which lasts a day.

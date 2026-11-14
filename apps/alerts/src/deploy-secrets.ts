@@ -2,7 +2,7 @@ import { mainnetSubgraphUrl } from "./sources.js"
 
 /** Values the deploy workflow must supply. cloudflare.config.ts declares each one as a secret. */
 export const REQUIRED_DEPLOY_SECRETS = ["APP_ORIGINS", "MAINNET_RPC_URL", "GNOSIS_RPC_URL", "GRAPH_API_KEY",
-  "TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_NAME", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"] as const
+  "TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_NAME", "TELEGRAM_WEBHOOK_SECRET", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"] as const
 
 /**
  * The secrets uploaded with a new alerts version. SUBGRAPH_URL_MAINNET is always included: the

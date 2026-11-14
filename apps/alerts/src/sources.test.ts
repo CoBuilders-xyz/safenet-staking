@@ -14,7 +14,7 @@ const finalizedHash = keccak256(encodePacked(["string"], ["finalized block 100"]
 const env: Env = { APP_ORIGIN: "https://app.test", DB: noDatabase,
   MAINNET_RPC_URL: "https://rpc.test", REWARDS_BASE_URL: "https://proof.test", SUBGRAPH_URL_MAINNET: "https://graph.test" }
 const sub: Subscription = { id: crypto.randomUUID(), wallet, triggers: ["cooldown", "rewards", "deregistered"], participation: 75, missed: 3,
-  channel: { kind: "telegram" }, telegram_chat: null, status: "unverified", last_delivery: null, link_expires: null, linked_at: null, paused: false }
+  channel: { kind: "telegram" }, telegram_chat: null, status: "unverified", last_delivery: null, link_expires: null, linked_at: null, paused: false, tested_at: null }
 function transport(options: { stale?: boolean; root?: Hex; claimed?: bigint; registered?: boolean; stake?: bigint; wrongChain?: boolean;
   finalizedAge?: number; registeredAtBlock?: string | null; firstSeenAtBlock?: string; lastUpdatedAtBlock?: string;
   unavailable?: "cooldown" | "rewards" | "delegations"; secondReady?: boolean; secondFails?: boolean } = {}) {
