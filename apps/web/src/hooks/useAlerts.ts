@@ -80,9 +80,9 @@ export function useAlerts(address: Address) {
   const watchUntil = useRef(0)
   const subscriptions = useQuery({
     queryKey: ["alerts", address, token], enabled: !!token, retry: false, gcTime: 0, staleTime: 0,
-    queryFn: () => {
+    queryFn: async () => {
       if (!watchUntil.current) watchUntil.current = Date.now() + LINK_WATCH
-      return alertRequest<AlertSubscription[]>("/subscriptions", token)
+      return (await alertRequest<AlertSubscription[]>("/subscriptions", token)).map(readSubscription)
     },
     refetchInterval: query => listPollInterval(query.state.data, Date.now(), watchUntil.current),
     refetchOnWindowFocus: "always",
@@ -123,6 +123,13 @@ export function useAlerts(address: Address) {
   const sendTest = (id: string) => action<{ sent: true; retryAfter: number }>(id, "test")
   const setPaused = (id: string, paused: boolean) => action<{ paused: boolean }>(id, paused ? "pause" : "resume")
   return { config, subscriptions, token, sign, refresh, remove, newLink, sendTest, setPaused, watchLink, pendingVerification }
+}
+/**
+ * A subscription as the page uses it. A service version from before `testRetryAfter` does not
+ * send it; the test is then available, and that service's own limit still answers a second one.
+ */
+export function readSubscription(sub: AlertSubscription): AlertSubscription {
+  return { ...sub, testRetryAfter: Number.isFinite(sub.testRetryAfter) && sub.testRetryAfter > 0 ? sub.testRetryAfter : 0 }
 }
 /** A Telegram link issued in this page session, with the expiry of its own code. */
 export interface TelegramLink { url: string; expiresAt: string }

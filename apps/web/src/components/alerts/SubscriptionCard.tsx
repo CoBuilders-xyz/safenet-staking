@@ -39,8 +39,9 @@ export function SubscriptionCardSkeleton({ label }: { label: string }) {
  * reload the card offers a new one. The card opens `link` only while the subscription's current
  * code is that link's own, by its expiry: a newer code makes this link dead.
  *
- * The status line and the line under it always hold their place, so the card keeps its height
- * when it goes from waiting to connected, and when a result or an error appears.
+ * The status line and the note under it always hold their place, two lines for the note on a
+ * narrow screen, so the card keeps its height when it goes from waiting to connected, and when a
+ * result appears.
  */
 export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscriptions, fetchedAt, actions, onLink }: {
   sub: AlertSubscription
@@ -52,7 +53,8 @@ export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscripti
   /** When `sub` was read. Its `testRetryAfter` seconds count from then, by this browser's clock. */
   fetchedAt: number
   actions: Actions
-  onLink: (id: string, link: TelegramLink) => void
+  /** Stores the new link. Resolves once the list shows that link's own expiry, so the card can open it. */
+  onLink: (id: string, link: TelegramLink) => Promise<unknown>
 }) {
   const { t } = useTranslation()
   const [pending, setPending] = useState<Pending | null>(null)
@@ -161,7 +163,7 @@ export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscripti
     {triggers}
     <p role="status" className="font-medium min-h-6">{status}</p>
     {/* Keyed by its kind, so a new result is a new element and is announced. */}
-    <p key={note?.role ?? "hint"} role={note?.role} className={`text-sm min-h-5 ${note?.role === "alert" ? "text-destructive" : "text-muted-foreground"}`}>{note?.text}</p>
+    <p key={note?.role ?? "hint"} role={note?.role} className={`text-sm min-h-10 sm:min-h-5 ${note?.role === "alert" ? "text-destructive" : "text-muted-foreground"}`}>{note?.text}</p>
     <div className="flex flex-wrap gap-2">
       {openLink && <Button asChild>
         <a ref={anchor} href={openLink} target="_blank" rel="noreferrer" onClick={() => { setOpened(true); void actions.watchLink() }}>
@@ -171,9 +173,11 @@ export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscripti
       {unlinked && !openLink && <Button disabled={busy}
         onClick={() => void run("link", async () => {
           const issued = await actions.newLink(sub.id)
-          onLink(sub.id, { url: issued.telegramUrl, expiresAt: issued.expiresAt })
           setOpened(false)
           setIssuedHere(true)
+          // The button stays on "Getting a link…" until the card can open this link. Free earlier,
+          // a second press would replace the code that was just issued.
+          await onLink(sub.id, { url: issued.telegramUrl, expiresAt: issued.expiresAt })
         })}>
         {pending === "link" ? t("alerts.newLinkPending", "Getting a link…") : t("alerts.newLink", "Get a new Telegram link")}
       </Button>}
@@ -182,7 +186,7 @@ export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscripti
         className="aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
         onClick={() => { if (!busy && testWait === 0) void run("test", async () => { await actions.sendTest(sub.id); setTestSent(true) }) }}>
         {pending === "test" ? t("alerts.testPending", "Sending…")
-          : testWait > 0 ? t("alerts.testAgainIn", "Test again in {{seconds}} s", { seconds: testWait })
+          : testWait > 0 ? t("alerts.testAgainInSeconds", "Test again in {{seconds}} sec", { seconds: testWait })
             : t("alerts.getTest", "Get test notification")}
       </Button>}
       {!expired && <Button variant="outline" disabled={busy} onClick={() => void run("pause", () => actions.setPaused(sub.id, !sub.paused))}>

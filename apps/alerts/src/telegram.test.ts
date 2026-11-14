@@ -433,6 +433,15 @@ test("the poll checks that Telegram delivers to the webhook, and never holds bac
   assert.equal((await webhookHealth(env, info({ url: "https://a.example/telegram/webhook", pending_update_count: 3, last_error_date: now - 60 })))!.failing, true)
   assert.equal((await webhookHealth(env, info({ url: "https://a.example/telegram/webhook", pending_update_count: 3, last_error_date: now - 3600 })))!.failing, false)
   assert.equal((await webhookHealth(env, info({ url: "https://a.example/telegram/webhook", pending_update_count: 0, last_error_date: now - 60 })))!.failing, false)
+  // With the Worker's own origin configured, only its own URL counts: a webhook that another
+  // deployment registered on the same path receives every Start, so this one is not healthy.
+  const own: Env = { ...env, ALERTS_URL: "https://alerts.example/" }
+  assert.equal((await webhookHealth(own, info({ url: "https://alerts.example/telegram/webhook" })))!.registered, true)
+  assert.equal((await webhookHealth(own, info({ url: "https://staging.example/telegram/webhook" })))!.registered, false)
+  assert.equal((await webhookHealth(own, info({ url: "https://alerts.example/telegram/webhook?x=1" })))!.registered, false)
+  assert.equal((await webhookHealth(own, info({ url: "" })))!.registered, false)
+  // A malformed origin matches nothing, so the mistake shows as an unhealthy run.
+  assert.equal((await webhookHealth({ ...env, ALERTS_URL: "alerts.example" }, info({ url: "https://alerts.example/telegram/webhook" })))!.registered, false)
   await assert.rejects(webhookHealth(env, async () => new Response(null, { status: 502 })))
   assert.equal(await webhookHealth(without("TELEGRAM_BOT_TOKEN"), async () => { throw new Error("must not be called") }), undefined)
 

@@ -262,6 +262,11 @@ test("a subscription's own actions: a new Telegram link, pause and resume, and a
       assert.ok(refusal.retryAfter >= 55 && refusal.retryAfter <= 60)
       assert.equal((await list()).testRetryAfter, refusal.retryAfter)
       assert.equal(sentTo.length, 1)
+      // A test that loses the race with a delete is "not found", not a limit to wait out.
+      const doomed = await db.subscribe(account.address.toLowerCase(), "sig", { ...telegram, triggers: ["deregistered"] }, "doomed")
+      await db.query("update alerts_subscriptions set telegram_chat = '1' where id = ?", doomed.id)
+      const gone = mock.method(db, "claimTest", async () => { await db.unsubscribe(doomed.id, account.address.toLowerCase()); return false })
+      try { assert.deepEqual(await code(await request(`/subscriptions/${doomed.id}/test`)), [404, "not_found"]) } finally { gone.mock.restore() }
       // Paused: listed as paused and skipped by the poller. Resumed: evaluated again.
       assert.deepEqual(await (await request(`/subscriptions/${created.id}/pause`)).json(), { paused: true })
       assert.equal((await list()).paused, true)

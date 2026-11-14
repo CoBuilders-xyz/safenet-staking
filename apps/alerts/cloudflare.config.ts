@@ -26,6 +26,8 @@ export default defineConfig({
       TELEGRAM_BOT_TOKEN: bindings.secret(), TELEGRAM_BOT_NAME: bindings.secret(),
       // What Telegram sends with each update to POST /telegram/webhook, as given to setWebhook.
       TELEGRAM_WEBHOOK_SECRET: bindings.secret(),
+      // This Worker's own public origin. The poll compares it with the webhook Telegram holds.
+      ALERTS_URL: bindings.secret(),
       VAPID_PUBLIC_KEY: bindings.secret(), VAPID_PRIVATE_KEY: bindings.secret(), VAPID_SUBJECT: bindings.secret(),
     },
   },

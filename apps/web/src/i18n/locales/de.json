@@ -764,9 +764,9 @@
     "statusTelegramOpened": "Warte darauf, dass du in Telegram Start drückst. Diese Karte aktualisiert sich, sobald du das tust.",
     "subscribing": "Wird abonniert…",
     "telegramHelpStart": "Öffne nach dem Abonnieren Telegram über die neue Karte und drücke Start. Wir senden nur an den Chat, den du verbindest.",
-    "testAgainIn": "Erneut testen in {{seconds}} s",
     "testPending": "Wird gesendet…",
     "testSentTelegramNow": "Testbenachrichtigung gesendet. Sieh in deinem Telegram-Chat nach.",
-    "addSubscription": "Abonnement hinzufügen"
+    "addSubscription": "Abonnement hinzufügen",
+    "testAgainInSeconds": "Erneut testen in {{seconds}} Sek."
   }
 }

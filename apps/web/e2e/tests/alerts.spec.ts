@@ -18,7 +18,7 @@ interface Service {
   delay: number
 }
 const TEST_INTERVAL = 60_000
-async function service(page: Page, options: { fail?: boolean; verify?: boolean; max?: number; telegram?: boolean } = {}): Promise<Service> {
+async function service(page: Page, options: { fail?: boolean; verify?: boolean; max?: number; telegram?: boolean; previous?: boolean } = {}): Promise<Service> {
   const state: Service = { subscriptions: [], calls: [], refuse: {}, loseLinkAnswer: false, reads: [], delay: 0 }
   let links = 0
   await page.route("https://mock-alerts.test/**", async route => {
@@ -39,7 +39,12 @@ async function service(page: Page, options: { fail?: boolean; verify?: boolean; 
       if (refusal) return route.fulfill({ status: refusal.status, headers, json: { error: "refused", code: refusal.code } })
       const sub = state.subscriptions.find(item => item.id === id)!
       if (name === "pause" || name === "resume") { sub.paused = name === "pause"; return route.fulfill({ headers, json: { paused: sub.paused } }) }
-      if (name === "test") { sub.testedAt = Date.now(); return route.fulfill({ headers, json: { sent: true, retryAfter: TEST_INTERVAL / 1000 } }) }
+      if (name === "test") {
+        // The service version before the countdown: one test a minute, answered without the seconds.
+        if (options.previous && sub.testedAt && Date.now() - sub.testedAt < TEST_INTERVAL) return route.fulfill({ status: 429, headers, json: { error: "One test message per minute", code: "rate" } })
+        sub.testedAt = Date.now()
+        return route.fulfill({ headers, json: options.previous ? { sent: true } : { sent: true, retryAfter: TEST_INTERVAL / 1000 } })
+      }
       sub.linkExpiresAt = new Date(Date.now() + 600_000).toISOString()
       if (state.loseLinkAnswer) { state.loseLinkAnswer = false; return route.abort() }
       return route.fulfill({ headers, json: { telegramUrl: `https://t.me/test_bot?start=reissued-${++links}`, expiresAt: sub.linkExpiresAt } })
@@ -56,8 +61,8 @@ async function service(page: Page, options: { fail?: boolean; verify?: boolean; 
       return route.fulfill({ headers, json: { id, telegramUrl: telegram ? "https://t.me/test_bot?start=local-test" : null, expiresAt: state.subscriptions.at(-1)!.linkExpiresAt } })
     }
     state.reads.push(Date.now())
-    return route.fulfill({ headers, json: state.subscriptions.map(({ testedAt, ...sub }) =>
-      ({ ...sub, testRetryAfter: testedAt ? Math.max(0, Math.ceil((testedAt + TEST_INTERVAL - Date.now()) / 1000)) : 0 })) })
+    return route.fulfill({ headers, json: state.subscriptions.map(({ testedAt, ...sub }) => options.previous ? sub
+      : ({ ...sub, testRetryAfter: testedAt ? Math.max(0, Math.ceil((testedAt + TEST_INTERVAL - Date.now()) / 1000)) : 0 })) })
   })
   return state
 }
@@ -189,7 +194,7 @@ test("Get test notification sends at once, shows the result, and counts down to 
   await expect(card.getByText("Test notification sent. Check your Telegram chat.")).toBeVisible()
   expect(mock.calls).toEqual(["test"])
   // One a minute: the button counts down, keeps the focus, and sends nothing until then.
-  const again = card.getByRole("button", { name: /^Test again in \d+ s$/ })
+  const again = card.getByRole("button", { name: /^Test again in \d+ sec$/ })
   await expect(again).toHaveAttribute("aria-disabled", "true")
   await expect(again).toBeFocused()
   await again.click({ force: true })
@@ -219,6 +224,68 @@ test("Get test notification sends at once, shows the result, and counts down to 
   await expect(card.getByRole("status").first()).toHaveText("Telegram no longer accepts messages for this chat. Delete this subscription and subscribe again.")
   await expect(card.getByText("Not delivering", { exact: true })).toBeVisible()
   await expect(card.getByRole("button", { name: "Get test notification" })).toHaveCount(0)
+})
+
+test("against the service version before the countdown, as after a rollback, the test still sends and its limit is explained", async ({ connectedPage: page }) => {
+  const mock = await service(page, { previous: true })
+  await page.goto("/#/alerts")
+  await page.getByRole("button", { name: "Sign to manage alerts" }).click()
+  await page.getByRole("button", { name: "Subscribe", exact: true }).click()
+  const card = page.getByRole("article")
+  await expect(card.getByRole("status")).toHaveText(waiting)
+  pressStart(mock.subscriptions[0]!)
+  const test = card.getByRole("button", { name: "Get test notification" })
+  await test.click()
+  await expect(card.getByText("Test notification sent. Check your Telegram chat.")).toBeVisible()
+  expect(mock.calls).toEqual(["test"])
+  // That version sends no seconds, so the button does not count down. Its own limit still answers.
+  await expect(test).toHaveAttribute("aria-disabled", "false")
+  await test.click()
+  await expect(card.getByRole("alert")).toHaveText("One test notification per minute for each subscription. Wait for the countdown, then try again.")
+  expect(mock.calls).toEqual(["test", "test"])
+})
+
+test("on a phone the card keeps its height from waiting to connected to tested, so the form below does not move", async ({ connectedPage: page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const { subscriptions } = await service(page)
+  await page.goto("/#/alerts")
+  await page.getByRole("button", { name: "Sign to manage alerts" }).click()
+  await page.getByRole("button", { name: "Subscribe", exact: true }).click()
+  const card = page.getByRole("article")
+  await expect(card.getByRole("status")).toHaveText(waiting)
+  const height = async () => Math.round((await card.boundingBox())!.height)
+  const waitingHeight = await height()
+  pressStart(subscriptions[0]!)
+  await expect(card.getByText("Telegram is connected. Get a test notification to see one arrive.")).toBeVisible()
+  expect(await height()).toBe(waitingHeight)
+  await card.getByRole("button", { name: "Get test notification" }).click()
+  await expect(card.getByText("Test notification sent. Check your Telegram chat.")).toBeVisible()
+  expect(await height()).toBe(waitingHeight)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
+test("a refused subscription is explained next to the Subscribe button, in view", async ({ connectedPage: page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const { refuse } = await service(page)
+  await page.goto("/#/alerts")
+  await page.getByRole("button", { name: "Sign to manage alerts" }).click()
+  const subscribe = page.getByRole("button", { name: "Subscribe", exact: true })
+  await subscribe.click()
+  await expect(page.getByRole("article")).toHaveCount(1)
+  // With a card above, the top of the page is off screen. The reason must be where the user is.
+  await page.getByRole("checkbox", { name: "Rewards claimable", exact: true }).check()
+  refuse.subscribe = { status: 409, code: "duplicate" }
+  await subscribe.click()
+  const alert = page.getByRole("alert")
+  await expect(alert).toHaveText("You already have a subscription with these same alerts on this channel. Change the selection, or use the existing one.")
+  await expect(alert).toBeInViewport()
+  const [message, button] = [(await alert.boundingBox())!, (await subscribe.boundingBox())!]
+  expect(button.y - (message.y + message.height)).toBeLessThan(40) // Directly above the button.
+  // The next attempt clears it.
+  delete refuse.subscribe
+  await subscribe.click()
+  await expect(page.getByRole("article")).toHaveCount(2)
+  await expect(page.getByRole("alert")).toHaveCount(0)
 })
 
 test("pause and resume keep the card in place and say what they did", async ({ connectedPage: page }) => {

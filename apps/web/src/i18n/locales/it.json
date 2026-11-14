@@ -774,9 +774,9 @@
     "statusTelegramOpened": "In attesa che tu prema Avvia in Telegram. Questa scheda si aggiorna non appena lo fai.",
     "subscribing": "Iscrizione in corso…",
     "telegramHelpStart": "Dopo l’iscrizione, apri Telegram dalla nuova scheda e premi Avvia. Inviamo solo alla chat che colleghi.",
-    "testAgainIn": "Nuova prova tra {{seconds}} s",
     "testPending": "Invio…",
     "testSentTelegramNow": "Notifica di prova inviata. Controlla la tua chat Telegram.",
-    "addSubscription": "Aggiungi un abbonamento"
+    "addSubscription": "Aggiungi un abbonamento",
+    "testAgainInSeconds": "Nuova prova tra {{seconds}} sec"
   }
 }

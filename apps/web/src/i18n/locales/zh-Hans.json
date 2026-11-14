@@ -754,9 +754,9 @@
     "statusTelegramOpened": "正在等待你在 Telegram 中点击开始。你点击后，此卡片会立即更新。",
     "subscribing": "正在订阅…",
     "telegramHelpStart": "订阅后，请从新卡片打开 Telegram 并点击开始。我们只向你连接的聊天发送通知。",
-    "testAgainIn": "{{seconds}} 秒后可再次测试",
     "testPending": "正在发送…",
     "testSentTelegramNow": "测试通知已发送。请查看你的 Telegram 聊天。",
-    "addSubscription": "添加订阅"
+    "addSubscription": "添加订阅",
+    "testAgainInSeconds": "{{seconds}} 秒后可再次测试"
   }
 }

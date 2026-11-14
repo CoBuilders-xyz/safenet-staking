@@ -88,6 +88,7 @@ source files, logs or browser variables:
 | `REWARDS_BASE_URL` | Optional isolated-fork dataset override. Normally resolve the canonical ENS dataset, with core's repository fallback. |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_NAME` | A dedicated bot token and its username, without `@`. A bot has one webhook: do not reuse a bot that another service reads. |
 | `TELEGRAM_WEBHOOK_SECRET` | What Telegram sends with every update, as given to `setWebhook`: 32 to 256 characters of `A-Z`, `a-z`, `0-9`, `_` and `-`. See [Telegram webhook](#telegram-webhook). |
+| `ALERTS_URL` | This Worker's own public https origin. Public. Each poll checks that the webhook Telegram holds is `<ALERTS_URL>/telegram/webhook`. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Persistent matching VAPID keypair and valid `mailto:` or HTTPS contact. Keep the private key server-side. |
 
 ### Allowed origins
@@ -160,6 +161,7 @@ that is still true after a resume is sent then. `POST /subscriptions/:id/test` s
 message at once, at most one per subscription per minute: Telegram gets it without a receipt button,
 and a browser gets it with a receipt, so showing it confirms delivery. It answers
 `{ sent, retryAfter }`; inside the minute it answers 429 `rate` with `retryAfter`, the seconds left.
+A subscription deleted while its test was on the way answers 404.
 The list returns `linked`, `linkedAt`, `linkExpiresAt`, `paused` and `testRetryAfter`, never a chat
 ID or a code. `testRetryAfter` is in seconds, not a time, because the browser's clock can differ
 from the Worker's. An error answer carries a `code` beside its text, and the interface chooses its
@@ -293,8 +295,10 @@ position, so subsequent invocations continue rather than starving later subscrip
 RPC errors and delivery failures appear in aggregate run health. A subgraph/chain failure is not a
 successful zero-result evaluation.
 Each poll asks Telegram, with `getWebhookInfo`, whether updates reach the Worker. A webhook that is
-not registered on `/telegram/webhook`, updates that wait behind an error of the last ten minutes, or
-a failed check keeps the run unhealthy, because no new chat can link then. It never stops a delivery.
+not `<ALERTS_URL>/telegram/webhook`, which includes one registered for another deployment of the
+same bot, updates that wait behind an error of the last ten minutes, or a failed check keeps the
+run unhealthy, because no new chat can link then. It never stops a delivery. Without `ALERTS_URL`,
+as in local development, any https URL on that path counts.
 Use a Workers Paid plan. Free-plan CPU and subrequest limits cannot support this poller.
 Validate backfill duration and subscription volume against the selected plan before release.
 

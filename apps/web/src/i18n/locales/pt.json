@@ -774,9 +774,9 @@
     "statusTelegramOpened": "Aguardando você tocar em Iniciar no Telegram. Este cartão se atualiza assim que você fizer isso.",
     "subscribing": "Assinando…",
     "telegramHelpStart": "Depois de assinar, abra o Telegram pelo novo cartão e toque em Iniciar. Enviamos apenas ao chat que você conecta.",
-    "testAgainIn": "Testar de novo em {{seconds}} s",
     "testPending": "Enviando…",
     "testSentTelegramNow": "Notificação de teste enviada. Confira seu chat do Telegram.",
-    "addSubscription": "Adicionar uma assinatura"
+    "addSubscription": "Adicionar uma assinatura",
+    "testAgainInSeconds": "Testar de novo em {{seconds}} seg"
   }
 }

@@ -17,7 +17,7 @@ const receiver = webPush.generateVAPIDKeys()
 const env = {
   APP_ORIGINS: "https://app.test,https://second.test",
   MAINNET_RPC_URL: "https://rpc.test", GNOSIS_RPC_URL: "https://gnosis.test", SUBGRAPH_URL_MAINNET: "https://graph.test", TELEGRAM_BOT_TOKEN: "runtime-test-only", TELEGRAM_BOT_NAME: "test_bot",
-  TELEGRAM_WEBHOOK_SECRET: "runtime-test-only-webhook-secret-0123456789",
+  TELEGRAM_WEBHOOK_SECRET: "runtime-test-only-webhook-secret-0123456789", ALERTS_URL: "https://alerts.test",
   VAPID_PUBLIC_KEY: vapid.publicKey, VAPID_PRIVATE_KEY: vapid.privateKey, VAPID_SUBJECT: "mailto:test@example.test",
 }
 const first = CONTRACTS.aegisFrostCoordinator.deployBlock

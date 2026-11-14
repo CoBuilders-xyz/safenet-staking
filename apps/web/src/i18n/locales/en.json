@@ -79,7 +79,7 @@
     "subscriptions": "Your subscriptions",
     "telegram": "Telegram",
     "telegramHelpStart": "After you subscribe, open Telegram from the new card and press Start. We send only to the chat you connect.",
-    "testAgainIn": "Test again in {{seconds}} s",
+    "testAgainInSeconds": "Test again in {{seconds}} sec",
     "testPending": "Sending…",
     "testSentPush": "Test notification sent. The browser you subscribed with should show it now.",
     "testSentTelegramNow": "Test notification sent. Check your Telegram chat.",

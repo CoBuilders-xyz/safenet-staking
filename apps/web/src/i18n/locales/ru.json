@@ -784,9 +784,9 @@
     "statusTelegramOpened": "Ждём, когда вы нажмёте «Запустить» в Telegram. Эта карточка обновится, как только вы это сделаете.",
     "subscribing": "Оформляем подписку…",
     "telegramHelpStart": "После подписки откройте Telegram из новой карточки и нажмите «Запустить». Мы отправляем только в чат, который вы подключаете.",
-    "testAgainIn": "Повторный тест через {{seconds}} с",
     "testPending": "Отправка…",
     "testSentTelegramNow": "Тестовое уведомление отправлено. Проверьте свой чат Telegram.",
-    "addSubscription": "Добавить подписку"
+    "addSubscription": "Добавить подписку",
+    "testAgainInSeconds": "Повторный тест через {{seconds}} сек"
   }
 }

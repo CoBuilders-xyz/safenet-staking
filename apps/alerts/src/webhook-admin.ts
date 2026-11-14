@@ -1,4 +1,4 @@
-import { WEBHOOK_PATH, WEBHOOK_UPDATES, usableWebhookSecret } from "./telegram.js"
+import { WEBHOOK_UPDATES, usableWebhookSecret, webhookUrlFor } from "./telegram.js"
 
 /** What the operator's environment supplies. `scripts/telegram-webhook.ts` passes `process.env`. */
 export type AdminEnv = Record<string, string | undefined>
@@ -24,15 +24,12 @@ function token(env: AdminEnv): string {
 export function webhookUrl(env: AdminEnv): string {
   const origin = env.ALERTS_URL
   if (!origin) throw new AdminError("ALERTS_URL is not set. Set it to the alerts Worker's origin, such as https://safenet-alerts.<subdomain>.workers.dev")
-  let url: URL
-  try { url = new URL(origin) } catch { throw new AdminError("ALERTS_URL is not a URL") }
-  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || !/^\/?$/.test(url.pathname)) {
-    throw new AdminError("ALERTS_URL must be an https origin: no path, query or credentials")
-  }
-  return `${url.origin}${WEBHOOK_PATH}`
+  const url = webhookUrlFor(origin)
+  if (!url) throw new AdminError("ALERTS_URL must be an https origin: no path, query or credentials")
+  return url
 }
 
-/** One Bot API call. A failure carries Telegram's own description, with the token removed in case it is echoed. */
+/** One Bot API call. A failure carries Telegram's own description, with the token and the secret removed in case either is echoed. */
 async function call(env: AdminEnv, method: string, body: unknown, transport: typeof fetch): Promise<unknown> {
   const secret = token(env)
   let answer: { ok?: boolean; result?: unknown; description?: unknown }
@@ -46,7 +43,8 @@ async function call(env: AdminEnv, method: string, body: unknown, transport: typ
     throw new AdminError(`Telegram did not answer ${method}`)
   }
   if (!answer.ok) {
-    const description = typeof answer.description === "string" ? answer.description.replaceAll(secret, "<token>") : "no description"
+    let description = typeof answer.description === "string" ? answer.description.replaceAll(secret, "<token>") : "no description"
+    if (env.TELEGRAM_WEBHOOK_SECRET) description = description.replaceAll(env.TELEGRAM_WEBHOOK_SECRET, "<secret>")
     throw new AdminError(`Telegram refused ${method}: ${description}`)
   }
   return answer.result

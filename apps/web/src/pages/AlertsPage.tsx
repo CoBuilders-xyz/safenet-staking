@@ -29,7 +29,8 @@ function ConnectedAlerts({ address }: { address: Address }) {
   const [channel, setChannel] = useState<"telegram" | "push">("telegram")
   const [pending, setPending] = useState<"sign" | "subscribe" | null>(null)
   const busy = pending !== null
-  const [error, setError] = useState<AlertErrorCode | null>(null)
+  // A failure, and the request it belongs to: the message appears next to the control that caused it.
+  const [error, setError] = useState<{ code: AlertErrorCode; during: "sign" | "subscribe" } | null>(null)
   // Telegram links issued in this page session, by subscription. The API returns a link only once.
   const [links, setLinks] = useState<Record<string, TelegramLink>>({})
   const [created, setCreated] = useState<string | null>(null)
@@ -42,7 +43,7 @@ function ConnectedAlerts({ address }: { address: Address }) {
   }
   const run = async (name: "sign" | "subscribe", action: () => Promise<unknown>) => {
     setPending(name); setError(null)
-    try { await action() } catch (failure) { setError(alertErrorCode(failure)) } finally { setPending(null) }
+    try { await action() } catch (failure) { setError({ code: alertErrorCode(failure), during: name }) } finally { setPending(null) }
   }
   const save = (event: FormEvent) => {
     event.preventDefault()
@@ -71,7 +72,10 @@ function ConnectedAlerts({ address }: { address: Address }) {
   const channelReady = channel === "push" ? !!alerts.config.data?.vapidPublicKey : !!alerts.config.data?.telegramBot
   const channelDown = alerts.config.isSuccess && !channelReady
   // A failed list is a session that ended or a service that did not answer; the Sign button follows it.
-  const shown = error ?? (alerts.subscriptions.isError ? alertErrorCode(alerts.subscriptions.error) : alerts.config.isError ? alertErrorCode(alerts.config.error) : null)
+  const shown = (error?.during === "sign" ? error.code : null)
+    ?? (alerts.subscriptions.isError ? alertErrorCode(alerts.subscriptions.error) : alerts.config.isError ? alertErrorCode(alerts.config.error) : null)
+  // A refused subscription is said above its own button: the top of the page can be off screen.
+  const formError = error?.during === "subscribe" ? error.code : null
   const creating = pending === "subscribe"
   return <section className="max-w-2xl space-y-6" aria-busy={busy}>
     <p className="text-sm text-muted-foreground">{t("alerts.privacy", "We store your wallet, choices and delivery token until you delete the subscription. Alerts never move funds.")}</p>
@@ -87,7 +91,7 @@ function ConnectedAlerts({ address }: { address: Address }) {
         <h2 id="alerts-subscriptions" className="font-semibold">{t("alerts.subscriptions", "Your subscriptions")}</h2>
         {subscriptions?.map(sub => <SubscriptionCard key={sub.id} sub={sub} link={links[sub.id]} focusLink={created === sub.id}
           maxSubscriptions={maxSubscriptions} fetchedAt={alerts.subscriptions.dataUpdatedAt} actions={alerts}
-          onLink={(id, link) => { setLinks(known => ({ ...known, [id]: link })); void alerts.watchLink() }}
+          onLink={(id, link) => { setLinks(known => ({ ...known, [id]: link })); return alerts.watchLink() }}
           triggers={<ul className="list-disc pl-5">{sub.triggers.map(trigger => <li key={trigger}>{labels[trigger]}{trigger === "participation" ? ` (${new Intl.NumberFormat(currentLanguage(), { style: "percent", maximumFractionDigits: 1 }).format(sub.participation / 100)})` : trigger === "missed" ? ` (${sub.missed.toLocaleString(currentLanguage())})` : ""}</li>)}</ul>} />)}
         {/* The new subscription holds its place while the service creates it. */}
         {creating && !subscriptions?.some(sub => sub.id === created) && <SubscriptionCardSkeleton label={t("alerts.creating", "Creating your subscription…")} />}
@@ -113,7 +117,8 @@ function ConnectedAlerts({ address }: { address: Address }) {
         {atLimit && <p role="status">{t("alerts.limitReached", "You have {{max}} subscriptions, the maximum. Delete one to add another.", { max: maxSubscriptions })}</p>}
         {/* Each reason the button is off is said in words, never by the button alone. */}
         {!atLimit && channelDown && <p role="status">{alertErrorMessage(t, channel === "push" ? "push_unavailable" : "telegram_unavailable", maxSubscriptions)}</p>}
-        {!atLimit && !channelDown && duplicate && <p role="status">{t("alerts.duplicateHint", "You already have a Telegram subscription with these same alerts. Change the selection to add another.")}</p>}
+        {!atLimit && !channelDown && duplicate && <p role="status" className="text-sm text-muted-foreground">{t("alerts.duplicateHint", "You already have a Telegram subscription with these same alerts. Change the selection to add another.")}</p>}
+        {formError && <p role="alert" className="text-destructive">{alertErrorMessage(t, formError, maxSubscriptions)}</p>}
         <Button type="submit" disabled={busy || atLimit || duplicate || !selected.length || !channelReady}>
           {creating ? t("alerts.subscribing", "Subscribing…") : t("alerts.subscribe", "Subscribe")}
         </Button>

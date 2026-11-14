@@ -60,8 +60,8 @@ test("a failure never carries the token or the secret", async () => {
   }
   const thrown: typeof fetch = async input => { throw new Error(`fetch failed: ${String(input)}`) }
   await assert.rejects(setWebhook(env, thrown), error => error instanceof AdminError && !leaks(error) && /did not answer setWebhook/.test(error.message))
-  const refused: typeof fetch = async () => Response.json({ ok: false, description: `Unauthorized for bot${env.TELEGRAM_BOT_TOKEN}` }, { status: 401 })
-  await assert.rejects(webhookInfo(env, refused), error => error instanceof AdminError && !leaks(error) && /Telegram refused getWebhookInfo: Unauthorized for bot<token>/.test(error.message))
+  const refused: typeof fetch = async () => Response.json({ ok: false, description: `Unauthorized for bot${env.TELEGRAM_BOT_TOKEN} with ${env.TELEGRAM_WEBHOOK_SECRET}` }, { status: 401 })
+  await assert.rejects(webhookInfo(env, refused), error => error instanceof AdminError && !leaks(error) && /Telegram refused getWebhookInfo: Unauthorized for bot<token> with <secret>/.test(error.message))
   // Telegram says yes but holds another URL: the command fails instead of reporting success.
   const other = telegram()
   const stuck: typeof fetch = async (input, init) => String(input).endsWith("/setWebhook") ? Response.json({ ok: true, result: true }) : other.transport(input, init)

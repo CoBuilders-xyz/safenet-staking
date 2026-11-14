@@ -40,6 +40,7 @@ Everything else already exists. Never put a value in the repository.
 | `SUBGRAPH_URL_MAINNET` | `ALERTS_SUBGRAPH_URL_MAINNET`, else the URL derived from `GRAPH_API_KEY` | optional `production` secret. Every deploy uploads one of the two, so removing the override takes effect on the next deploy |
 | `TELEGRAM_BOT_TOKEN` | `TELEGRAM_BOT_TOKEN` | repository secret |
 | `TELEGRAM_WEBHOOK_SECRET` | `TELEGRAM_WEBHOOK_SECRET` | `production` secret. See [Telegram webhook](#telegram-webhook) |
+| `ALERTS_URL` | `VITE_ALERTS_API_URL` | repository variable: the alerts Worker's own origin, which the web build also reads |
 | `TELEGRAM_BOT_NAME`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT` | same names | `production` variables |
 | `VAPID_PRIVATE_KEY` | `VAPID_PRIVATE_KEY` | `production` secret |
 | D1 binding | `ALERTS_D1_DATABASE_ID` | `production` variable |
@@ -112,7 +113,9 @@ was given. It never calls `getUpdates`. `apps/alerts/README.md` describes the en
    `telegram_webhook` on. After the deploy, the step *Register the Telegram webhook* calls
    `setWebhook` with the URL, the secret, `allowed_updates=["message","callback_query"]` and
    `drop_pending_updates=true`, reads the registration back, and fails unless Telegram holds that
-   URL. A deploy without the secret fails before it uploads the Worker, and names the missing value.
+   URL. A deploy fails before it uploads the Worker when the secret or `VITE_ALERTS_API_URL` is
+   missing, when the secret is not 32 to 256 characters of the allowed alphabet, or when the URL is
+   not an https origin. The error names the value and never shows it.
 
 Between the deploy and the registration, a few seconds, nothing reads Telegram. A `/start` or a
 receipt press sent in that gap, or before it, is dropped by `drop_pending_updates`. Nothing is lost
@@ -134,8 +137,9 @@ Telegram would otherwise deliver again the updates that the last poll already ha
    ```
    503 instead means the deployed Worker has no usable secret.
 3. `curl -sS https://safenet-alerts.<subdomain>.workers.dev/health` answers 200 after the next
-   poll, at most five minutes later. Each poll asks Telegram whether the webhook is registered and
-   delivering, and a run is unhealthy when it is not.
+   poll, at most five minutes later. Each poll asks Telegram whether the webhook it holds is this
+   Worker's URL and is delivering, and a run is unhealthy when it is not. A webhook registered for
+   another deployment of the same bot is unhealthy here.
 4. In the interface: subscribe with Telegram, open the link and press Start. The bot answers
    "Linked." at once, and the card shows *Connected* within about two seconds. Press *Get test
    notification*: the message arrives in the chat, and the card says it was sent.
@@ -158,10 +162,16 @@ The Worker versions before the webhook read `getUpdates` on each Cron run. To go
    ```
 2. Roll the `safenet-alerts` Worker back, in the Cloudflare dashboard, to the last version before
    the webhook. That version polls again, and links a chat on the Cron run after Start, up to five
-   minutes later. The interface keeps working against it; its cards only connect more slowly.
+   minutes later. The interface keeps working against it: its cards connect more slowly, and the
+   test button shows no countdown.
 
 Do both steps. A webhook version with no webhook, or a polling version with one, links no chat.
 The D1 migration needs no rollback: the older version ignores the two tables it added.
+
+The interface and the Worker can be released in either order. The page of this change works
+against the polling Worker: its cards connect on the next Cron run, and the test button has no
+countdown. Deploy the Worker and register the webhook first when you can, so that no user sees
+"This card updates as soon as you do" while the old Worker still takes up to five minutes.
 
 To set the webhook from a shell instead of the workflow, with `TELEGRAM_BOT_TOKEN`,
 `TELEGRAM_WEBHOOK_SECRET` (the deployed value) and `ALERTS_URL` in the environment:

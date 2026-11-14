@@ -116,6 +116,9 @@ jobs:
           TELEGRAM_BOT_NAME: ${{ vars.TELEGRAM_BOT_NAME }}
           # What Telegram sends with every update. The step below gives Telegram the same value.
           TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+          # The Worker's own public origin, the same value the web build reads. Each poll checks
+          # that the webhook Telegram holds is this URL, and not another deployment's.
+          ALERTS_URL: ${{ vars.VITE_ALERTS_API_URL }}
           VAPID_PUBLIC_KEY: ${{ vars.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ vars.VAPID_SUBJECT }}
@@ -123,7 +126,8 @@ jobs:
           secrets="$RUNNER_TEMP/alerts-secrets.json"
           trap 'rm -f "$secrets"' EXIT
           umask 077
-          # src/deploy-secrets.ts checks the required values and always includes SUBGRAPH_URL_MAINNET.
+          # src/deploy-secrets.ts checks the required values, the form of the webhook secret and of
+          # ALERTS_URL, and always includes SUBGRAPH_URL_MAINNET.
           node --import tsx scripts/deploy-secrets.ts "$secrets"
           pnpm exec cf deploy --secrets-file "$secrets" --message "safenet-alerts ${GITHUB_SHA::12}"
 

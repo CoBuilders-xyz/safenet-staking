@@ -774,9 +774,9 @@
     "statusTelegramOpened": "En attente de votre appui sur Démarrer dans Telegram. Cette carte se met à jour dès que vous le faites.",
     "subscribing": "Abonnement en cours…",
     "telegramHelpStart": "Après l’abonnement, ouvrez Telegram depuis la nouvelle carte et appuyez sur Démarrer. Nous n’envoyons qu’au chat que vous connectez.",
-    "testAgainIn": "Nouveau test dans {{seconds}} s",
     "testPending": "Envoi…",
     "testSentTelegramNow": "Notification de test envoyée. Consultez votre chat Telegram.",
-    "addSubscription": "Ajouter un abonnement"
+    "addSubscription": "Ajouter un abonnement",
+    "testAgainInSeconds": "Nouveau test dans {{seconds}} sec"
   }
 }

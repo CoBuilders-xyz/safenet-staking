@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { act, fireEvent, render, screen } from "@testing-library/react"
 import type { TFunction } from "i18next"
 import { SubscriptionCard } from "../alerts/SubscriptionCard"
-import { AlertError, LINK_POLL_FAST, LINK_POLL_SLOW, LIST_POLL, listPollInterval, type AlertErrorCode, type AlertSubscription, type TelegramLink } from "@/hooks/useAlerts"
+import { AlertError, LINK_POLL_FAST, LINK_POLL_SLOW, LIST_POLL, listPollInterval, readSubscription, type AlertErrorCode, type AlertSubscription, type TelegramLink } from "@/hooks/useAlerts"
 import { alertErrorMessage } from "@/lib/alertMessages"
 import { i18n } from "@/i18n"
 
@@ -24,7 +24,7 @@ function actions() {
 }
 function setup(sub: AlertSubscription, options: { link?: TelegramLink; fetchedAt?: number } = {}) {
   const calls = actions()
-  const onLink = vi.fn()
+  const onLink = vi.fn().mockResolvedValue(undefined)
   const props = (current: AlertSubscription, fetchedAt = options.fetchedAt ?? NOW) => <SubscriptionCard sub={current} triggers={null} link={options.link}
     focusLink={false} maxSubscriptions={10} fetchedAt={fetchedAt} actions={calls} onLink={onLink} />
   const view = render(props(sub))
@@ -64,11 +64,20 @@ describe("SubscriptionCard", () => {
     act(() => { vi.advanceTimersByTime(70_000) })
     expect(status()).toHaveTextContent("The Telegram link expired before Start was pressed. Get a new link, open it and press Start.")
     expect(screen.getByText("Link expired")).toBeInTheDocument()
+    // The page stores the link and reads the list again. Until that is done the card cannot open
+    // the link, so the button must not come back: a second press would cancel the new code.
+    let listed: (value: unknown) => void = () => {}
+    onLink.mockReturnValue(new Promise(resolve => { listed = resolve }))
     fireEvent.click(screen.getByRole("button", { name: "Get a new Telegram link" }))
     expect(screen.getByRole("button", { name: "Getting a link…" })).toBeDisabled()
-    await act(async () => { await vi.runOnlyPendingTimersAsync() })
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
     expect(calls.newLink).toHaveBeenCalledWith("sub")
     expect(onLink).toHaveBeenCalledWith("sub", { url: "https://t.me/test_bot?start=new", expiresAt: inMinutes(10) })
+    expect(screen.getByRole("button", { name: "Getting a link…" })).toBeDisabled()
+    expect(screen.queryByRole("button", { name: "Get a new Telegram link" })).toBeNull()
+    await act(async () => { listed(undefined); await vi.advanceTimersByTimeAsync(0) })
+    expect(screen.getByRole("button", { name: "Get a new Telegram link" })).toBeEnabled()
+    expect(calls.newLink).toHaveBeenCalledOnce()
   })
 
   it("an old link is not offered for a newer code", () => {
@@ -127,13 +136,13 @@ describe("SubscriptionCard", () => {
     await act(async () => { finish({ sent: true, retryAfter: 60 }); await Promise.resolve() })
     update({ ...linked, testRetryAfter: 60 }, NOW)
     expect(screen.getByText("Test notification sent. Check your Telegram chat.")).toHaveAttribute("role", "status")
-    const waiting = screen.getByRole("button", { name: "Test again in 60 s" })
+    const waiting = screen.getByRole("button", { name: "Test again in 60 sec" })
     expect(waiting).toHaveAttribute("aria-disabled", "true")
     expect(waiting).toHaveFocus()
     fireEvent.click(waiting)
     expect(calls.sendTest).toHaveBeenCalledOnce()
     act(() => { vi.advanceTimersByTime(15_000) })
-    expect(screen.getByRole("button", { name: "Test again in 45 s" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Test again in 45 sec" })).toBeInTheDocument()
     // The minute ends: the button is back without waiting for the next read of the list.
     act(() => { vi.advanceTimersByTime(45_000) })
     expect(screen.getByRole("button", { name: "Get test notification" })).toHaveAttribute("aria-disabled", "false")
@@ -145,7 +154,7 @@ describe("SubscriptionCard", () => {
     // Five minutes pass with nothing to count, so the card's own clock rests.
     vi.setSystemTime(NOW + 5 * 60_000)
     update({ ...linked, testRetryAfter: 42 }, NOW + 5 * 60_000)
-    expect(screen.getByRole("button", { name: "Test again in 42 s" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Test again in 42 sec" })).toBeInTheDocument()
   })
 
   it.each([
@@ -189,6 +198,22 @@ describe("SubscriptionCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete subscription" }))
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Delete" })) })
     expect(calls.remove).toHaveBeenCalledWith("sub")
+  })
+})
+
+describe("a list from a service version before the test countdown", () => {
+  it("reads a missing or unusable testRetryAfter as none, so the test button works", async () => {
+    const previous: Partial<AlertSubscription> = { ...linked }
+    delete previous.testRetryAfter
+    for (const value of [previous as AlertSubscription, { ...linked, testRetryAfter: Number.NaN }, { ...linked, testRetryAfter: -5 },
+      { ...linked, testRetryAfter: null as unknown as number }]) expect(readSubscription(value).testRetryAfter).toBe(0)
+    expect(readSubscription({ ...linked, testRetryAfter: 42 }).testRetryAfter).toBe(42)
+    const { calls } = setup(readSubscription(previous as AlertSubscription))
+    const button = screen.getByRole("button", { name: "Get test notification" })
+    expect(button).toHaveAttribute("aria-disabled", "false")
+    await act(async () => { fireEvent.click(button) })
+    expect(calls.sendTest).toHaveBeenCalledWith("sub")
+    expect(screen.getByText("Test notification sent. Check your Telegram chat.")).toBeInTheDocument()
   })
 })
 

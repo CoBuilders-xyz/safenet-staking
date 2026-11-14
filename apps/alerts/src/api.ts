@@ -106,7 +106,8 @@ export async function api(request: Request, env: Env, db = new Database(env.DB),
           if (!await db.claimTest(id, owner.wallet)) {
             // Another request claimed this minute's test. Read when it did, to say how long to wait.
             const current = (await db.subscriptions(owner.wallet)).find(row => row.id === id)
-            throw new HttpError(429, "One test message per minute", "rate", Math.max(1, testRetryAfter(current?.tested_at ?? null)))
+            if (!current) throw new HttpError(404, "Not found") // Deleted since the read above.
+            throw new HttpError(429, "One test message per minute", "rate", Math.max(1, testRetryAfter(current.tested_at)))
           }
           const outcome = await sendTest(db, env, sub)
           if (outcome === "expired") throw new HttpError(409, "Subscription expired", "expired")

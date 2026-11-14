@@ -774,9 +774,9 @@
     "statusTelegramOpened": "Esperando que pulses Iniciar en Telegram. Esta tarjeta se actualiza apenas lo hagas.",
     "subscribing": "Suscribiendo…",
     "telegramHelpStart": "Después de suscribirte, abrí Telegram desde la tarjeta nueva y pulsá Iniciar. Solo enviamos al chat que conectás.",
-    "testAgainIn": "Probar de nuevo en {{seconds}} s",
     "testPending": "Enviando…",
     "testSentTelegramNow": "Notificación de prueba enviada. Revisá tu chat de Telegram.",
-    "addSubscription": "Agregar una suscripción"
+    "addSubscription": "Agregar una suscripción",
+    "testAgainInSeconds": "Probar de nuevo en {{seconds}} seg"
   }
 }

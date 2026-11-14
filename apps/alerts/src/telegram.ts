@@ -13,6 +13,16 @@ export const WEBHOOK_UPDATES = ["message", "callback_query"] as const
  */
 const SECRET_FORMAT = /^[\w-]{32,256}$/
 export const usableWebhookSecret = (secret: string | undefined): secret is string => !!secret && SECRET_FORMAT.test(secret)
+/**
+ * The webhook URL of the Worker at `origin`: an https origin, with no path, query or credentials.
+ * Undefined for anything else, so a mistyped origin is never registered or taken as healthy.
+ */
+export function webhookUrlFor(origin: string | undefined): string | undefined {
+  let url: URL
+  try { url = new URL(origin ?? "") } catch { return }
+  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || !/^\/?$/.test(url.pathname)) return
+  return `${url.origin}${WEBHOOK_PATH}`
+}
 /** Telegram subscriptions need the bot, its name and the webhook secret: without the last one no /start arrives. */
 export const telegramReady = (env: Env): boolean =>
   !!env.TELEGRAM_BOT_TOKEN && !!env.TELEGRAM_BOT_NAME && usableWebhookSecret(env.TELEGRAM_WEBHOOK_SECRET)
@@ -210,9 +220,11 @@ export interface WebhookHealth { registered: boolean; pending: number; failing: 
 /** An error this recent, with updates still waiting, means deliveries are failing now. */
 const RECENT_ERROR = 10 * 60_000
 /**
- * Asks Telegram whether updates reach this Worker: a webhook is registered on WEBHOOK_PATH, and
- * no delivery is failing. Undefined without a bot. The poller calls it, so an unregistered or
- * failing webhook, which stops every /start, shows in the run's health.
+ * Asks Telegram whether updates reach this Worker: the webhook it holds is this Worker's, and no
+ * delivery is failing. Undefined without a bot. The poller calls it, so a webhook that is missing,
+ * failing, or registered for another deployment, each of which stops every /start here, shows in
+ * the run's health. "This Worker's" is the URL built from ALERTS_URL. Only where that is not
+ * configured, as in local development, any https URL on WEBHOOK_PATH counts.
  */
 export async function webhookHealth(env: Env, transport: typeof fetch = fetch): Promise<WebhookHealth | undefined> {
   if (!env.TELEGRAM_BOT_TOKEN) return
@@ -223,10 +235,15 @@ export async function webhookHealth(env: Env, transport: typeof fetch = fetch): 
   const info = record((await response.json() as { result?: unknown }).result)
   if (!info) throw new Error("Telegram unavailable")
   let registered = false
-  try {
-    const url = new URL(String(info.url))
-    registered = url.protocol === "https:" && url.pathname === WEBHOOK_PATH
-  } catch { /* An empty URL: no webhook is registered. */ }
+  if (env.ALERTS_URL !== undefined && env.ALERTS_URL !== "") {
+    // A malformed ALERTS_URL gives no URL to match, so the run is unhealthy until it is fixed.
+    registered = typeof info.url === "string" && info.url === webhookUrlFor(env.ALERTS_URL)
+  } else {
+    try {
+      const url = new URL(String(info.url))
+      registered = url.protocol === "https:" && url.pathname === WEBHOOK_PATH
+    } catch { /* An empty URL: no webhook is registered. */ }
+  }
   const pending = typeof info.pending_update_count === "number" ? info.pending_update_count : 0
   const lastError = typeof info.last_error_date === "number" ? info.last_error_date * 1000 : 0
   return { registered, pending, failing: pending > 0 && Date.now() - lastError < RECENT_ERROR }
