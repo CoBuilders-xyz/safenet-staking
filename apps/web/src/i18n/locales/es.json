@@ -752,11 +752,9 @@
     "creating": "Creando tu suscripción…",
     "deletePending": "Borrando…",
     "duplicateHint": "Ya tenés una suscripción de Telegram con estas mismas alertas. Cambiá la selección para agregar otra.",
-    "errorDeliveryTest": "No se pudo entregar la notificación de prueba. Tu suscripción no cambió. Probá de nuevo en un minuto.",
     "errorDuplicate": "Ya tenés una suscripción con estas mismas alertas en este canal. Cambiá la selección, o usá la que ya existe.",
     "errorForbidden": "El servicio de alertas no acepta solicitudes desde esta dirección del sitio. Abrí el sitio oficial y probá de nuevo.",
     "errorRateSign": "Demasiadas solicitudes de firma para esta wallet. Esperá cinco minutos y firmá de nuevo.",
-    "errorRateTest": "Una notificación de prueba por minuto para cada suscripción. Esperá la cuenta regresiva y probá de nuevo.",
     "getTest": "Recibir notificación de prueba",
     "justLinked": "Telegram está conectado. Pedí una notificación de prueba para ver cómo llega.",
     "linkTelegramAgain": "Abrir Telegram de nuevo",
@@ -777,6 +775,8 @@
     "testPending": "Enviando…",
     "testSentTelegramNow": "Notificación de prueba enviada. Revisá tu chat de Telegram.",
     "addSubscription": "Agregar una suscripción",
-    "testAgainInSeconds": "Probar de nuevo en {{seconds}} seg"
+    "testAgainInSeconds": "Probar de nuevo en {{seconds}} seg",
+    "errorDeliveryTestRetry": "No se pudo entregar la notificación de prueba. Probá de nuevo en un minuto.",
+    "errorRateTestMinute": "Una notificación de prueba por minuto para cada suscripción. Esperá un minuto y probá de nuevo."
   }
 }

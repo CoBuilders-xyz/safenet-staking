@@ -732,11 +732,9 @@
     "creating": "正在创建订阅…",
     "deletePending": "正在删除…",
     "duplicateHint": "你已有一个包含相同提醒的 Telegram 订阅。请更改选择后再添加。",
-    "errorDeliveryTest": "测试通知未能送达。你的订阅没有变化。请一分钟后重试。",
     "errorDuplicate": "你在此渠道已有一个包含相同提醒的订阅。请更改选择，或使用现有订阅。",
     "errorForbidden": "提醒服务不接受来自此网站地址的请求。请打开官方网站后重试。",
     "errorRateSign": "此钱包的登录请求过多。请等待五分钟后重新签名。",
-    "errorRateTest": "每个订阅每分钟可发送一条测试通知。请等待倒计时结束后重试。",
     "getTest": "获取测试通知",
     "justLinked": "Telegram 已连接。获取一条测试通知，看看它如何送达。",
     "linkTelegramAgain": "再次打开 Telegram",
@@ -757,6 +755,8 @@
     "testPending": "正在发送…",
     "testSentTelegramNow": "测试通知已发送。请查看你的 Telegram 聊天。",
     "addSubscription": "添加订阅",
-    "testAgainInSeconds": "{{seconds}} 秒后可再次测试"
+    "testAgainInSeconds": "{{seconds}} 秒后可再次测试",
+    "errorDeliveryTestRetry": "测试通知未能送达。请一分钟后重试。",
+    "errorRateTestMinute": "每个订阅每分钟可发送一条测试通知。请等待一分钟后重试。"
   }
 }

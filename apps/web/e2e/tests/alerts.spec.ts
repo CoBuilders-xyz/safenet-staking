@@ -208,15 +208,15 @@ test("Get test notification sends at once, shows the result, and counts down to 
   mock.delay = 0
   mock.subscriptions[0]!.testedAt = Date.now() - 60_000
   await expect(test).toHaveAttribute("aria-disabled", "false", { timeout: 20_000 })
-  // Telegram did not take it: the card says so and what to do. The subscription is unchanged.
+  // Telegram did not take it: the card says so and what to do. The subscription stays connected.
   mock.refuse.test = { status: 502, code: "delivery" }
   await test.click()
-  await expect(card.getByRole("alert")).toHaveText("The test notification could not be delivered. Nothing changed in your subscription. Try again in a minute.")
+  await expect(card.getByRole("alert")).toHaveText("The test notification could not be delivered. Try again in a minute.")
   await expect(card.getByRole("status").first()).toHaveText(connected)
   // Refused by the limit, as when another tab sent one: the reason, not a generic failure.
   mock.refuse.test = { status: 429, code: "rate" }
   await test.click()
-  await expect(card.getByRole("alert")).toHaveText("One test notification per minute for each subscription. Wait for the countdown, then try again.")
+  await expect(card.getByRole("alert")).toHaveText("One test notification per minute for each subscription. Wait a minute, then try again.")
   // The chat blocked the bot: the service expires the subscription, and the card says to replace it.
   mock.refuse.test = { status: 409, code: "expired" }
   mock.subscriptions[0]!.status = "expired"
@@ -241,7 +241,7 @@ test("against the service version before the countdown, as after a rollback, the
   // That version sends no seconds, so the button does not count down. Its own limit still answers.
   await expect(test).toHaveAttribute("aria-disabled", "false")
   await test.click()
-  await expect(card.getByRole("alert")).toHaveText("One test notification per minute for each subscription. Wait for the countdown, then try again.")
+  await expect(card.getByRole("alert")).toHaveText("One test notification per minute for each subscription. Wait a minute, then try again.")
   expect(mock.calls).toEqual(["test", "test"])
 })
 
@@ -264,6 +264,37 @@ test("on a phone the card keeps its height from waiting to connected to tested, 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
 
+for (const language of ["es", "de", "fr", "it", "pt", "ru", "zh-Hans"]) {
+  test(`on a phone in ${language}, where the texts are longer, the card keeps its height through opening the link and connecting`, async ({ connectedPage: page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.addInitScript(code => localStorage.setItem("language", code), language)
+    const { subscriptions } = await service(page)
+    await page.goto("/#/alerts")
+    await expect(page.locator("html")).toHaveAttribute("lang", language)
+    // The page is not in English here, so the controls are found by their place, not their name.
+    await page.locator("main section button").first().click()
+    await page.locator("form button[type=submit]").click()
+    const card = page.getByRole("article")
+    const link = card.getByRole("link")
+    await expect(link).toBeVisible()
+    const height = async () => Math.round((await card.boundingBox())!.height)
+    const waitingHeight = await height()
+    await page.context().route("https://t.me/**", route => route.fulfill({ body: "Telegram" }))
+    const [telegram] = await Promise.all([page.waitForEvent("popup"), link.click()])
+    await telegram.close()
+    await expect(link).not.toHaveText(/Start|Iniciar|Démarrer|Avvia|Запустить|开始/) // "Open Telegram again", in the page's language.
+    expect(await height(), "after the link was opened").toBe(waitingHeight)
+    pressStart(subscriptions[0]!)
+    await expect(card.getByRole("link")).toHaveCount(0)
+    expect(await height(), "after Start connected the chat").toBe(waitingHeight)
+    // The test result takes the note's place without moving anything either.
+    await card.getByRole("button").first().click()
+    await expect(card.getByRole("button").first()).toHaveAttribute("aria-disabled", "true")
+    expect(await height(), "after a test notification was sent").toBe(waitingHeight)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  })
+}
+
 test("a refused subscription is explained next to the Subscribe button, in view", async ({ connectedPage: page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   const { refuse } = await service(page)
@@ -281,8 +312,10 @@ test("a refused subscription is explained next to the Subscribe button, in view"
   await expect(alert).toBeInViewport()
   const [message, button] = [(await alert.boundingBox())!, (await subscribe.boundingBox())!]
   expect(button.y - (message.y + message.height)).toBeLessThan(40) // Directly above the button.
-  // The next attempt clears it.
+  // The refusal was about that choice: a new choice removes it.
   delete refuse.subscribe
+  await page.getByRole("checkbox", { name: "Validator deregistered", exact: true }).check()
+  await expect(page.getByRole("alert")).toHaveCount(0)
   await subscribe.click()
   await expect(page.getByRole("article")).toHaveCount(2)
   await expect(page.getByRole("alert")).toHaveCount(0)

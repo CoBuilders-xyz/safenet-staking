@@ -39,9 +39,9 @@ export function SubscriptionCardSkeleton({ label }: { label: string }) {
  * reload the card offers a new one. The card opens `link` only while the subscription's current
  * code is that link's own, by its expiry: a newer code makes this link dead.
  *
- * The status line and the note under it always hold their place, two lines for the note on a
- * narrow screen, so the card keeps its height when it goes from waiting to connected, and when a
- * result appears.
+ * The status line and the note under it always hold their place, three lines and two on a narrow
+ * screen, so the card keeps its height when it goes from waiting to connected, and when a result
+ * appears, in every language of the interface.
  */
 export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscriptions, fetchedAt, actions, onLink }: {
   sub: AlertSubscription
@@ -161,10 +161,12 @@ export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscripti
       </Badge>
     </div>
     {triggers}
-    <p role="status" className="font-medium min-h-6">{status}</p>
+    {/* Three lines on a phone, where the waiting status of the longer languages needs them. */}
+    <p role="status" className="font-medium min-h-18 sm:min-h-6">{status}</p>
     {/* Keyed by its kind, so a new result is a new element and is announced. */}
     <p key={note?.role ?? "hint"} role={note?.role} className={`text-sm min-h-10 sm:min-h-5 ${note?.role === "alert" ? "text-destructive" : "text-muted-foreground"}`}>{note?.text}</p>
-    <div className="flex flex-wrap gap-2">
+    {/* One button per row on a phone: the rows then do not depend on how long a label is in each language. */}
+    <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
       {openLink && <Button asChild>
         <a ref={anchor} href={openLink} target="_blank" rel="noreferrer" onClick={() => { setOpened(true); void actions.watchLink() }}>
           {opened ? t("alerts.linkTelegramAgain", "Open Telegram again") : t("alerts.linkTelegram", "Open Telegram and press Start")}

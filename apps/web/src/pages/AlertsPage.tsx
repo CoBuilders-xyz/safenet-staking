@@ -96,7 +96,8 @@ function ConnectedAlerts({ address }: { address: Address }) {
         {/* The new subscription holds its place while the service creates it. */}
         {creating && !subscriptions?.some(sub => sub.id === created) && <SubscriptionCardSkeleton label={t("alerts.creating", "Creating your subscription…")} />}
       </section>}
-      <form onSubmit={save} aria-labelledby="alerts-add" className="space-y-5">
+      {/* A refusal belongs to the choice that was sent: changing the choice removes it. */}
+      <form onSubmit={save} onChange={() => { if (error?.during === "subscribe") setError(null) }} aria-labelledby="alerts-add" className="space-y-5">
         <h2 id="alerts-add" className="font-semibold">{t("alerts.addSubscription", "Add a subscription")}</h2>
         <fieldset disabled={busy || atLimit} className="space-y-3">
           <legend className="font-medium mb-3">{t("alerts.chooseTriggers", "Choose triggers")}</legend>

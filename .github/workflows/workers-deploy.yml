@@ -143,19 +143,22 @@ jobs:
           ALERTS_URL: ${{ vars.VITE_ALERTS_API_URL }}
         run: node --import tsx scripts/telegram-webhook.ts set
       # Every alerts deploy reports what Telegram holds. A webhook that is missing, or that points
-      # elsewhere, means no chat can link: the job warns, and the next poll turns /health to 503.
+      # elsewhere, means no chat can link: the job ends red, after the deploy, so that it is seen.
+      # A report Telegram could not give is only a warning: the deploy itself is done.
       - name: Report the Telegram webhook
         if: inputs.target != 'api'
-        continue-on-error: true
         working-directory: apps/alerts
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           ALERTS_URL: ${{ vars.VITE_ALERTS_API_URL }}
         run: |
-          report="$(node --import tsx scripts/telegram-webhook.ts info)"
+          if ! report="$(node --import tsx scripts/telegram-webhook.ts info)"; then
+            echo "::warning::Telegram gave no webhook report. Check it with 'telegram:webhook info' (DEPLOY.md)."
+            exit 0
+          fi
           { echo "### Telegram webhook"; echo '```'; echo "$report"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           echo "$report"
           case "$report" in
             "webhook: registered for this Worker"*) ;;
-            *) echo "::warning::Telegram does not deliver updates to this Worker. Run this workflow with 'telegram_webhook' on (DEPLOY.md)." ;;
+            *) echo "::error::The Worker is deployed, but Telegram does not deliver updates to it, so no chat can link. Run this workflow again with 'telegram_webhook' on (DEPLOY.md)."; exit 1 ;;
           esac

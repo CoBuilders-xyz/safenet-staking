@@ -752,11 +752,9 @@
     "creating": "Creazione dell’abbonamento…",
     "deletePending": "Eliminazione…",
     "duplicateHint": "Hai già un abbonamento Telegram con questi stessi avvisi. Cambia la selezione per aggiungerne un altro.",
-    "errorDeliveryTest": "Impossibile consegnare la notifica di prova. Il tuo abbonamento non è cambiato. Riprova tra un minuto.",
     "errorDuplicate": "Hai già un abbonamento con questi stessi avvisi su questo canale. Cambia la selezione, oppure usa quello esistente.",
     "errorForbidden": "Il servizio di avvisi non accetta richieste da questo indirizzo del sito. Apri il sito ufficiale e riprova.",
     "errorRateSign": "Troppe richieste di firma per questo wallet. Attendi cinque minuti, poi firma di nuovo.",
-    "errorRateTest": "Una notifica di prova al minuto per ogni abbonamento. Attendi il conto alla rovescia, poi riprova.",
     "getTest": "Ricevi notifica di prova",
     "justLinked": "Telegram è collegato. Richiedi una notifica di prova per vederne arrivare una.",
     "linkTelegramAgain": "Apri di nuovo Telegram",
@@ -777,6 +775,8 @@
     "testPending": "Invio…",
     "testSentTelegramNow": "Notifica di prova inviata. Controlla la tua chat Telegram.",
     "addSubscription": "Aggiungi un abbonamento",
-    "testAgainInSeconds": "Nuova prova tra {{seconds}} sec"
+    "testAgainInSeconds": "Nuova prova tra {{seconds}} sec",
+    "errorDeliveryTestRetry": "Impossibile consegnare la notifica di prova. Riprova tra un minuto.",
+    "errorRateTestMinute": "Una notifica di prova al minuto per ogni abbonamento. Attendi un minuto, poi riprova."
   }
 }

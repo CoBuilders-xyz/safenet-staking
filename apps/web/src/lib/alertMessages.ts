@@ -15,9 +15,9 @@ export function alertErrorMessage(t: TFunction, code: AlertErrorCode, maxSubscri
     case "push_unavailable": return t("alerts.errorPushUnavailable", "Browser notifications are not available right now. Try again later, or use Telegram.")
     case "duplicate": return t("alerts.errorDuplicate", "You already have a subscription with these same alerts on this channel. Change the selection, or use the existing one.")
     case "rate": return during === "test"
-      ? t("alerts.errorRateTest", "One test notification per minute for each subscription. Wait for the countdown, then try again.")
+      ? t("alerts.errorRateTestMinute", "One test notification per minute for each subscription. Wait a minute, then try again.")
       : t("alerts.errorRateSign", "Too many sign-in requests for this wallet. Wait five minutes, then sign again.")
-    case "delivery": return t("alerts.errorDeliveryTest", "The test notification could not be delivered. Nothing changed in your subscription. Try again in a minute.")
+    case "delivery": return t("alerts.errorDeliveryTestRetry", "The test notification could not be delivered. Try again in a minute.")
     case "forbidden": return t("alerts.errorForbidden", "The alerts service does not accept requests from this address of the site. Open the official site and try again.")
     case "expired": return t("alerts.errorExpired", "This subscription can no longer deliver. Delete it and subscribe again.")
     case "linked": return t("alerts.errorLinked", "Telegram is already connected for this subscription.")

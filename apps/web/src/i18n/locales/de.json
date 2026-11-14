@@ -742,13 +742,11 @@
     "creating": "Dein Abonnement wird erstellt…",
     "deletePending": "Wird gelöscht…",
     "duplicateHint": "Du hast bereits ein Telegram-Abonnement mit genau diesen Benachrichtigungen. Ändere die Auswahl, um ein weiteres hinzuzufügen.",
-    "errorDeliveryTest": "Die Testbenachrichtigung konnte nicht zugestellt werden. An deinem Abonnement hat sich nichts geändert. Versuche es in einer Minute erneut.",
     "errorDuplicate": "Du hast bereits ein Abonnement mit genau diesen Benachrichtigungen auf diesem Kanal. Ändere die Auswahl oder nutze das vorhandene.",
     "errorForbidden": "Der Benachrichtigungsdienst nimmt keine Anfragen von dieser Adresse der Website an. Öffne die offizielle Website und versuche es erneut.",
     "errorRateSign": "Zu viele Anmeldeanfragen für diese Wallet. Warte fünf Minuten und signiere dann erneut.",
-    "errorRateTest": "Eine Testbenachrichtigung pro Minute je Abonnement. Warte den Countdown ab und versuche es dann erneut.",
     "getTest": "Testbenachrichtigung erhalten",
-    "justLinked": "Telegram ist verbunden. Hol dir eine Testbenachrichtigung, um zu sehen, wie sie ankommt.",
+    "justLinked": "Telegram ist verbunden. Hol dir jetzt eine Testbenachrichtigung.",
     "linkTelegramAgain": "Telegram erneut öffnen",
     "newLinkPending": "Link wird geholt…",
     "signing": "Warte auf deine Signatur…",
@@ -767,6 +765,8 @@
     "testPending": "Wird gesendet…",
     "testSentTelegramNow": "Testbenachrichtigung gesendet. Sieh in deinem Telegram-Chat nach.",
     "addSubscription": "Abonnement hinzufügen",
-    "testAgainInSeconds": "Erneut testen in {{seconds}} Sek."
+    "testAgainInSeconds": "Erneut testen in {{seconds}} Sek.",
+    "errorDeliveryTestRetry": "Die Testbenachrichtigung konnte nicht zugestellt werden. Versuche es in einer Minute erneut.",
+    "errorRateTestMinute": "Eine Testbenachrichtigung pro Minute je Abonnement. Warte eine Minute und versuche es dann erneut."
   }
 }

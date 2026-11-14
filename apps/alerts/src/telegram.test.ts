@@ -253,7 +253,7 @@ test("a press of Confirm receipt is answered in the same request, and the confir
     await send(press(ack, 123))
     assert.deepEqual(telegramApi.calls, [
       { method: "answerCallbackQuery", body: { callback_query_id: "query", text: "Receipt confirmed." } },
-      { method: "editMessageText", body: { chat_id: 123, message_id: 55, text: "Safenet\nready\n\nReceipt confirmed." } },
+      { method: "editMessageText", body: { chat_id: 123, message_id: 55, text: "Safenet\nready\n\nReceipt confirmed.", reply_markup: { inline_keyboard: [] } } },
     ])
     assert.equal(await status(), "verified")
     assert.equal((await db.query<{ state: string }>("select state from alerts_deliveries"))[0]!.state, "received")

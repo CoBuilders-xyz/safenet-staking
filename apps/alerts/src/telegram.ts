@@ -165,10 +165,11 @@ export async function handleUpdate(db: Database, env: Env, update: Json, transpo
     }
     // Every press is answered here, so the button never stays on "loading".
     await call("answerCallbackQuery", { callback_query_id: callback.id, text: confirmed ? RECEIPT_NOTE : "This receipt has expired." })
-    // The confirmation is also written into the message, where it stays visible, and the button goes.
+    // The confirmation is also written into the message, where it stays visible. The empty keyboard
+    // removes the button on every Telegram client.
     const text = source?.text, messageId = source?.message_id
     if (confirmed && chat !== undefined && typeof messageId === "number" && typeof text === "string" && !text.endsWith(RECEIPT_NOTE)) {
-      await call("editMessageText", { chat_id: chat, message_id: messageId, text: `${text}\n\n${RECEIPT_NOTE}` })
+      await call("editMessageText", { chat_id: chat, message_id: messageId, text: `${text}\n\n${RECEIPT_NOTE}`, reply_markup: { inline_keyboard: [] } })
     }
     return { outcome: received ? "receipt" : confirmed ? "receipt_repeated" : "receipt_refused", replyFailed }
   }

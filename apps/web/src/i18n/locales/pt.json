@@ -752,11 +752,9 @@
     "creating": "Criando sua assinatura…",
     "deletePending": "Excluindo…",
     "duplicateHint": "Você já tem uma assinatura do Telegram com estes mesmos alertas. Mude a seleção para adicionar outra.",
-    "errorDeliveryTest": "Não foi possível entregar a notificação de teste. Sua assinatura não mudou. Tente de novo em um minuto.",
     "errorDuplicate": "Você já tem uma assinatura com estes mesmos alertas neste canal. Mude a seleção, ou use a que já existe.",
     "errorForbidden": "O serviço de alertas não aceita solicitações deste endereço do site. Abra o site oficial e tente de novo.",
     "errorRateSign": "Muitas solicitações de assinatura para esta carteira. Aguarde cinco minutos e assine de novo.",
-    "errorRateTest": "Uma notificação de teste por minuto para cada assinatura. Aguarde a contagem regressiva e tente de novo.",
     "getTest": "Receber notificação de teste",
     "justLinked": "O Telegram está conectado. Peça uma notificação de teste para ver uma chegar.",
     "linkTelegramAgain": "Abrir o Telegram de novo",
@@ -777,6 +775,8 @@
     "testPending": "Enviando…",
     "testSentTelegramNow": "Notificação de teste enviada. Confira seu chat do Telegram.",
     "addSubscription": "Adicionar uma assinatura",
-    "testAgainInSeconds": "Testar de novo em {{seconds}} seg"
+    "testAgainInSeconds": "Testar de novo em {{seconds}} seg",
+    "errorDeliveryTestRetry": "Não foi possível entregar a notificação de teste. Tente de novo em um minuto.",
+    "errorRateTestMinute": "Uma notificação de teste por minuto para cada assinatura. Aguarde um minuto e tente de novo."
   }
 }

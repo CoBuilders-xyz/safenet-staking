@@ -26,6 +26,8 @@ does the same.
    ```
    Set the ID it prints as the `production` environment variable `ALERTS_D1_DATABASE_ID`.
 3. **The two web URLs** as repository variables, and in Vercel: see [Web](#web-where-the-interface-finds-the-workers).
+4. **The Telegram webhook secret**, as the `production` secret `TELEGRAM_WEBHOOK_SECRET`: see
+   [Set it up](#set-it-up). An alerts deploy without it fails by name before it uploads the Worker.
 
 Everything else already exists. Never put a value in the repository.
 
@@ -73,7 +75,7 @@ configured.
 
 ## Order of operations
 
-1. Do the three steps in [What remains](#what-remains-before-the-first-deploy).
+1. Do the four steps in [What remains](#what-remains-before-the-first-deploy).
 2. Run *Workers deploy* from `main` with target `both` and `telegram_webhook` on, and approve it.
    The workflow tests each package, applies the D1 migrations, deploys both Workers, then
    registers the Telegram webhook ([Telegram webhook](#telegram-webhook)).
@@ -127,6 +129,8 @@ Telegram would otherwise deliver again the updates that the last poll already ha
 
 1. The job summary shows a *Telegram webhook* block. It must start with
    `webhook: registered for this Worker`, list `message, callback_query`, and show no last error.
+   An alerts deploy whose webhook is missing, or registered for another URL, ends red at this
+   step: the Worker is deployed, and the fix is to run the workflow again with `telegram_webhook` on.
    The same report, at any time, with the bot token in the shell:
    ```sh
    ALERTS_URL=https://safenet-alerts.<subdomain>.workers.dev pnpm --filter @cobuilders/safenet-alerts telegram:webhook info

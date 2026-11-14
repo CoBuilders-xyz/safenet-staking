@@ -752,11 +752,9 @@
     "creating": "Création de votre abonnement…",
     "deletePending": "Suppression…",
     "duplicateHint": "Vous avez déjà un abonnement Telegram avec ces mêmes alertes. Modifiez la sélection pour en ajouter un autre.",
-    "errorDeliveryTest": "La notification de test n’a pas pu être remise. Votre abonnement n’a pas changé. Réessayez dans une minute.",
     "errorDuplicate": "Vous avez déjà un abonnement avec ces mêmes alertes sur ce canal. Modifiez la sélection, ou utilisez celui qui existe.",
     "errorForbidden": "Le service d’alertes n’accepte pas les requêtes depuis cette adresse du site. Ouvrez le site officiel et réessayez.",
     "errorRateSign": "Trop de demandes de signature pour ce portefeuille. Attendez cinq minutes, puis signez de nouveau.",
-    "errorRateTest": "Une notification de test par minute pour chaque abonnement. Attendez la fin du compte à rebours, puis réessayez.",
     "getTest": "Recevoir une notification de test",
     "justLinked": "Telegram est connecté. Demandez une notification de test pour en voir arriver une.",
     "linkTelegramAgain": "Ouvrir Telegram de nouveau",
@@ -777,6 +775,8 @@
     "testPending": "Envoi…",
     "testSentTelegramNow": "Notification de test envoyée. Consultez votre chat Telegram.",
     "addSubscription": "Ajouter un abonnement",
-    "testAgainInSeconds": "Nouveau test dans {{seconds}} sec"
+    "testAgainInSeconds": "Nouveau test dans {{seconds}} sec",
+    "errorDeliveryTestRetry": "La notification de test n’a pas pu être remise. Réessayez dans une minute.",
+    "errorRateTestMinute": "Une notification de test par minute pour chaque abonnement. Attendez une minute, puis réessayez."
   }
 }

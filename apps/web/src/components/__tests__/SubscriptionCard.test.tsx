@@ -158,8 +158,8 @@ describe("SubscriptionCard", () => {
   })
 
   it.each([
-    ["delivery", "The test notification could not be delivered. Nothing changed in your subscription. Try again in a minute."],
-    ["rate", "One test notification per minute for each subscription. Wait for the countdown, then try again."],
+    ["delivery", "The test notification could not be delivered. Try again in a minute."],
+    ["rate", "One test notification per minute for each subscription. Wait a minute, then try again."],
     ["expired", "This subscription can no longer deliver. Delete it and subscribe again."],
     ["not_linked", "Connect Telegram first: get a link, open it and press Start."],
     ["session", "Your session expired. Sign again to continue."],
@@ -245,7 +245,7 @@ describe("alert error messages", () => {
 
   it("names the limit that refused the request", () => {
     expect(alertErrorMessage(t, "rate", 10)).toBe("Too many sign-in requests for this wallet. Wait five minutes, then sign again.")
-    expect(alertErrorMessage(t, "rate", 10, "test")).toBe("One test notification per minute for each subscription. Wait for the countdown, then try again.")
+    expect(alertErrorMessage(t, "rate", 10, "test")).toBe("One test notification per minute for each subscription. Wait a minute, then try again.")
     expect(alertErrorMessage(t, "limit", 4)).toBe("You have 4 subscriptions, the maximum. Delete one to add another.")
   })
 })
