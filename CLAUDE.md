@@ -171,7 +171,9 @@ snapshot, publication or index jobs call `page-on-red.yml`.
 from `main` or a `v*` tag, needs `PINATA_JWT` and `PINATA_GATEWAY`, and fails when they are empty.
 `workers-deploy.yml` runs only by hand, from `main`, through the protected `production`
 environment: it tests `apps/api` and `apps/alerts`, applies the alerts D1 migrations and deploys
-both Workers with `cf deploy`, on their workers.dev URLs. `DEPLOY.md` lists every input.
+both Workers with `cf deploy`, on their workers.dev URLs. With `telegram_webhook` on, it then
+registers the alerts Worker's Telegram webhook with `TELEGRAM_WEBHOOK_SECRET`; every alerts deploy
+reports what Telegram holds. `DEPLOY.md` lists every input.
 The release build takes the two service URLs, `VITE_VALIDATOR_INFO_URL` and `VITE_ALERTS_API_URL`,
 from repository variables.
 `availability.yml` runs the `availability` script of `apps/web` every six hours, on demand, and
