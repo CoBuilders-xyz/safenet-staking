@@ -260,7 +260,8 @@ test("a subscription's own actions: a new Telegram link, pause and resume, and a
       const refusal = await refused.json() as { code: string; retryAfter: number }
       assert.deepEqual([refused.status, refusal.code], [429, "rate"])
       assert.ok(refusal.retryAfter >= 55 && refusal.retryAfter <= 60)
-      assert.equal((await list()).testRetryAfter, refusal.retryAfter)
+      // The list counts from its own instant, so a second can pass between the two answers.
+      assert.ok(Math.abs((await list()).testRetryAfter as number - refusal.retryAfter) <= 1)
       assert.equal(sentTo.length, 1)
       // A test that loses the race with a delete is "not found", not a limit to wait out.
       const doomed = await db.subscribe(account.address.toLowerCase(), "sig", { ...telegram, triggers: ["deregistered"] }, "doomed")
