@@ -185,21 +185,21 @@ export async function telegramWebhook(request: Request, env: Env, db: Database, 
   if (!env.TELEGRAM_BOT_TOKEN || !usableWebhookSecret(secret)) return answer(503)
   const given = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
   if (!given || given.length > 256 || !await sameSecret(given, secret)) return answer(401)
-  let claimed: number | undefined
+  let held: { id: number; claim: string } | undefined
   try {
     const update = await readUpdate(request)
     if (!update) return answer(200)
-    const claim = await db.claimUpdate(update.update_id)
-    if (claim === "done") return answer(200)
-    if (claim === "busy") return answer(503, { "Retry-After": "5" })
-    claimed = update.update_id
+    const taken = await db.claimUpdate(update.update_id)
+    if (taken === "done") return answer(200)
+    if (taken === "busy") return answer(503, { "Retry-After": "5" })
+    held = { id: update.update_id, claim: taken.claim }
     const result = await handleUpdate(db, env, update, transport)
-    await db.finishUpdate(claimed)
+    await db.finishUpdate(held.id, held.claim)
     console.log(JSON.stringify({ event: "alerts_telegram_update", ...result }))
     return answer(200)
   } catch {
     // Never log the failure itself: it can name stored values or a provider URL.
-    if (claimed !== undefined) try { await db.releaseUpdate(claimed) } catch { /* The lease ends by itself. */ }
+    if (held) try { await db.releaseUpdate(held.id, held.claim) } catch { /* The lease ends by itself. */ }
     console.log(JSON.stringify({ event: "alerts_telegram_update", outcome: "error" }))
     return answer(500)
   }

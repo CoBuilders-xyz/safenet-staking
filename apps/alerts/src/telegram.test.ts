@@ -306,7 +306,8 @@ test("an update another request is handling answers 503 until that request ends 
     const sub = await db.subscribe(account.address, "sig", telegram, await digest(link))
     const telegramApi = provider()
     const update = start(`/start ${link}`, 123)
-    assert.equal(await db.claimUpdate(update.update_id), "claimed") // Another request holds it.
+    const first = await db.claimUpdate(update.update_id) // Another request holds it.
+    assert.ok(typeof first === "object")
     const busy = await telegramWebhook(post(update), env, db, telegramApi.transport)
     assert.deepEqual([busy.status, busy.headers.get("Retry-After")], [503, "5"])
     assert.equal(await chatOf(db, sub.id), null)
@@ -316,6 +317,16 @@ test("an update another request is handling answers 503 until that request ends 
     assert.equal((await telegramWebhook(post(update), env, db, telegramApi.transport)).status, 200)
     assert.equal(await chatOf(db, sub.id), "123")
     assert.equal(await db.claimUpdate(update.update_id), "done")
+    // The first request, slow rather than dead, comes back: its claim was taken over, so it can
+    // neither release the update for another round nor finish one it does not hold.
+    await db.releaseUpdate(update.update_id, first.claim)
+    assert.equal(await db.claimUpdate(update.update_id), "done")
+    const other = await db.claimUpdate(update.update_id + 1)
+    assert.ok(typeof other === "object")
+    await db.finishUpdate(update.update_id + 1, first.claim)
+    assert.equal(await db.claimUpdate(update.update_id + 1), "busy")
+    await db.finishUpdate(update.update_id + 1, other.claim)
+    assert.equal(await db.claimUpdate(update.update_id + 1), "done")
   } finally { await db.close() }
 })
 
@@ -459,7 +470,7 @@ test("cleanup drops handled updates after two days, spent reply windows, and con
     assert.equal(await db.linkTelegram(await digest("c".repeat(43)), "123"), true)
     assert.equal(await db.linkedWith(await digest("c".repeat(43)), "123"), true)
     assert.equal(await db.linkedWith(await digest("c".repeat(43)), "456"), false)
-    for (const id of [1, 2]) { await db.claimUpdate(id); await db.finishUpdate(id) }
+    for (const id of [1, 2]) { const taken = await db.claimUpdate(id); assert.ok(typeof taken === "object"); await db.finishUpdate(id, taken.claim) }
     await db.query("update alerts_telegram_updates set received_at = ? where update_id = 1", at(-49 * 3_600_000))
     assert.equal(await db.allowReply("old"), true)
     assert.equal(await db.allowReply("new"), true)

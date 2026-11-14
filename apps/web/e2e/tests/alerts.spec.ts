@@ -307,6 +307,12 @@ test("creating a subscription shows its place at once, and an unavailable channe
   await expect(page.getByRole("status", { name: "Creating your subscription…" })).toHaveCount(0)
   await expect(page.getByRole("article").getByText("Not confirmed yet", { exact: true })).toBeVisible()
   await expect(page.getByRole("button", { name: "Subscribe", exact: true })).toBeEnabled()
+  // The next subscription holds its place too, under the card that is already there.
+  await page.getByRole("checkbox", { name: "Rewards claimable", exact: true }).check()
+  await page.getByRole("button", { name: "Subscribe", exact: true }).click()
+  await expect(page.getByRole("status", { name: "Creating your subscription…" })).toBeVisible()
+  await expect(page.getByRole("article")).toHaveCount(2)
+  await expect(page.getByRole("status", { name: "Creating your subscription…" })).toHaveCount(0)
 })
 
 test("a lost or expired Telegram link is replaced from the card, without deleting the subscription", async ({ connectedPage: page }) => {

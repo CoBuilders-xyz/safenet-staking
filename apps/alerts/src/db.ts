@@ -262,26 +262,28 @@ export class Database {
   }
 
   /**
-   * Takes a Telegram update for this request. "done" when an earlier delivery of it was handled,
-   * "busy" while another request still holds it. A claim left by a request that died is taken over
-   * once its lease ends.
+   * Takes a Telegram update for this request, and returns the claim to finish or release it with.
+   * "done" when an earlier delivery of it was handled, "busy" while another request still holds
+   * it. A claim left by a request that died is taken over once its lease ends.
    */
-  async claimUpdate(updateId: number): Promise<"claimed" | "done" | "busy"> {
+  async claimUpdate(updateId: number): Promise<{ claim: string } | "done" | "busy"> {
     const now = Date.now()
-    const claimed = await this.run(`insert into alerts_telegram_updates(update_id, state, lease_until, received_at) values (?1, 'processing', ?2, ?3)
-      on conflict(update_id) do update set lease_until = excluded.lease_until, received_at = excluded.received_at
-      where alerts_telegram_updates.state = 'processing' and alerts_telegram_updates.lease_until < ?3`,
-    updateId, iso(now + UPDATE_LEASE), iso(now)) > 0
-    if (claimed) return "claimed"
+    const claim = crypto.randomUUID()
+    const claimed = await this.run(`insert into alerts_telegram_updates(update_id, state, claim, lease_until, received_at) values (?1, 'processing', ?2, ?3, ?4)
+      on conflict(update_id) do update set claim = excluded.claim, lease_until = excluded.lease_until, received_at = excluded.received_at
+      where alerts_telegram_updates.state = 'processing' and alerts_telegram_updates.lease_until < ?4`,
+    updateId, claim, iso(now + UPDATE_LEASE), iso(now)) > 0
+    if (claimed) return { claim }
     const [row] = await this.all<{ state: string }>("select state from alerts_telegram_updates where update_id = ?", updateId)
     return row?.state === "done" ? "done" : "busy"
   }
-  async finishUpdate(updateId: number) {
-    await this.run("update alerts_telegram_updates set state = 'done' where update_id = ?", updateId)
+  /** Marks our own claim handled. A request whose claim was taken over changes nothing. */
+  async finishUpdate(updateId: number, claim: string) {
+    await this.run("update alerts_telegram_updates set state = 'done' where update_id = ? and claim = ?", updateId, claim)
   }
-  /** Gives the update back after a failure, so Telegram's next delivery of it is handled. */
-  async releaseUpdate(updateId: number) {
-    await this.run("delete from alerts_telegram_updates where update_id = ? and state = 'processing'", updateId)
+  /** Gives our own claim back after a failure, so Telegram's next delivery of the update is handled. */
+  async releaseUpdate(updateId: number, claim: string) {
+    await this.run("delete from alerts_telegram_updates where update_id = ? and claim = ? and state = 'processing'", updateId, claim)
   }
   /** Counts one guidance reply to this chat. False when the chat already got REPLY_LIMIT in the window. */
   async allowReply(chatKey: string): Promise<boolean> {

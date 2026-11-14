@@ -46,6 +46,7 @@ function ConnectedAlerts({ address }: { address: Address }) {
   }
   const save = (event: FormEvent) => {
     event.preventDefault()
+    setCreated(null) // The subscription created before is in the list; the placeholder is for this one.
     void run("subscribe", async () => {
       const delivery = channel === "telegram" ? { kind: "telegram" } : await browserChannel(alerts.config.data?.vapidPublicKey ?? "")
       const result = await alertRequest<{ id: string; telegramUrl: string | null; expiresAt: string | null }>("/subscriptions", alerts.token,

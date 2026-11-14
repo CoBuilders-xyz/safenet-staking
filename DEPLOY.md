@@ -114,9 +114,11 @@ was given. It never calls `getUpdates`. `apps/alerts/README.md` describes the en
    `drop_pending_updates=true`, reads the registration back, and fails unless Telegram holds that
    URL. A deploy without the secret fails before it uploads the Worker, and names the missing value.
 
-Between the deploy and the registration, a few seconds, nothing reads Telegram. A `/start` sent in
-that gap, or before it, is dropped by `drop_pending_updates`; the alerts page shows that
-subscription as not connected and offers a new link.
+Between the deploy and the registration, a few seconds, nothing reads Telegram. A `/start` or a
+receipt press sent in that gap, or before it, is dropped by `drop_pending_updates`. Nothing is lost
+for good: the alerts page shows that subscription as still waiting, and opening its link again, or
+a new link, connects it. The registration drops them on purpose: on the move from polling,
+Telegram would otherwise deliver again the updates that the last poll already handled.
 
 ### Verify
 
@@ -141,9 +143,9 @@ subscription as not connected and offers a new link.
 ### Rotate the secret
 
 Repeat [Set it up](#set-it-up): write a new secret, then deploy with `telegram_webhook` on. For the
-few seconds between the deploy and the registration, Telegram still sends the old secret, the
-Worker answers 401, and Telegram delivers those updates again afterwards unless
-`drop_pending_updates` removed them.
+few seconds between the deploy and the registration, Telegram still sends the old secret and the
+Worker answers 401. The registration then drops those updates, as above: a user who pressed Start
+in those seconds opens the link again.
 
 ### Roll back to polling
 
