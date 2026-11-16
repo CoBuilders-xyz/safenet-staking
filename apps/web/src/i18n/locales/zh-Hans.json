@@ -757,6 +757,18 @@
     "addSubscription": "添加订阅",
     "testAgainInSeconds": "{{seconds}} 秒后可再次测试",
     "errorDeliveryTestRetry": "测试通知未能送达。请一分钟后重试。",
-    "errorRateTestMinute": "每个订阅每分钟可发送一条测试通知。请等待一分钟后重试。"
+    "errorRateTestMinute": "每个订阅每分钟可发送一条测试通知。请等待一分钟后重试。",
+    "addSubscriptionIntro": "先选择要监控的内容，再选择接收方式。",
+    "checkInterval": "大约每 5 分钟检查一次。",
+    "groupWallet": "此钱包",
+    "cooldownHint": "此钱包的一笔提取已结束冷却期，可以领取。",
+    "rewardsHint": "经验证的奖励证明显示此钱包有尚未领取的奖励。",
+    "groupValidators": "您委托的验证者",
+    "groupValidatorsHint": "仅限此钱包在以太坊上有活跃质押的验证者。没有委托时，这些提醒不会触发。",
+    "deregisteredHint": "您委托的验证者已不再注册。",
+    "participationHint": "您委托的验证者在完整的 Aegis 日（最多 14 天）内低于您的阈值。每个 UTC 日最多提醒一次。",
+    "missedHint": "您委托的验证者连续错过您设定数量的已证明签名轮次。每段连续错过只提醒一次。",
+    "stepChannel": "选择接收提醒的方式",
+    "stepConfirm": "确认"
   }
 }

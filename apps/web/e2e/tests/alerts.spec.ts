@@ -85,6 +85,42 @@ test("alerts explains wallet connection and passes accessibility checks", async 
   expect(scan.violations.filter(v => v.impact === "serious" || v.impact === "critical")).toEqual([])
 })
 
+test("the page reads as one hierarchy, and each trigger says when it fires", async ({ connectedPage: page }) => {
+  await service(page)
+  await page.goto("/#/alerts")
+  await page.getByRole("button", { name: "Sign to manage alerts" }).click()
+  await expect(page.getByText("You have no alert subscriptions.")).toBeVisible()
+  // The page, its two sections, the steps of the form in order, and the groups of triggers.
+  const main = page.getByRole("main")
+  await expect(main.getByRole("heading", { level: 1 })).toHaveText("Alerts")
+  await expect(main.getByRole("heading", { level: 2 })).toHaveText(["Your subscriptions", "Add a subscription"])
+  const form = page.getByRole("form", { name: "Add a subscription" })
+  await expect(form.getByRole("heading", { level: 3 })).toHaveText(["Choose triggers", "Choose where to receive alerts", "Confirm"])
+  await expect(form.getByRole("heading", { level: 4 })).toHaveText(["This wallet", "Validators you delegate to"])
+  // Each box is named by its trigger alone, and described by when it fires.
+  const delegated = "Only validators this wallet has an active stake on, on Ethereum. With no delegation, these never fire."
+  for (const [name, description] of [
+    ["Cooldown ready to claim", "A withdrawal from this wallet finished its cooldown and can be claimed."],
+    ["Rewards claimable", "A verified reward proof shows rewards this wallet has not claimed yet."],
+    ["Validator deregistered", `A validator you delegate to is no longer registered. ${delegated}`],
+    ["Participation below my threshold", `A validator you delegate to is below your threshold over complete Aegis days (up to 14). At most one alert per UTC day. ${delegated}`],
+    ["Consecutive missed signing rounds", `A validator you delegate to misses your number of attested signing rounds in a row. One alert per streak. ${delegated}`],
+  ]) {
+    await expect(form.getByRole("checkbox", { name, exact: true })).toHaveAccessibleDescription(description!)
+  }
+  // A threshold appears under its own trigger, only while that trigger is selected.
+  const threshold = form.getByRole("spinbutton", { name: "Participation threshold (%)" })
+  await expect(threshold).toHaveCount(0)
+  const participation = page.getByRole("checkbox", { name: "Participation below my threshold", exact: true })
+  await participation.check()
+  const option = form.locator("div", { has: participation }).last()
+  await expect(option.getByRole("spinbutton", { name: "Participation threshold (%)" })).toBeVisible()
+  // Help sits with the control it belongs to.
+  await expect(form.getByLabel("Delivery channel")).toHaveAccessibleDescription("After you subscribe, open Telegram from the new card and press Start. We send only to the chat you connect.")
+  await expect(form.getByRole("button", { name: "Subscribe", exact: true })).toHaveAccessibleDescription("We store your wallet, choices and delivery token until you delete the subscription. Alerts never move funds.")
+  await axe(page)
+})
+
 test("signs, selects all five triggers, shows the Telegram link in its card and deletes after confirmation", async ({ connectedPage: page }) => {
   const { subscriptions } = await service(page)
   await page.goto("/#/alerts")

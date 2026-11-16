@@ -152,9 +152,9 @@ export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscripti
   else if (unlinked) note = { text: t("alerts.newLinkHint", "A new link cancels the previous one, and a Start already sent with it.") }
 
   const tones = { ok: "border-success/50 text-success", wait: "border-primary/50 text-foreground", off: "border-border text-muted-foreground" }
-  return <article ref={card} className="rounded-lg border p-4 space-y-3" aria-busy={busy}>
+  return <article ref={card} className="rounded-lg border border-border bg-card text-card-foreground p-4 sm:p-5 space-y-3" style={{ boxShadow: "var(--shadow-card)" }} aria-busy={busy}>
     <div className="flex flex-wrap items-center gap-2">
-      <h3 className="font-medium">{telegram ? t("alerts.telegram", "Telegram") : t("alerts.browser", "Browser notifications")}</h3>
+      <h3 className="text-base font-semibold">{telegram ? t("alerts.telegram", "Telegram") : t("alerts.browser", "Browser notifications")}</h3>
       <Badge variant="outline" className={tones[state.tone]}>
         {state.tone === "wait" && unlinked && <span aria-hidden className="mr-1.5 size-1.5 rounded-full bg-primary animate-pulse motion-reduce:animate-none" />}
         {state.label}

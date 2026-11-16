@@ -777,6 +777,18 @@
     "addSubscription": "Adicionar uma assinatura",
     "testAgainInSeconds": "Testar de novo em {{seconds}} seg",
     "errorDeliveryTestRetry": "Não foi possível entregar a notificação de teste. Tente de novo em um minuto.",
-    "errorRateTestMinute": "Uma notificação de teste por minuto para cada assinatura. Aguarde um minuto e tente de novo."
+    "errorRateTestMinute": "Uma notificação de teste por minuto para cada assinatura. Aguarde um minuto e tente de novo.",
+    "addSubscriptionIntro": "Escolha o que monitorar e depois onde receber.",
+    "checkInterval": "As verificações acontecem a cada 5 minutos, aproximadamente.",
+    "groupWallet": "Esta carteira",
+    "cooldownHint": "Um saque desta carteira terminou o período de espera e pode ser resgatado.",
+    "rewardsHint": "Uma prova de recompensas verificada mostra recompensas que esta carteira ainda não resgatou.",
+    "groupValidators": "Validadores para os quais você delega",
+    "groupValidatorsHint": "Somente validadores em que esta carteira tem stake ativo, na Ethereum. Sem delegação, nunca disparam.",
+    "deregisteredHint": "Um validador para o qual você delega não está mais registrado.",
+    "participationHint": "Um validador para o qual você delega está abaixo do seu limite nos dias completos do Aegis (até 14). No máximo um alerta por dia UTC.",
+    "missedHint": "Um validador para o qual você delega perde seguidas a sua quantidade de rodadas de assinatura atestadas. Um alerta por sequência.",
+    "stepChannel": "Escolha onde receber os alertas",
+    "stepConfirm": "Confirmar"
   }
 }
