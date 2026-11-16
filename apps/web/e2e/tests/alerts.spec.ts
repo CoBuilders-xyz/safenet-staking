@@ -300,6 +300,43 @@ test("on a phone the card keeps its height from waiting to connected to tested, 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
 
+test("on a phone a card that loads connected shows no empty lines above its buttons, and holds its height once a result appears", async ({ connectedPage: page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const { subscriptions } = await service(page)
+  subscriptions.push(pressStart({ id: "subscription-1", channel: "telegram", triggers: ["cooldown"], participation: 75, missed: 3, status: "unverified",
+    linked: false, linkedAt: null, linkExpiresAt: null, paused: false, lastDelivery: null }))
+  await page.goto("/#/alerts")
+  await page.getByRole("button", { name: "Sign to manage alerts" }).click()
+  const card = page.getByRole("article")
+  const status = card.getByRole("status")
+  await expect(status).toHaveText(connected)
+  const test = card.getByRole("button", { name: "Get test notification" })
+  const [text, button] = [(await status.boundingBox())!, (await test.boundingBox())!]
+  expect(button.y - (text.y + text.height)).toBeLessThanOrEqual(12) // The card's own spacing, nothing reserved.
+  // The first result takes its line once; the countdown that follows does not move anything.
+  await test.click()
+  await expect(card.getByText("Test notification sent. Check your Telegram chat.")).toBeVisible()
+  const height = Math.round((await card.boundingBox())!.height)
+  await page.getByRole("button", { name: "Pause" }).click()
+  await expect(card.getByRole("status").first()).toHaveText("Paused. No alerts are sent until you resume.")
+  expect(Math.round((await card.boundingBox())!.height)).toBe(height)
+})
+
+test("on a phone a browser card keeps its height when the service confirms it", async ({ connectedPage: page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const { subscriptions } = await service(page)
+  subscriptions.push({ id: "subscription-1", channel: "push", triggers: ["cooldown"], participation: 75, missed: 3, status: "unverified",
+    linked: true, linkedAt: null, linkExpiresAt: null, paused: false, lastDelivery: null })
+  await page.goto("/#/alerts")
+  await page.getByRole("button", { name: "Sign to manage alerts" }).click()
+  const card = page.getByRole("article")
+  await expect(card.getByRole("status")).toHaveText("Subscribed. Get a test notification: the browser you subscribed with should show it.")
+  const height = Math.round((await card.boundingBox())!.height)
+  subscriptions[0]!.status = "verified"
+  await expect(card.getByRole("status")).toHaveText("Notifications reach the browser you subscribed with.", { timeout: 20_000 })
+  expect(Math.round((await card.boundingBox())!.height)).toBe(height)
+})
+
 for (const language of ["es", "de", "fr", "it", "pt", "ru", "zh-Hans"]) {
   test(`on a phone in ${language}, where the texts are longer, the card keeps its height through opening the link and connecting`, async ({ connectedPage: page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
