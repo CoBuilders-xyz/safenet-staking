@@ -13,6 +13,10 @@ on:
         type: choice
         options: [both, api, alerts]
         default: both
+      telegram_webhook:
+        description: After the alerts deploy, register the Telegram webhook with the deployed secret (DEPLOY.md).
+        type: boolean
+        default: false
 
 concurrency:
   group: workers-deploy
@@ -110,6 +114,11 @@ jobs:
           SUBGRAPH_URL_MAINNET: ${{ secrets.ALERTS_SUBGRAPH_URL_MAINNET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_BOT_NAME: ${{ vars.TELEGRAM_BOT_NAME }}
+          # What Telegram sends with every update. The step below gives Telegram the same value.
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+          # The Worker's own public origin, the same value the web build reads. Each poll checks
+          # that the webhook Telegram holds is this URL, and not another deployment's.
+          ALERTS_URL: ${{ vars.VITE_ALERTS_API_URL }}
           VAPID_PUBLIC_KEY: ${{ vars.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ vars.VAPID_SUBJECT }}
@@ -117,6 +126,39 @@ jobs:
           secrets="$RUNNER_TEMP/alerts-secrets.json"
           trap 'rm -f "$secrets"' EXIT
           umask 077
-          # src/deploy-secrets.ts checks the required values and always includes SUBGRAPH_URL_MAINNET.
+          # src/deploy-secrets.ts checks the required values, the form of the webhook secret and of
+          # ALERTS_URL, and always includes SUBGRAPH_URL_MAINNET.
           node --import tsx scripts/deploy-secrets.ts "$secrets"
           pnpm exec cf deploy --secrets-file "$secrets" --message "safenet-alerts ${GITHUB_SHA::12}"
+
+      # Telegram keeps one webhook per bot. Registering it here, right after the deploy, gives
+      # Telegram the same secret the new version checks, so no update is refused in between.
+      # The script prints the registration, never the token or the secret.
+      - name: Register the Telegram webhook
+        if: inputs.target != 'api' && inputs.telegram_webhook
+        working-directory: apps/alerts
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+          ALERTS_URL: ${{ vars.VITE_ALERTS_API_URL }}
+        run: node --import tsx scripts/telegram-webhook.ts set
+      # Every alerts deploy reports what Telegram holds. A webhook that is missing, or that points
+      # elsewhere, means no chat can link: the job ends red, after the deploy, so that it is seen.
+      # A report Telegram could not give is only a warning: the deploy itself is done.
+      - name: Report the Telegram webhook
+        if: inputs.target != 'api'
+        working-directory: apps/alerts
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          ALERTS_URL: ${{ vars.VITE_ALERTS_API_URL }}
+        run: |
+          if ! report="$(node --import tsx scripts/telegram-webhook.ts info)"; then
+            echo "::warning::Telegram gave no webhook report. Check it with 'telegram:webhook info' (DEPLOY.md)."
+            exit 0
+          fi
+          { echo "### Telegram webhook"; echo '```'; echo "$report"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          echo "$report"
+          case "$report" in
+            "webhook: registered for this Worker"*) ;;
+            *) echo "::error::The Worker is deployed, but Telegram does not deliver updates to it, so no chat can link. Run this workflow again with 'telegram_webhook' on (DEPLOY.md)."; exit 1 ;;
+          esac

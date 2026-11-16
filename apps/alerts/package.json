@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "test": "node ../../tools/run-node-tests.mjs src && pnpm test:runtime",
     "test:runtime": "pnpm build && node --import tsx scripts/runtime.ts",
-    "report:uptime": "node --env-file-if-exists=../../.env.local --import tsx scripts/uptime.ts"
+    "report:uptime": "node --env-file-if-exists=../../.env.local --import tsx scripts/uptime.ts",
+    "telegram:webhook": "node --env-file-if-exists=../../.env.local --import tsx scripts/telegram-webhook.ts"
   },
   "dependencies": {
     "@cobuilders/safenet-core": "workspace:*",

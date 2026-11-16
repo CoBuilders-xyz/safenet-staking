@@ -18,9 +18,11 @@ export interface AlertSubscription {
   linkExpiresAt: string | null
   paused: boolean
   lastDelivery: string | null
+  /** Seconds until this subscription can send another test notification. 0 when it can now. */
+  testRetryAfter: number
 }
 /** Why a request failed. The API sends most of these as `code`; the rest arise in the browser. */
-const errorCodes = ["invalid", "session", "forbidden", "not_found", "limit", "linked", "not_linked", "expired", "rate", "delivery",
+const errorCodes = ["invalid", "session", "forbidden", "not_found", "limit", "duplicate", "linked", "not_linked", "expired", "rate", "delivery",
   "telegram_unavailable", "push_unavailable", "unavailable", "network", "signature", "rejected", "permission", "unsupported", "push"] as const
 export type AlertErrorCode = typeof errorCodes[number]
 export class AlertError extends Error {
@@ -45,6 +47,21 @@ export async function alertRequest<T>(path: string, token?: string, body?: unkno
   return response.json() as Promise<T>
 }
 
+/**
+ * How often the list is read. Telegram tells the Worker about Start at once, so while a link can
+ * still complete the list is read every LINK_POLL_FAST for the LINK_WATCH after the user last
+ * acted on a link, then every LINK_POLL_SLOW. Otherwise every LIST_POLL. A hidden tab reads
+ * nothing, and reads at once when it is shown again: on a phone, that is the return from Telegram.
+ */
+export const LINK_POLL_FAST = 1500
+export const LINK_POLL_SLOW = 5000
+export const LIST_POLL = 15_000
+export const LINK_WATCH = 2 * 60_000
+export function listPollInterval(subscriptions: AlertSubscription[] | undefined, now: number, watchUntil: number): number {
+  if (!subscriptions?.some(sub => linkPending(sub, now))) return LIST_POLL
+  return now < watchUntil ? LINK_POLL_FAST : LINK_POLL_SLOW
+}
+
 /** Mounted with wallet address as key. Tokens stay in memory and leave on disconnect/switch. */
 export function useAlerts(address: Address) {
   const [session, setSession] = useState<{ token: string; expiresAt: string } | null>(null)
@@ -59,12 +76,16 @@ export function useAlerts(address: Address) {
     return () => clearTimeout(timer)
   }, [session])
   const token = session?.token
+  // Until when a pending link is read at the fast rate. A page opened on a pending link starts there too.
+  const watchUntil = useRef(0)
   const subscriptions = useQuery({
-    queryKey: ["alerts", address, token], enabled: !!token, retry: false, gcTime: 0,
-    queryFn: () => alertRequest<AlertSubscription[]>("/subscriptions", token),
-    // The Worker links a Telegram chat on its next Cron run, so poll faster while a link can still
-    // complete. Once the link has expired the fast poll stops, and the card says what to do.
-    refetchInterval: query => query.state.data?.some(sub => linkPending(sub, Date.now())) ? 10_000 : 15_000,
+    queryKey: ["alerts", address, token], enabled: !!token, retry: false, gcTime: 0, staleTime: 0,
+    queryFn: async () => {
+      if (!watchUntil.current) watchUntil.current = Date.now() + LINK_WATCH
+      return (await alertRequest<AlertSubscription[]>("/subscriptions", token)).map(readSubscription)
+    },
+    refetchInterval: query => listPollInterval(query.state.data, Date.now(), watchUntil.current),
+    refetchOnWindowFocus: "always",
   })
   const sign = async () => {
     let pending = pendingSignature.current
@@ -82,6 +103,8 @@ export function useAlerts(address: Address) {
     setPendingVerification(false)
   }
   const refresh = () => client.invalidateQueries({ queryKey: ["alerts", address] })
+  /** The user got or opened a Telegram link: read the list at the fast rate from now. */
+  const watchLink = () => { watchUntil.current = Date.now() + LINK_WATCH; return refresh() }
   const remove = async (id: string) => { await alertRequest(`/subscriptions/${id}`, token, undefined, "DELETE"); await refresh() }
   const action = async <T,>(id: string, name: "telegram-link" | "pause" | "resume" | "test", refreshAfter = true) => {
     // A refusal can mean the list is out of date (already linked, expired, deleted), so refresh then too.
@@ -97,9 +120,16 @@ export function useAlerts(address: Address) {
    * The caller stores the link and then refreshes, so the card never pairs the new expiry with an old link.
    */
   const newLink = (id: string) => action<{ telegramUrl: string; expiresAt: string }>(id, "telegram-link", false)
-  const sendTest = (id: string) => action<{ sent: true }>(id, "test")
+  const sendTest = (id: string) => action<{ sent: true; retryAfter: number }>(id, "test")
   const setPaused = (id: string, paused: boolean) => action<{ paused: boolean }>(id, paused ? "pause" : "resume")
-  return { config, subscriptions, token, sign, refresh, remove, newLink, sendTest, setPaused, pendingVerification }
+  return { config, subscriptions, token, sign, refresh, remove, newLink, sendTest, setPaused, watchLink, pendingVerification }
+}
+/**
+ * A subscription as the page uses it. A service version from before `testRetryAfter` does not
+ * send it; the test is then available, and that service's own limit still answers a second one.
+ */
+export function readSubscription(sub: AlertSubscription): AlertSubscription {
+  return { ...sub, testRetryAfter: Number.isFinite(sub.testRetryAfter) && sub.testRetryAfter > 0 ? sub.testRetryAfter : 0 }
 }
 /** A Telegram link issued in this page session, with the expiry of its own code. */
 export interface TelegramLink { url: string; expiresAt: string }

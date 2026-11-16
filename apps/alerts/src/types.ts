@@ -16,6 +16,8 @@ export interface Subscription {
   /** When /start linked the Telegram chat. Null for a chat linked before this was recorded. */
   linked_at: string | null
   paused: boolean
+  /** When the last test message was claimed. Null before the first one. */
+  tested_at: string | null
 }
 type WorkerConfig = import("cf/config").UnwrapConfig<typeof import("../cloudflare.config.js").default>["worker"]
 type ConfiguredEnv = import("cf/config").InferEnv<WorkerConfig>
@@ -30,12 +32,13 @@ export type Env = Pick<ConfiguredEnv, "DB"> & Partial<Omit<ConfiguredEnv, "DB">>
   SUBGRAPH_URL_MAINNET?: string
 }
 /** Machine-readable reasons. The interface chooses its message from the code, never from the text. */
-export type ErrorCode = "invalid" | "session" | "forbidden" | "not_found" | "limit" | "linked" | "not_linked" | "expired"
+export type ErrorCode = "invalid" | "session" | "forbidden" | "not_found" | "limit" | "duplicate" | "linked" | "not_linked" | "expired"
   | "rate" | "delivery" | "telegram_unavailable" | "push_unavailable" | "unavailable"
 const statusCodes: Record<number, ErrorCode> = { 400: "invalid", 401: "session", 403: "forbidden", 404: "not_found", 413: "invalid", 415: "invalid", 429: "rate" }
 export class HttpError extends Error {
   readonly code: ErrorCode
-  constructor(public status: number, message: string, code?: ErrorCode) {
+  /** `retryAfter` is in seconds, for a 429: when the same request can succeed. */
+  constructor(public status: number, message: string, code?: ErrorCode, readonly retryAfter?: number) {
     super(message)
     this.code = code ?? statusCodes[status] ?? "unavailable"
   }
