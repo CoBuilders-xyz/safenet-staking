@@ -777,6 +777,18 @@
     "addSubscription": "Aggiungi un abbonamento",
     "testAgainInSeconds": "Nuova prova tra {{seconds}} sec",
     "errorDeliveryTestRetry": "Impossibile consegnare la notifica di prova. Riprova tra un minuto.",
-    "errorRateTestMinute": "Una notifica di prova al minuto per ogni abbonamento. Attendi un minuto, poi riprova."
+    "errorRateTestMinute": "Una notifica di prova al minuto per ogni abbonamento. Attendi un minuto, poi riprova.",
+    "addSubscriptionIntro": "Scegli cosa monitorare, poi dove riceverlo.",
+    "checkInterval": "I controlli avvengono circa ogni 5 minuti.",
+    "groupWallet": "Questo wallet",
+    "cooldownHint": "Un prelievo di questo wallet ha terminato il periodo di attesa e può essere riscattato.",
+    "rewardsHint": "Una prova delle ricompense verificata mostra ricompense che questo wallet non ha ancora riscattato.",
+    "groupValidators": "Validatori a cui deleghi",
+    "groupValidatorsHint": "Solo i validatori su cui questo wallet ha uno stake attivo, su Ethereum. Senza delega, non scattano mai.",
+    "deregisteredHint": "Un validatore a cui deleghi non è più registrato.",
+    "participationHint": "Un validatore a cui deleghi è sotto la tua soglia nei giorni Aegis completi (fino a 14). Al massimo un avviso per giorno UTC.",
+    "missedHint": "Un validatore a cui deleghi manca di fila il tuo numero di turni di firma attestati. Un avviso per serie.",
+    "stepChannel": "Scegli dove ricevere gli avvisi",
+    "stepConfirm": "Conferma"
   }
 }

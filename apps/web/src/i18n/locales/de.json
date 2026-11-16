@@ -767,6 +767,18 @@
     "addSubscription": "Abonnement hinzufügen",
     "testAgainInSeconds": "Erneut testen in {{seconds}} Sek.",
     "errorDeliveryTestRetry": "Die Testbenachrichtigung konnte nicht zugestellt werden. Versuche es in einer Minute erneut.",
-    "errorRateTestMinute": "Eine Testbenachrichtigung pro Minute je Abonnement. Warte eine Minute und versuche es dann erneut."
+    "errorRateTestMinute": "Eine Testbenachrichtigung pro Minute je Abonnement. Warte eine Minute und versuche es dann erneut.",
+    "addSubscriptionIntro": "Wähle, was überwacht wird, und dann, wo du es erhältst.",
+    "checkInterval": "Die Prüfung läuft etwa alle 5 Minuten.",
+    "groupWallet": "Diese Wallet",
+    "cooldownHint": "Eine Auszahlung dieser Wallet hat ihre Wartezeit beendet und kann beansprucht werden.",
+    "rewardsHint": "Ein verifizierter Belohnungsnachweis zeigt Belohnungen, die diese Wallet noch nicht beansprucht hat.",
+    "groupValidators": "Validatoren, an die du delegierst",
+    "groupValidatorsHint": "Nur Validatoren, bei denen diese Wallet einen aktiven Stake auf Ethereum hat. Ohne Delegation lösen sie nie aus.",
+    "deregisteredHint": "Ein Validator, an den du delegierst, ist nicht mehr registriert.",
+    "participationHint": "Ein Validator, an den du delegierst, liegt über die vollständigen Aegis-Tage (bis zu 14) unter deinem Schwellenwert. Höchstens eine Benachrichtigung pro UTC-Tag.",
+    "missedHint": "Ein Validator, an den du delegierst, verpasst deine Anzahl attestierter Signaturrunden in Folge. Eine Benachrichtigung pro Serie.",
+    "stepChannel": "Wähle, wo du Benachrichtigungen erhältst",
+    "stepConfirm": "Bestätigen"
   }
 }

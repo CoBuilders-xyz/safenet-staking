@@ -39,9 +39,10 @@ export function SubscriptionCardSkeleton({ label }: { label: string }) {
  * reload the card offers a new one. The card opens `link` only while the subscription's current
  * code is that link's own, by its expiry: a newer code makes this link dead.
  *
- * The status line and the note under it always hold their place, three lines and two on a narrow
- * screen, so the card keeps its height when it goes from waiting to connected, and when a result
- * appears, in every language of the interface.
+ * Once the card has waited for Start or shown a result, the status line and the note under it hold
+ * their place, three lines and two on a narrow screen, so the card keeps its height from waiting
+ * to connected to tested, in every language of the interface. A card that loads connected has
+ * nothing to hold yet, so it shows no empty lines above its buttons.
  */
 export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscriptions, fetchedAt, actions, onLink }: {
   sub: AlertSubscription
@@ -101,6 +102,18 @@ export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscripti
     try { await action() } catch (failure) { setError({ code: alertErrorCode(failure), during: name }) } finally { setPending(null) }
   }
 
+  // A confirmed browser never returns to unconfirmed. A card that showed it unconfirmed keeps room for it.
+  const [unconfirmed, setUnconfirmed] = useState(!telegram && !expired && sub.status !== "verified")
+  if (!telegram && !expired && sub.status !== "verified" && !unconfirmed) setUnconfirmed(true)
+  // The statuses a connected card moves between by itself or by Pause and Resume.
+  const paused = t("alerts.statusPaused", "Paused. No alerts are sent until you resume.")
+  const pushUnconfirmed = t("alerts.statusPushUnverifiedTest", "Subscribed. Get a test notification: the browser you subscribed with should show it.")
+  const steady = telegram
+    ? [sub.linkedAt
+      ? t("alerts.statusTelegramConnectedSince", "Connected to Telegram since {{date}}.", { date: formatUtcDayLong(Date.parse(sub.linkedAt)) })
+      : t("alerts.statusTelegramConnected", "Connected to Telegram."), paused]
+    : [t("alerts.statusPushVerified", "Notifications reach the browser you subscribed with."), paused,
+      ...unconfirmed ? [pushUnconfirmed] : []]
   let state: { label: string; tone: "ok" | "wait" | "off" }
   let status: string
   if (expired) {
@@ -125,18 +138,16 @@ export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscripti
     }
   } else if (sub.paused) {
     state = { label: t("alerts.pausedBadge", "Paused"), tone: "off" }
-    status = t("alerts.statusPaused", "Paused. No alerts are sent until you resume.")
+    status = paused
   } else if (telegram) {
     state = { label: t("alerts.stateConnected", "Connected"), tone: "ok" }
-    status = sub.linkedAt
-      ? t("alerts.statusTelegramConnectedSince", "Connected to Telegram since {{date}}.", { date: formatUtcDayLong(Date.parse(sub.linkedAt)) })
-      : t("alerts.statusTelegramConnected", "Connected to Telegram.")
+    status = steady[0]!
   } else if (sub.status === "verified") {
     state = { label: t("alerts.stateConnected", "Connected"), tone: "ok" }
-    status = t("alerts.statusPushVerified", "Notifications reach the browser you subscribed with.")
+    status = steady[0]!
   } else {
     state = { label: t("alerts.stateNotConfirmed", "Not confirmed yet"), tone: "wait" }
-    status = t("alerts.statusPushUnverifiedTest", "Subscribed. Get a test notification: the browser you subscribed with should show it.")
+    status = pushUnconfirmed
   }
 
   // One line under the status: the latest result first, then what helps in the current state.
@@ -146,25 +157,35 @@ export function SubscriptionCard({ sub, triggers, link, focusLink, maxSubscripti
     ? t("alerts.testSentTelegramNow", "Test notification sent. Check your Telegram chat.")
     : t("alerts.testSentPush", "Test notification sent. The browser you subscribed with should show it now.") }
   else if (justLinked) note = { role: "status", text: t("alerts.justLinked", "Telegram is connected. Get a test notification to see one arrive.") }
-  else if (sub.paused && unlinked) note = { text: t("alerts.statusPaused", "Paused. No alerts are sent until you resume.") }
+  else if (sub.paused && unlinked) note = { text: paused }
   else if (openLink) note = { text: t("alerts.linkMinutesLeft", "Minutes left on this link: {{minutes}}.", {
     minutes: Math.max(1, Math.ceil((Date.parse(sub.linkExpiresAt!) - now) / 60_000)) }) }
   else if (unlinked) note = { text: t("alerts.newLinkHint", "A new link cancels the previous one, and a Start already sent with it.") }
 
+  // Both stay true for the life of the card: once it held its place, it never shrinks.
+  const [linking, setLinking] = useState(unlinked)
+  if (unlinked && !linking) setLinking(true)
+  const [noted, setNoted] = useState(false)
+  if (note && !noted) setNoted(true)
+
   const tones = { ok: "border-success/50 text-success", wait: "border-primary/50 text-foreground", off: "border-border text-muted-foreground" }
-  return <article ref={card} className="rounded-lg border p-4 space-y-3" aria-busy={busy}>
+  return <article ref={card} className="rounded-lg border border-border bg-card text-card-foreground p-4 sm:p-5 space-y-3" style={{ boxShadow: "var(--shadow-card)" }} aria-busy={busy}>
     <div className="flex flex-wrap items-center gap-2">
-      <h3 className="font-medium">{telegram ? t("alerts.telegram", "Telegram") : t("alerts.browser", "Browser notifications")}</h3>
+      <h3 className="text-base font-semibold">{telegram ? t("alerts.telegram", "Telegram") : t("alerts.browser", "Browser notifications")}</h3>
       <Badge variant="outline" className={tones[state.tone]}>
         {state.tone === "wait" && unlinked && <span aria-hidden className="mr-1.5 size-1.5 rounded-full bg-primary animate-pulse motion-reduce:animate-none" />}
         {state.label}
       </Badge>
     </div>
     {triggers}
-    {/* Three lines on a phone, where the waiting status of the longer languages needs them. */}
-    <p role="status" className="font-medium min-h-18 sm:min-h-6">{status}</p>
+    {/* Three lines on a phone while linking, where the waiting status of the longer languages needs them.
+        Otherwise as tall as the longest steady status, drawn invisibly in the same cell. */}
+    <div className="grid">
+      <p role="status" className={`col-start-1 row-start-1 font-medium ${linking ? "min-h-18 sm:min-h-6" : ""}`}>{status}</p>
+      {!linking && !expired && steady.map(text => <p key={text} aria-hidden className="invisible col-start-1 row-start-1 font-medium">{text}</p>)}
+    </div>
     {/* Keyed by its kind, so a new result is a new element and is announced. */}
-    <p key={note?.role ?? "hint"} role={note?.role} className={`text-sm min-h-10 sm:min-h-5 ${note?.role === "alert" ? "text-destructive" : "text-muted-foreground"}`}>{note?.text}</p>
+    <p key={note?.role ?? "hint"} role={note?.role} className={`text-sm ${linking || noted ? "min-h-10 sm:min-h-5" : "empty:hidden"} ${note?.role === "alert" ? "text-destructive" : "text-muted-foreground"}`}>{note?.text}</p>
     {/* One button per row on a phone: the rows then do not depend on how long a label is in each language. */}
     <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
       {openLink && <Button asChild>

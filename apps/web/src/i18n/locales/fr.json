@@ -777,6 +777,18 @@
     "addSubscription": "Ajouter un abonnement",
     "testAgainInSeconds": "Nouveau test dans {{seconds}} sec",
     "errorDeliveryTestRetry": "La notification de test n’a pas pu être remise. Réessayez dans une minute.",
-    "errorRateTestMinute": "Une notification de test par minute pour chaque abonnement. Attendez une minute, puis réessayez."
+    "errorRateTestMinute": "Une notification de test par minute pour chaque abonnement. Attendez une minute, puis réessayez.",
+    "addSubscriptionIntro": "Choisissez ce qu'il faut surveiller, puis où le recevoir.",
+    "checkInterval": "Les vérifications ont lieu environ toutes les 5 minutes.",
+    "groupWallet": "Ce portefeuille",
+    "cooldownHint": "Un retrait de ce portefeuille a terminé sa période d'attente et peut être réclamé.",
+    "rewardsHint": "Une preuve de récompenses vérifiée montre des récompenses que ce portefeuille n'a pas encore réclamées.",
+    "groupValidators": "Validateurs auxquels vous déléguez",
+    "groupValidatorsHint": "Uniquement les validateurs sur lesquels ce portefeuille a un stake actif, sur Ethereum. Sans délégation, elles ne se déclenchent jamais.",
+    "deregisteredHint": "Un validateur auquel vous déléguez n'est plus enregistré.",
+    "participationHint": "Un validateur auquel vous déléguez est sous votre seuil sur les jours Aegis complets (jusqu'à 14). Au plus une alerte par jour UTC.",
+    "missedHint": "Un validateur auquel vous déléguez manque d'affilée votre nombre de tours de signature attestés. Une alerte par série.",
+    "stepChannel": "Choisissez où recevoir les alertes",
+    "stepConfirm": "Confirmer"
   }
 }
