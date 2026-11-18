@@ -209,7 +209,7 @@ unit tests, builds and packs it. Its `check` job installs the tarball outside th
 empty, as on a pull request from a fork, through the package's own public endpoints. Its `publish` job sends
 that same tarball with `npm publish --provenance --access public --tag <dist-tag>` and GitHub OIDC Trusted Publishing.
 No permanent npm token is used. The publish job pins npm@12.2.1.
-Augusto manually published beta.0; both npm Trusted Publishers are configured (see NPM-RELEASE.md).
+Augusto manually published beta.0; both npm Trusted Publishers are configured (see RELEASING.md).
 It refuses version 0.0.0, a tag whose version differs from the package's,
 a dispatch that publishes from a branch other than `main`, and a private repository, from which
 npm does not publish with provenance. A dispatch with `publish` off, and every pull request that

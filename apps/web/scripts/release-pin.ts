@@ -59,8 +59,8 @@ const credentials = pinataCredentials()
 if (typeof credentials === "string") {
   fail(
     `${credentials}. The release is NOT pinned. ` +
-      "In CI, add the repository secrets PINATA_JWT and PINATA_GATEWAY, or run the workflow with pin=false " +
-      "to build and verify without publishing.",
+      "In CI, add the repository secrets PINATA_JWT and PINATA_GATEWAY, or run the workflow by hand, " +
+      "which builds and verifies without publishing.",
   )
 }
 
