@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { type Address, getAddress } from "viem"
+import { type Address, getAddress, isAddress } from "viem"
 import { SEF_DATA } from "@cobuilders/safenet-core"
 import { truncateAddress } from "@/lib/format"
 
@@ -24,15 +24,18 @@ interface RawValidator {
 function isValidEntry(v: unknown): v is RawValidator {
   if (typeof v !== "object" || v === null) return false
   const obj = v as Record<string, unknown>
-  return typeof obj.address === "string"
+  // A row the address check rejects is skipped, so one bad row cannot fail the whole list.
+  return typeof obj.address === "string" && isAddress(obj.address, { strict: false })
 }
 
 /**
- * The label as published, or the short address when it is missing or blank. An empty label would
- * render an empty name, and the card's link to the validator page would have nothing to click.
+ * The label as published, or the short address when it is missing, blank or the address itself,
+ * which the REST API sends when SEF's label is blank. An empty label would render an empty name,
+ * and the card's link to the validator page would have nothing to click.
  */
 function displayLabel(label: unknown, address: Address): string {
-  return typeof label === "string" && label.trim() !== "" ? label : truncateAddress(address)
+  if (typeof label !== "string" || label.trim() === "") return truncateAddress(address)
+  return label.toLowerCase() === address.toLowerCase() ? truncateAddress(address) : label
 }
 
 async function fetchValidators(): Promise<ValidatorInfo[]> {

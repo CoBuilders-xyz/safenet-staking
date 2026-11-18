@@ -36,6 +36,22 @@ test("the label is never empty: a blank SEF label without ENS becomes the addres
     assert.match(response.headers.get("X-Data-Sources")!, /"sef":0,"address":1/)
   }
 })
+test("a non-blank SEF label is kept verbatim, padding included", async () => {
+  const response = await get("validators", { rows: [{ ...raw, label: "  SEF Operator  " }] })
+  assert.equal((await response.json() as typeof raw[])[0]!.label, "  SEF Operator  ")
+})
+test("ENS wins over a blank SEF label; an empty lookup result falls back to SEF's label", async () => {
+  const named = createApp({ fetch: upstream({ rows: [{ ...raw, label: "" }] }), ens: async () => "operator.eth", now: () => NOW })
+  assert.equal((await (await named.request("http://api.test/v1/validators", {}, ENV)).json() as typeof raw[])[0]!.label, "operator.eth")
+  const empty = createApp({ fetch: upstream(), ens: async () => "", now: () => NOW })
+  assert.equal((await (await empty.request("http://api.test/v1/validators", {}, ENV)).json() as typeof raw[])[0]!.label, raw.label)
+})
+test("a failed lookup and a blank SEF label give the address, and both are counted", async () => {
+  const failed = createApp({ fetch: upstream({ rows: [{ ...raw, label: " " }] }), ens: async () => { throw Error() }, now: () => NOW })
+  const response = await failed.request("http://api.test/v1/validators", {}, ENV)
+  assert.equal((await response.json() as typeof raw[])[0]!.label, raw.address)
+  assert.match(response.headers.get("X-Data-Sources")!, /"ens":0,"sef":0,"address":1,"unavailable":1/)
+})
 test("the detail endpoint carries the same label as the list", async () => {
   const response = await get(`validators/${TARGET}`)
   assert.equal((await response.json() as { label: string }).label, raw.label)
