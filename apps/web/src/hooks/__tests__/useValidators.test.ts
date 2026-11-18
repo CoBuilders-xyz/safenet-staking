@@ -143,7 +143,7 @@ describe("useValidators", () => {
       { address: "0x2222222222222222222222222222222222222222", label: "   " },
       { address: "0x3333333333333333333333333333333333333333" },
       { address: "0x4444444444444444444444444444444444444444", label: null },
-      { address: "0xCc00DE0eA14c08669b26DcBFE365dBD9890B04D9", label: "0xCc00DE0eA14c08669b26DcBFE365dBD9890B04D9" },
+      { address: "0xCc00DE0eA14c08669b26DcBFE365dBD9890B04D9", label: "0xcc00de0ea14c08669b26dcbfe365dbd9890b04d9" },
       { address: "0x5555555555555555555555555555555555555555", label: "Gnosis" },
     ]
     mockFetch.mockResolvedValue({
