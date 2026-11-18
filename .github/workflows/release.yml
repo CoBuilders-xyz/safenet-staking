@@ -6,13 +6,15 @@ name: Release
 #
 #   build     no secret but the public Graph browser key. Builds from build.env, packs the CAR
 #             whose CID anyone can rebuild (VERIFY.md).
-#   pin       pins the CAR to Pinata and checks the gateways.
+#   approve   the `release-approval` environment: its required reviewer approves the release
+#             once, before anything leaves the runner. The jobs after it need no other approval.
+#   pin       pins the CAR to Pinata and checks the public gateways.
 #   smoke     the production smoke suite on the new CID, through a public gateway.
-#   publish   the protected `production` environment. Uploads the same files to Vercel without
-#             a domain, sets the ENS contenthash, then gives the Vercel deployment the
-#             production domain, and checks both.
+#   publish   the `production` environment, which holds the credentials. Uploads the same files
+#             to Vercel without a domain, sets the ENS contenthash, then gives the Vercel
+#             deployment the production domain, and checks both.
 #
-# A published release whose tag starts with web-v runs all four, on the tagged commit, which must
+# A published release whose tag starts with web-v runs all five, on the tagged commit, which must
 # be on main. A manual run builds only, to check that a commit builds and to read its CID.
 
 on:
@@ -106,10 +108,23 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-  pin:
-    name: pin
+  approve:
+    name: approve
     needs: build
     if: github.event_name == 'release'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # Its required reviewer approves here, once per release.
+    environment: release-approval
+    steps:
+      - name: Record the approval
+        env:
+          CID: ${{ needs.build.outputs.cid }}
+        run: echo "Release of \`$CID\` approved." >> "$GITHUB_STEP_SUMMARY"
+
+  pin:
+    name: pin
+    needs: [build, approve]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     outputs:
@@ -185,7 +200,7 @@ jobs:
     needs: [build, pin, smoke]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # Its required reviewer approves each run before it can read the secrets below.
+    # It holds the credentials below. The approval was given once, in the approve job.
     environment: production
     # One release at a time changes production, whatever its tag.
     concurrency:
@@ -229,16 +244,19 @@ jobs:
 
       # 1. Vercel: the files of the CAR as a prebuilt static deployment, with no build on Vercel.
       # --skip-domain keeps the production domain on the current deployment until step 3.
+      # It runs from the repository root. The project's Root Directory is apps/web, and Vercel CLI
+      # 65.9.0 refuses to deploy unless that directory exists under the working directory. Linked
+      # through VERCEL_ORG_ID and VERCEL_PROJECT_ID, it reads the build output from
+      # .vercel/output under the working directory, and uploads only that directory.
       - name: Upload to Vercel without the production domain
         id: vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          out="$RUNNER_TEMP/vercel"
-          mkdir -p "$out/.vercel/output/static"
-          cp -R apps/web/dist/. "$out/.vercel/output/static/"
-          echo '{"version":3}' > "$out/.vercel/output/config.json"
-          cd "$out"
+          rm -rf .vercel/output
+          mkdir -p .vercel/output/static
+          cp -R apps/web/dist/. .vercel/output/static/
+          echo '{"version":3}' > .vercel/output/config.json
           url="$(npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --skip-domain --yes --token "$VERCEL_TOKEN")"
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Vercel deployment: $url" >> "$GITHUB_STEP_SUMMARY"

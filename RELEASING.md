@@ -56,18 +56,22 @@ Publishing a `web-v*` draft runs *Release* on the tagged commit:
 
 1. **build**: builds from `apps/web/build.env` and the repository variables, with no secret but
    the public Graph browser key, and packs the CAR. Anyone can rebuild its CID ([VERIFY.md](VERIFY.md)).
-2. **pin**: pins the CAR to Pinata and checks that the public gateways serve it. The dedicated
+2. **approve**: the run waits in the `release-approval` environment until its reviewer approves.
+   This is the only approval: nothing is pinned or published before it, and nothing after it
+   asks again.
+3. **pin**: pins the CAR to Pinata and checks that the public gateways serve it. The dedicated
    Pinata gateway in `PINATA_GATEWAY`, if set, is checked for information only.
-3. **smoke**: the production smoke suite on the new CID, through Orbitor's gateway.
-4. **publish**, in the `production` environment, after its reviewer approves:
+4. **smoke**: the production smoke suite on the new CID, through Orbitor's gateway.
+5. **publish**, in the `production` environment, which holds the credentials:
    1. uploads the files of the CAR to Vercel as a deployment without the production domain;
    2. sets the contenthash of `safenet.cobuilders.eth` to the CID, and reads it back;
    3. moves the Vercel production domain to that deployment, and checks that it serves the
       `index.html` of the build.
 
 The ENS name and Vercel then serve the same files. A red step stops the run, and the steps before
-it are safe to repeat: *Re-run failed jobs* finishes the release. When step 1 fails, production has
-not changed. When step 2 or 3 fails, the two origins can differ until the rerun.
+it are safe to repeat: *Re-run failed jobs* finishes the release. When the Vercel upload fails,
+production has not changed. When the ENS or the domain step fails, the two origins can differ
+until the rerun.
 
 After a release, add its CID to `deployments.json` in a pull request. The availability check
 reads the latest entry to know which CID the gateways must serve.
@@ -81,6 +85,18 @@ release. To act at once, set the ENS contenthash back to the previous CID (in `d
 and promote the previous Vercel production deployment in Vercel's dashboard, both by hand.
 
 ### One-time setup
+
+**Environments.** Two GitHub environments, under *Settings → Environments*:
+
+| Environment | Required reviewer | Deployment branches and tags | Holds |
+|---|---|---|---|
+| `release-approval` | yes, the deployer | `main` and tags `*-v*` | nothing |
+| `production` | no | `main` and tags `*-v*` | the credentials below and the Worker secrets |
+
+The approval lives in `release-approval`, so each release and each Workers deploy asks once. The
+`production` environment has no reviewer, so the job that reads the credentials does not ask
+again. Only `main` and release tags reach it, so restrict who can create `*-v*` tags with a tag
+ruleset.
 
 The `publish` job reads these from the `production` environment or the repository. It stops, and
 names what is missing, when one is empty.
@@ -137,7 +153,7 @@ then publish within two days, or it expires.
 
 These still run by hand, from `main`, until each has its own release workflow:
 
-- **API, alerts:** Actions → *Workers deploy*, then approve the `production` environment.
+- **API, alerts:** Actions → *Workers deploy*, then approve the `release-approval` environment.
   [DEPLOY.md](DEPLOY.md) lists the inputs. Afterwards, check the API with
   `API_URL=<origin> pnpm --filter @cobuilders/safenet-api smoke`.
 - **Subgraphs:** Actions → *Deploy subgraphs to Studio*. The package's `CLAUDE.md` has the slug and
