@@ -106,9 +106,16 @@ describe("waitUntilServed", () => {
   })
 
   it("ends a slow request at the deadline, not after the per-request timeout", async () => {
-    // Answers only when the request is aborted, as a gateway that never answers.
+    // Answers only when the request is aborted, as a gateway that never answers. The timer stands
+    // for the open socket of a real request: AbortSignal.timeout alone keeps no event loop alive.
     const fetcher = ((_url: string, init?: RequestInit) =>
-      new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(new Error("aborted"))))) as typeof fetch
+      new Promise<Response>((_resolve, reject) => {
+        const socket = setTimeout(() => reject(new Error("no abort within 10 s")), 10_000)
+        init?.signal?.addEventListener("abort", () => {
+          clearTimeout(socket)
+          reject(new Error("aborted"))
+        })
+      })) as typeof fetch
     const started = Date.now()
     const outcome = await waitUntilServed(gw, check(fetcher, { ready: "index.html" }))
     assert.equal(outcome.ok, false)
