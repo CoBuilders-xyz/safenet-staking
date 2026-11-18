@@ -20,8 +20,8 @@ as `pnpm <script>` from `apps/web`.
   which `pnpm bootstrap` also runs.
 - **E2E, Anvil fork:** `test:fork` (Playwright, `e2e/fork/`). Needs `anvil` and the archive
   `MAINNET_RPC_URL`.
-- **Production smoke:** `test:smoke:web` (Playwright, `e2e/smoke/`), against `PRODUCTION_URL`,
-  no wallet, no mocks. Fails when `PRODUCTION_URL` is unset.
+- **Production smoke:** `test:smoke:web` (Playwright, `e2e/smoke/`), against `SMOKE_URL`, else
+  `PRODUCTION_URL` (`e2e/smoke/target.ts`), no wallet, no mocks. Fails when neither is set.
 - **Availability:** `availability` (`scripts/availability.ts`): production answers with the title
   and serves its entry script; with a root `deployments.json`, each gateway in core serves the
   latest release. Needs `PRODUCTION_URL`.
@@ -39,7 +39,8 @@ as `pnpm <script>` from `apps/web`.
 - **IPFS release:** `release:build` builds from `build.env` alone, checks the bundle budget, and
   writes `release/app.car` and `release/CID`; `release:pin` pins the CAR to Pinata and checks the
   gateways, with `PINATA_JWT` and `PINATA_GATEWAY`. `VERIFY.md` at the root rebuilds a release;
-  `.github/workflows/release.yml` runs both on a `v*` tag or by hand
+  `.github/workflows/release.yml` runs both when a `web-v*` release is published, then sets the
+  ENS name and Vercel production to the same build (`RELEASING.md`)
 
 Before every commit, run `pnpm check` from the root. Before a pull request, also `test`,
 `test:e2e` and `build` here.

@@ -121,7 +121,7 @@ The release build ignores the other shell settings and .env files. It reads [`bu
 | `test:e2e` | Playwright against mocked RPC, `e2e/tests/` |
 | `test:e2e:ui`, `test:e2e:headed` | The same suite in Playwright's UI, or in a visible browser |
 | `test:fork` | Playwright against the real contracts on an Anvil Mainnet fork, `e2e/fork/`; see [Fork suite](#fork-suite) |
-| `test:smoke:web` | Playwright against the production deployment at `PRODUCTION_URL`, `e2e/smoke/`; see [Production smoke suite](#production-smoke-suite) |
+| `test:smoke:web` | Playwright against a deployment, `SMOKE_URL` or else `PRODUCTION_URL`, `e2e/smoke/`; see [Production smoke suite](#production-smoke-suite) |
 | `availability` | Checks that the production deployment, and the gateways for the latest release in the root `deployments.json`, serve the interface; needs `PRODUCTION_URL` |
 | `fork:up`, `fork:reset`, `fork:down` | The manual QA fork for Claim & Stake; see [`docs/manual-qa-fork.md`](../../docs/manual-qa-fork.md) |
 | `codegen` | Regenerates the typed GraphQL in `src/graphql/<chain>/generated.ts` from each subgraph package's `schema.graphql` |
@@ -192,8 +192,8 @@ CI runs it nightly, not on pull requests, because every run reads from the archi
 
 ### Production smoke suite
 
-`pnpm test:smoke:web`, from the root or here, opens the production deployment as a visitor
-without a wallet sees it. Nothing is mocked: every figure comes from the RPC, the subgraphs and
+`pnpm test:smoke:web`, from the root or here, opens a deployment as a visitor without a wallet
+sees it: `SMOKE_URL`, else `PRODUCTION_URL` (`e2e/smoke/target.ts`). Nothing is mocked: every figure comes from the RPC, the subgraphs and
 SEF's files the deployment reads.
 
 ```bash
@@ -203,15 +203,17 @@ PRODUCTION_URL=<the production deployment> pnpm --filter @cobuilders/safenet-web
 It checks that the index answers with the title, that the Overview shows a total staked figure
 and not "Unavailable", that the validators list shows at least one validator, that the Rewards
 page shows the Programme section without its load error, and that `manifest.json` carries `name`,
-`description` and an `iconPath` that answers as an image.
+`description` and an `iconPath` that answers as an image. The manifest's CORS header is checked
+only on `PRODUCTION_URL`, the Safe App origin.
 
-- **Needs** `PRODUCTION_URL`. It has no default, because it is deployment configuration, not a
-  constant: in GitHub Actions it is a repository variable. The suite fails with a message when
-  it is unset.
+- **Needs** `SMOKE_URL` or `PRODUCTION_URL`. Neither has a default, because they are deployment
+  configuration, not constants: in GitHub Actions `PRODUCTION_URL` is a repository variable. The
+  suite fails with a message when both are unset.
 - **Proves** that the deployment works today for a reader. It sends no transaction.
 
 CI runs it nightly in `nightly.yml`, job `web-smoke`, and alone through a manual run of the
-Nightly workflow with `suite: web-smoke`.
+Nightly workflow with `suite: web-smoke`. A web release runs it on the new CID before production
+moves.
 
 ## Tech stack
 
@@ -355,8 +357,8 @@ The tree uses sorted-pair hashing, the OpenZeppelin convention, with viem for th
 
 ## Deployment
 
-Production is IPFS. The Release section of the [repository README](../../README.md#release)
-describes the workflow, and [`VERIFY.md`](../../VERIFY.md) shows how to rebuild a release and
+Production is the ENS name and the Vercel production domain, which serve one build.
+[`RELEASING.md`](../../RELEASING.md) describes the release, and [`VERIFY.md`](../../VERIFY.md) shows how to rebuild a release and
 compare its CID.
 
 ### Build
@@ -386,8 +388,9 @@ pnpm --filter @cobuilders/safenet-web release:pin
   `.env.local`, and fails when either is missing. `RELEASE_NAME` and `GATEWAY_TIMEOUT_SECONDS`
   are optional.
 
-`.github/workflows/release.yml` runs both on a `v*` tag or by hand. Its build step receives only the public browser key, mapped from `GRAPH_API_KEY` to
-`VITE_GRAPH_API_KEY`; it receives no private credentials. Its pin job takes the two Pinata secrets and runs only from `main` or a `v*` tag.
+`.github/workflows/release.yml` runs both when a `web-v*` release is published, then the smoke,
+the ENS contenthash and Vercel production. Its build step receives only the public browser key, mapped from `GRAPH_API_KEY` to
+`VITE_GRAPH_API_KEY`; it receives no private credentials. By hand it only builds.
 
 ### Safe App
 

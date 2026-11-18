@@ -59,8 +59,8 @@ const credentials = pinataCredentials()
 if (typeof credentials === "string") {
   fail(
     `${credentials}. The release is NOT pinned. ` +
-      "In CI, add the repository secrets PINATA_JWT and PINATA_GATEWAY, or run the workflow with pin=false " +
-      "to build and verify without publishing.",
+      "In CI, add the repository secrets PINATA_JWT and PINATA_GATEWAY, or run the workflow by hand, " +
+      "which builds and verifies without publishing.",
   )
 }
 
@@ -118,6 +118,9 @@ try {
   fail(`${err instanceof Error ? err.message : String(err)}. The release is NOT pinned.`)
 }
 console.log(`release-pin: pinned ${cid}`)
+// In GitHub Actions, the release smoke runs once the pin is confirmed, even when a gateway check
+// below fails: the CID may still be served elsewhere, and its smoke says whether it works.
+if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, "pinned=true\n")
 
 // --- Gateways ---
 const outcomes = await checkGateways(gatewaysToCheck(credentials), {
