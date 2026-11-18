@@ -35,7 +35,7 @@ function isValidEntry(v: unknown): v is RawValidator {
  */
 function displayLabel(label: unknown, address: Address): string {
   if (typeof label !== "string" || label.trim() === "") return truncateAddress(address)
-  return label.toLowerCase() === address.toLowerCase() ? truncateAddress(address) : label
+  return label.trim().toLowerCase() === address.toLowerCase() ? truncateAddress(address) : label
 }
 
 async function fetchValidators(): Promise<ValidatorInfo[]> {

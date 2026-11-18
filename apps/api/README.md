@@ -49,9 +49,10 @@ The list preserves `address`, `label`, `commission`, `is_active`, and
 null. The reference UI converts this wire format into camelCase fields and percentages.
 Returning the hook's camelCase shape directly would break its conversion.
 
-The list is drop-in compatible with SEF's `validator-info.json`: for a validator without an ENS
-name, the row carries SEF's five fields with SEF's values, the address checksummed. A label is the
-Mainnet ENS name found by reverse lookup with forward confirmation. When there is none, or the
+The list is drop-in compatible with SEF's `validator-info.json`: every row carries SEF's five
+fields. For a validator without an ENS name, they hold SEF's values, with two exceptions: the
+address is checksummed, and a blank SEF label becomes the address, as described below. A label is
+the Mainnet ENS name found by reverse lookup with forward confirmation. When there is none, or the
 lookup fails, the label is SEF's own label. When SEF's label is blank, the label is the checksummed
 address. A label is never empty. A row whose label is not a string is malformed, as SEF's file
 always carries one. `X-Data-Sources` reports how many labels came from each source (`ens`, `sef`,
