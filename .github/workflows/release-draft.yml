@@ -1,0 +1,119 @@
+name: Create draft release
+
+# The first step of every release (RELEASING.md). It picks the next version of one project, lists
+# the commits that changed it since its last release, and creates a draft GitHub Release for the
+# head of main. Nothing ships here. Publishing the draft creates the tag, and the tag starts that
+# project's own release workflow:
+#
+#   web        release.yml   build, pin to IPFS, smoke, then the ENS name and Vercel production
+#   cli, mcp   publish.yml   npm, and cli-binaries.yml for the standalone binaries
+#
+# Versions: cli and mcp take the version in their package.json, which must not have a tag yet.
+# The other projects take the date in Buenos Aires and a counter, <project>-v<YYYYMMDD>.<N>, where
+# N is 0 for the first release of the day and one more than the highest earlier N after that.
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: The project to release.
+        type: choice
+        options: [web, cli, mcp]
+      dry_run:
+        description: Print the version and the changes, and create no draft.
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-draft
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  draft:
+    name: draft ${{ inputs.project }}
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      # To create the draft release.
+      contents: write
+    steps:
+      # Pin actions to full SHA: mutable tags can be moved to malicious code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # All history and tags, for the earlier versions and the list of changes.
+          fetch-depth: 0
+      - name: Version, changes and draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PROJECT: ${{ inputs.project }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          # The paths whose commits a release of the project ships. packages/core reaches users
+          # only through the projects that read it, so it is listed under each of them.
+          case "$PROJECT" in
+            web) paths="apps/web packages/core packages/snapshots"; package="" ;;
+            cli) paths="packages/cli packages/core"; package="packages/cli/package.json" ;;
+            mcp) paths="packages/mcp packages/cli packages/core"; package="packages/mcp/package.json" ;;
+            *) echo "::error::Unknown project $PROJECT"; exit 1 ;;
+          esac
+
+          # Tags, and the tags of drafts, which exist only once the draft is published.
+          taken="$( { git tag -l "${PROJECT}-v*"; gh release list --repo "$REPO" --limit 1000 --json tagName --jq '.[].tagName'; } | sort -u)"
+
+          if [ -n "$package" ]; then
+            version="$(node -p "require('./$package').version")"
+            if [ "$version" = "0.0.0" ]; then echo "::error::$package has version 0.0.0, which is never released."; exit 1; fi
+            tag="${PROJECT}-v${version}"
+            if grep -qxF "$tag" <<< "$taken"; then
+              echo "::error::$tag already has a tag or a draft. Raise the version in $package first."
+              exit 1
+            fi
+          else
+            day="$(TZ=America/Argentina/Buenos_Aires date +%Y%m%d)"
+            last="$(grep -E "^${PROJECT}-v${day}\.[0-9]+$" <<< "$taken" | sed 's/.*\.//' | sort -n | tail -1 || true)"
+            tag="${PROJECT}-v${day}.$(( ${last:--1} + 1 ))"
+          fi
+          prerelease=""
+          case "$tag" in *-v*-*) prerelease="--prerelease" ;; esac
+
+          # The changes since the last published release of the project that main contains.
+          previous=""
+          for candidate in $(git tag -l "${PROJECT}-v*" --sort=-creatordate); do
+            if git merge-base --is-ancestor "$candidate" "$GITHUB_SHA"; then previous="$candidate"; break; fi
+          done
+          notes="$RUNNER_TEMP/notes.md"
+          {
+            echo "Built from \`$GITHUB_SHA\`."
+            echo
+            if [ -n "$previous" ]; then
+              echo "Changes since $previous:"
+              range="$previous..$GITHUB_SHA"
+            else
+              echo "First release of $PROJECT with this process. The last 30 changes:"
+              range="$GITHUB_SHA"
+            fi
+            echo
+            # shellcheck disable=SC2086 # paths is a list of paths.
+            changes="$(git log --no-merges --max-count=30 --format='- %s (%h)' "$range" -- $paths)"
+            echo "${changes:-No commit changed $paths.}"
+          } > "$notes"
+
+          {
+            echo "### $tag"
+            echo
+            cat "$notes"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run: no draft created." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # shellcheck disable=SC2086 # prerelease is empty or one flag.
+          url="$(gh release create "$tag" --repo "$REPO" --draft $prerelease --target "$GITHUB_SHA" --title "$tag" --notes-file "$notes")"
+          echo "Draft: $url. Publish it to release." >> "$GITHUB_STEP_SUMMARY"

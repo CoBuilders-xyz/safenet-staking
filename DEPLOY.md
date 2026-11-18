@@ -65,10 +65,10 @@ The interface reads two public build-time values. No code names a host:
 | `VITE_VALIDATOR_INFO_URL` | `https://safenet-api.<subdomain>.workers.dev/v1/validators` |
 | `VITE_ALERTS_API_URL` | `https://safenet-alerts.<subdomain>.workers.dev` |
 
-- **IPFS release:** add both as GitHub *repository* variables. `release.yml` passes them to the
-  build and lists them in the job summary, so a rebuild can reproduce the CID (`VERIFY.md`).
-- **Vercel:** set both in the Vercel project, Production environment, then redeploy. Vercel builds
-  from its own variables, not from `apps/web/build.env`.
+- Add both as GitHub *repository* variables. `release.yml` passes them to the build and lists
+  them in the job summary, so a rebuild can reproduce the CID (`VERIFY.md`). The same build goes
+  to IPFS and to Vercel production, so Vercel's own variables do not reach production.
+- A change of either is a web release ([RELEASING.md](RELEASING.md)).
 
 Unset, the validator list reads SEF's published JSON and the alerts page says alerts are not
 configured.
@@ -85,8 +85,8 @@ configured.
    API_URL=https://safenet-api.<subdomain>.workers.dev pnpm --filter @cobuilders/safenet-api smoke
    curl -sS https://safenet-alerts.<subdomain>.workers.dev/health   # 200 after the first good poll
    ```
-4. Set the two web values on Vercel and redeploy it. Set them as repository variables before the
-   next IPFS release. Cut that release only after the API answers: the validator list does not
+4. Set the two web values as repository variables, then release the web
+   ([RELEASING.md](RELEASING.md)). Release only after the API answers: the validator list does not
    fall back to SEF when the API is down.
 
 Later deploys: run the workflow again. Leave `telegram_webhook` off unless the secret or the

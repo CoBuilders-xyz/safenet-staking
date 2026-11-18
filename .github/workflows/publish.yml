@@ -13,7 +13,7 @@ name: Publish
 # Trusted Publishing needs an existing npm package. Bootstrap once with interactive 2FA,
 # or a temporary granular token for the first CI publish only; then configure npm's GitHub
 # publisher for CoBuilders-xyz/safenet-staking, publish.yml, and delete the token.
-# See NPM-RELEASE.md. Normal publishing below uses OIDC only.
+# See RELEASING.md. Normal publishing below uses OIDC only.
 
 on:
   push:

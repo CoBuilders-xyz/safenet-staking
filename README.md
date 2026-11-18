@@ -117,20 +117,17 @@ Install published betas with `@beta`.
 Publishing uses GitHub Actions OIDC Trusted Publishing, with no permanent npm token.
 Both packages already have Trusted Publishers configured for `publish.yml`.
 Publishing beta.3 updates the `beta` tag; it does not change `latest`.
-See [NPM-RELEASE.md](NPM-RELEASE.md) for dry-run checks, bootstrap history, manual tag cleanup and release tags.
+See [RELEASING.md](RELEASING.md#publish-the-cli-and-the-mcp-server) for releases, dry-run checks and tag cleanup.
 
 ## Release
 
-Production is IPFS. Vercel serves previews only.
-
-A release is a tag `v*`, or a manual run of the `Release` workflow. The workflow builds the
-interface from `apps/web/build.env` and the injected public `VITE_GRAPH_API_KEY`, packs it into a CAR and
-pins that CAR to Pinata. Then it checks that the dedicated Pinata gateway and each public
-gateway in `packages/core` serve it.
-
-A manual run has a boolean input `pin`, on by default. With `pin` off, the workflow builds,
-records the CID and uploads the CAR as an artifact, and pins nothing. The pin job also refuses
-any ref other than `main` or a `v*` tag, so a manual run from another branch never pins.
+Production is the ENS name `safenet.cobuilders.eth` and the Vercel production domain, and both
+serve one build. [RELEASING.md](RELEASING.md) is the operator page for every release: a draft
+GitHub Release from *Create draft release*, then its publication, which runs the project's own
+workflow. A web release builds the interface from `apps/web/build.env` and the injected public
+`VITE_GRAPH_API_KEY`, packs it into a CAR, pins it to Pinata, checks the gateways, runs the
+production smoke on the new CID, then points the ENS name at it and moves the Vercel production
+domain to the same files.
 
 The build step receives only the intentionally public Graph gateway key (COB-566).
 Private credentials remain excluded. Configure subgraph restrictions and a USD 20/month spending cap before building.
@@ -149,20 +146,20 @@ pnpm --filter @cobuilders/safenet-web release:pin     # needs PINATA_JWT and PIN
 ### deployments.json
 
 `deployments.json` at the repository root records each pinned release, so the availability check
-knows which CID the gateways must serve. Nothing in the repository writes it: after `release:pin`
-succeeds, whoever ran the release adds the entry by hand, in a pull request. It is a JSON array,
+knows which CID the gateways must serve. Nothing in the repository writes it: after a web release, whoever
+published it adds the entry by hand, in a pull request. It is a JSON array,
 one object per release:
 
 ```json
 [
-  { "cid": "bafy…", "tag": "v1.0.0", "pinnedAt": "2026-11-02T10:00:00Z" }
+  { "cid": "bafy…", "tag": "web-v20261118.0", "pinnedAt": "2026-11-18T10:00:00Z" }
 ]
 ```
 
 - `cid`: the root CID that `release:build` wrote to `apps/web/release/CID` and Pinata confirmed.
   Rebuild it as `VERIFY.md` shows before recording it: the same commit gives the same CID.
-- `tag`: the git tag of the release. A manual run without a tag records the branch and the
-  commit it built, as `main@<short sha>`.
+- `tag`: the git tag of the release. A release from before the tags records the commit it
+  built, as `main@<short sha>`.
 - `pinnedAt`: when the pin was confirmed, ISO 8601, in UTC. When only the release run is known,
   the time that run ended.
 
@@ -171,8 +168,6 @@ when an entry lacks a field, when `cid` is not a CID, or when `pinnedAt` is not 
 unit test reads the committed file so a bad edit fails its pull request first. Without the file,
 it checks no gateway and says so in its summary.
 
-The record names no ENS name. The interface's ENS name is recorded here only once its
-contenthash points at a recorded CID on chain.
 
 ## Daily snapshots
 

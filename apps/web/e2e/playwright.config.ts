@@ -2,12 +2,15 @@ import { resolve } from "node:path"
 import { defineConfig, type PlaywrightTestConfig } from "@playwright/test"
 import { MAINNET_FORK, MAINNET_FORK_SEF_DATA } from "@cobuilders/safenet-core"
 import { ANVIL_PORT, E2E_PORT, FORK_PORT } from "./ports"
+import { smokeTarget } from "./smoke/target"
 
 // Three suites share this file, but never a run.
 //
 //   pnpm test:e2e         project `chromium`, tests/, against mocked RPC. Every pull request.
 //   pnpm test:fork        project `fork`, fork/, against Anvil on a pinned Mainnet fork. Nightly.
-//   pnpm test:smoke:web   project `smoke`, smoke/, against the production deployment. Nightly.
+//   pnpm test:smoke:web   project `smoke`, smoke/, against a deployment: SMOKE_URL, else
+//                         PRODUCTION_URL (smoke/target.ts). After every release and deploy, and
+//                         every six hours in availability.yml.
 //
 // The fork and smoke scripts set E2E_SUITE. The fork suite needs its own web servers, built with
 // other env, and the smoke suite needs none, and Playwright's webServer is per config rather than
@@ -95,24 +98,6 @@ const forked: Pick<PlaywrightTestConfig, "projects" | "webServer"> = {
   ],
 }
 
-/**
- * The production deployment, from PRODUCTION_URL. It is deployment configuration, not a constant,
- * so it lives in the environment: a repository variable in GitHub Actions. With a trailing slash,
- * so `./#/rewards` resolves under a deployment served from a path.
- */
-function productionUrl(): string {
-  const value = process.env.PRODUCTION_URL?.trim()
-  if (!value) {
-    throw new Error(
-      "PRODUCTION_URL is not set. The smoke suite runs against the production deployment and has no default. " +
-        "Export PRODUCTION_URL, the URL of the deployment to check.",
-    )
-  }
-  const url = new URL(value)
-  if (!url.pathname.endsWith("/")) url.pathname += "/"
-  return url.href
-}
-
 // No web server, no mocks and no wallet: the deployment as a visitor sees it. Retried once in CI,
 // because a public RPC or SEF's file can fail one request; a second failure is a finding.
 const smoke = (): Pick<PlaywrightTestConfig, "projects" | "webServer"> => ({
@@ -122,7 +107,7 @@ const smoke = (): Pick<PlaywrightTestConfig, "projects" | "webServer"> => ({
       testDir: "./smoke",
       timeout: 90_000,
       expect: { timeout: 45_000 },
-      use: { browserName: "chromium", baseURL: productionUrl() },
+      use: { browserName: "chromium", baseURL: smokeTarget().url },
     },
   ],
 })
@@ -132,7 +117,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? (suite === "smoke" ? 1 : 2) : 0,
   workers: fork || process.env.CI ? 1 : undefined,
-  // The smoke suite also prints each test, so the nightly log reads without the report.
+  // The smoke suite also prints each test, so the job log reads without the report.
   reporter: suite === "smoke" ? [["list"], ["html", { open: "never" }]] : "html",
   timeout: 30_000,
   use: {

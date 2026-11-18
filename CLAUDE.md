@@ -51,7 +51,7 @@ Specific commands, only where they apply:
 | `pnpm metrics` | `packages/core` | The 24 metrics, computed against live chains and compared with SEF's published JSON. Writes `packages/core/.metrics/`, which is git-ignored | needs an archive node. With public RPC only, it stopped on a failed Mainnet log range when this file was written |
 | `pnpm check:browser` | root | `apps/web/src` reads no `process.env`, and a built bundle contains no value from `.env.local` other than the public `VITE_` ones | works, part of `check` |
 | `pnpm test:smoke` | root, `packages/cli`, `packages/mcp` | Each of the six read commands runs against Mainnet through the real entry point; the MCP server, started over stdio, answers `status` and `validators_list` | needs the archive `MAINNET_RPC_URL`; runs nightly. Skipped, with the reason, everywhere else |
-| `pnpm test:smoke:web` | root, `apps/web` | The production deployment at `PRODUCTION_URL`, in Playwright, with no wallet and no mocks: the index answers with the title, the Overview shows a total staked figure that is not "Unavailable", the validators list shows a validator, the Rewards page shows the Programme section without its load error, and `manifest.json` carries `name`, `description` and an `iconPath` that answers as an image. Fails with a message when `PRODUCTION_URL` is unset | needs `PRODUCTION_URL`; nightly in `nightly.yml`, and alone by a dispatch with `suite: web-smoke`. On 2026-10-27, 3 of 5 passed against production: the Rewards page showed its load error, and the deployed manifest had no `iconPath` yet |
+| `pnpm test:smoke:web` | root, `apps/web` | A deployment, `SMOKE_URL` or else `PRODUCTION_URL` (`apps/web/e2e/smoke/target.ts`), in Playwright, with no wallet and no mocks: the index answers with the title, the Overview shows a total staked figure that is not "Unavailable", the validators list shows a validator, the Rewards page shows the Programme section without its load error, and `manifest.json` carries `name`, `description` and an `iconPath` that answers as an image; its CORS header only on `PRODUCTION_URL`, the Safe App origin. Fails with a message when neither URL is set | needs `PRODUCTION_URL`; nightly in `nightly.yml`, and alone by a dispatch with `suite: web-smoke`; in `release.yml` on the new CID through Orbitor's gateway, because Filebase sends `default-src 'self'` and the app cannot run there. On 2026-10-27, 3 of 5 passed against production: the Rewards page showed its load error, and the deployed manifest had no `iconPath` yet |
 | `availability` | `apps/web`, through `pnpm --filter` | The production deployment at `PRODUCTION_URL` answers with the title of `apps/web/index.html` and serves the entry script its index names. When `deployments.json` at the root records a release, each gateway in `IPFS_GATEWAYS` serves `index.html` of the latest one with the same title. Writes a table to the job summary | needs `PRODUCTION_URL`; every six hours in `availability.yml`, and on a pull request that changes the check or `deployments.json`. The record holds the first release, pinned on 2026-10-27, and both gateways served it then |
 | `pnpm test:e2e` | `apps/web` | The interface behaves, against mocked RPC. Playwright. Includes axe against WCAG 2.2 AA on every route; a serious or critical violation fails it (`apps/web/ACCESSIBILITY.md`) | runs; one navigation test is intermittently flaky |
 | `pnpm test:fork` | `apps/web`, `packages/cli` | Against the real contracts on an Anvil Mainnet fork at a pinned block, each effect checked by reading the chain. `apps/web`: the staking flows in the interface, in Playwright, about 1.5 minutes. `packages/cli`: the five write commands sent for real, then each with `--dry-run`, which must change nothing, in node:test; one of those tests needs no Anvil and also runs under `pnpm test`; about 20 seconds | needs `anvil` and the archive `MAINNET_RPC_URL`; nightly in CI |
@@ -166,9 +166,17 @@ the orphan branch `snapshots`. Only a run on `main` writes that branch; a pull r
 changes `packages/snapshots` or the workflow runs credential-free checks and fixture tests only.
 Publication uses the exact event commit and requires a schedule or dispatch on `main`. Failed main
 snapshot, publication or index jobs call `page-on-red.yml`.
-`release.yml` runs on a tag `v*` or by hand: its `build` job receives no secret, builds from
-`apps/web/build.env`, packs `apps/web/release/app.car` and prints the CID; its `pin` job runs only
-from `main` or a `v*` tag, needs `PINATA_JWT` and `PINATA_GATEWAY`, and fails when they are empty.
+`RELEASING.md` is the operator page for every release and deploy. `release-draft.yml`, by hand
+from `main`, creates a draft GitHub Release for one project, with its next version and changes;
+publishing the draft creates the tag that starts the project's workflow.
+`release.yml` runs when a `web-v*` release is published, on the tagged commit, which must be on
+`main`: its `build` job receives no secret but the public Graph browser key, builds from
+`apps/web/build.env` and packs `apps/web/release/app.car`; `pin` pins it with `PINATA_JWT` and
+`PINATA_GATEWAY`; `smoke` runs the web smoke on the new CID; `publish`, in the protected
+`production` environment, uploads the same files to Vercel, sets the ENS contenthash of
+`safenet.cobuilders.eth` with `ENS_MANAGER_PRIVATE_KEY` on the resolver the ENS registry names
+(`packages/core/src/ens.ts`), then moves the Vercel production domain with `VERCEL_TOKEN`. By
+hand, it only builds.
 `workers-deploy.yml` runs only by hand, from `main`, through the protected `production`
 environment: it tests `apps/api` and `apps/alerts`, applies the alerts D1 migrations and deploys
 both Workers with `cf deploy`, on their workers.dev URLs. With `telegram_webhook` on, it then

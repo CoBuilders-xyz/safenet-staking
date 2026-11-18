@@ -64,6 +64,7 @@
       "cache": false,
       "passThroughEnv": [
         "PRODUCTION_URL",
+        "SMOKE_URL",
         "CI"
       ]
     },

@@ -1,7 +1,8 @@
 # Verify a release
 
-Production for this interface is a directory on IPFS. Its address, the CID, is a hash of the
-exact files. Anyone can rebuild those files from this repository and get the same CID. If the
+Production for this interface is a directory on IPFS, served through the ENS name
+`safenet.cobuilders.eth`, and the same files on the Vercel production domain. Its address, the
+CID, is a hash of the exact files. Anyone can rebuild those files from this repository and get the same CID. If the
 CID you build matches the CID being served, the interface you load is the source you read.
 
 ## What you need

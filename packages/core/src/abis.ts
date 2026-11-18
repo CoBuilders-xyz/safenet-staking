@@ -305,3 +305,14 @@ export const ensUniversalResolverAbi = parseAbi([
 export const ensResolverAbi = parseAbi([
   "function contenthash(bytes32 node) view returns (bytes)",
 ])
+
+/** The ENS registry: the resolver a name has set. The web release reads it (./ens.ts). */
+export const ensRegistryAbi = parseAbi([
+  "function resolver(bytes32 node) view returns (address)",
+])
+
+/** A resolver's contenthash, read and written. The web release sets its name's with it. */
+export const ensContenthashAbi = parseAbi([
+  "function contenthash(bytes32 node) view returns (bytes)",
+  "function setContenthash(bytes32 node, bytes hash)",
+])

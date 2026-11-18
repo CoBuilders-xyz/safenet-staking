@@ -1,7 +1,9 @@
 import { test, expect, type Page } from "@playwright/test"
+import { smokeTarget } from "./target"
 
 /**
- * The production deployment at PRODUCTION_URL, as a visitor without a wallet sees it. No mocks:
+ * A production deployment, SMOKE_URL or else PRODUCTION_URL (./target.ts), as a visitor without a
+ * wallet sees it. No mocks:
  * every figure comes from the RPC, the subgraphs and SEF's files the deployment reads. Each test
  * waits for a section to leave its loading state, then asserts what it shows, so a figure the
  * interface could not read fails the test instead of passing as a skeleton.
@@ -51,9 +53,12 @@ test("the rewards page renders the programme without a load error", async ({ pag
 test("manifest.json carries what Safe{Wallet} reads, and its icon exists", async ({ request, baseURL }) => {
   const response = await request.get("manifest.json")
   expect(response.status(), "manifest.json answers").toBe(200)
-  // Safe{Wallet} reads the manifest from its own origin. This request has no CORS, so without this
-  // header check a manifest Safe{Wallet} cannot read would still pass.
-  expect(response.headers()["access-control-allow-origin"], "manifest.json is readable from another origin").toBe("*")
+  // Safe{Wallet} reads the manifest from the Safe App origin. This request has no CORS, so without
+  // this header check a manifest Safe{Wallet} cannot read would still pass. Other origins are not
+  // loaded by Safe{Wallet}, and may send other headers.
+  if (smokeTarget().safeApp) {
+    expect(response.headers()["access-control-allow-origin"], "manifest.json is readable from another origin").toBe("*")
+  }
   const manifest = (await response.json()) as Record<string, unknown>
   for (const field of ["name", "description", "iconPath"]) {
     expect(typeof manifest[field], `manifest.json carries ${field}`).toBe("string")

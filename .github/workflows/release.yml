@@ -1,18 +1,24 @@
 name: Release
 
-# Production is IPFS. This workflow builds the interface from build.env plus the public Graph browser key, packs it into a
-# CAR whose CID anyone can rebuild (VERIFY.md), and pins that CAR. Vercel serves previews only.
-# The ENS contenthash is not touched here.
+# The web release (RELEASING.md). Production is two origins that serve one build: the ENS name
+# safenet.cobuilders.eth, through its IPFS contenthash, and the Vercel production domain. Only
+# this workflow changes either, so both always serve the same files.
+#
+#   build     no secret but the public Graph browser key. Builds from build.env, packs the CAR
+#             whose CID anyone can rebuild (VERIFY.md).
+#   pin       pins the CAR to Pinata and checks the gateways.
+#   smoke     the production smoke suite on the new CID, through a public gateway.
+#   publish   the protected `production` environment. Uploads the same files to Vercel without
+#             a domain, sets the ENS contenthash, then gives the Vercel deployment the
+#             production domain, and checks both.
+#
+# A published release whose tag starts with web-v runs all four, on the tagged commit, which must
+# be on main. A manual run builds only, to check that a commit builds and to read its CID.
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
-    inputs:
-      pin:
-        description: Pin the CAR to Pinata and check that the gateways serve it. Off builds and verifies only.
-        type: boolean
-        default: true
-  push:
-    tags: ["v*"]
 
 concurrency:
   group: release-${{ github.ref }}
@@ -27,6 +33,7 @@ env:
 jobs:
   build:
     name: build
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'web-v')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
@@ -37,6 +44,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # All history, to check that a released commit is on main.
+          fetch-depth: 0
+      - name: Require a commit on main
+        if: github.event_name == 'release'
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::The tag ${{ github.event.release.tag_name }} points at a commit that is not on main. Release from a draft that Create draft release made."
+            exit 1
+          fi
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -76,26 +92,26 @@ jobs:
             echo "- \`VITE_VALIDATOR_INFO_URL=${VITE_VALIDATOR_INFO_URL}\`"
             echo "- \`VITE_ALERTS_API_URL=${VITE_ALERTS_API_URL}\`"
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload the CAR and the CID
+      # The CAR and the files packed into it, from one build: IPFS gets the CAR, Vercel the files.
+      - name: Upload the build
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-${{ steps.cid.outputs.cid }}
           path: |
             apps/web/release/app.car
             apps/web/release/CID
+            apps/web/dist/
           if-no-files-found: error
           retention-days: 90
 
   pin:
     name: pin
     needs: build
-    # A tag push always pins. A manual run pins unless pin=false. Either way only from main or a
-    # v* tag, so a manual run from a feature branch never pins to the production account.
-    if: >-
-      (github.event_name == 'push' || inputs.pin) &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name == 'release'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    outputs:
+      pinned: ${{ steps.pin.outputs.pinned }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -109,15 +125,183 @@ jobs:
           package-manager-cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Download the CAR and the CID
+      - name: Download the build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-${{ needs.build.outputs.cid }}
-          path: apps/web/release
-      # Fails with a clear message when either secret is empty. It never skips.
+          path: apps/web
+      # Fails with a clear message when either secret is empty. It never skips. It sets
+      # pinned=true as soon as Pinata confirms the pin, before the gateway checks, so the smoke
+      # says whether the CID works even when one gateway is slow.
       - name: Pin to Pinata and check the gateways
+        id: pin
         env:
           PINATA_JWT: ${{ secrets.PINATA_JWT }}
           PINATA_GATEWAY: ${{ secrets.PINATA_GATEWAY }}
-          RELEASE_NAME: safenet-staking ${{ github.ref_name }} ${{ needs.build.outputs.cid }}
+          RELEASE_NAME: safenet-staking ${{ github.event.release.tag_name }} ${{ needs.build.outputs.cid }}
         run: pnpm --filter @cobuilders/safenet-web release:pin
+
+  smoke:
+    name: smoke
+    needs: [build, pin]
+    if: ${{ !cancelled() && needs.pin.outputs.pinned == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # Orbitor's path gateway, ORBITOR_IPFS_GATEWAY in packages/core. Filebase cannot run the app:
+      # it sends Content-Security-Policy default-src 'self', which blocks every call the app makes.
+      SMOKE_URL: https://ipfs.orbitor.dev/ipfs/${{ needs.build.outputs.cid }}/
+      PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install Playwright chromium
+        run: pnpm --filter @cobuilders/safenet-web exec playwright install --with-deps chromium
+      - name: Smoke tests on the new CID
+        run: pnpm test:smoke:web
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-release-smoke
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 14
+
+  publish:
+    name: publish
+    needs: [build, pin, smoke]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Its required reviewer approves each run before it can read the secrets below.
+    environment: production
+    # One release at a time changes production, whatever its tag.
+    concurrency:
+      group: web-production
+      cancel-in-progress: false
+    env:
+      CID: ${{ needs.build.outputs.cid }}
+      PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      # The CLI version is pinned: this job holds the production credentials.
+      VERCEL_CLI: vercel@65.9.0
+    steps:
+      - name: Require the credentials
+        env:
+          ENS_MANAGER_PRIVATE_KEY: ${{ secrets.ENS_MANAGER_PRIVATE_KEY }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+        run: |
+          missing=""
+          for name in ENS_MANAGER_PRIVATE_KEY VERCEL_TOKEN MAINNET_RPC_URL VERCEL_ORG_ID VERCEL_PROJECT_ID PRODUCTION_URL; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then echo "::error::Missing secrets or variables:$missing. RELEASING.md lists them."; exit 1; fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      # viem and multiformats for the ENS step, from the lockfile.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Download the build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-${{ needs.build.outputs.cid }}
+          path: apps/web
+
+      # 1. Vercel: the files of the CAR as a prebuilt static deployment, with no build on Vercel.
+      # --skip-domain keeps the production domain on the current deployment until step 3.
+      - name: Upload to Vercel without the production domain
+        id: vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          out="$RUNNER_TEMP/vercel"
+          mkdir -p "$out/.vercel/output/static"
+          cp -R apps/web/dist/. "$out/.vercel/output/static/"
+          echo '{"version":3}' > "$out/.vercel/output/config.json"
+          cd "$out"
+          url="$(npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --skip-domain --yes --token "$VERCEL_TOKEN")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Vercel deployment: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      # 2. ENS: the contenthash of the name, on the resolver the ENS registry names for it
+      # (packages/core/src/ens.ts), signed by the key that manages the name. Does nothing when
+      # the name already points at this CID, so a rerun is safe.
+      - name: Set the ENS contenthash
+        working-directory: apps/web
+        env:
+          ENS_MANAGER_PRIVATE_KEY: ${{ secrets.ENS_MANAGER_PRIVATE_KEY }}
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+        run: |
+          # shellcheck disable=SC2016 # JavaScript, not shell.
+          node --import tsx --input-type=module -e '
+            import { createPublicClient, createWalletClient, http, namehash } from "viem"
+            import { mainnet } from "viem/chains"
+            import { privateKeyToAccount } from "viem/accounts"
+            import { CID } from "multiformats/cid"
+            import { ENS_REGISTRY, WEB_ENS_NAME, ensContenthashAbi, ensRegistryAbi } from "@cobuilders/safenet-core"
+
+            const cid = process.env.CID
+            const node = namehash(WEB_ENS_NAME)
+            // ENSIP-7: the ipfs-ns codec 0xe3 as a varint, then the binary CIDv1.
+            const contenthash = `0xe301${Buffer.from(CID.parse(cid).toV1().bytes).toString("hex")}`
+            const transport = http(process.env.MAINNET_RPC_URL)
+            const client = createPublicClient({ chain: mainnet, transport })
+            const resolver = await client.readContract({ address: ENS_REGISTRY, abi: ensRegistryAbi, functionName: "resolver", args: [node] })
+            const read = () => client.readContract({ address: resolver, abi: ensContenthashAbi, functionName: "contenthash", args: [node] })
+
+            if ((await read()).toLowerCase() === contenthash) {
+              console.log(`${WEB_ENS_NAME} already points at ${cid}`)
+              process.exit(0)
+            }
+            const key = process.env.ENS_MANAGER_PRIVATE_KEY.trim()
+            const account = privateKeyToAccount(key.startsWith("0x") ? key : `0x${key}`)
+            // The simulation fails, before any gas is spent, when the key does not manage the name.
+            const { request } = await client.simulateContract({
+              account, address: resolver, abi: ensContenthashAbi, functionName: "setContenthash", args: [node, contenthash],
+            })
+            const hash = await createWalletClient({ account, chain: mainnet, transport }).writeContract(request)
+            console.log(`transaction ${hash}`)
+            const receipt = await client.waitForTransactionReceipt({ hash, timeout: 600_000 })
+            if (receipt.status !== "success") throw new Error(`transaction ${hash} reverted`)
+            if ((await read()).toLowerCase() !== contenthash) throw new Error(`${WEB_ENS_NAME} does not point at ${cid} after ${hash}`)
+            console.log(`${WEB_ENS_NAME} now points at ${cid}`)
+          '
+          echo "ENS: the name points at \`$CID\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # 3. Vercel: the production domain moves to the deployment of step 1.
+      - name: Give the Vercel deployment the production domain
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DEPLOYMENT: ${{ steps.vercel.outputs.url }}
+        run: npx --yes "$VERCEL_CLI" promote "$DEPLOYMENT" --yes --token "$VERCEL_TOKEN"
+
+      # The production domain serves the index.html of this build, byte for byte.
+      - name: Check the Vercel production domain
+        run: |
+          for _ in 1 2 3 4 5 6; do
+            if curl -fsS --max-time 20 "${PRODUCTION_URL%/}/index.html" -o "$RUNNER_TEMP/served.html" \
+              && cmp -s "$RUNNER_TEMP/served.html" apps/web/dist/index.html; then
+              echo "Vercel: $PRODUCTION_URL serves this build" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::$PRODUCTION_URL does not serve the index.html of $CID after two minutes."
+          exit 1
