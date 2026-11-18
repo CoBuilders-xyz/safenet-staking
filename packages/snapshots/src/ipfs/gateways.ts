@@ -100,14 +100,16 @@ export async function waitUntilServed(gateway: Gateway, check: ServeCheck): Prom
   const get = check.fetch ?? fetch
   const retryMs = check.retryMs ?? 15_000
   const deadline = Date.now() + timeoutMs
+  // Each request ends by the deadline too, so a slow answer cannot stretch the window.
+  const bounded = () => AbortSignal.timeout(Math.max(1, Math.min(60_000, deadline - Date.now())))
   let last = "no answer"
   for (let attempt = 1; ; attempt++) {
     try {
-      const readyStatus = ready ? await status(get, gatewayUrl(origin, cid, ready)) : 200
+      const readyStatus = ready ? await status(get, gatewayUrl(origin, cid, ready), bounded()) : 200
       if (readyStatus !== 200) {
         last = `${ready}: HTTP ${readyStatus}`
       } else {
-        const res = await get(gatewayUrl(origin, cid, probe), { redirect: "follow", signal: AbortSignal.timeout(60_000) })
+        const res = await get(gatewayUrl(origin, cid, probe), { redirect: "follow", signal: bounded() })
         if (res.status === 200) {
           // The path is immutable: a 200 with other bytes will not get better with retries.
           if (!servesRelease(new Uint8Array(await res.arrayBuffer()), expected)) {
@@ -131,8 +133,8 @@ export async function waitUntilServed(gateway: Gateway, check: ServeCheck): Prom
 }
 
 /** One fetch, bounded, whose body is dropped unread. A body that errors is not an answer error. */
-async function status(get: typeof fetch, url: string): Promise<number> {
-  const res = await get(url, { redirect: "follow", signal: AbortSignal.timeout(60_000) })
+async function status(get: typeof fetch, url: string, signal: AbortSignal): Promise<number> {
+  const res = await get(url, { redirect: "follow", signal })
   await res.body?.cancel().catch(() => {})
   return res.status
 }

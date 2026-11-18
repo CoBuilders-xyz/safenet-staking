@@ -105,6 +105,16 @@ describe("waitUntilServed", () => {
     assert.match(outcome.detail, /not served within 0\.05 s\. Last: manifest\.json: HTTP 429/)
   })
 
+  it("ends a slow request at the deadline, not after the per-request timeout", async () => {
+    // Answers only when the request is aborted, as a gateway that never answers.
+    const fetcher = ((_url: string, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(new Error("aborted"))))) as typeof fetch
+    const started = Date.now()
+    const outcome = await waitUntilServed(gw, check(fetcher, { ready: "index.html" }))
+    assert.equal(outcome.ok, false)
+    assert.ok(Date.now() - started < 5_000, `took ${Date.now() - started} ms`)
+  })
+
   it("checks every gateway to the end", async () => {
     const fetcher = (async (url: string) => (url.startsWith("https://a.") ? new Response(expected) : new Response("", { status: 502 }))) as typeof fetch
     const outcomes = await checkGateways(
