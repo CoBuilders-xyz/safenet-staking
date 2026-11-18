@@ -36,7 +36,10 @@ test("a web release asks for one approval, after the build and before the pin", 
 test("the Vercel upload runs from the repository root, where the Root Directory apps/web exists", () => {
   const step = jobs("release.yml").publish.split("- name: Upload to Vercel without the production domain")[1]?.split("\n      - ")[0]
   assert.ok(step, "release.yml has the Vercel upload step")
-  assert.doesNotMatch(step, /\bcd\b/)
+  assert.doesNotMatch(step, /\bcd\b|working-directory:/)
+  // No default working directory at workflow or job scope moves it either.
+  const text = readFileSync(resolve(import.meta.dirname, "../../.github/workflows/release.yml"), "utf8")
+  assert.doesNotMatch(text, /^\s*defaults:/m)
   assert.match(step, /cp -R apps\/web\/dist\/\. \.vercel\/output\/static\//)
   assert.match(step, /deploy --prebuilt --prod --skip-domain/)
 })
