@@ -38,6 +38,6 @@ export function smokeTarget(env: Readonly<Record<string, string | undefined>> = 
     )
   }
   const url = explicit ? normalise("SMOKE_URL", explicit) : normalise("PRODUCTION_URL", production!)
-  const safeApp = !explicit || (!!production && normalise("PRODUCTION_URL", production).href === url.href)
+  const safeApp = !explicit || (!!production && normalise("PRODUCTION_URL", production).origin === url.origin)
   return { url: url.href, safeApp }
 }

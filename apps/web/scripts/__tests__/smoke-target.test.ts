@@ -15,8 +15,9 @@ describe("smokeTarget", () => {
     expect(smokeTarget({ SMOKE_URL: `${ENS}/ipfs/bafy` })).toEqual({ url: `${ENS}/ipfs/bafy/`, safeApp: false })
   })
 
-  it("treats SMOKE_URL equal to PRODUCTION_URL as the Safe App origin", () => {
+  it("treats SMOKE_URL on the origin of PRODUCTION_URL as the Safe App origin", () => {
     expect(smokeTarget({ PRODUCTION_URL: PRODUCTION, SMOKE_URL: `${PRODUCTION}/` }).safeApp).toBe(true)
+    expect(smokeTarget({ PRODUCTION_URL: `${PRODUCTION}/app?x=1`, SMOKE_URL: `${PRODUCTION}/#/rewards` }).safeApp).toBe(true)
   })
 
   it("refuses to run without either, or with a value that is not a URL", () => {

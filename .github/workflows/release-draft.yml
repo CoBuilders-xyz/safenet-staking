@@ -56,11 +56,13 @@ jobs:
         run: |
           set -euo pipefail
           # The paths whose commits a release of the project ships. packages/core reaches users
-          # only through the projects that read it, so it is listed under each of them.
+          # only through the projects that read it, so it is listed under each of them, with the
+          # shared build inputs: the root package.json, the lockfile and the workspace file.
+          shared="package.json pnpm-lock.yaml pnpm-workspace.yaml"
           case "$PROJECT" in
-            web) paths="apps/web packages/core packages/snapshots"; package="" ;;
-            cli) paths="packages/cli packages/core"; package="packages/cli/package.json" ;;
-            mcp) paths="packages/mcp packages/cli packages/core"; package="packages/mcp/package.json" ;;
+            web) paths="apps/web packages/core packages/snapshots $shared"; package="" ;;
+            cli) paths="packages/cli packages/core $shared"; package="packages/cli/package.json" ;;
+            mcp) paths="packages/mcp packages/cli packages/core $shared"; package="packages/mcp/package.json" ;;
             *) echo "::error::Unknown project $PROJECT"; exit 1 ;;
           esac
 
