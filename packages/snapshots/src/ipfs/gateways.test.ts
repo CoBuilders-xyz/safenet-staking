@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, it, test } from "node:test"
-import { checkGateways, gatewayHost, gatewayUrl, probeAsset, servesRelease, waitUntilServed, type ServeCheck } from "./gateways.js"
-import { pinataCredentials } from "./pin.js"
+import { checkGateways, failures, gatewayHost, gatewayUrl, probeAsset, servesRelease, waitUntilServed, type ServeCheck } from "./gateways.js"
+import { DEDICATED_GATEWAY_LABEL, gatewaysToCheck, pinataCredentials } from "./pin.js"
 
 const bytes = (text: string) => new TextEncoder().encode(text)
 
@@ -113,12 +113,34 @@ describe("waitUntilServed", () => {
     )
     assert.deepEqual(outcomes.map((o) => [o.label, o.ok]), [["a", true], ["b", false]])
   })
+
+  it("reports an informational gateway that did not serve, and does not count it as a failure", async () => {
+    const fetcher = (async (url: string) => (url.startsWith("https://a.") ? new Response(expected) : new Response("", { status: 403 }))) as typeof fetch
+    const outcomes = await checkGateways(
+      [{ label: "a", origin: "https://a.example" }, { label: "d", origin: "https://d.example", informational: true }],
+      check(fetcher),
+    )
+    assert.deepEqual(outcomes.map((o) => [o.label, o.ok, o.informational]), [["a", true, undefined], ["d", false, true]])
+    assert.deepEqual(failures(outcomes), [])
+    assert.deepEqual(failures([{ label: "a", ok: false, detail: "x" }]).map((o) => o.label), ["a"])
+  })
 })
 
 describe("pinataCredentials", () => {
-  it("names each missing secret", () => {
-    assert.equal(pinataCredentials({}), "PINATA_JWT and PINATA_GATEWAY are empty")
-    assert.equal(pinataCredentials({ PINATA_JWT: "j" }), "PINATA_GATEWAY is empty")
+  it("needs the JWT, and takes the gateway as optional", () => {
+    assert.equal(pinataCredentials({}), "PINATA_JWT is empty")
+    assert.equal(pinataCredentials({ PINATA_GATEWAY: "gw.example" }), "PINATA_JWT is empty")
+    const c = pinataCredentials({ PINATA_JWT: "j" })
+    if (typeof c === "string") throw new Error(c)
+    assert.equal(c.gateway, undefined)
+    assert.equal(c.redact(new Error("failed with j")), "failed with <jwt>")
+  })
+
+  it("checks the public gateways, and the dedicated one as informational only when set", () => {
+    assert.ok(gatewaysToCheck({}).every((g) => !g.informational && g.label !== DEDICATED_GATEWAY_LABEL))
+    const withDedicated = gatewaysToCheck({ gateway: "gw.example" })
+    assert.deepEqual(withDedicated.at(-1), { label: DEDICATED_GATEWAY_LABEL, origin: "https://gw.example", informational: true })
+    assert.equal(withDedicated.length, gatewaysToCheck({}).length + 1)
   })
 
   it("takes the JWT and the gateway host out of every message", () => {

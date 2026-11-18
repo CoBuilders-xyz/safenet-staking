@@ -7,8 +7,8 @@
  * if Pinata reports any other CID. The upload and the gateway checks are the ones the daily
  * snapshots use, from `@cobuilders/safenet-snapshots/ipfs`.
  *
- * Then it checks the dedicated Pinata gateway and each public gateway in IPFS_GATEWAYS from
- * packages/core. On each it waits for `/ipfs/<cid>/index.html` to answer 200, then fetches one
+ * Then it checks each public gateway in IPFS_GATEWAYS from packages/core, and the dedicated
+ * Pinata gateway when PINATA_GATEWAY is set. On each it waits for `/ipfs/<cid>/index.html` to answer 200, then fetches one
  * JavaScript file of the release, the smallest `.js` under `assets/`, and compares it byte for
  * byte with that file inside the CAR. The smallest, because a gateway fetches the file from the
  * network on first request: a large chunk drew several 504s before its 200. A pin no gateway serves is not a release, and a 200 with a
@@ -23,17 +23,20 @@
  * records when each gateway was last probed, and why the IPFS project's own public gateways are
  * not on it: they retired on 2026-09-21 and answer 429, so a check against them could never pass.
  *
- * Every gateway is checked to the end, and each one's result is printed, before the run fails,
- * so the log shows whether the dedicated gateway served the release when a public one did not.
+ * The public gateways decide: the run fails when one of them does not serve the release. The
+ * dedicated gateway is informational. Its result is printed, but it never fails the run, and it
+ * gets at most two minutes: since 2026-11-18 Pinata answers 403 for every CID on a
+ * `*.mypinata.cloud` host without a custom domain. Every gateway is checked to the end, and each
+ * one's result is printed, before the run fails.
  *
  * PINATA_GATEWAY is a secret, so its host never reaches the log or the step summary. Output
  * names it "the dedicated Pinata gateway" and prints each public gateway URL in full.
  *
- * Required environment variables. Missing ones fail the run; nothing is skipped:
+ * Required environment variable. Missing, it fails the run:
  *   PINATA_JWT       API JWT from https://app.pinata.cloud/developers/api-keys
- *   PINATA_GATEWAY   dedicated gateway host, e.g. "example.mypinata.cloud". A URL works too;
- *                    only its host is used.
  * Optional:
+ *   PINATA_GATEWAY   dedicated gateway host, such as its custom domain. A URL works too; only its
+ *                    host is used. Checked for information only.
  *   RELEASE_NAME             name shown in Pinata. Defaults to "safenet-staking <CID>".
  *   GATEWAY_TIMEOUT_SECONDS  retry window per gateway. Defaults to 900.
  *
@@ -44,7 +47,7 @@ import { appendFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmS
 import { tmpdir } from "node:os"
 import { join, relative, resolve, sep } from "node:path"
 import {
-  checkGateways, DEDICATED_GATEWAY_LABEL, gatewaysToCheck, gatewayUrl, pinataCredentials, pinCar, probeAsset,
+  checkGateways, DEDICATED_GATEWAY_LABEL, failures, gatewaysToCheck, gatewayUrl, pinataCredentials, pinCar, probeAsset,
 } from "@cobuilders/safenet-snapshots/ipfs"
 
 const RELEASE = resolve(import.meta.dirname, "../release")
@@ -59,7 +62,7 @@ const credentials = pinataCredentials()
 if (typeof credentials === "string") {
   fail(
     `${credentials}. The release is NOT pinned. ` +
-      "In CI, add the repository secrets PINATA_JWT and PINATA_GATEWAY, or run the workflow by hand, " +
+      "In CI, add the repository secret PINATA_JWT, or run the workflow by hand, " +
       "which builds and verifies without publishing.",
   )
 }
@@ -132,8 +135,11 @@ const outcomes = await checkGateways(gatewaysToCheck(credentials), {
   redact: credentials.redact,
   log: (line) => console.log(`release-pin: ${line}`),
 })
-for (const { label, ok, detail } of outcomes) {
-  const line = `release-pin: ${ok ? "OK" : "FAILED"} ${label}: ${detail}`
+const state = ({ ok, informational }: { ok: boolean; informational?: boolean }) =>
+  ok ? "OK" : informational ? "NOT SERVED (informational)" : "FAILED"
+for (const outcome of outcomes) {
+  const { label, ok, detail } = outcome
+  const line = `release-pin: ${state(outcome)} ${label}: ${detail}`
   if (ok) console.log(line)
   else console.error(line)
 }
@@ -144,16 +150,17 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     [
       `### Pinned \`${cid}\``,
       "",
-      ...outcomes.map(({ label, ok, detail }) =>
-        label === DEDICATED_GATEWAY_LABEL
-          ? `- ${ok ? "OK" : "FAILED"}: \`/ipfs/${cid}/index.html\` on the dedicated Pinata gateway. ${detail}`
-          : `- ${ok ? "OK" : "FAILED"}: ${gatewayUrl(label, cid, "index.html")}. ${detail}`,
+      ...outcomes.map((outcome) =>
+        outcome.label === DEDICATED_GATEWAY_LABEL
+          ? `- ${state(outcome)}: \`/ipfs/${cid}/index.html\` on the dedicated Pinata gateway. ${outcome.detail}`
+          : `- ${state(outcome)}: ${gatewayUrl(outcome.label, cid, "index.html")}. ${outcome.detail}`,
       ),
       "",
     ].join("\n"),
   )
 }
 
-const failed = outcomes.filter((o) => !o.ok).length
-if (failed) fail(`${cid} is pinned, but ${failed} of ${outcomes.length} gateways did not serve it.`)
-console.log(`release-pin: ${cid} is pinned and served by every gateway`)
+const failed = failures(outcomes).length
+const required = outcomes.filter((o) => !o.informational).length
+if (failed) fail(`${cid} is pinned, but ${failed} of ${required} public gateways did not serve it.`)
+console.log(`release-pin: ${cid} is pinned and served by every public gateway`)

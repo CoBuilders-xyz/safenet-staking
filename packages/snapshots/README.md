@@ -185,7 +185,7 @@ pnpm --filter @cobuilders/safenet-cli start status --json --rpc-url http://127.0
 | Script | What it does |
 |---|---|
 | `snapshot:build [--out <dir>]` | builds the day; needs `MAINNET_RPC_URL` |
-| `snapshot:publish --dir <day> --out <dir> [--index <dir>] [--replace]` | packs, pins and checks the gateways for the day and the new index; needs `PINATA_JWT` and `PINATA_GATEWAY` |
+| `snapshot:publish --dir <day> --out <dir> [--index <dir>] [--replace]` | packs, pins and checks the gateways for the day and the new index; needs `PINATA_JWT`; `PINATA_GATEWAY` is optional and informational |
 | `snapshot:verify <directory \| CID>` | re-derives the CID from the files |
 
 Run them from the root as `pnpm --filter @cobuilders/safenet-snapshots <script>`; `snapshot:build`

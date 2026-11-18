@@ -56,7 +56,8 @@ Publishing a `web-v*` draft runs *Release* on the tagged commit:
 
 1. **build**: builds from `apps/web/build.env` and the repository variables, with no secret but
    the public Graph browser key, and packs the CAR. Anyone can rebuild its CID ([VERIFY.md](VERIFY.md)).
-2. **pin**: pins the CAR to Pinata and checks the gateways.
+2. **pin**: pins the CAR to Pinata and checks that the public gateways serve it. The dedicated
+   Pinata gateway in `PINATA_GATEWAY`, if set, is checked for information only.
 3. **smoke**: the production smoke suite on the new CID, through Orbitor's gateway.
 4. **publish**, in the `production` environment, after its reviewer approves:
    1. uploads the files of the CAR to Vercel as a deployment without the production domain;

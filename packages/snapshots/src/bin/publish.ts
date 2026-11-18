@@ -14,7 +14,8 @@
  *
  * Required environment variables. Missing ones fail the run; nothing is skipped:
  *   PINATA_JWT       API JWT from https://app.pinata.cloud/developers/api-keys
- *   PINATA_GATEWAY   dedicated gateway host. A URL works too; only its host is used.
+ *   PINATA_GATEWAY   optional. The dedicated gateway host; a URL works too, only its host is used.
+ *                    Checked for information only: the public gateways decide.
  * Optional:
  *   GATEWAY_TIMEOUT_SECONDS  retry window per gateway. Defaults to 900.
  *
@@ -28,7 +29,7 @@ import { basename, join, resolve } from "node:path"
 import { parseArgs } from "node:util"
 import { addDay, emptyIndex, parseIndex, type IndexEntry, type SnapshotIndex } from "../date-index.js"
 import {
-  checkGateways, DEDICATED_GATEWAY_LABEL, gatewaysToCheck, gatewayUrl, packDirectory, pinataCredentials, pinCar,
+  checkGateways, DEDICATED_GATEWAY_LABEL, failures, gatewaysToCheck, gatewayUrl, packDirectory, pinataCredentials, pinCar,
   type Outcome, type PinataCredentials,
 } from "../ipfs/index.js"
 import { serialise, manifestMismatch } from "../write.js"
@@ -60,14 +61,18 @@ function summary(lines: string[]): void {
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n\n`)
 }
 
-function describe(cid: string, outcomes: readonly Outcome[], probe: string): string[] {
-  return outcomes.map(({ label, ok, detail }) =>
-    label === DEDICATED_GATEWAY_LABEL
-      ? `- ${ok ? "OK" : "FAILED"}: \`/ipfs/${cid}/${probe}\` on the dedicated Pinata gateway. ${detail}`
-      : `- ${ok ? "OK" : "FAILED"}: ${gatewayUrl(label, cid, probe)}. ${detail}`)
+function state({ ok, informational }: Outcome): string {
+  return ok ? "OK" : informational ? "NOT SERVED (informational)" : "FAILED"
 }
 
-/** Pack, pin, and prove every gateway serves `probe`. Fails the run when any gateway does not. */
+function describe(cid: string, outcomes: readonly Outcome[], probe: string): string[] {
+  return outcomes.map((outcome) =>
+    outcome.label === DEDICATED_GATEWAY_LABEL
+      ? `- ${state(outcome)}: \`/ipfs/${cid}/${probe}\` on the dedicated Pinata gateway. ${outcome.detail}`
+      : `- ${state(outcome)}: ${gatewayUrl(outcome.label, cid, probe)}. ${outcome.detail}`)
+}
+
+/** Pack, pin, and prove every public gateway serves `probe`. Fails the run when one does not. */
 async function publish(credentials: PinataCredentials, dir: string, name: string, probe: string, what: string): Promise<string> {
   const timeoutMs = Number(process.env.GATEWAY_TIMEOUT_SECONDS ?? 900) * 1000
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) fail(SCRIPT, "GATEWAY_TIMEOUT_SECONDS must be a positive number")
@@ -83,14 +88,15 @@ async function publish(credentials: PinataCredentials, dir: string, name: string
     redact: credentials.redact,
     log: (line) => console.log(`${SCRIPT}: ${line}`),
   })
-  for (const { label, ok, detail } of outcomes) {
-    const line = `${SCRIPT}: ${ok ? "OK" : "FAILED"} ${label}: ${detail}`
-    if (ok) console.log(line)
+  for (const outcome of outcomes) {
+    const line = `${SCRIPT}: ${state(outcome)} ${outcome.label}: ${outcome.detail}`
+    if (outcome.ok) console.log(line)
     else console.error(line)
   }
   summary([`### ${what}: \`${packed.cid}\``, "", ...describe(packed.cid, outcomes, probe)])
-  const failed = outcomes.filter((o) => !o.ok).length
-  if (failed) fail(SCRIPT, `${what} ${packed.cid} is pinned, but ${failed} of ${outcomes.length} gateways did not serve it`)
+  const failed = failures(outcomes).length
+  const required = outcomes.filter((o) => !o.informational).length
+  if (failed) fail(SCRIPT, `${what} ${packed.cid} is pinned, but ${failed} of ${required} public gateways did not serve it`)
   return packed.cid
 }
 
@@ -144,7 +150,7 @@ run(SCRIPT, async () => {
 
   const credentials = pinataCredentials()
   if (typeof credentials === "string") {
-    fail(SCRIPT, `${credentials}. The snapshot is NOT pinned. In CI, add the repository secrets PINATA_JWT and PINATA_GATEWAY`)
+    fail(SCRIPT, `${credentials}. The snapshot is NOT pinned. In CI, add the repository secret PINATA_JWT`)
   }
 
   const cid = await publish(credentials, dir, `safenet-snapshot ${manifest.day} ${manifest.mainnet.block}`, "manifest.json", `Snapshot ${manifest.day}`)

@@ -140,7 +140,7 @@ The CID depends on the source, lockfile, `build.env` and the public gateway key.
 
 ```sh
 pnpm --filter @cobuilders/safenet-web release:build   # writes apps/web/release/CID and app.car
-pnpm --filter @cobuilders/safenet-web release:pin     # needs PINATA_JWT and PINATA_GATEWAY
+pnpm --filter @cobuilders/safenet-web release:pin     # needs PINATA_JWT
 ```
 
 ### deployments.json

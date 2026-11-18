@@ -110,8 +110,8 @@ jobs:
           MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
           GITHUB_TOKEN: ${{ github.token }}
         run: pnpm --filter @cobuilders/safenet-snapshots snapshot:build --out "$RUNNER_TEMP/snapshot"
-      # Pins the day and the new index, and checks the dedicated gateway and both public gateways
-      # in packages/core serve each. Writes both CIDs to the job summary.
+      # Pins the day and the new index, and checks that both public gateways in packages/core
+      # serve each. The dedicated gateway, when set, is checked for information only. Writes both CIDs to the job summary.
       - name: Pin the day and the index
         id: publish
         env:
