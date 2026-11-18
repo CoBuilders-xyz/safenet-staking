@@ -383,7 +383,8 @@ pnpm --filter @cobuilders/safenet-web release:pin
   the social preview tags carry an absolute URL.
 - `release:pin` (`scripts/release-pin.ts`) uploads the CAR to Pinata and fails if Pinata reports
   another CID. It then checks each gateway in `IPFS_GATEWAYS` in `packages/core`: each must
-  serve `index.html` and the release's smallest `.js` file byte for byte. It needs `PINATA_JWT`,
+  answer 200 for `index.html` and serve the release's smallest `.js` file byte for byte. A
+  gateway behind Cloudflare changes `index.html`, so its bytes are not compared. It needs `PINATA_JWT`,
   from the environment or the root `.env.local`, and fails when it is missing. With
   `PINATA_GATEWAY`, it also checks that dedicated gateway, for information only: Pinata answers
   403 on a `*.mypinata.cloud` host without a custom domain. `RELEASE_NAME` and
