@@ -56,13 +56,13 @@ Publishing a `web-v*` draft runs *Release* on the tagged commit:
 
 1. **build**: builds from `apps/web/build.env` and the repository variables, with no secret but
    the public Graph browser key, and packs the CAR. Anyone can rebuild its CID ([VERIFY.md](VERIFY.md)).
-2. **approve**: the run waits in the `release-approval` environment until its reviewer approves.
+2. **approve**: the run waits in the `production` environment until its reviewer approves.
    This is the only approval: nothing is pinned or published before it, and nothing after it
    asks again.
 3. **pin**: pins the CAR to Pinata and checks that the public gateways serve it. The dedicated
    Pinata gateway in `PINATA_GATEWAY`, if set, is checked for information only.
 4. **smoke**: the production smoke suite on the new CID, through Orbitor's gateway.
-5. **publish**, in the `production` environment, which holds the credentials:
+5. **publish**, in the `web-release` environment, which holds the credentials:
    1. uploads the files of the CAR to Vercel as a deployment without the production domain;
    2. sets the contenthash of `safenet.cobuilders.eth` to the CID, and reads it back;
    3. moves the Vercel production domain to that deployment, and checks that it serves the
@@ -90,23 +90,22 @@ and promote the previous Vercel production deployment in Vercel's dashboard, bot
 
 | Environment | Required reviewer | Deployment branches and tags | Holds |
 |---|---|---|---|
-| `release-approval` | yes, the deployer | `main` and tags `*-v*` | nothing |
-| `production` | no | `main` and tags `*-v*` | the credentials below and the Worker secrets |
+| `production` | yes, the deployer | `main` and tags `*-v*` | the Worker credentials |
+| `web-release` | none | tags `web-v*` only | the web release credentials below |
 
-The approval lives in `release-approval`, so each release and each Workers deploy asks once. The
-`production` environment has no reviewer, so the job that reads the credentials does not ask
-again. Only `main` and release tags reach it, so restrict who can create `*-v*` tags with a tag
-ruleset.
+The web release asks once, in `production`, before the pin. `web-release` has no reviewer, so the
+publish job after it does not ask again. Without a reviewer, a workflow run from any `web-v*` tag
+reaches its secrets, so a tag ruleset must let only the deployer create `web-v*` tags.
 
-The `publish` job reads these from the `production` environment or the repository. It stops, and
+The `publish` job reads these from the `web-release` environment or the repository. It stops, and
 names what is missing, when one is empty.
 
 | Name | Kind | What it is |
 |---|---|---|
-| `ENS_MANAGER_PRIVATE_KEY` | `production` secret | The key of the account that manages `safenet.cobuilders.eth` |
-| `VERCEL_TOKEN` | `production` secret | A Vercel access token for the team that owns the project |
-| `MAINNET_RPC_URL` | repository secret | Already set for the nightly jobs |
-| `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | variables | The team and project ids, from Vercel's project settings or `.vercel/project.json` after `vercel link` |
+| `ENS_MANAGER_PRIVATE_KEY` | `web-release` secret | The key of the account that manages `safenet.cobuilders.eth` |
+| `VERCEL_TOKEN` | `web-release` secret | A Vercel access token for the team that owns the project |
+| `MAINNET_RPC_URL` | organization or repository secret | Already set for the nightly jobs |
+| `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | `web-release` variables | The team and project ids, from Vercel's project settings or `.vercel/project.json` after `vercel link` |
 | `PRODUCTION_URL` | variable | Already set: the Vercel production domain |
 
 **The ENS manager.** A dedicated account, used for nothing else:
@@ -153,7 +152,7 @@ then publish within two days, or it expires.
 
 These still run by hand, from `main`, until each has its own release workflow:
 
-- **API, alerts:** Actions → *Workers deploy*, then approve the `release-approval` environment.
+- **API, alerts:** Actions → *Workers deploy*, then approve the `production` environment.
   [DEPLOY.md](DEPLOY.md) lists the inputs. Afterwards, check the API with
   `API_URL=<origin> pnpm --filter @cobuilders/safenet-api smoke`.
 - **Subgraphs:** Actions → *Deploy subgraphs to Studio*. The package's `CLAUDE.md` has the slug and

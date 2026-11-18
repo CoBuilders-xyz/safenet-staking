@@ -172,14 +172,15 @@ publishing the draft creates the tag that starts the project's workflow.
 `release.yml` runs when a `web-v*` release is published, on the tagged commit, which must be on
 `main`: its `build` job receives no secret but the public Graph browser key, builds from
 `apps/web/build.env` and packs `apps/web/release/app.car`; `approve` waits for the one approval,
-in the `release-approval` environment; `pin` pins it with `PINATA_JWT` and
+from the `production` environment's reviewer; `pin` pins it with `PINATA_JWT` and
 checks the public gateways; `smoke` runs the web smoke on the new CID; `publish`, in the
-`production` environment, which holds the credentials and asks for no approval, uploads the same files to Vercel, sets the ENS contenthash of
+`web-release` environment, which holds the credentials, admits only `web-v*` tags and asks for no
+approval, uploads the same files to Vercel, sets the ENS contenthash of
 `safenet.cobuilders.eth` with `ENS_MANAGER_PRIVATE_KEY` on the resolver the ENS registry names
 (`packages/core/src/ens.ts`), then moves the Vercel production domain with `VERCEL_TOKEN`. By
 hand, it only builds.
-`workers-deploy.yml` runs only by hand, from `main`, after one approval in the `release-approval`
-environment; its deploy job reads the `production` environment: it tests `apps/api` and `apps/alerts`, applies the alerts D1 migrations and deploys
+`workers-deploy.yml` runs only by hand, from `main`, through the protected `production`
+environment: it tests `apps/api` and `apps/alerts`, applies the alerts D1 migrations and deploys
 both Workers with `cf deploy`, on their workers.dev URLs. With `telegram_webhook` on, it then
 registers the alerts Worker's Telegram webhook with `TELEGRAM_WEBHOOK_SECRET`; every alerts deploy
 reports what Telegram holds. `DEPLOY.md` lists every input.

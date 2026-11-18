@@ -6,11 +6,12 @@ name: Release
 #
 #   build     no secret but the public Graph browser key. Builds from build.env, packs the CAR
 #             whose CID anyone can rebuild (VERIFY.md).
-#   approve   the `release-approval` environment: its required reviewer approves the release
-#             once, before anything leaves the runner. The jobs after it need no other approval.
+#   approve   the `production` environment: its required reviewer approves the release once,
+#             before anything leaves the runner. The jobs after it need no other approval.
 #   pin       pins the CAR to Pinata and checks the public gateways.
 #   smoke     the production smoke suite on the new CID, through a public gateway.
-#   publish   the `production` environment, which holds the credentials. Uploads the same files
+#   publish   the `web-release` environment, which holds the credentials and has no reviewer, so
+#             it asks for no second approval. Only web-v* tags reach it. Uploads the same files
 #             to Vercel without a domain, sets the ENS contenthash, then gives the Vercel
 #             deployment the production domain, and checks both.
 #
@@ -115,7 +116,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     # Its required reviewer approves here, once per release.
-    environment: release-approval
+    environment: production
     steps:
       - name: Record the approval
         env:
@@ -200,8 +201,9 @@ jobs:
     needs: [build, pin, smoke]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # It holds the credentials below. The approval was given once, in the approve job.
-    environment: production
+    # It holds the credentials below and has no reviewer: the approval was given once, in the
+    # approve job. Its deployment rule admits only web-v* tags.
+    environment: web-release
     # One release at a time changes production, whatever its tag.
     concurrency:
       group: web-production

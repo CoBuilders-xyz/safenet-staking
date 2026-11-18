@@ -2,7 +2,7 @@ name: Workers deploy
 
 # Deploys the REST API (apps/api) and the alerts Worker (apps/alerts) to Cloudflare with `cf`, from
 # the configs in each package. Alerts first applies its D1 migrations. Runs only by hand, only from
-# main. The `release-approval` environment gates every run; `production` holds the credentials.
+# main, and only through the `production` environment, whose protection rules gate every run.
 # Pull requests never reach this workflow. DEPLOY.md lists every secret and variable it reads.
 
 on:
@@ -30,21 +30,8 @@ env:
   CF_SEND_TELEMETRY: "false"
 
 jobs:
-  # Its required reviewer approves the deploy. The `production` environment below holds the
-  # credentials and asks for no second approval.
-  approve:
-    name: approve
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    environment: release-approval
-    steps:
-      - name: Record the approval
-        run: echo "Deploy of ${GITHUB_SHA} approved." >> "$GITHUB_STEP_SUMMARY"
-
   deploy:
     name: deploy ${{ inputs.target }}
-    needs: approve
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 20

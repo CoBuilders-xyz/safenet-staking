@@ -24,13 +24,13 @@ test("a web release asks for one approval, after the build and before the pin", 
   assert.deepEqual(Object.keys(j), ["build", "approve", "pin", "smoke", "publish"])
   assert.equal(environment(j.build), undefined)
   assert.deepEqual(needs(j.approve), ["build"])
-  assert.equal(environment(j.approve), "release-approval")
+  assert.equal(environment(j.approve), "production")
   assert.ok(needs(j.pin).includes("approve"))
   assert.equal(environment(j.pin), undefined)
   assert.ok(needs(j.smoke).includes("pin"))
   assert.equal(environment(j.smoke), undefined)
   assert.ok(needs(j.publish).includes("smoke"))
-  assert.equal(environment(j.publish), "production")
+  assert.equal(environment(j.publish), "web-release")
 })
 
 test("the Vercel upload runs from the repository root, where the Root Directory apps/web exists", () => {
@@ -39,11 +39,4 @@ test("the Vercel upload runs from the repository root, where the Root Directory 
   assert.doesNotMatch(step, /\bcd\b/)
   assert.match(step, /cp -R apps\/web\/dist\/\. \.vercel\/output\/static\//)
   assert.match(step, /deploy --prebuilt --prod --skip-domain/)
-})
-
-test("a Workers deploy asks for one approval before the job that reads production", () => {
-  const j = jobs("workers-deploy.yml")
-  assert.equal(environment(j.approve), "release-approval")
-  assert.deepEqual(needs(j.deploy), ["approve"])
-  assert.equal(environment(j.deploy), "production")
 })
