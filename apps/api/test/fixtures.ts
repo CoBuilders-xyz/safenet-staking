@@ -7,7 +7,7 @@ export const NOW = utcDayMs(AEGIS_START_DAY) + 16 * 86400_000 + 12 * 3600_000
 export const HASH = `0x${"a".repeat(64)}`
 export const SHA = "b".repeat(40)
 export const ENV = { SUBGRAPH_URL_MAINNET: SUBGRAPH_ENDPOINTS.mainnet, SUBGRAPH_URL_GNOSIS: SUBGRAPH_ENDPOINTS.gnosis }
-export const raw = { address: TARGET, label: "Manual label must never escape", commission: 0.05, is_active: false, participation_rate_14d: null }
+export const raw = { address: TARGET, label: "SEF Operator", commission: 0.05, is_active: false, participation_rate_14d: null }
 export const meta = { block: { number: 100, hash: HASH, timestamp: NOW / 1000 - 20 }, hasIndexingErrors: false }
 export interface FixtureOptions {
   publication?: number

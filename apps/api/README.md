@@ -49,11 +49,14 @@ The list preserves `address`, `label`, `commission`, `is_active`, and
 null. The reference UI converts this wire format into camelCase fields and percentages.
 Returning the hook's camelCase shape directly would break its conversion.
 
-Labels use Mainnet ENS reverse lookup with forward confirmation. An unresolved or failed lookup
-returns `""`. Metadata reports how many lookups failed. SEF's manual names never become labels.
-`is_active` remains SEF's published flag. `registered` is the separate indexed Mainnet fact.
-An empty label produces an empty name heading in the existing reference card; its address button
-still identifies the validator. This is the required empty-label contract, not an inferred name.
+The list is drop-in compatible with SEF's `validator-info.json`: for a validator without an ENS
+name, the row carries SEF's five fields with SEF's values, the address checksummed. A label is the Mainnet ENS name found by reverse lookup with
+forward confirmation. When there is none, or the lookup fails, the label is SEF's own label. When
+SEF's label is blank, the label is the checksummed address. A label is never empty. A row whose
+label is not a string is malformed, as SEF's file always carries one. `X-Data-Sources` reports
+how many labels came from each source (`ens`, `sef`, `address`) and how many lookups failed
+(`unavailable`). `is_active` remains SEF's published flag. `registered` is the separate indexed
+Mainnet fact.
 
 Amounts and event counters use decimal strings. The API never rounds wei through JavaScript numbers.
 Stats name `proposals` explicitly; they do not claim this equals SEF's Aegis SentinelOracle request metric.

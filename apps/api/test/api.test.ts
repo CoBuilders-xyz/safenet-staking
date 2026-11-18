@@ -7,21 +7,44 @@ import { ENV, HASH, NOW, OTHER, TARGET, graphData, meta, raw, upstream, type Fix
 function app(options: FixtureOptions = {}) { return createApp({ fetch: upstream(options), ens: async () => null, now: () => NOW }) }
 async function get(path: string, options: FixtureOptions = {}) { return app(options).request(`http://api.test/v1/${path}`, {}, ENV) }
 
-test("reference wire contract: bare array, fractional rates, inactive and null preserved, labels ENS-only", async () => {
+test("reference wire contract: bare array, fractional rates, inactive and null preserved, SEF's label kept without ENS", async () => {
   const response = await get("validators")
   assert.equal(response.status, 200)
-  assert.deepEqual(await response.json(), [{ ...raw, label: "" }])
+  // Drop-in compatible with validator-info.json: with no ENS name, the row carries SEF's values.
+  assert.deepEqual(await response.json(), [raw])
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*")
   assert.match(response.headers.get("X-Data-Sources")!, /commit/)
+  assert.match(response.headers.get("X-Data-Sources")!, /"ens":0,"sef":1,"address":0,"unavailable":0/)
 })
-test("ENS success replaces manual labels; failures use empty labels and disclose unavailable lookup", async () => {
+test("a confirmed ENS name replaces SEF's label; a failed lookup keeps SEF's label and is disclosed", async () => {
   const resolved = createApp({ fetch: upstream(), ens: async () => "operator.eth", now: () => NOW })
   const r = await resolved.request("http://api.test/v1/validators", {}, ENV)
   assert.equal((await r.json() as typeof raw[])[0]!.label, "operator.eth")
+  assert.match(r.headers.get("X-Data-Sources")!, /"ens":1,"sef":0/)
   const failed = createApp({ fetch: upstream(), ens: async () => { throw Error("secret URL must not escape") }, now: () => NOW })
   const f = await failed.request("http://api.test/v1/validators", {}, ENV)
-  assert.equal((await f.json() as typeof raw[])[0]!.label, "")
+  const body = await f.text()
+  assert.equal((JSON.parse(body) as typeof raw[])[0]!.label, raw.label)
   assert.match(f.headers.get("X-Data-Sources")!, /"unavailable":1/)
+  assert.doesNotMatch(body + f.headers.get("X-Data-Sources")!, /secret URL/)
+})
+test("the label is never empty: a blank SEF label without ENS becomes the address", async () => {
+  for (const label of ["", "   "]) {
+    const response = await get("validators", { rows: [{ ...raw, label }] })
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), [{ ...raw, label: raw.address }])
+    assert.match(response.headers.get("X-Data-Sources")!, /"sef":0,"address":1/)
+  }
+})
+test("the detail endpoint carries the same label as the list", async () => {
+  const response = await get(`validators/${TARGET}`)
+  assert.equal((await response.json() as { label: string }).label, raw.label)
+})
+test("a row whose label is not a string is malformed, as validator-info.json always carries one", async () => {
+  for (const row of [{ ...raw, label: undefined }, { ...raw, label: 7 }, { ...raw, label: null }]) {
+    const response = await get("validators", { rows: [row] })
+    assert.equal(response.status, 502)
+  }
 })
 test("all six endpoints return actual typed results with provenance", async () => {
   for (const path of ["validators", `validators/${TARGET}`, `validators/${TARGET}/history?window=7d`, `validators/${TARGET}/events`, "system/stats", "health"]) {

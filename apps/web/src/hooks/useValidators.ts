@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query"
 import { type Address, getAddress } from "viem"
 import { SEF_DATA } from "@cobuilders/safenet-core"
+import { truncateAddress } from "@/lib/format"
 
 export interface ValidatorInfo {
   address: Address
   isActive: boolean
+  /** The display name. Never empty: a missing or blank label becomes the short address. */
   label: string
   commission: number
   /** SEF's 14-day rate in percent, two decimals. Null when SEF publishes no rate, never 0. */
@@ -13,7 +15,7 @@ export interface ValidatorInfo {
 
 interface RawValidator {
   address: string
-  label: string
+  label?: unknown
   commission: number
   is_active: boolean
   participation_rate_14d: number | null
@@ -22,10 +24,15 @@ interface RawValidator {
 function isValidEntry(v: unknown): v is RawValidator {
   if (typeof v !== "object" || v === null) return false
   const obj = v as Record<string, unknown>
-  return (
-    typeof obj.address === "string" &&
-    typeof obj.label === "string"
-  )
+  return typeof obj.address === "string"
+}
+
+/**
+ * The label as published, or the short address when it is missing or blank. An empty label would
+ * render an empty name, and the card's link to the validator page would have nothing to click.
+ */
+function displayLabel(label: unknown, address: Address): string {
+  return typeof label === "string" && label.trim() !== "" ? label : truncateAddress(address)
 }
 
 async function fetchValidators(): Promise<ValidatorInfo[]> {
@@ -47,17 +54,20 @@ async function fetchValidators(): Promise<ValidatorInfo[]> {
   if (!Array.isArray(json)) {
     throw new Error("Invalid validator data format")
   }
-  return json.filter(isValidEntry).map((v) => ({
-    address: getAddress(v.address),
-    isActive: v.is_active ?? true,
-    label: v.label,
-    commission:
-      Math.round((v.commission ?? 0) * 100 * 100) / 100,
-    participationRate:
-      typeof v.participation_rate_14d === "number"
-        ? Math.round(v.participation_rate_14d * 100 * 100) / 100
-        : null,
-  }))
+  return json.filter(isValidEntry).map((v) => {
+    const address = getAddress(v.address)
+    return {
+      address,
+      isActive: v.is_active ?? true,
+      label: displayLabel(v.label, address),
+      commission:
+        Math.round((v.commission ?? 0) * 100 * 100) / 100,
+      participationRate:
+        typeof v.participation_rate_14d === "number"
+          ? Math.round(v.participation_rate_14d * 100 * 100) / 100
+          : null,
+    }
+  })
 }
 
 export function useValidators() {

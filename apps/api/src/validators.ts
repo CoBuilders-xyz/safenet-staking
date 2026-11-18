@@ -28,7 +28,8 @@ export function validator(value: unknown): SefValidator {
   const v = object(value)
   if (typeof v.address !== "string" || !isAddress(v.address, { strict: false })) throw malformed()
   return {
-    address: getAddress(v.address.toLowerCase()), label: "", commission: fraction(v.commission),
+    // SEF's display name, kept verbatim. validators() replaces it with a confirmed ENS name.
+    address: getAddress(v.address.toLowerCase()), label: string(v.label), commission: fraction(v.commission),
     is_active: boolean(v.is_active), participation_rate_14d: v.participation_rate_14d === null ? null : fraction(v.participation_rate_14d),
   }
 }
@@ -44,9 +45,14 @@ export async function validators(fetcher: Fetcher, lookup: EnsLookup, now: numbe
   if (now - published > SEF_DATA.staleAfterMs) throw new ApiError("stale_upstream", 503, "SEF validator data is not current.")
   const data = array(await json(fetcher, `${SEF_DATA.assetsAtCommit(sha)}/validator-info.json`)).map(validator)
   if (!data.length || data.length > 100 || new Set(data.map(v => v.address)).size !== data.length) throw malformed()
-  let failedLabels = 0
+  // A confirmed ENS name wins, then SEF's own label, so a validator without ENS keeps the name
+  // validator-info.json gives it. The label is never empty: a blank SEF label becomes the address.
+  const labels = { ens: 0, sef: 0, address: 0, unavailable: 0 }
   await Promise.all(data.map(async v => {
-    try { v.label = await lookup(address(v.address)) ?? "" } catch { failedLabels++ }
+    let name: string | null = null
+    try { name = await lookup(address(v.address)) } catch { labels.unavailable++ }
+    if (name) { v.label = name; labels.ens++ } else if (v.label.trim()) labels.sef++
+    else { v.label = v.address; labels.address++ }
   }))
   const window = participationWindow(new Date(published))
   return {
@@ -54,7 +60,7 @@ export async function validators(fetcher: Fetcher, lookup: EnsLookup, now: numbe
     sources: [{ source: "sef", commit: sha, publishedAt, checkedAt: new Date(now).toISOString(),
       programme: programmePhase(new Date(published)), window,
       // is_active and commission retain SEF's semantics; they are not on-chain registration.
-      labels: { source: "forward-confirmed ENS", unavailable: failedLabels } }],
+      labels: { source: "forward-confirmed ENS, else SEF label, else address", ...labels } }],
     expiresAt: published + SEF_DATA.staleAfterMs,
   }
 }
