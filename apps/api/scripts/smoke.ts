@@ -6,6 +6,8 @@ const first = await fetch(new URL("/v1/validators", base))
 assert.equal(first.status, 200, await first.clone().text())
 const rows = await first.json() as { address: string; label: string; is_active: boolean; commission: number; participation_rate_14d: number | null }[]
 assert.ok(rows.length)
+// The list is drop-in compatible with validator-info.json: every row carries a non-empty label.
+assert.ok(rows.every(r => typeof r.label === "string" && r.label.trim() !== ""), "every validator has a non-empty label")
 const target = await selectSmokeTarget(rows, base)
 for (const path of ["/v1/validators", `/v1/validators/${target.address}`, ...["7d", "30d", "all"].map(w => `/v1/validators/${target.address}/history?window=${w}`), `/v1/validators/${target.address}/events`, "/v1/system/stats", "/v1/health"]) {
   const start = performance.now()

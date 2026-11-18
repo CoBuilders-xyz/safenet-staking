@@ -22,8 +22,8 @@ generated `Env`, as `src/index.ts` does for `GITHUB_TOKEN`, with a comment that 
 every required binding in the config.
 
 Keep the validator list a bare array with SEF's snake_case names and fractional rates.
-The reference's hook converts that array to `ValidatorInfo[]`. Labels come only from
-forward-confirmed ENS. Missing ENS means an empty label, never SEF's manually edited label.
+The reference's hook converts that array to `ValidatorInfo[]`. A label is the forward-confirmed
+ENS name, else SEF's label from validator-info.json, else the address. Never emit an empty label.
 Missing participation means null. SEF activity does not mean on-chain registration.
 
 Reject stale, malformed or indexing-error results. Never relabel Beta rows as Aegis.

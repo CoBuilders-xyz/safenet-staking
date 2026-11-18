@@ -115,11 +115,12 @@ describe("useValidators", () => {
     )
   })
 
-  it("queryFn skips entries with missing required fields", async () => {
+  it("queryFn skips entries without a valid address", async () => {
     const rawData = [
       { address: "0x1111111111111111111111111111111111111111", label: "Valid" },
-      { address: "0x2222222222222222222222222222222222222222" }, // missing label
-      { label: "No Address" }, // missing address
+      { label: "No Address" },
+      { address: "not-an-address", label: null },
+      { address: "0x12345", label: "Short" },
       null,
     ]
     mockFetch.mockResolvedValue({
@@ -132,6 +133,37 @@ describe("useValidators", () => {
 
     expect(result).toHaveLength(1)
     expect((result as Array<{ label: string }>)[0].label).toBe("Valid")
+  })
+
+  it("queryFn gives an empty, blank, missing, non-string or address label the short address, never an empty name", async () => {
+    // From 2026-11-12 the REST API sent "" for every label, and the validator cards
+    // rendered an empty name link.
+    const rawData = [
+      { address: "0x1111111111111111111111111111111111111111", label: "" },
+      { address: "0x2222222222222222222222222222222222222222", label: "   " },
+      { address: "0x3333333333333333333333333333333333333333" },
+      { address: "0x4444444444444444444444444444444444444444", label: null },
+      { address: "0xCc00DE0eA14c08669b26DcBFE365dBD9890B04D9", label: "0xcc00de0ea14c08669b26dcbfe365dbd9890b04d9" },
+      { address: "0x6666666666666666666666666666666666666666", label: " 0x6666666666666666666666666666666666666666 " },
+      { address: "0x5555555555555555555555555555555555555555", label: "Gnosis" },
+    ]
+    mockFetch.mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify(rawData)),
+    })
+
+    renderHook(() => useValidators())
+    const result = (await capturedQueryFn!()) as Array<{ label: string }>
+
+    expect(result.map((v) => v.label)).toEqual([
+      "0x1111...1111",
+      "0x2222...2222",
+      "0x3333...3333",
+      "0x4444...4444",
+      "0xcc00...04d9",
+      "0x6666...6666",
+      "Gnosis",
+    ])
   })
 
   it("queryFn handles JSON with stray commas", async () => {
