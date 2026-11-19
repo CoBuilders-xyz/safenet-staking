@@ -33,15 +33,36 @@ export function validator(value: unknown): SefValidator {
     is_active: boolean(v.is_active), participation_rate_14d: v.participation_rate_14d === null ? null : fraction(v.participation_rate_14d),
   }
 }
+/**
+ * When SEF's update job last succeeded on `main`, in milliseconds, or undefined when GitHub does
+ * not say. Never throws: without an answer the caller keeps the file's commit time.
+ */
+async function lastUpdateRun(fetcher: Fetcher, headers: Headers, now: number): Promise<number | undefined> {
+  try {
+    const run = object(array(object(await json(fetcher, SEF_DATA.updateRuns, { headers })).workflow_runs)[0])
+    if (run.status !== "completed" || run.conclusion !== "success" || run.head_branch !== "main") return undefined
+    const started = Date.parse(string(run.run_started_at))
+    return Number.isFinite(started) && started <= now + 60_000 ? started : undefined
+  } catch {
+    return undefined
+  }
+}
 export async function validators(fetcher: Fetcher, lookup: EnsLookup, now: number, githubToken?: string): Promise<Result<SefValidator[]>> {
   const headers = new Headers({ "User-Agent": "safenet-api", Accept: "application/vnd.github+json" })
   if (githubToken) headers.set("Authorization", `Bearer ${githubToken}`)
-  const commits = array(await json(fetcher, SEF_DATA.validatorInfoCommits, { headers }))
-  const latest = object(commits[0]), sha = string(latest.sha)
+  // The run is read first. The job pushes its commit before it succeeds, so the commit read after
+  // a successful run is never older than that run's output.
+  const run = await lastUpdateRun(fetcher, headers, now)
+  const latest = object(array(await json(fetcher, SEF_DATA.validatorInfoCommits, { headers }))[0]), sha = string(latest.sha)
   if (!/^[a-f0-9]{40}$/.test(sha)) throw malformed()
-  const publishedAt = string(object(object(latest.commit).committer).date)
-  const published = Date.parse(publishedAt)
-  if (!Number.isFinite(published) || published > now + 60_000) throw malformed()
+  const committedAt = string(object(object(latest.commit).committer).date)
+  const committed = Date.parse(committedAt)
+  if (!Number.isFinite(committed) || committed > now + 60_000) throw malformed()
+  // SEF's job recomputes the rates on every run and commits the file only when a value changed.
+  // Equal rates leave the last commit old while the data is current, so the data is as fresh as
+  // the newer of that commit and the job's last successful run, which also fixes the window.
+  const published = run !== undefined && run > committed ? run : committed
+  const publishedAt = new Date(published).toISOString()
   if (now - published > SEF_DATA.staleAfterMs) throw new ApiError("stale_upstream", 503, "SEF validator data is not current.")
   const data = array(await json(fetcher, `${SEF_DATA.assetsAtCommit(sha)}/validator-info.json`)).map(validator)
   if (!data.length || data.length > 100 || new Set(data.map(v => v.address)).size !== data.length) throw malformed()
@@ -57,7 +78,9 @@ export async function validators(fetcher: Fetcher, lookup: EnsLookup, now: numbe
   const window = participationWindow(new Date(published))
   return {
     data,
-    sources: [{ source: "sef", commit: sha, publishedAt, checkedAt: new Date(now).toISOString(),
+    // publishedAt is the instant the freshness and the window rest on; committedAt is the file's.
+    sources: [{ source: "sef", commit: sha, committedAt, publishedAt,
+      publishedBy: published === committed ? "file commit" : "update run", checkedAt: new Date(now).toISOString(),
       programme: programmePhase(new Date(published)), window,
       // is_active and commission retain SEF's semantics; they are not on-chain registration.
       labels: { source: "forward-confirmed ENS, else SEF label, else address", ...labels } }],

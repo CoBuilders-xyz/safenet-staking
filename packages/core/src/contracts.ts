@@ -176,6 +176,13 @@ export const SEF_DATA = {
    * than the cron. The daily snapshot reads the file at that commit.
    */
   rewardsLatestCommits: `${SEF_API}/commits?path=assets/rewards/latest.json&per_page=1`,
+  /**
+   * The last successful run on `main` of SEF's update job, `update-data.yml`, through the GitHub
+   * API. The job recomputes every file on each run and commits a file only when its content
+   * changed, so rates that stay equal leave validator-info.json without a new commit. This run
+   * shows the job is alive when the file's last commit is old.
+   */
+  updateRuns: `${SEF_API}/actions/workflows/update-data.yml/runs?branch=main&status=success&per_page=1`,
   /** A file under `assets/` at one commit, so the rates and their window come from one write. */
   assetsAtCommit: (sha: string) => `${SEF_RAW}/${sha}/assets`,
   /** Their cron runs every 3 hours. Three missed runs is our staleness threshold. */

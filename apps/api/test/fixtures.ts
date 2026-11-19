@@ -10,14 +10,23 @@ export const ENV = { SUBGRAPH_URL_MAINNET: SUBGRAPH_ENDPOINTS.mainnet, SUBGRAPH_
 export const raw = { address: TARGET, label: "SEF Operator", commission: 0.05, is_active: false, participation_rate_14d: null }
 export const meta = { block: { number: 100, hash: HASH, timestamp: NOW / 1000 - 20 }, hasIndexingErrors: false }
 export interface FixtureOptions {
+  /** When validator-info.json was last committed. */
   publication?: number
+  /** What GitHub answers for SEF's update job: a run, "none" (the default), or "error". */
+  run?: Record<string, unknown> | "none" | "error"
   rows?: unknown
   graph?: (query: string, variables: Record<string, unknown>) => Record<string, unknown>
 }
+/** A successful run of SEF's update job on main that started at `at`. */
+export const sefRun = (at: number) => ({ status: "completed", conclusion: "success", head_branch: "main", run_started_at: new Date(at).toISOString() })
 export function upstream(options: FixtureOptions = {}): Fetcher {
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input.toString()
     if (url === SEF_DATA.validatorInfoCommits) return Response.json([{ sha: SHA, commit: { committer: { date: new Date(options.publication ?? NOW - 1000).toISOString() } } }])
+    if (url === SEF_DATA.updateRuns) {
+      if (options.run === "error") return new Response("unavailable", { status: 503 })
+      return Response.json({ workflow_runs: !options.run || options.run === "none" ? [] : [options.run] })
+    }
     if (url.includes(`/${SHA}/assets/`)) return Response.json(options.rows ?? [raw])
     const { query, variables } = JSON.parse(String(init?.body)) as { query: string; variables: Record<string, unknown> }
     const data = options.graph?.(query, variables) ?? graphData(query)
