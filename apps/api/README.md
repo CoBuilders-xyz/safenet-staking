@@ -84,7 +84,13 @@ Detail, history, events and stats also include `sources` in their body. The list
 `X-Data-Expires-At` is milliseconds since Unix epoch. `X-Cache` reports response cache HIT or MISS.
 
 SEF data is fetched at its latest file commit, never paired with a moving branch timestamp.
-It becomes unavailable after core's nine-hour threshold. Subgraph data must have an error-free
+SEF's update job recomputes the rates every three hours and commits the file only when a value
+changed, so equal rates leave that commit old while the data is current. The data is therefore as
+fresh as the newer of the file commit and the last successful run of the job on `main`
+(`SEF_DATA.updateRuns` in core), and the participation window ends at that instant's hour. The
+source entry names both: `committedAt`, `publishedAt` and `publishedBy`. When GitHub gives no
+usable run, the file commit time decides. The data becomes unavailable nine hours after that
+instant, core's threshold. Subgraph data must have an error-free
 indexed block within core's fifteen-minute threshold. Unknown time is not fresh.
 
 Response caching lasts at most 60 seconds and never exceeds source freshness. Shared SEF/ENS
@@ -94,7 +100,8 @@ successful subgraph stats with `/v1/system/stats` for at most 60 seconds, within
 Dependency readiness can therefore lag a new outage by up to 60 seconds. After expiry, failed
 reads return degraded health; an old success is never served beyond its expiry.
 The Cache API is local to each Cloudflare location; this is not a global quota limiter.
-Set the optional `GITHUB_TOKEN` Worker secret for authenticated GitHub commit metadata requests.
+Set the optional `GITHUB_TOKEN` Worker secret for authenticated GitHub metadata requests: the
+file's commits and the update job's runs, two requests per metadata refresh.
 Without it, GitHub permits only 60 unauthenticated requests per hour per source IP.
 Authenticated quotas and Studio quotas remain deployment capacity dependencies.
 Before public deployment, configure edge rate limits for health and data routes. Successful-data
@@ -140,7 +147,7 @@ Set public endpoint configuration in `cloudflare.config.ts`; keep authenticated 
 in Worker secrets if the selected provider requires them. Never put a credential in a text binding
 or frontend `VITE_` value. `GITHUB_TOKEN` is optional, so `cloudflare.config.ts` does not
 declare it (`cf` requires every declared secret); `src/index.ts` types it. It is sent
-only to GitHub's commits API, never to raw assets, subgraphs or RPC endpoints.
+only to GitHub's commits and workflow runs APIs, never to raw assets, subgraphs or RPC endpoints.
 The deploy workflow uploads it from the `SAFENET_API_GITHUB_TOKEN` secret when that exists,
 and warns otherwise. Use a token
 with only the read access needed for the public SEF repository. For local development,

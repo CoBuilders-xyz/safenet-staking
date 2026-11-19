@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import { SEF_DATA, SUBGRAPH_STALE_AFTER_SECONDS, GNOSIS_INDEXED_PROGRAMME } from "@cobuilders/safenet-core"
 import { createApp } from "../src/index.js"
-import { ENV, HASH, NOW, OTHER, TARGET, graphData, meta, raw, upstream, type FixtureOptions } from "./fixtures.js"
+import { ENV, HASH, NOW, OTHER, TARGET, graphData, meta, raw, sefRun, upstream, type FixtureOptions } from "./fixtures.js"
 
 function app(options: FixtureOptions = {}) { return createApp({ fetch: upstream(options), ens: async () => null, now: () => NOW }) }
 async function get(path: string, options: FixtureOptions = {}) { return app(options).request(`http://api.test/v1/${path}`, {}, ENV) }
@@ -308,27 +308,108 @@ test("health never reuses SEF metadata beyond 60 seconds even when list routes p
   }
 })
 
-test("GitHub secret authenticates only commit metadata and never enters responses or caches", async () => {
+test("GitHub secret authenticates only GitHub API metadata and never enters responses or caches", async () => {
+  const github: string[] = [SEF_DATA.validatorInfoCommits, SEF_DATA.updateRuns]
   for (const token of [undefined, "fixture-only-github-credential"]) {
     for (const route of ["validators", "health"]) {
-      const original = upstream(), seen: string[] = [], cached: string[] = []
+      const original = upstream(), seen = new Map<string, string | null>(), cached: string[] = []
       const a = createApp({ ens: async () => null, now: () => NOW,
         fetch: (async (input, init) => {
-          const url = String(input)
-          seen.push(url)
-          assert.equal(new Headers(init?.headers).get("Authorization"),
-            url === SEF_DATA.validatorInfoCommits && token ? `Bearer ${token}` : null)
+          seen.set(String(input), new Headers(init?.headers).get("Authorization"))
           return original(input, init)
         }) as typeof fetch,
         cache: { match: async () => undefined, put: async (_key, response) => { cached.push(await response.text()) } },
       })
       const response = await a.request(`http://api.test/v1/${route}`, {}, { ...ENV, GITHUB_TOKEN: token })
       assert.equal(response.status, 200)
-      assert.ok(seen.includes(SEF_DATA.validatorInfoCommits))
-      assert.ok(seen.length >= 2)
+      // Checked after the response: a failed assertion inside fetch would read as an upstream failure.
+      assert.ok(seen.size >= 3)
+      for (const url of github) assert.ok(seen.has(url))
+      for (const [url, authorization] of seen) {
+        assert.equal(authorization, github.includes(url) && token ? `Bearer ${token}` : null)
+      }
       assert.doesNotMatch(await response.text() + JSON.stringify([...response.headers]) + cached.join(""), /fixture-only-github-credential/)
     }
   }
+})
+
+const HOUR = 3_600_000
+/** The SEF entry of X-Data-Sources. */
+async function sefSource(response: Response) {
+  return (JSON.parse(response.headers.get("X-Data-Sources")!) as Record<string, unknown>[]).find(s => s.source === "sef")!
+}
+test("file unchanged, cron alive: an old file commit with a recent successful update run is current", async () => {
+  // SEF commits validator-info.json only when a rate changed. Here the last change is 29 hours
+  // old and the job last succeeded two hours ago.
+  const committed = NOW - 29 * HOUR, ran = NOW - 2 * HOUR - 17 * 60_000
+  const options = { publication: committed, run: sefRun(ran) }
+  const response = await get("validators", options)
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), [raw])
+  const source = await sefSource(response)
+  assert.equal(source.committedAt, new Date(committed).toISOString())
+  assert.equal(source.publishedAt, new Date(ran).toISOString())
+  assert.equal(source.publishedBy, "update run")
+  // The window ends at the hour of the run that recomputed the rates, not of the old commit.
+  const end = Math.floor(ran / HOUR) * HOUR
+  assert.deepEqual(source.window, { start: new Date(end - 14 * 24 * HOUR).toISOString(), end: new Date(end).toISOString() })
+  const health = await get("health", options)
+  assert.equal(health.status, 200)
+  assert.deepEqual((await health.json() as { failures: unknown[] }).failures, [])
+})
+test("a dead cron still goes stale: an old commit and a last run past the threshold fail closed", async () => {
+  const committed = NOW - 29 * HOUR
+  assert.equal((await get("validators", { publication: committed, run: sefRun(NOW - SEF_DATA.staleAfterMs + 1000) })).status, 200)
+  const options = { publication: committed, run: sefRun(NOW - SEF_DATA.staleAfterMs - 1) }
+  const response = await get("validators", options)
+  assert.equal(response.status, 503)
+  assert.equal((await response.json() as { error: { code: string } }).error.code, "stale_upstream")
+  assert.equal(response.headers.get("Cache-Control"), "no-store")
+  const health = await get("health", options)
+  assert.equal(health.status, 503)
+  assert.deepEqual((await health.json() as { failures: unknown[] }).failures, [{ dependency: "sef", code: "stale_upstream" }])
+})
+test("the data expires nine hours after the update run, not after the file commit", async () => {
+  const entries = new Map<string, Response>()
+  let time = NOW
+  const a = createApp({ fetch: upstream({ publication: NOW - 29 * HOUR, run: sefRun(NOW - SEF_DATA.staleAfterMs + 2000) }), ens: async () => null, now: () => time,
+    cache: { match: async key => entries.get(String(key instanceof Request ? key.url : key))?.clone(), put: async (key, response) => { entries.set(String(key instanceof Request ? key.url : key), response) } } })
+  const one = await a.request("http://api.test/v1/validators", {}, ENV)
+  assert.equal(one.status, 200)
+  assert.equal(one.headers.get("X-Data-Expires-At"), String(NOW + 2000))
+  time += 2001
+  assert.equal((await a.request("http://api.test/v1/validators", {}, ENV)).status, 503)
+})
+test("without a usable update run the file commit time decides, fresh or stale", async () => {
+  const unusable: NonNullable<FixtureOptions["run"]>[] = [
+    "none", "error", { ...sefRun(NOW - HOUR), conclusion: "failure" }, { ...sefRun(NOW - HOUR), status: "in_progress" },
+    { ...sefRun(NOW - HOUR), head_branch: "test-branch" }, { ...sefRun(NOW - HOUR), run_started_at: "not a date" },
+    { ...sefRun(NOW - HOUR), run_started_at: null }, sefRun(NOW + 61_000),
+  ]
+  for (const run of unusable) {
+    const stale = await get("validators", { publication: NOW - SEF_DATA.staleAfterMs - 1, run })
+    assert.equal(stale.status, 503)
+    assert.equal((await stale.json() as { error: { code: string } }).error.code, "stale_upstream")
+    const fresh = await get("validators", { publication: NOW - 4 * HOUR, run })
+    assert.equal(fresh.status, 200)
+    const source = await sefSource(fresh)
+    assert.equal(source.publishedAt, new Date(NOW - 4 * HOUR).toISOString())
+    assert.equal(source.publishedBy, "file commit")
+  }
+  // A request that throws, as on a timeout or a refused connection, is the same.
+  const original = upstream({ publication: NOW - 4 * HOUR })
+  const a = createApp({ ens: async () => null, now: () => NOW,
+    fetch: (async (url, init) => { if (String(url) === SEF_DATA.updateRuns) throw new Error("GitHub unavailable"); return original(url, init) }) as typeof fetch })
+  const response = await a.request("http://api.test/v1/validators", {}, ENV)
+  assert.equal(response.status, 200)
+  assert.equal((await sefSource(response)).publishedBy, "file commit")
+})
+test("a file commit newer than the last update run decides", async () => {
+  const response = await get("validators", { publication: NOW - HOUR, run: sefRun(NOW - 4 * HOUR) })
+  assert.equal(response.status, 200)
+  const source = await sefSource(response)
+  assert.equal(source.publishedAt, new Date(NOW - HOUR).toISOString())
+  assert.equal(source.publishedBy, "file commit")
 })
 
 test("noncanonical event cursors fail before cache or upstream access", async () => {
