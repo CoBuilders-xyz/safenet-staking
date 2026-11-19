@@ -66,9 +66,10 @@ Publishing a `web-v*` draft runs *Release* on the tagged commit:
    3. sets the contenthash of `safenet.cobuilders.eth` to the CID, and reads it back.
 
 The ENS name and Vercel then serve the same files. A red step stops the run, and the steps before
-it are safe to repeat: *Re-run failed jobs* finishes the release. When step 1 or 2 fails, neither
-origin has changed. When step 3 fails, Vercel serves the new build and the ENS name the previous
-one until the rerun. The run summary says which origin moved.
+it are safe to repeat: *Re-run failed jobs* finishes the release. When step 1 fails, neither origin
+has changed. When step 2 or 3 fails, the origins can differ until the rerun: Vercel can accept a
+promotion just before its request fails, and an ENS transaction can land after its wait ends. The
+run summary says, for each origin, whether it moved, did not change, or may have moved.
 
 After a release, add its CID to `deployments.json` in a pull request. The availability check
 reads the latest entry to know which CID the gateways must serve.

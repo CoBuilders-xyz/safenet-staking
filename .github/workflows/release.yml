@@ -336,20 +336,32 @@ jobs:
           '
           echo "ENS: the name points at \`$CID\`" >> "$GITHUB_STEP_SUMMARY"
 
-      # On a failure, which host serves the new build. A rerun of the failed jobs finishes the
-      # release: the upload and the promotion repeat, and the ENS step skips a name already set.
+      # On a failure, what each host serves. Only a verified step says "moved": the production
+      # check for Vercel, the read-back of the ENS step for the name. A step that never ran leaves
+      # its host unchanged. A step that started and failed may have moved it: Vercel can accept a
+      # promotion before the request times out, and an ENS transaction can land after its wait
+      # ends. A rerun of the failed jobs finishes the release: the upload and the promotion
+      # repeat, and the ENS step skips a name already set.
       - name: Say which host moved
         if: failure()
         env:
           PROMOTED: ${{ steps.promote.outcome }}
+          CHECKED: ${{ steps.check.outcome }}
           ENS: ${{ steps.ens.outcome }}
         run: |
-          if [ "$PROMOTED" != success ]; then
-            line="Neither host moved: Vercel production and the ENS name still serve the previous release."
-          elif [ "$ENS" != success ]; then
-            line="Vercel production moved to \`$CID\`. The ENS name did not finish moving and may still point at the previous release."
+          if [ "$CHECKED" = success ]; then
+            vercel="Vercel production serves \`$CID\`."
+          elif [ "$PROMOTED" = skipped ] || [ -z "$PROMOTED" ]; then
+            vercel="Vercel production did not change."
           else
-            line="Both hosts moved to \`$CID\`."
+            vercel="Vercel production may have moved to \`$CID\`: check Deployments in Vercel."
           fi
-          echo "::error::$line"
-          echo "$line" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$ENS" = success ]; then
+            ens="The ENS name points at \`$CID\`."
+          elif [ "$ENS" = skipped ] || [ -z "$ENS" ]; then
+            ens="The ENS name did not change."
+          else
+            ens="The ENS name may point at \`$CID\`: read its contenthash."
+          fi
+          echo "::error::$vercel $ens"
+          echo "$vercel $ens" >> "$GITHUB_STEP_SUMMARY"

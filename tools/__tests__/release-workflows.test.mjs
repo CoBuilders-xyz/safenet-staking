@@ -113,22 +113,27 @@ test("publish moves Vercel, checks it, then sets ENS, and reports which host mov
     "Check the Vercel production domain", "Set the ENS contenthash", "Say which host moved"].map((n) => publish.indexOf(`- name: ${n}\n`))
   assert.ok(order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])), `step order ${order}`)
   assert.match(publish.split("- name: Say which host moved\n")[1], /^ {8}if: failure\(\)$/m)
-  const report = (PROMOTED, ENS) => {
+  const report = (PROMOTED, CHECKED, ENS) => {
     const dir = mkdtempSync(join(tmpdir(), "release-report-"))
     try {
       const run = spawnSync("/bin/bash", ["--noprofile", "--norc", "-e", "-c", stepScript("Say which host moved")], {
-        env: { PATH: "/usr/bin:/bin", PROMOTED, ENS, CID: "bafyfixture", GITHUB_STEP_SUMMARY: join(dir, "summary") }, encoding: "utf8",
+        env: { PATH: "/usr/bin:/bin", PROMOTED, CHECKED, ENS, CID: "bafyfixture", GITHUB_STEP_SUMMARY: join(dir, "summary") }, encoding: "utf8",
       })
       assert.equal(run.status, 0, run.stderr)
-      return readFileSync(join(dir, "summary"), "utf8")
+      return readFileSync(join(dir, "summary"), "utf8").trim()
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
   }
-  // The upload or the promotion failed, so the ENS step was skipped.
-  assert.match(report("failure", "skipped"), /^Neither host moved/)
-  assert.match(report("", ""), /^Neither host moved/)
-  // Promoted, then the production check failed and ENS was skipped, or the ENS step failed.
-  assert.match(report("success", "skipped"), /^Vercel production moved to `bafyfixture`\. The ENS name did not finish moving/)
-  assert.match(report("success", "failure"), /^Vercel production moved/)
+  const unchanged = "Vercel production did not change. The ENS name did not change."
+  // The upload failed: nothing after it ran.
+  assert.equal(report("skipped", "skipped", "skipped"), unchanged)
+  assert.equal(report("", "", ""), unchanged)
+  // The promote request failed: Vercel may still have accepted it.
+  assert.match(report("failure", "skipped", "skipped"), /^Vercel production may have moved .* The ENS name did not change\.$/)
+  // Promoted with 202, but production never served the build: not proven.
+  assert.match(report("success", "failure", "skipped"), /^Vercel production may have moved/)
+  // Vercel verified, then the ENS step failed: its transaction may still land.
+  assert.equal(report("success", "success", "failure"),
+    "Vercel production serves `bafyfixture`. The ENS name may point at `bafyfixture`: read its contenthash.")
 })
