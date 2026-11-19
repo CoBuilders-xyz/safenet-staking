@@ -93,6 +93,10 @@ names what is missing, when one is empty.
 | `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | variables | The team and project ids, from Vercel's project settings or `.vercel/project.json` after `vercel link` |
 | `PRODUCTION_URL` | variable | Already set: the Vercel production domain |
 
+The `pin` job reads `PINATA_JWT`, a repository secret, already set, and stops when it is empty.
+`PINATA_GATEWAY`, also a repository secret, is optional: the host of the dedicated Pinata gateway,
+such as its custom domain, which the job checks for information only.
+
 **The ENS manager.** A dedicated account, used for nothing else:
 
 1. Create a new account. Store its private key only as the `ENS_MANAGER_PRIVATE_KEY` secret.
