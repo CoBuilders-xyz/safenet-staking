@@ -61,13 +61,14 @@ Publishing a `web-v*` draft runs *Release* on the tagged commit:
 3. **smoke**: the production smoke suite on the new CID, through Orbitor's gateway.
 4. **publish**, in the `production` environment, after its reviewer approves:
    1. uploads the files of the CAR to Vercel as a deployment without the production domain;
-   2. sets the contenthash of `safenet.cobuilders.eth` to the CID, and reads it back;
-   3. moves the Vercel production domain to that deployment, and checks that it serves the
-      `index.html` of the build.
+   2. moves the Vercel production domain to that deployment, through Vercel's API, and checks
+      that it serves the `index.html` of the build;
+   3. sets the contenthash of `safenet.cobuilders.eth` to the CID, and reads it back.
 
 The ENS name and Vercel then serve the same files. A red step stops the run, and the steps before
-it are safe to repeat: *Re-run failed jobs* finishes the release. When step 1 fails, production has
-not changed. When step 2 or 3 fails, the two origins can differ until the rerun.
+it are safe to repeat: *Re-run failed jobs* finishes the release. When step 1 or 2 fails, neither
+origin has changed. When step 3 fails, Vercel serves the new build and the ENS name the previous
+one until the rerun. The run summary says which origin moved.
 
 After a release, add its CID to `deployments.json` in a pull request. The availability check
 reads the latest entry to know which CID the gateways must serve.
