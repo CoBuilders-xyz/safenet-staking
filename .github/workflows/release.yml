@@ -6,16 +6,13 @@ name: Release
 #
 #   build     no secret but the public Graph browser key. Builds from build.env, packs the CAR
 #             whose CID anyone can rebuild (VERIFY.md).
-#   approve   the `production` environment: its required reviewer approves the release once,
-#             before anything leaves the runner. The jobs after it need no other approval.
-#   pin       pins the CAR to Pinata and checks the public gateways.
+#   pin       pins the CAR to Pinata and checks the gateways.
 #   smoke     the production smoke suite on the new CID, through a public gateway.
-#   publish   the `web-release` environment, which holds the credentials and has no reviewer, so
-#             it asks for no second approval. Only web-v* tags reach it. Uploads the same files
-#             to Vercel without a domain, sets the ENS contenthash, then gives the Vercel
-#             deployment the production domain, and checks both.
+#   publish   the protected `production` environment. Uploads the same files to Vercel without
+#             a domain, sets the ENS contenthash, then gives the Vercel deployment the
+#             production domain, and checks both.
 #
-# A published release whose tag starts with web-v runs all five, on the tagged commit, which must
+# A published release whose tag starts with web-v runs all four, on the tagged commit, which must
 # be on main. A manual run builds only, to check that a commit builds and to read its CID.
 
 on:
@@ -109,23 +106,10 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-  approve:
-    name: approve
-    needs: build
-    if: github.event_name == 'release'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    # Its required reviewer approves here, once per release.
-    environment: production
-    steps:
-      - name: Record the approval
-        env:
-          CID: ${{ needs.build.outputs.cid }}
-        run: echo "Release of \`$CID\` approved." >> "$GITHUB_STEP_SUMMARY"
-
   pin:
     name: pin
-    needs: [build, approve]
+    needs: build
+    if: github.event_name == 'release'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     outputs:
@@ -201,9 +185,8 @@ jobs:
     needs: [build, pin, smoke]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # It holds the credentials below and has no reviewer: the approval was given once, in the
-    # approve job. Its deployment rule admits only web-v* tags.
-    environment: web-release
+    # Its required reviewer approves each run before it can read the secrets below.
+    environment: production
     # One release at a time changes production, whatever its tag.
     concurrency:
       group: web-production

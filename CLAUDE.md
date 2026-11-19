@@ -171,11 +171,9 @@ from `main`, creates a draft GitHub Release for one project, with its next versi
 publishing the draft creates the tag that starts the project's workflow.
 `release.yml` runs when a `web-v*` release is published, on the tagged commit, which must be on
 `main`: its `build` job receives no secret but the public Graph browser key, builds from
-`apps/web/build.env` and packs `apps/web/release/app.car`; `approve` waits for the one approval,
-from the `production` environment's reviewer; `pin` pins it with `PINATA_JWT` and
-checks the public gateways; `smoke` runs the web smoke on the new CID; `publish`, in the
-`web-release` environment, which holds the credentials, admits only `web-v*` tags and asks for no
-approval, uploads the same files to Vercel, sets the ENS contenthash of
+`apps/web/build.env` and packs `apps/web/release/app.car`; `pin` pins it with `PINATA_JWT` and
+checks the public gateways; `smoke` runs the web smoke on the new CID; `publish`, in the protected
+`production` environment, uploads the same files to Vercel, sets the ENS contenthash of
 `safenet.cobuilders.eth` with `ENS_MANAGER_PRIVATE_KEY` on the resolver the ENS registry names
 (`packages/core/src/ens.ts`), then moves the Vercel production domain with `VERCEL_TOKEN`. By
 hand, it only builds.

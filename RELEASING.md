@@ -56,22 +56,18 @@ Publishing a `web-v*` draft runs *Release* on the tagged commit:
 
 1. **build**: builds from `apps/web/build.env` and the repository variables, with no secret but
    the public Graph browser key, and packs the CAR. Anyone can rebuild its CID ([VERIFY.md](VERIFY.md)).
-2. **approve**: the run waits in the `production` environment until its reviewer approves.
-   This is the only approval: nothing is pinned or published before it, and nothing after it
-   asks again.
-3. **pin**: pins the CAR to Pinata and checks that the public gateways serve it. The dedicated
+2. **pin**: pins the CAR to Pinata and checks that the public gateways serve it. The dedicated
    Pinata gateway in `PINATA_GATEWAY`, if set, is checked for information only.
-4. **smoke**: the production smoke suite on the new CID, through Orbitor's gateway.
-5. **publish**, in the `web-release` environment, which holds the credentials:
+3. **smoke**: the production smoke suite on the new CID, through Orbitor's gateway.
+4. **publish**, in the `production` environment, after its reviewer approves:
    1. uploads the files of the CAR to Vercel as a deployment without the production domain;
    2. sets the contenthash of `safenet.cobuilders.eth` to the CID, and reads it back;
    3. moves the Vercel production domain to that deployment, and checks that it serves the
       `index.html` of the build.
 
 The ENS name and Vercel then serve the same files. A red step stops the run, and the steps before
-it are safe to repeat: *Re-run failed jobs* finishes the release. When the Vercel upload fails,
-production has not changed. When the ENS or the domain step fails, the two origins can differ
-until the rerun.
+it are safe to repeat: *Re-run failed jobs* finishes the release. When step 1 fails, production has
+not changed. When step 2 or 3 fails, the two origins can differ until the rerun.
 
 After a release, add its CID to `deployments.json` in a pull request. The availability check
 reads the latest entry to know which CID the gateways must serve.
@@ -86,26 +82,15 @@ and promote the previous Vercel production deployment in Vercel's dashboard, bot
 
 ### One-time setup
 
-**Environments.** Two GitHub environments, under *Settings → Environments*:
-
-| Environment | Required reviewer | Deployment branches and tags | Holds |
-|---|---|---|---|
-| `production` | yes, the deployer | `main` and tags `*-v*` | the Worker credentials |
-| `web-release` | none | tags `web-v*` only | the web release credentials below |
-
-The web release asks once, in `production`, before the pin. `web-release` has no reviewer, so the
-publish job after it does not ask again. Without a reviewer, a workflow run from any `web-v*` tag
-reaches its secrets, so a tag ruleset must let only the deployer create `web-v*` tags.
-
-The `publish` job reads these from the `web-release` environment or the repository. It stops, and
+The `publish` job reads these from the `production` environment or the repository. It stops, and
 names what is missing, when one is empty.
 
 | Name | Kind | What it is |
 |---|---|---|
-| `ENS_MANAGER_PRIVATE_KEY` | `web-release` secret | The key of the account that manages `safenet.cobuilders.eth` |
-| `VERCEL_TOKEN` | `web-release` secret | A Vercel access token for the team that owns the project |
-| `MAINNET_RPC_URL` | organization or repository secret | Already set for the nightly jobs |
-| `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | `web-release` variables | The team and project ids, from Vercel's project settings or `.vercel/project.json` after `vercel link` |
+| `ENS_MANAGER_PRIVATE_KEY` | `production` secret | The key of the account that manages `safenet.cobuilders.eth` |
+| `VERCEL_TOKEN` | `production` secret | A Vercel access token for the team that owns the project |
+| `MAINNET_RPC_URL` | repository secret | Already set for the nightly jobs |
+| `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | variables | The team and project ids, from Vercel's project settings or `.vercel/project.json` after `vercel link` |
 | `PRODUCTION_URL` | variable | Already set: the Vercel production domain |
 
 **The ENS manager.** A dedicated account, used for nothing else:
