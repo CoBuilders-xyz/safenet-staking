@@ -56,7 +56,8 @@ Publishing a `web-v*` draft runs *Release* on the tagged commit:
 
 1. **build**: builds from `apps/web/build.env` and the repository variables, with no secret but
    the public Graph browser key, and packs the CAR. Anyone can rebuild its CID ([VERIFY.md](VERIFY.md)).
-2. **pin**: pins the CAR to Pinata and checks the gateways.
+2. **pin**: pins the CAR to Pinata and checks that the public gateways serve it. The dedicated
+   Pinata gateway in `PINATA_GATEWAY`, if set, is checked for information only.
 3. **smoke**: the production smoke suite on the new CID, through Orbitor's gateway.
 4. **publish**, in the `production` environment, after its reviewer approves:
    1. uploads the files of the CAR to Vercel as a deployment without the production domain;
@@ -91,6 +92,10 @@ names what is missing, when one is empty.
 | `MAINNET_RPC_URL` | repository secret | Already set for the nightly jobs |
 | `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | variables | The team and project ids, from Vercel's project settings or `.vercel/project.json` after `vercel link` |
 | `PRODUCTION_URL` | variable | Already set: the Vercel production domain |
+
+The `pin` job reads `PINATA_JWT`, a repository secret, already set, and stops when it is empty.
+`PINATA_GATEWAY`, also a repository secret, is optional: the host of the dedicated Pinata gateway,
+such as its custom domain, which the job checks for information only.
 
 **The ENS manager.** A dedicated account, used for nothing else:
 

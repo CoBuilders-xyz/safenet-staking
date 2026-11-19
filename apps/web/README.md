@@ -382,11 +382,13 @@ pnpm --filter @cobuilders/safenet-web release:pin
   `@cobuilders/safenet-snapshots/ipfs`, which the daily snapshots publish through too. `release/` is git-ignored. Set `VITE_APP_URL` in `build.env` so that
   the social preview tags carry an absolute URL.
 - `release:pin` (`scripts/release-pin.ts`) uploads the CAR to Pinata and fails if Pinata reports
-  another CID. It then checks the dedicated Pinata gateway and each gateway in `IPFS_GATEWAYS`
-  in `packages/core`: each must serve `index.html` and the release's smallest `.js` file byte for
-  byte. It needs `PINATA_JWT` and `PINATA_GATEWAY`, from the environment or the root
-  `.env.local`, and fails when either is missing. `RELEASE_NAME` and `GATEWAY_TIMEOUT_SECONDS`
-  are optional.
+  another CID. It then checks each gateway in `IPFS_GATEWAYS` in `packages/core`: each must
+  answer 200 for `index.html` and serve the release's smallest `.js` file byte for byte. A
+  gateway behind Cloudflare changes `index.html`, so its bytes are not compared. It needs `PINATA_JWT`,
+  from the environment or the root `.env.local`, and fails when it is missing. With
+  `PINATA_GATEWAY`, it also checks that dedicated gateway, for information only: Pinata answers
+  403 on a `*.mypinata.cloud` host without a custom domain. `RELEASE_NAME` and
+  `GATEWAY_TIMEOUT_SECONDS` are optional.
 
 `.github/workflows/release.yml` runs both when a `web-v*` release is published, then the smoke,
 the ENS contenthash and Vercel production. Its build step receives only the public browser key, mapped from `GRAPH_API_KEY` to

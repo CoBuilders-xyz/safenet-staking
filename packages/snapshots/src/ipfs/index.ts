@@ -6,7 +6,7 @@
  */
 export { byteOrder, listFiles, packDirectory, PackError, type Packed } from "./car.js"
 export {
-  checkGateways, gatewayHost, gatewayUrl, probeAsset, servesRelease, waitUntilServed,
+  checkGateways, failures, gatewayHost, INFORMATIONAL_TIMEOUT_MS, gatewayUrl, probeAsset, servesRelease, waitUntilServed,
   type Gateway, type Outcome, type ServeCheck,
 } from "./gateways.js"
 export {

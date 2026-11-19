@@ -37,8 +37,8 @@ as `pnpm <script>` from `apps/web`.
   loopback and checks Lighthouse mobile, the median of three runs per route, against the rest.
   `PERFORMANCE.md` explains each limit. Raise one only with the measurement that justifies it.
 - **IPFS release:** `release:build` builds from `build.env` alone, checks the bundle budget, and
-  writes `release/app.car` and `release/CID`; `release:pin` pins the CAR to Pinata and checks the
-  gateways, with `PINATA_JWT` and `PINATA_GATEWAY`. `VERIFY.md` at the root rebuilds a release;
+  writes `release/app.car` and `release/CID`; `release:pin` pins the CAR to Pinata with `PINATA_JWT`
+  and checks the public gateways. `VERIFY.md` at the root rebuilds a release;
   `.github/workflows/release.yml` runs both when a `web-v*` release is published, then sets the
   ENS name and Vercel production to the same build (`RELEASING.md`)
 

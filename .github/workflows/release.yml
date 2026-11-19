@@ -229,16 +229,19 @@ jobs:
 
       # 1. Vercel: the files of the CAR as a prebuilt static deployment, with no build on Vercel.
       # --skip-domain keeps the production domain on the current deployment until step 3.
+      # It runs from the repository root. The project's Root Directory is apps/web, and Vercel CLI
+      # 65.9.0 refuses to deploy unless that directory exists under the working directory. Linked
+      # through VERCEL_ORG_ID and VERCEL_PROJECT_ID, it reads the build output from
+      # .vercel/output under the working directory, and uploads only that directory.
       - name: Upload to Vercel without the production domain
         id: vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          out="$RUNNER_TEMP/vercel"
-          mkdir -p "$out/.vercel/output/static"
-          cp -R apps/web/dist/. "$out/.vercel/output/static/"
-          echo '{"version":3}' > "$out/.vercel/output/config.json"
-          cd "$out"
+          rm -rf .vercel/output
+          mkdir -p .vercel/output/static
+          cp -R apps/web/dist/. .vercel/output/static/
+          echo '{"version":3}' > .vercel/output/config.json
           url="$(npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --skip-domain --yes --token "$VERCEL_TOKEN")"
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Vercel deployment: $url" >> "$GITHUB_STEP_SUMMARY"

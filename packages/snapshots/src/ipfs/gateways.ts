@@ -53,7 +53,16 @@ export interface Gateway {
   /** What the log prints. The dedicated gateway's host is a secret, so its label is not its URL. */
   readonly label: string
   readonly origin: string
+  /**
+   * Checked and reported, but never a failure, and given at most INFORMATIONAL_TIMEOUT_MS. The
+   * dedicated Pinata gateway is one: since 2026-11-18 Pinata answers 403 for every CID on a
+   * `*.mypinata.cloud` host without a custom domain, so a release cannot depend on it.
+   */
+  readonly informational?: boolean
 }
+
+/** The retry window of an informational gateway. */
+export const INFORMATIONAL_TIMEOUT_MS = 120_000
 
 export interface ServeCheck {
   readonly cid: string
@@ -76,6 +85,12 @@ export interface Outcome {
   readonly label: string
   readonly ok: boolean
   readonly detail: string
+  readonly informational?: boolean
+}
+
+/** The outcomes that fail the run: a gateway that is not informational and did not serve. */
+export function failures(outcomes: readonly Outcome[]): Outcome[] {
+  return outcomes.filter((o) => !o.ok && !o.informational)
 }
 
 /** One gateway, retried until it serves the probe's bytes or the time runs out. */
@@ -85,14 +100,16 @@ export async function waitUntilServed(gateway: Gateway, check: ServeCheck): Prom
   const get = check.fetch ?? fetch
   const retryMs = check.retryMs ?? 15_000
   const deadline = Date.now() + timeoutMs
+  // Each request ends by the deadline too, so a slow answer cannot stretch the window.
+  const bounded = () => AbortSignal.timeout(Math.max(1, Math.min(60_000, deadline - Date.now())))
   let last = "no answer"
   for (let attempt = 1; ; attempt++) {
     try {
-      const readyStatus = ready ? await status(get, gatewayUrl(origin, cid, ready)) : 200
+      const readyStatus = ready ? await status(get, gatewayUrl(origin, cid, ready), bounded()) : 200
       if (readyStatus !== 200) {
         last = `${ready}: HTTP ${readyStatus}`
       } else {
-        const res = await get(gatewayUrl(origin, cid, probe), { redirect: "follow", signal: AbortSignal.timeout(60_000) })
+        const res = await get(gatewayUrl(origin, cid, probe), { redirect: "follow", signal: bounded() })
         if (res.status === 200) {
           // The path is immutable: a 200 with other bytes will not get better with retries.
           if (!servesRelease(new Uint8Array(await res.arrayBuffer()), expected)) {
@@ -116,8 +133,8 @@ export async function waitUntilServed(gateway: Gateway, check: ServeCheck): Prom
 }
 
 /** One fetch, bounded, whose body is dropped unread. A body that errors is not an answer error. */
-async function status(get: typeof fetch, url: string): Promise<number> {
-  const res = await get(url, { redirect: "follow", signal: AbortSignal.timeout(60_000) })
+async function status(get: typeof fetch, url: string, signal: AbortSignal): Promise<number> {
+  const res = await get(url, { redirect: "follow", signal })
   await res.body?.cancel().catch(() => {})
   return res.status
 }
@@ -127,10 +144,13 @@ async function status(get: typeof fetch, url: string): Promise<number> {
  * CID when a public one did not.
  */
 export async function checkGateways(gateways: readonly Gateway[], check: ServeCheck): Promise<Outcome[]> {
-  const settled = await Promise.allSettled(gateways.map((g) => waitUntilServed(g, check)))
-  return settled.map((result, i) =>
-    result.status === "fulfilled"
+  const settled = await Promise.allSettled(gateways.map((g) =>
+    waitUntilServed(g, g.informational ? { ...check, timeoutMs: Math.min(check.timeoutMs, INFORMATIONAL_TIMEOUT_MS) } : check)))
+  return settled.map((result, i) => {
+    const { label, informational } = gateways[i]!
+    const outcome = result.status === "fulfilled"
       ? result.value
-      : { label: gateways[i]!.label, ok: false, detail: `check crashed: ${check.redact(result.reason)}` },
-  )
+      : { label, ok: false, detail: `check crashed: ${check.redact(result.reason)}` }
+    return informational ? { ...outcome, informational } : outcome
+  })
 }
