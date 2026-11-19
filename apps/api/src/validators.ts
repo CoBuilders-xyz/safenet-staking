@@ -50,10 +50,10 @@ async function lastUpdateRun(fetcher: Fetcher, headers: Headers, now: number): P
 export async function validators(fetcher: Fetcher, lookup: EnsLookup, now: number, githubToken?: string): Promise<Result<SefValidator[]>> {
   const headers = new Headers({ "User-Agent": "safenet-api", Accept: "application/vnd.github+json" })
   if (githubToken) headers.set("Authorization", `Bearer ${githubToken}`)
-  const [answer, run] = await Promise.all([
-    json(fetcher, SEF_DATA.validatorInfoCommits, { headers }), lastUpdateRun(fetcher, headers, now),
-  ])
-  const latest = object(array(answer)[0]), sha = string(latest.sha)
+  // The run is read first. The job pushes its commit before it succeeds, so the commit read after
+  // a successful run is never older than that run's output.
+  const run = await lastUpdateRun(fetcher, headers, now)
+  const latest = object(array(await json(fetcher, SEF_DATA.validatorInfoCommits, { headers }))[0]), sha = string(latest.sha)
   if (!/^[a-f0-9]{40}$/.test(sha)) throw malformed()
   const committedAt = string(object(object(latest.commit).committer).date)
   const committed = Date.parse(committedAt)

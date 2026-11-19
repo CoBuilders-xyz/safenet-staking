@@ -404,6 +404,19 @@ test("without a usable update run the file commit time decides, fresh or stale",
   assert.equal(response.status, 200)
   assert.equal((await sefSource(response)).publishedBy, "file commit")
 })
+test("a publication between the two GitHub reads never pairs the old file with the new run", async () => {
+  // SEF's job pushes its commit before it succeeds: once a read shows the run, the commit exists.
+  const ran = NOW - 60_000, pushed = ran + 20_000
+  const before = upstream({ publication: NOW - 29 * HOUR, run: sefRun(ran) }), after = upstream({ publication: pushed, run: sefRun(ran) })
+  let runSeen = false
+  const a = createApp({ ens: async () => null, now: () => NOW,
+    fetch: (async (url, init) => { if (String(url) === SEF_DATA.updateRuns) runSeen = true; return (runSeen ? after : before)(url, init) }) as typeof fetch })
+  const response = await a.request("http://api.test/v1/validators", {}, ENV)
+  assert.equal(response.status, 200)
+  const source = await sefSource(response)
+  assert.equal(source.committedAt, new Date(pushed).toISOString())
+  assert.equal(source.publishedBy, "file commit")
+})
 test("a file commit newer than the last update run decides", async () => {
   const response = await get("validators", { publication: NOW - HOUR, run: sefRun(NOW - 4 * HOUR) })
   assert.equal(response.status, 200)
