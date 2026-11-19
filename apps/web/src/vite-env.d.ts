@@ -15,4 +15,10 @@ interface ImportMetaEnv {
   readonly VITE_SUBGRAPH_URL_GNOSIS?: string
   /** Set by vite.config.ts from .env.ports. Empty when there is none. */
   readonly VITE_GRAPH_NODE_PORT?: string
+  /** The release tag, such as web-v20261119.0. Set only by the release build. */
+  readonly VITE_RELEASE_VERSION?: string
+  /** Set by vite.config.ts in a build: the full SHA of HEAD. Empty in a dev server. */
+  readonly VITE_BUILD_COMMIT?: string
+  /** Set by vite.config.ts in a build: the commit time of HEAD, ISO 8601 in UTC. */
+  readonly VITE_BUILD_TIME?: string
 }

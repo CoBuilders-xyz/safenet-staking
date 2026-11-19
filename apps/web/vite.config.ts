@@ -4,6 +4,7 @@ import { parseEnv } from "node:util"
 import { defineConfig, type ViteDevServer, type PreviewServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { readBuildCommit } from './scripts/build-info'
 
 const safeAppHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,7 +53,12 @@ const webPort = process.env.WEB_PORT ?? ports.WEB_PORT
 // local node is reached by setting VITE_SUBGRAPH_URL_* to its URL.
 const graphNodePort = process.env.GRAPH_NODE_PORT ?? ports.GRAPH_NODE_PORT ?? ""
 
-export default defineConfig({
+// The build identifier in the footer: HEAD's SHA and commit time, read from git and not from the
+// clock, so two builds of one commit hold the same bytes. A dev server shows "dev": its HEAD
+// moves while it runs.
+export default defineConfig(({ command }) => {
+  const head = command === "build" ? readBuildCommit(repoRoot) : undefined
+  return {
   base: './',
   // Env lives at the repository root, where `pnpm env:pull` writes .env.local, so dev and
   // build read the same file as the Node scripts. Vite still exposes only VITE_ values to the
@@ -60,6 +66,8 @@ export default defineConfig({
   envDir: repoRoot,
   define: {
     "import.meta.env.VITE_GRAPH_NODE_PORT": JSON.stringify(graphNodePort),
+    "import.meta.env.VITE_BUILD_COMMIT": JSON.stringify(head?.commit ?? ""),
+    "import.meta.env.VITE_BUILD_TIME": JSON.stringify(head?.time ?? ""),
   },
   plugins: [
     react(),
@@ -104,4 +112,4 @@ export default defineConfig({
       },
     },
   },
-})
+}})

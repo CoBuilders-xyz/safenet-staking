@@ -53,4 +53,34 @@ describe("Footer", () => {
     }
     expect(screen.getByRole("link", { name: "FAQ" })).toHaveAttribute("href", "/faq")
   })
+
+  it("shows the release version and the short commit, with the full commit and its time as the title", async () => {
+    vi.stubEnv("VITE_RELEASE_VERSION", "web-v20261119.0")
+    vi.stubEnv("VITE_BUILD_COMMIT", "0123456789abcdef0123456789abcdef01234567")
+    vi.stubEnv("VITE_BUILD_TIME", "2026-11-19T12:00:00Z")
+    await renderFooter()
+
+    const build = screen.getByTestId("build-id")
+    expect(build).toHaveTextContent("web-v20261119.0 · 0123456")
+    expect(build).toHaveAttribute("title", "0123456789abcdef0123456789abcdef01234567 · 2026-11-19T12:00:00Z")
+  })
+
+  it("shows the short commit alone for a build that is not a release", async () => {
+    vi.stubEnv("VITE_RELEASE_VERSION", "")
+    vi.stubEnv("VITE_BUILD_COMMIT", "0123456789abcdef0123456789abcdef01234567")
+    await renderFooter()
+
+    expect(screen.getByTestId("build-id")).toHaveTextContent(/^0123456$/)
+  })
+
+  it("shows dev when no commit was baked in", async () => {
+    vi.stubEnv("VITE_RELEASE_VERSION", "")
+    vi.stubEnv("VITE_BUILD_COMMIT", "")
+    vi.stubEnv("VITE_BUILD_TIME", "")
+    await renderFooter()
+
+    const build = screen.getByTestId("build-id")
+    expect(build).toHaveTextContent(/^dev$/)
+    expect(build).not.toHaveAttribute("title")
+  })
 })

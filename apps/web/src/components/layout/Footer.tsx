@@ -2,8 +2,12 @@ import { useTranslation } from "react-i18next"
 import { SEF_DOCS } from "@cobuilders/safenet-core"
 import { LegalLink } from "@/components/LegalLink"
 import { OPERATOR_NAME, type ContentPageName } from "@/config/legal"
+import { buildInfo } from "@/lib/build-info"
 
 const docsUrl = import.meta.env.VITE_DOCS_URL || SEF_DOCS.home
+
+// The same string on every host that serves this build: the release version and the commit.
+const build = buildInfo()
 
 const linkClass = "hover:text-foreground transition-colors"
 
@@ -26,6 +30,9 @@ export function Footer() {
           </p>
           <p className="text-xs text-muted-foreground">
             {t("footer.operatedBy", "Operated by {{operator}}", { operator: OPERATOR_NAME })}
+          </p>
+          <p className="font-mono text-[11px] text-muted-foreground" title={build.detail} data-testid="build-id">
+            {build.label}
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">

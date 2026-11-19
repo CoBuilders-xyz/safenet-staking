@@ -18,16 +18,25 @@ function publicUrl(key: string, value: string): string {
   return value
 }
 
+/** The tag of a web release, such as web-v20261119.0. The footer shows it. */
+const RELEASE_VERSION = /^web-v[0-9][0-9A-Za-z.-]*$/
+
 /**
- * Release inputs: committed public values, the one explicit COB-566 browser key, and the service
- * URLs. A non-empty URL from the environment wins over build.env.
+ * Release inputs: committed public values, the one explicit COB-566 browser key, the service
+ * URLs, and the release version. A non-empty URL from the environment wins over build.env. The
+ * version comes only from the environment: a committed one would be stale by the next release.
  */
-export function releaseEnvironment(source: string, graphApiKey?: string, urls: ReleaseUrls = {}): Record<string, string | undefined> {
+export function releaseEnvironment(source: string, graphApiKey?: string, urls: ReleaseUrls = {}, version?: string): Record<string, string | undefined> {
   const values = parseEnv(source)
   for (const key of Object.keys(values)) {
     if (!key.startsWith("VITE_")) throw new Error("build.env must contain only VITE_ variables")
   }
   if (values.VITE_GRAPH_API_KEY) throw new Error("Inject VITE_GRAPH_API_KEY through the environment, not build.env")
+  if (values.VITE_RELEASE_VERSION) throw new Error("Inject VITE_RELEASE_VERSION through the environment, not build.env")
+  if (version?.trim()) {
+    if (!RELEASE_VERSION.test(version.trim())) throw new Error("VITE_RELEASE_VERSION must be a web release tag, such as web-v20261119.0")
+    values.VITE_RELEASE_VERSION = version.trim()
+  }
   if (graphApiKey?.trim()) values.VITE_GRAPH_API_KEY = graphApiKey.trim()
   for (const key of RELEASE_URL_INPUTS) {
     const value = urls[key]?.trim()
