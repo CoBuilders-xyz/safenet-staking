@@ -5,7 +5,7 @@ import { GNOSIS_INDEXED_PROGRAMME, GNOSIS_AEGIS_FIRST_COMPLETE_DAY, utcDayMs } f
 import { StakeHistoryDocument, type StakeHistoryQuery } from "@/graphql/mainnet/generated"
 import { AttestationHistoryDocument, type AttestationHistoryQuery } from "@/graphql/gnosis/generated"
 import { useSubgraphQuery, type SubgraphResult } from "@/hooks/useSubgraphQuery"
-import { dailySeries, lastCompleteDay } from "@/lib/history"
+import { dailySeries, lastCompleteDay, rangeWindow, type HistoryRange } from "@/lib/history"
 import { describeDegradation } from "@/lib/subgraph"
 import { formatUtcDateTime } from "@/lib/format"
 import { Button } from "@/components/ui/button"
@@ -14,7 +14,6 @@ import { OverviewSection } from "./OverviewSection"
 
 const DAY = 86400
 const date = (seconds: number) => new Date(seconds * 1000).toISOString().slice(0, 10)
-type Range = 7 | 30 | "all"
 export function HistoryChart({ kind }: { kind: "stake" | "attestations" }) {
   return kind === "stake" ? <StakeHistoryChart /> : <AttestationHistoryChart />
 }
@@ -32,7 +31,7 @@ function AttestationHistoryChart() {
 /** Render one independently sourced history and its accessible data table. */
 function Chart({ kind, result }: { kind: "stake" | "attestations"; result: SubgraphResult<StakeHistoryQuery | AttestationHistoryQuery> }) {
   const { t } = useTranslation()
-  const [range, setRange] = useState<Range>(30)
+  const [range, setRange] = useState<HistoryRange>(30)
   const title = kind === "stake" ? t("overview.charts.stake", "Total SAFE staked over time") : t("overview.charts.attestations", "Attestations per day")
   const source = kind === "stake" ? t("overview.charts.mainnet", "Mainnet subgraph") : t("overview.charts.gnosis", "Gnosis subgraph")
   const today = result.status === "live" ? Math.floor(result.freshness.checkedAt / 1000 / DAY) * DAY : 0
@@ -44,7 +43,7 @@ function Chart({ kind, result }: { kind: "stake" | "attestations"; result: Subgr
   const coverageStart = kind === "attestations" && GNOSIS_INDEXED_PROGRAMME === "aegis" && !pageFull
     ? utcDayMs(GNOSIS_AEGIS_FIRST_COMPLETE_DAY) / 1000 : undefined
   const series = dailySeries(raw.filter((d) => d.date <= end), kind === "stake", end, coverageStart)
-  const visible = range === "all" ? series : series.filter((d) => d.date >= end - (range - 1) * DAY)
+  const { visible, whole } = rangeWindow(series, range, end)
   const freshness = result.status === "live" ? t("overview.charts.freshness", "{{source}}. Indexed block {{block}} at {{time}}.", {
     source, block: result.freshness.block.toLocaleString("en-US"), time: formatUtcDateTime(new Date(result.freshness.blockTimestamp! * 1000).toISOString()),
   }) : source
@@ -52,6 +51,7 @@ function Chart({ kind, result }: { kind: "stake" | "attestations"; result: Subgr
     <div className="flex flex-wrap gap-2" role="group" aria-label={t("overview.charts.range", "Time range")}>
       {([7, 30, "all"] as const).map((r) => <Button key={r} size="sm" variant={range === r ? "default" : "outline"} aria-pressed={range === r} onClick={() => setRange(r)}>{r === "all" ? t("overview.charts.all", "All time") : t("overview.charts.days", "{{count}} days", { count: r })}</Button>)}
     </div>
+    {whole && <p className="text-xs text-muted-foreground">{t("overview.charts.shortHistory", "The history starts on {{date}}. This range shows all of it.", { date: date(series[0].date) })}</p>}
     {result.status === "loading" ? <Skeleton className="h-64 w-full" aria-label={t("overview.figure.loading", "Loading")} /> : result.status === "degraded" ? <p role="alert">{describeDegradation(result.degradation, t)}</p> : pageFull && range === "all" ? <p role="alert">{t("overview.charts.tooMany", "History exceeds the available page. The chart cannot show all data.")}</p> : visible.length === 0 ? <p>{t("overview.charts.empty", "No data is available for this range.")}</p> : <> <div className="h-64 w-full min-w-0" role="img" aria-label={title}>
       <ResponsiveContainer width="100%" height="100%">
         {kind === "stake" ? <AreaChart data={visible}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tickFormatter={date} minTickGap={30} /><YAxis width={70} tickFormatter={(v: number) => v.toLocaleString("en-US", { notation: "compact" })} /><Tooltip labelFormatter={(v) => date(Number(v))} /><Area type="stepAfter" dataKey="value" name="SAFE" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.25} /></AreaChart> : <BarChart data={visible}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tickFormatter={date} minTickGap={30} /><YAxis width={70} tickFormatter={(v: number) => v.toLocaleString("en-US", { notation: "compact" })} /><Tooltip labelFormatter={(v) => date(Number(v))} /><Bar dataKey="value" name={title} fill="var(--chart-1)" /></BarChart>}

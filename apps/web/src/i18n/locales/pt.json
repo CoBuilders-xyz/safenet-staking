@@ -359,6 +359,7 @@
       "mainnet": "Subgrafo Mainnet",
       "programme": "Programa: {{programme}}. Apenas dias UTC completos.",
       "range": "Período",
+      "shortHistory": "O histórico começa em {{date}}. Este período mostra-o por inteiro.",
       "stake": "Total de SAFE em staking ao longo do tempo",
       "tooMany": "O histórico excede a página disponível. O gráfico não pode mostrar todos os dados."
     }

@@ -15,6 +15,17 @@ export function dailySeries(rows: Point[], carry: boolean, end: number, start?: 
   return result
 }
 
+export type HistoryRange = number | "all"
+
+/**
+ * The days a range shows: the newest `range` days up to `end`, or every day for "all".
+ * `whole` says a numbered range is longer than the history, so it shows all of it, as "all" does.
+ */
+export function rangeWindow(series: Point[], range: HistoryRange, end: number): { visible: Point[]; whole: boolean } {
+  if (range === "all") return { visible: series, whole: false }
+  const visible = series.filter((d) => d.date > end - range * DAY)
+  return { visible, whole: series.length > 0 && series.length < range }
+}
 
 /** Only a day before the indexed UTC day is complete. */
 export function lastCompleteDay(checkedAt: number, indexedAt: number): number {
