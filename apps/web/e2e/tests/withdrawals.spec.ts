@@ -20,6 +20,24 @@ test.describe("Withdrawals Page", () => {
     await expect(withdrawals.pendingHeading).toBeVisible({ timeout: 10_000 })
   })
 
+  test("names the validator of a pending withdrawal", async ({ connectedPage: page }) => {
+    const withdrawals = new WithdrawalsPage(page)
+    await withdrawals.goto()
+
+    await expect(withdrawals.pendingHeading).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText("Validator A", { exact: true })).toBeVisible()
+    await expect(page.getByText("Unknown validator")).toHaveCount(0)
+  })
+
+  test("names the validator from the event logs when the subgraph is down", async ({ connectedPage: page, mockSubgraph }) => {
+    mockSubgraph.mainnet = "fail"
+    const withdrawals = new WithdrawalsPage(page)
+    await withdrawals.goto()
+
+    await expect(withdrawals.pendingHeading).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText("Validator A", { exact: true })).toBeVisible()
+  })
+
   test("shows FIFO info tooltip trigger", async ({ connectedPage: page }) => {
     const withdrawals = new WithdrawalsPage(page)
     await withdrawals.goto()

@@ -80,7 +80,7 @@ describe("WithdrawalQueue", () => {
       reset: vi.fn(),
       txHash: undefined,
     })
-    mockUseWithdrawalValidators.mockReturnValue({ data: undefined })
+    mockUseWithdrawalValidators.mockReturnValue({ data: undefined, isResolving: true })
   })
 
   function renderQueue() {
@@ -162,6 +162,48 @@ describe("WithdrawalQueue", () => {
     renderQueue()
 
     expect(screen.getByText("Pending Withdrawals")).toBeInTheDocument()
+  })
+
+  it("holds the validator's line with a placeholder until the validators resolve, then names them", () => {
+    mockUseAccount.mockReturnValue({ isConnected: true })
+    mockUsePendingWithdrawals.mockReturnValue({
+      data: [
+        { amount: 50n * 10n ** 18n, claimableAt: BigInt(Math.floor(Date.now() / 1000) + 3600) },
+        { amount: 20n * 10n ** 18n, claimableAt: BigInt(Math.floor(Date.now() / 1000) + 7200) },
+      ],
+      isLoading: false,
+    })
+
+    const { rerender } = renderQueue()
+    expect(screen.getAllByTestId("withdrawal-validator-skeleton")).toHaveLength(2)
+    expect(screen.queryByText("Unknown validator")).not.toBeInTheDocument()
+
+    mockUseWithdrawalValidators.mockReturnValue({
+      data: [MOCK_VALIDATORS[1].address, MOCK_VALIDATORS[0].address],
+      isResolving: false,
+    })
+    rerender(
+      <TooltipProvider>
+        <WithdrawalQueue />
+      </TooltipProvider>,
+    )
+    expect(screen.queryByTestId("withdrawal-validator-skeleton")).not.toBeInTheDocument()
+    expect(screen.getByText("Greenfield")).toBeInTheDocument()
+    expect(screen.getByText("Gnosis")).toBeInTheDocument()
+  })
+
+  it("stops the placeholder when the validators cannot be read", () => {
+    mockUseAccount.mockReturnValue({ isConnected: true })
+    mockUsePendingWithdrawals.mockReturnValue({
+      data: [{ amount: 50n * 10n ** 18n, claimableAt: BigInt(Math.floor(Date.now() / 1000) + 3600) }],
+      isLoading: false,
+    })
+    mockUseWithdrawalValidators.mockReturnValue({ data: undefined, isResolving: false })
+
+    renderQueue()
+
+    expect(screen.queryByTestId("withdrawal-validator-skeleton")).not.toBeInTheDocument()
+    expect(screen.getByText("Unknown validator")).toBeInTheDocument()
   })
 
   it("shows FIFO info tooltip button", () => {

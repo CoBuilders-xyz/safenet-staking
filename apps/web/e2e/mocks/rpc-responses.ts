@@ -65,6 +65,7 @@ export const SELECTORS = {
   stakes: "0xa4e47b66",
   totalStakerStakes: "0x42007deb",
   withdrawalQueues: "0x86fa9442",
+  withdrawalNodes: "0x51be0f80",
   getPendingWithdrawals: "0xf340c0d0",
   getNextClaimableWithdrawal: "0xb870e6c8",
   // Token contract reads
@@ -167,9 +168,20 @@ export function buildCallResponses(userAddress: string, state: MockChainState): 
   })
 
   // Staking: withdrawalQueues(address) → (uint64 head, uint64 tail)
-  responses.set(key(staking, SELECTORS.withdrawalQueues), () =>
-    "0x" + toUint256(0n) + toUint256(1n)
-  )
+  // An empty queue has head 0. The mocked withdrawals carry the ids 1 to n, in queue order.
+  responses.set(key(staking, SELECTORS.withdrawalQueues), () => {
+    const count = BigInt(state.pendingWithdrawals.length)
+    return "0x" + toUint256(count === 0n ? 0n : 1n) + toUint256(count)
+  })
+
+  // Staking: withdrawalNodes(address, uint64) → (amount, claimableAt, previous, next)
+  responses.set(key(staking, SELECTORS.withdrawalNodes), (data: string) => {
+    const id = BigInt("0x" + data.slice(74, 138))
+    const node = state.pendingWithdrawals[Number(id) - 1]
+    if (!node) return "0x" + toUint256(0n).repeat(4)
+    const next = Number(id) < state.pendingWithdrawals.length ? id + 1n : 0n
+    return "0x" + toUint256(node.amount) + toUint256(node.claimableAt) + toUint256(id - 1n) + toUint256(next)
+  })
 
   // Staking: getPendingWithdrawals(address) → (amount, claimableAt)[]
   responses.set(key(staking, SELECTORS.getPendingWithdrawals), (data: string) => {
