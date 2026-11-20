@@ -359,6 +359,7 @@
       "mainnet": "Sous-graphe Mainnet",
       "programme": "Programme : {{programme}}. Jours UTC complets uniquement.",
       "range": "Période",
+      "shortHistory": "L’historique commence le {{date}}. Cette période l’affiche en entier.",
       "stake": "Total de SAFE stakés au fil du temps",
       "tooMany": "L’historique dépasse la page disponible. Le graphique ne peut pas tout afficher."
     }

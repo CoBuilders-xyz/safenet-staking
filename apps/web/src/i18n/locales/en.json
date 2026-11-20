@@ -307,6 +307,7 @@
       "mainnet": "Mainnet subgraph",
       "programme": "Programme: {{programme}}. Complete UTC days only.",
       "range": "Time range",
+      "shortHistory": "The history starts on {{date}}. This range shows all of it.",
       "stake": "Total SAFE staked over time",
       "tooMany": "History exceeds the available page. The chart cannot show all data."
     },

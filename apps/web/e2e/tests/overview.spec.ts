@@ -1,5 +1,5 @@
 import { test, expect } from "../fixtures/base.fixture"
-import { GNOSIS_SNAPSHOT } from "@cobuilders/safenet-core"
+import { GNOSIS_AEGIS_FIRST_COMPLETE_DAY, GNOSIS_SNAPSHOT } from "@cobuilders/safenet-core"
 import { VALIDATORS } from "../fixtures/test-data"
 
 /**
@@ -35,6 +35,18 @@ test.describe("Network Overview", () => {
     await expect(attestationHistory.getByRole("table")).toContainText("4,800")
     await stakeHistory.getByRole("button", { name: "7 days" }).click()
     await expect(stakeHistory.getByRole("button", { name: "7 days" })).toHaveAttribute("aria-pressed", "true")
+    // The mocked stake history is 4 days long, so a longer range shows all of it and says so.
+    await expect(stakeHistory.getByRole("rowheader")).toHaveCount(4)
+    await expect(stakeHistory).toContainText("This range shows all of it.")
+    // The Aegis history is longer than 30 days: 30 days shows exactly 30, all time shows every day.
+    const attestationDays = attestationHistory.getByRole("rowheader")
+    await expect(attestationDays).toHaveCount(30)
+    await expect(attestationHistory).not.toContainText("This range shows all of it.")
+    await attestationHistory.getByRole("button", { name: "All time" }).click()
+    await expect(attestationDays.first()).toHaveText(GNOSIS_AEGIS_FIRST_COMPLETE_DAY)
+    expect(await attestationDays.count()).toBeGreaterThan(30)
+    await attestationHistory.getByRole("button", { name: "7 days" }).click()
+    await expect(attestationDays).toHaveCount(7)
     // The mocked rewards file ends in Beta, so the estimate is withheld with its reason, never a number.
     const apr = page.getByRole("group", { name: "Estimated APR", exact: true })
     await expect(apr).toContainText("Unavailable")

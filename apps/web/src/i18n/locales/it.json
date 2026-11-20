@@ -359,6 +359,7 @@
       "mainnet": "Sottografo Mainnet",
       "programme": "Programma: {{programme}}. Solo giorni UTC completi.",
       "range": "Periodo",
+      "shortHistory": "La cronologia inizia il {{date}}. Questo periodo la mostra per intero.",
       "stake": "Totale SAFE in staking nel tempo",
       "tooMany": "La cronologia supera la pagina disponibile. Il grafico non può mostrare tutti i dati."
     }

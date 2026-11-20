@@ -339,6 +339,7 @@
       "mainnet": "Mainnet 子图",
       "programme": "计划：{{programme}}。仅包含完整的 UTC 日。",
       "range": "时间范围",
+      "shortHistory": "历史数据始于 {{date}}。此范围显示全部历史。",
       "stake": "SAFE 质押总量变化",
       "tooMany": "历史数据超出可用页面。图表无法显示所有数据。"
     }

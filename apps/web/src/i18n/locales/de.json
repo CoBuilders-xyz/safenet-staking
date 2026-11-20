@@ -349,6 +349,7 @@
       "mainnet": "Mainnet-Subgraph",
       "programme": "Programm: {{programme}}. Nur vollständige UTC-Tage.",
       "range": "Zeitraum",
+      "shortHistory": "Der Verlauf beginnt am {{date}}. Dieser Zeitraum zeigt ihn vollständig.",
       "stake": "Gesamter SAFE-Stake im Zeitverlauf",
       "tooMany": "Der Verlauf überschreitet die verfügbare Seite. Nicht alle Daten können angezeigt werden."
     }
