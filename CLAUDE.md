@@ -173,10 +173,10 @@ publishing the draft creates the tag that starts the project's workflow.
 `main`: its `build` job receives no secret but the public Graph browser key, builds from
 `apps/web/build.env` and packs `apps/web/release/app.car`; `pin` pins it with `PINATA_JWT` and
 checks the public gateways; `smoke` runs the web smoke on the new CID; `publish`, in the protected
-`production` environment, uploads the same files to Vercel, sets the ENS contenthash of
+`production` environment, uploads the same files to Vercel, moves the Vercel production domain
+to them through Vercel's API with `VERCEL_TOKEN`, then sets the ENS contenthash of
 `safenet.cobuilders.eth` with `ENS_MANAGER_PRIVATE_KEY` on the resolver the ENS registry names
-(`packages/core/src/ens.ts`), then moves the Vercel production domain with `VERCEL_TOKEN`. By
-hand, it only builds.
+(`packages/core/src/ens.ts`); on a failure it says which origin moved. By hand, it only builds.
 `workers-deploy.yml` runs only by hand, from `main`, through the protected `production`
 environment: it tests `apps/api` and `apps/alerts`, applies the alerts D1 migrations and deploys
 both Workers with `cf deploy`, on their workers.dev URLs. With `telegram_webhook` on, it then

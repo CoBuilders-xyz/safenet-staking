@@ -232,7 +232,7 @@ jobs:
           path: apps/web
 
       # 1. Vercel: the files of the CAR as a prebuilt static deployment, with no build on Vercel.
-      # --skip-domain keeps the production domain on the current deployment until step 3.
+      # --skip-domain keeps the production domain on the current deployment until step 2.
       # It runs from the repository root. The project's Root Directory is apps/web, and Vercel CLI
       # 65.9.0 refuses to deploy unless that directory exists under the working directory. Linked
       # through VERCEL_ORG_ID and VERCEL_PROJECT_ID, it reads the build output from
@@ -250,10 +250,55 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Vercel deployment: $url" >> "$GITHUB_STEP_SUMMARY"
 
-      # 2. ENS: the contenthash of the name, on the resolver the ENS registry names for it
+      # 2. Vercel: the production domain moves to the deployment of step 1, through Vercel's REST
+      # API with the team id. `vercel promote` 65.9.0 first looks up the token's user and stopped
+      # there with "User not found. (404)"; the API calls below need no user. The lookup of the
+      # deployment also proves the token and the team before anything moves. Vercel goes first:
+      # its promotion is quick and a dashboard click reverts it, while the ENS step costs gas.
+      - name: Give the Vercel deployment the production domain
+        id: promote
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DEPLOYMENT: ${{ steps.vercel.outputs.url }}
+        run: |
+          body="$RUNNER_TEMP/vercel-api.json"
+          api() {
+            curl -sS --max-time 60 -o "$body" -w '%{http_code}' \
+              -H "Authorization: Bearer $VERCEL_TOKEN" -H "Content-Type: application/json" "$@"
+          }
+          reason() { jq -r '.error.message // empty' "$body" 2>/dev/null || true; }
+          status="$(api "https://api.vercel.com/v13/deployments/${DEPLOYMENT#https://}?teamId=$VERCEL_ORG_ID")"
+          if [ "$status" != 200 ]; then
+            echo "::error::Vercel did not find $DEPLOYMENT in the team (HTTP $status): $(reason)"
+            exit 1
+          fi
+          id="$(jq -r .id "$body")"
+          status="$(api -X POST --data '{}' "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/promote/$id?teamId=$VERCEL_ORG_ID")"
+          case "$status" in
+            2??) echo "Vercel: promoted $id" >> "$GITHUB_STEP_SUMMARY" ;;
+            *) echo "::error::Vercel did not promote $id (HTTP $status): $(reason)"; exit 1 ;;
+          esac
+
+      # The production domain serves the index.html of this build, byte for byte.
+      - name: Check the Vercel production domain
+        id: check
+        run: |
+          for _ in 1 2 3 4 5 6; do
+            if curl -fsS --max-time 20 "${PRODUCTION_URL%/}/index.html" -o "$RUNNER_TEMP/served.html" \
+              && cmp -s "$RUNNER_TEMP/served.html" apps/web/dist/index.html; then
+              echo "Vercel: $PRODUCTION_URL serves this build" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::$PRODUCTION_URL does not serve the index.html of $CID after two minutes."
+          exit 1
+
+      # 3. ENS: the contenthash of the name, on the resolver the ENS registry names for it
       # (packages/core/src/ens.ts), signed by the key that manages the name. Does nothing when
       # the name already points at this CID, so a rerun is safe.
       - name: Set the ENS contenthash
+        id: ens
         working-directory: apps/web
         env:
           ENS_MANAGER_PRIVATE_KEY: ${{ secrets.ENS_MANAGER_PRIVATE_KEY }}
@@ -295,23 +340,32 @@ jobs:
           '
           echo "ENS: the name points at \`$CID\`" >> "$GITHUB_STEP_SUMMARY"
 
-      # 3. Vercel: the production domain moves to the deployment of step 1.
-      - name: Give the Vercel deployment the production domain
+      # On a failure, what each host serves. Only a verified step says "moved": the production
+      # check for Vercel, the read-back of the ENS step for the name. A step that never ran leaves
+      # its host unchanged. A step that started and failed may have moved it: Vercel can accept a
+      # promotion before the request times out, and an ENS transaction can land after its wait
+      # ends. A rerun of the failed jobs finishes the release: the upload and the promotion
+      # repeat, and the ENS step skips a name already set.
+      - name: Say which host moved
+        if: failure()
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          DEPLOYMENT: ${{ steps.vercel.outputs.url }}
-        run: npx --yes "$VERCEL_CLI" promote "$DEPLOYMENT" --yes --token "$VERCEL_TOKEN"
-
-      # The production domain serves the index.html of this build, byte for byte.
-      - name: Check the Vercel production domain
+          PROMOTED: ${{ steps.promote.outcome }}
+          CHECKED: ${{ steps.check.outcome }}
+          ENS: ${{ steps.ens.outcome }}
         run: |
-          for _ in 1 2 3 4 5 6; do
-            if curl -fsS --max-time 20 "${PRODUCTION_URL%/}/index.html" -o "$RUNNER_TEMP/served.html" \
-              && cmp -s "$RUNNER_TEMP/served.html" apps/web/dist/index.html; then
-              echo "Vercel: $PRODUCTION_URL serves this build" >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-            sleep 20
-          done
-          echo "::error::$PRODUCTION_URL does not serve the index.html of $CID after two minutes."
-          exit 1
+          if [ "$CHECKED" = success ]; then
+            vercel="Vercel production serves \`$CID\`."
+          elif [ "$PROMOTED" = skipped ] || [ -z "$PROMOTED" ]; then
+            vercel="Vercel production did not change."
+          else
+            vercel="Vercel production may have moved to \`$CID\`: check Deployments in Vercel."
+          fi
+          if [ "$ENS" = success ]; then
+            ens="The ENS name points at \`$CID\`."
+          elif [ "$ENS" = skipped ] || [ -z "$ENS" ]; then
+            ens="The ENS name did not change."
+          else
+            ens="The ENS name may point at \`$CID\`: read its contenthash."
+          fi
+          echo "::error::$vercel $ens"
+          echo "$vercel $ens" >> "$GITHUB_STEP_SUMMARY"
