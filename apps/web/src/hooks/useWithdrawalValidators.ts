@@ -18,6 +18,13 @@ const addresses = getContractAddresses(activeChain.id)
 /** While a withdrawal has no validator yet, ask again this often: the subgraph indexes it within blocks. */
 const UNRESOLVED_REFETCH_MS = 15_000
 
+/**
+ * How far past the connected chain's head the subgraph may be and still describe that chain.
+ * A public endpoint can answer a few blocks behind the subgraph. A fork stays at its pinned
+ * block while Mainnet moves on, and soon falls further behind than this.
+ */
+const HEAD_LAG_TOLERANCE_BLOCKS = 50n
+
 interface IndexedValidators {
   byId: Map<bigint, Address>
   /** The last block the subgraph indexed. Null when it did not answer. */
@@ -63,7 +70,7 @@ async function indexedValidators(staker: Address, signal?: AbortSignal): Promise
  * back to the deploy block: each limits `eth_getLogs` to between 50 and
  * 10,000 blocks. A scan of that length is left for an endpoint that serves
  * it, such as an Anvil fork, where the subgraph does not know the fork's own
- * withdrawals.
+ * withdrawals and is not read at all.
  *
  * A withdrawal neither source resolves is the zero address, and the query
  * runs again until it resolves.
@@ -106,19 +113,27 @@ export function useWithdrawalValidators() {
         currentId = node[3]
       }
 
-      // 2. Ask the subgraph for the validator of each unclaimed withdrawal.
-      const indexed = await indexedValidators(address, signal)
-      const idToValidator = indexed.byId
+      // 2. Ask the subgraph for the validator of each unclaimed withdrawal. A subgraph well past
+      // this chain's head indexes another history: on a fork, a withdrawal made there can carry
+      // the ID of a later Mainnet one. Its answer is then discarded.
+      const [indexed, latestBlock] = await Promise.all([
+        indexedValidators(address, signal),
+        client.getBlockNumber(),
+      ])
+      const describesThisChain =
+        indexed.block !== null && indexed.block <= latestBlock + HEAD_LAG_TOLERANCE_BLOCKS
+      const idToValidator = describesThisChain ? indexed.byId : new Map<bigint, Address>()
       if (nodeIds.every((id) => idToValidator.has(id))) {
         return nodeIds.map((id) => idToValidator.get(id) ?? ZERO_ADDRESS)
       }
 
       // 3. For the rest, fetch WithdrawalInitiated events. Only the blocks the subgraph has not
-      // indexed, when it answered: that range is short enough for a public endpoint. On a fork
-      // the subgraph is ahead of the chain, so the scan starts at the deploy block.
-      const latestBlock = await client.getBlockNumber()
-      const scanFrom =
-        indexed.block !== null && indexed.block < latestBlock ? indexed.block + 1n : deployBlock
+      // indexed, when its answer stands: that range is short enough for a public endpoint.
+      // Otherwise the scan starts at the deploy block.
+      const afterIndexed = indexed.block !== null ? indexed.block + 1n : deployBlock
+      const scanFrom = !describesThisChain
+        ? deployBlock
+        : afterIndexed > latestBlock ? latestBlock : afterIndexed
       const getEventLogs = () =>
         client.getLogs({
           address: addresses.staking,

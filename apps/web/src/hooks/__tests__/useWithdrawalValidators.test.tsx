@@ -117,6 +117,28 @@ describe("useWithdrawalValidators", () => {
     expect(mockClient.getLogs).toHaveBeenCalledWith(expect.objectContaining({ fromBlock: deployBlock }))
   })
 
+  it("discards a subgraph ahead of the chain even when it holds every queued id", async () => {
+    // On a fork, the id 7 made there can be another validator's on Mainnet.
+    answerOperations(indexed([["7", V2.toLowerCase()], ["9", V2.toLowerCase()]]))
+    mockClient.getBlockNumber.mockResolvedValue(BigInt(INDEXED_BLOCK) - 1000n)
+    mockClient.getLogs.mockResolvedValue([{ args: { withdrawalId: 7n, validator: V1 } }])
+
+    const { result } = render()
+
+    await waitFor(() => expect(result.current.data).toEqual([V1, zeroAddress]))
+    expect(mockClient.getLogs).toHaveBeenCalledWith(expect.objectContaining({ fromBlock: deployBlock }))
+  })
+
+  it("keeps the subgraph's answer when the endpoint is a few blocks behind it", async () => {
+    answerOperations(indexed([["7", V1.toLowerCase()], ["9", V2.toLowerCase()]]))
+    mockClient.getBlockNumber.mockResolvedValue(BigInt(INDEXED_BLOCK) - 3n)
+
+    const { result } = render()
+
+    await waitFor(() => expect(result.current.data).toEqual([V1, V2]))
+    expect(mockClient.getLogs).not.toHaveBeenCalled()
+  })
+
   it("leaves the zero address for a withdrawal neither source resolves", async () => {
     answerOperations(indexed([["7", V1.toLowerCase()]]))
     // What a public endpoint does with a range it refuses: every request fails.

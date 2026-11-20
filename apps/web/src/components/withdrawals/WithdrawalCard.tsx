@@ -82,7 +82,13 @@ export function WithdrawalCard({
                 {validatorLabel}
               </span>
             )}
-            {isUnknown && isValidatorLoading && <Skeleton className="h-[18px] w-28" />}
+            {/* An unknown validator has no address. Its line stays, so the card keeps its height. */}
+            {isUnknown &&
+              (isValidatorLoading ? (
+                <Skeleton className="h-[18px] w-28" />
+              ) : (
+                <span data-testid="withdrawal-address-spacer" aria-hidden="true" className="h-[18px]" />
+              ))}
             {validator && !isZero && (
               <span
                 className="text-sm font-mono leading-[18px]

@@ -215,7 +215,8 @@ The e2e fixtures seed the acceptance (`termsAccepted`, true by default).
   `useWithdrawalValidators` walks the queue's ids and reads each one's validator from the
   Mainnet subgraph, then, for an id the subgraph lacks, from the `WithdrawalInitiated` logs
   after the subgraph's last block. The public RPC endpoints refuse a log scan back to the deploy
-  block, so a scan of that length only succeeds on a private endpoint or an Anvil fork.
+  block, so a scan of that length only succeeds on a private endpoint or an Anvil fork. A
+  subgraph more than 50 blocks past the connected chain's head, as on a fork, is not used.
 - **Gas** (`src/hooks/useGasEstimate.ts`): `estimateGas` and `getGasPrice`, debounced 500 ms.
 - **Approval** (`src/hooks/useApprovalFlow.ts`): wraps `useTokenAllowance` with the exact or
   unlimited approval type and its toasts.

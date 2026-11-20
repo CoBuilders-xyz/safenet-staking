@@ -115,6 +115,19 @@ describe("WithdrawalCard", () => {
     expect(screen.getByText("Unknown validator")).toBeInTheDocument()
   })
 
+  it("keeps the address line when the validator stays unknown, so the card does not shrink", () => {
+    const { rerender } = render(<WithdrawalCard {...defaultProps} validator={undefined} isValidatorLoading />)
+    expect(screen.queryByTestId("withdrawal-address-spacer")).not.toBeInTheDocument()
+
+    rerender(<WithdrawalCard {...defaultProps} validator={zeroAddress} />)
+    expect(screen.getByText("Unknown validator")).toBeInTheDocument()
+    expect(screen.getByTestId("withdrawal-address-spacer")).toHaveClass("h-[18px]")
+
+    rerender(<WithdrawalCard {...defaultProps} />)
+    expect(screen.queryByTestId("withdrawal-address-spacer")).not.toBeInTheDocument()
+    expect(screen.getByText(truncateAddress(TEST_ACCOUNTS.validator1))).toBeInTheDocument()
+  })
+
   it("shows enabled Claim button when claimable", () => {
     render(<WithdrawalCard {...defaultProps} />)
 
