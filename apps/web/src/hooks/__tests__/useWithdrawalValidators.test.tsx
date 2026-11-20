@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
-import { renderHook, waitFor } from "@testing-library/react"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { act, renderHook, waitFor } from "@testing-library/react"
 import { getAddress, zeroAddress } from "viem"
 import { TEST_ACCOUNTS } from "@/__tests__/test-data"
 import { answerOperations, meta, mockRequest, queryWrapper } from "@/__tests__/subgraph-mocks"
 import { deployBlock } from "@/config/contracts"
-import { useWithdrawalValidators } from "../useWithdrawalValidators"
+import { UNRESOLVED_REFETCH_MS, useWithdrawalValidators } from "../useWithdrawalValidators"
 
 vi.mock("graphql-request", () => ({ request: (o: unknown) => mockRequest(o) }))
 
@@ -147,6 +147,35 @@ describe("useWithdrawalValidators", () => {
     const { result } = render()
 
     await waitFor(() => expect(result.current.data).toEqual([V1, zeroAddress]))
+  })
+
+  describe("after a failed lookup", () => {
+    beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }))
+    afterEach(() => vi.useRealTimers())
+
+    it("asks again after the chain head could not be read, and then names the validators", async () => {
+      answerOperations(indexed([["7", V1.toLowerCase()], ["9", V2.toLowerCase()]]))
+      mockClient.getBlockNumber.mockRejectedValueOnce(new Error("HTTP 429"))
+
+      const { result } = render()
+      await waitFor(() => expect(result.current.isError).toBe(true))
+      expect(result.current.data).toBeUndefined()
+
+      await act(() => vi.advanceTimersByTimeAsync(UNRESOLVED_REFETCH_MS))
+
+      await waitFor(() => expect(result.current.data).toEqual([V1, V2]))
+      expect(mockClient.getBlockNumber).toHaveBeenCalledTimes(2)
+    })
+
+    it("stops asking once every validator is resolved", async () => {
+      answerOperations(indexed([["7", V1.toLowerCase()], ["9", V2.toLowerCase()]]))
+
+      const { result } = render()
+      await waitFor(() => expect(result.current.data).toEqual([V1, V2]))
+      await act(() => vi.advanceTimersByTimeAsync(UNRESOLVED_REFETCH_MS * 3))
+
+      expect(mockClient.getBlockNumber).toHaveBeenCalledOnce()
+    })
   })
 
   it("is resolving until the validators arrive, and while the queue's head is read", async () => {

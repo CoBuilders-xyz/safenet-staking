@@ -16,7 +16,7 @@ const WITHDRAWAL_INITIATED_EVENT = indexedEvent("staking", "WithdrawalInitiated"
 const addresses = getContractAddresses(activeChain.id)
 
 /** While a withdrawal has no validator yet, ask again this often: the subgraph indexes it within blocks. */
-const UNRESOLVED_REFETCH_MS = 15_000
+export const UNRESOLVED_REFETCH_MS = 15_000
 
 /**
  * How far past the connected chain's head the subgraph may be and still describe that chain.
@@ -188,8 +188,11 @@ export function useWithdrawalValidators() {
       return nodeIds.map((id) => idToValidator.get(id) ?? ZERO_ADDRESS)
     },
     staleTime: 60_000,
+    // A lookup that failed, on the chain head or a queue node, is as unresolved as a zero address.
     refetchInterval: (query) =>
-      query.state.data?.includes(ZERO_ADDRESS) ? UNRESOLVED_REFETCH_MS : false,
+      query.state.status === "error" || query.state.data?.includes(ZERO_ADDRESS)
+        ? UNRESOLVED_REFETCH_MS
+        : false,
     enabled: !!client && !!address && head !== undefined && tail !== undefined && head !== 0n,
   })
 
