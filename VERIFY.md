@@ -16,6 +16,10 @@ CID you build matches the CID being served, the interface you load is the source
 Set `VITE_VALIDATOR_INFO_URL` and `VITE_ALERTS_API_URL` to the values in the release's job
 summary, or leave them unset when it lists none. Both are public URLs.
 
+Set `VITE_RELEASE_VERSION` to the release tag, for example `web-v20261119.0`. The job summary
+lists it too. The footer of the interface shows that tag and the short commit, so the CID holds
+both. A manual run of the workflow has no tag: leave it unset to rebuild one.
+
 For a gateway-enabled release, also supply its public browser key as `VITE_GRAPH_API_KEY`.
 Obtain that value from the released JavaScript (the `/api/<KEY>/subgraphs/id/` URL),
 or from the operator. Do not commit or print it. It is already public in that release.
@@ -61,11 +65,12 @@ It prints the root CID. It must equal `apps/web/release/CID`.
 |---|---|
 | The source at the commit | `apps/web`, `packages/core` |
 | Every dependency, at an exact version | `pnpm-lock.yaml` |
-| The public build-time values | `apps/web/build.env` plus `VITE_GRAPH_API_KEY`, `VITE_VALIDATOR_INFO_URL` and `VITE_ALERTS_API_URL` from the environment. The release job summary lists both URLs |
+| The public build-time values | `apps/web/build.env` plus `VITE_GRAPH_API_KEY`, `VITE_VALIDATOR_INFO_URL`, `VITE_ALERTS_API_URL` and `VITE_RELEASE_VERSION` from the environment. The release job summary lists the last three |
+| The commit itself | The SHA and the commit time of `HEAD`, read from git. The footer shows them |
 | The CID settings | `ipfs-car` 3.1.0 defaults: CIDv1, raw leaves, 1 MiB fixed-size chunks, balanced layout 1024 links wide, no mtime, no mode |
 
 Nothing else. The release build ignores every `.env` file, every other `VITE_` variable in your
-shell and the graph-node port in `.env.ports`, and the bundle holds no timestamp. Text files
+shell and the graph-node port in `.env.ports`, and the bundle holds no time but the commit's own. Text files
 are checked out with LF line endings on every platform, by `.gitattributes`. `apps/web/build.env` is committed and holds only
 public values; a value there ships to every visitor.
 
@@ -83,7 +88,9 @@ public values; a value there ships to every visitor.
    port into the bundle, from your shell or from the `.env.ports` that `pnpm bootstrap` writes
    per worktree. If you changed the script, check that neither reaches Vite.
 6. Confirm the public gateway key matches the released build. A missing or rotated key changes the CID.
-7. Compare the files: `ls -lR apps/web/dist` on both sides, then `diff` the first file that
+7. `VITE_RELEASE_VERSION` must be the release tag, exactly. The footer of the served interface
+   shows it, before the short commit.
+8. Compare the files: `ls -lR apps/web/dist` on both sides, then `diff` the first file that
    differs. A difference there is a reproducibility bug. Please open an issue with it.
 
 ## Verify a daily snapshot

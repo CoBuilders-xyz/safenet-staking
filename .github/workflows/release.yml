@@ -75,12 +75,15 @@ jobs:
           VITE_GRAPH_API_KEY: ${{ secrets.GRAPH_API_KEY }}
           VITE_VALIDATOR_INFO_URL: ${{ vars.VITE_VALIDATOR_INFO_URL }}
           VITE_ALERTS_API_URL: ${{ vars.VITE_ALERTS_API_URL }}
+          # The footer shows the tag and the commit. Empty on a manual run, which shows the commit.
+          VITE_RELEASE_VERSION: ${{ github.event.release.tag_name }}
         run: pnpm --filter @cobuilders/safenet-web release:build
       - name: Record the CID
         id: cid
         env:
           VITE_VALIDATOR_INFO_URL: ${{ vars.VITE_VALIDATOR_INFO_URL }}
           VITE_ALERTS_API_URL: ${{ vars.VITE_ALERTS_API_URL }}
+          VITE_RELEASE_VERSION: ${{ github.event.release.tag_name }}
         run: |
           cid="$(cat apps/web/release/CID)"
           echo "cid=$cid" >> "$GITHUB_OUTPUT"
@@ -93,6 +96,7 @@ jobs:
             echo
             echo "- \`VITE_VALIDATOR_INFO_URL=${VITE_VALIDATOR_INFO_URL}\`"
             echo "- \`VITE_ALERTS_API_URL=${VITE_ALERTS_API_URL}\`"
+            echo "- \`VITE_RELEASE_VERSION=${VITE_RELEASE_VERSION}\`"
           } >> "$GITHUB_STEP_SUMMARY"
       # The CAR and the files packed into it, from one build: IPFS gets the CAR, Vercel the files.
       - name: Upload the build

@@ -29,6 +29,7 @@
     "scripts/codegen-check.ts",
     "scripts/codegen-live-check.ts",
     "scripts/fork-env/*.ts",
+    "scripts/build-info.ts",
     "scripts/release.ts",
     "scripts/release-pin.ts",
     "scripts/i18n-catalogues.ts",

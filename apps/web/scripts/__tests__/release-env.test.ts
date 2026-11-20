@@ -27,4 +27,12 @@ describe("release inputs", () => {
       try { releaseEnvironment(source) } catch (error) { expect(String(error)).not.toContain("private-marker") }
     }
   })
+  it("takes the release version from the environment only, and checks it", () => {
+    expect(releaseEnvironment("VITE_APP_URL=\n", undefined, {}, " web-v20261119.0 ")).toEqual({ VITE_APP_URL: "", VITE_RELEASE_VERSION: "web-v20261119.0" })
+    expect(releaseEnvironment("VITE_APP_URL=\n", undefined, {}, " ")).toEqual({ VITE_APP_URL: "" })
+    for (const bad of ["cli-v0.1.0", "web-v", "web-v2026 <b>"]) {
+      expect(() => releaseEnvironment("", undefined, {}, bad)).toThrow()
+    }
+    expect(() => releaseEnvironment("VITE_RELEASE_VERSION=web-v20261119.0")).toThrow()
+  })
 })
