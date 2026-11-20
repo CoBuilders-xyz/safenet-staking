@@ -18,11 +18,12 @@ export function parseBuildCommit(output: string): BuildCommit | undefined {
 /**
  * HEAD of the checkout at `repo`. Both values come from the commit, never from the clock or the
  * machine, so two builds of one commit hold the same bytes and the release CID stays
- * reproducible. Undefined without git or outside a checkout.
+ * reproducible. Undefined without git or outside a checkout. --no-show-signature keeps the
+ * signature report of log.showSignature out of the output for a signed HEAD.
  */
 export function readBuildCommit(repo: string): BuildCommit | undefined {
   try {
-    return parseBuildCommit(execFileSync("git", ["-C", repo, "show", "-s", "--format=%H %ct", "HEAD"], {
+    return parseBuildCommit(execFileSync("git", ["-C", repo, "show", "-s", "--no-show-signature", "--format=%H %ct", "HEAD"], {
       encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
     }))
   } catch {
