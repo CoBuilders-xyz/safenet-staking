@@ -100,6 +100,9 @@ function mainnet(operation: string, mode: SubgraphMode, variables: Record<string
   switch (operation) {
     case "ValidatorDirectory":
       return { _meta, validators: mode === "empty" ? [] : validators.map((v) => v.row) }
+    case "StakerWithdrawalValidators":
+      // The test user's first queued withdrawal, the one the mocked WithdrawalInitiated log names.
+      return { _meta, withdrawals: mode === "empty" ? [] : [{ id: "1", validator: { id: VALIDATORS.validatorA } }] }
     case "ValidatorActivity": {
       const v = mode === "empty" ? undefined : validators.find((x) => x.row.id === variables.id)
       // One page holds every row here, so a later page, after a cursor, is empty.

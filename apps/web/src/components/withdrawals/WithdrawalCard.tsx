@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next"
 import { Progress } from "@/components/ui/progress"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   formatTokenAmount,
   formatCountdown,
@@ -22,6 +23,10 @@ interface WithdrawalCardProps {
   withdrawDelay?: number
   validator?: Address
   validators?: ValidatorInfo[]
+  /** The withdrawal's validator is still being read. */
+  isValidatorLoading?: boolean
+  /** The list of validator names is still being read. */
+  isNameLoading?: boolean
 }
 
 export function WithdrawalCard({
@@ -34,6 +39,8 @@ export function WithdrawalCard({
   withdrawDelay,
   validator,
   validators,
+  isValidatorLoading = false,
+  isNameLoading = false,
 }: WithdrawalCardProps) {
   const { t } = useTranslation()
   const secondsLeft = useCountdown(claimableAt)
@@ -52,13 +59,15 @@ export function WithdrawalCard({
   const metadata = validator ? findValidator(validators, validator) : undefined
   const isZero =
     validator === "0x0000000000000000000000000000000000000000"
-  const validatorLabel = isZero
+  const isUnknown = !validator || isZero
+  // A name shows as soon as it is known. Until then a placeholder holds its line, so the card
+  // never shows an empty gap, nor an address that turns into a name a moment later.
+  const showNameSkeleton = isUnknown ? isValidatorLoading : !metadata && isNameLoading
+  const validatorLabel = isUnknown
     ? t("withdrawals.unknownValidator", "Unknown validator")
     : metadata
       ? metadata.label
-      : validator
-        ? truncateAddress(validator)
-        : undefined
+      : truncateAddress(validator)
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -66,11 +75,20 @@ export function WithdrawalCard({
         {/* Left: validator info + status badge */}
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            {validatorLabel && (
+            {showNameSkeleton ? (
+              <Skeleton data-testid="withdrawal-validator-skeleton" className="h-6 w-40" />
+            ) : (
               <span className="text-2xl font-heading font-normal leading-none">
                 {validatorLabel}
               </span>
             )}
+            {/* An unknown validator has no address. Its line stays, so the card keeps its height. */}
+            {isUnknown &&
+              (isValidatorLoading ? (
+                <Skeleton className="h-[18px] w-28" />
+              ) : (
+                <span data-testid="withdrawal-address-spacer" aria-hidden="true" className="h-[18px]" />
+              ))}
             {validator && !isZero && (
               <span
                 className="text-sm font-mono leading-[18px]

@@ -23,8 +23,8 @@ export function WithdrawalQueue() {
   const { data: withdrawals, isLoading, isError, refetch } = usePendingWithdrawals()
   const wrongNetwork = useWrongNetwork()
   const { data: withdrawDelay } = useWithdrawDelay()
-  const { data: withdrawalValidators } = useWithdrawalValidators()
-  const { data: allValidators } = useValidators()
+  const { data: withdrawalValidators, isResolving: isResolvingValidators } = useWithdrawalValidators()
+  const { data: allValidators, isPending: isValidatorNamesPending } = useValidators()
   const { claimWithdrawal, isSigningTx, isConfirmingTx, isSuccess: isClaimed, isSafeQueued: isClaimSafeQueued, error: claimError, txHash: claimTxHash, reset: resetClaim } = useClaimWithdrawal()
   const {
     batchClaimWithdrawals,
@@ -183,6 +183,8 @@ export function WithdrawalQueue() {
           withdrawDelay={withdrawDelay !== undefined ? Number(withdrawDelay) : undefined}
           validator={withdrawalValidators?.[i]}
           validators={allValidators}
+          isValidatorLoading={withdrawalValidators?.[i] === undefined && isResolvingValidators}
+          isNameLoading={isValidatorNamesPending}
         />
       ))}
     </div>

@@ -1,0 +1,16 @@
+# Mainnet subgraph query for the withdrawals page.
+
+# The validator of each withdrawal one staker has not claimed. The contract's queue returns
+# (amount, claimableAt) and no validator; only the WithdrawalInitiated event names it, and a
+# public RPC endpoint does not serve logs back to the deploy block.
+query StakerWithdrawalValidators($staker: Bytes!) {
+  _meta {
+    ...MainnetFreshness
+  }
+  withdrawals(first: 1000, where: { staker: $staker, claimed: false }, orderBy: id) {
+    id
+    validator {
+      id
+    }
+  }
+}

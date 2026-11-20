@@ -211,7 +211,12 @@ The e2e fixtures seed the acceptance (`termsAccepted`, true by default).
   ENS primary names come from reverse resolution, with SEF's label as the fallback and a source
   caption. Beta-only windows carry their dates and an ended notice, never current figures.
 - **Withdrawals** (`src/hooks/useWithdrawals.ts`): the connected user's queue, polled every
-  15 seconds, and `useNextClaimable` for the banner.
+  15 seconds, and `useNextClaimable` for the banner. The queue carries no validator.
+  `useWithdrawalValidators` walks the queue's ids and reads each one's validator from the
+  Mainnet subgraph, then, for an id the subgraph lacks, from the `WithdrawalInitiated` logs
+  after the subgraph's last block. The public RPC endpoints refuse a log scan back to the deploy
+  block, so a scan of that length only succeeds on a private endpoint or an Anvil fork. A
+  subgraph more than 50 blocks past the connected chain's head, as on a fork, is not used.
 - **Gas** (`src/hooks/useGasEstimate.ts`): `estimateGas` and `getGasPrice`, debounced 500 ms.
 - **Approval** (`src/hooks/useApprovalFlow.ts`): wraps `useTokenAllowance` with the exact or
   unlimited approval type and its toasts.
