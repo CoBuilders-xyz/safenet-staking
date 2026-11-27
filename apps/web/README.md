@@ -123,7 +123,7 @@ The release build ignores the other shell settings and .env files. It reads [`bu
 | `test:e2e:ui`, `test:e2e:headed` | The same suite in Playwright's UI, or in a visible browser |
 | `test:fork` | Playwright against the real contracts on an Anvil Mainnet fork, `e2e/fork/`; see [Fork suite](#fork-suite) |
 | `test:smoke:web` | Playwright against a deployment, `SMOKE_URL` or else `PRODUCTION_URL`, `e2e/smoke/`; see [Production smoke suite](#production-smoke-suite) |
-| `availability` | Checks that the production deployment, and the gateways for the latest release in the root `deployments.json`, serve the interface; needs `PRODUCTION_URL` |
+| `availability` | Checks that the production deployment, the ENS name and the gateways for the CID it serves deliver the interface, and that the API and alerts Workers report healthy; needs `PRODUCTION_URL`, `VALIDATOR_INFO_URL` and `ALERTS_API_URL` |
 | `fork:up`, `fork:reset`, `fork:down` | The manual QA fork for Claim & Stake; see [`docs/manual-qa-fork.md`](../../docs/manual-qa-fork.md) |
 | `codegen` | Regenerates the typed GraphQL in `src/graphql/<chain>/generated.ts` from each subgraph package's `schema.graphql` |
 | `codegen:check` | Fails when the committed GraphQL types differ from a fresh `codegen` |

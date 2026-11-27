@@ -132,6 +132,19 @@ jobs:
           sleep 60
           pnpm verify:abis
 
+  # The status page's Gatus configuration: the pinned image starts on it, with made-up secrets,
+  # and loads both alert providers. Gatus exits on a configuration it refuses. No secret needed.
+  status-config:
+    name: status-config
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start Gatus on ops/status/config.yaml
+        run: bash ops/status/check-config.sh
+
   history-packages:
     name: history packages (no publish)
     runs-on: ubuntu-24.04

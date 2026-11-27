@@ -1,0 +1,10 @@
+# Railway config as code for the status service. Set the service's root directory to ops/status.
+# The volume and the domain are set in Railway's dashboard (README.md).
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"

@@ -23,8 +23,9 @@ as `pnpm <script>` from `apps/web`.
 - **Production smoke:** `test:smoke:web` (Playwright, `e2e/smoke/`), against `SMOKE_URL`, else
   `PRODUCTION_URL` (`e2e/smoke/target.ts`), no wallet, no mocks. Fails when neither is set.
 - **Availability:** `availability` (`scripts/availability.ts`): production answers with the title
-  and serves its entry script; with a root `deployments.json`, each gateway in core serves the
-  latest release. Needs `PRODUCTION_URL`.
+  and serves its entry script; the ENS name serves the same index and names its CID; each gateway
+  in core serves that CID; the API and the alerts Worker report healthy. Needs `PRODUCTION_URL`,
+  `VALIDATOR_INFO_URL` and `ALERTS_API_URL`.
 - **GraphQL types:** `codegen` regenerates them; `codegen:live-check` validates the documents
   against a running graph-node
 - **Reward proofs:** `generate:proofs [--out <dir>]` reads `scripts/merkle-config.json` and writes

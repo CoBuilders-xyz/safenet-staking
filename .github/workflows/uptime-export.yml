@@ -1,0 +1,97 @@
+name: Uptime export
+
+# Weekly, the uptime of every check on the status page (ops/status), as JSON and Markdown: the
+# last 8 days, so each run overlaps the one before, the month to date and the previous month.
+# Gatus keeps uptime for about 30 days and GitHub keeps an artifact for at most 90, so the
+# exports are the record, and each one must be kept somewhere longer-lived before it expires
+# (ops/status/README.md). This workflow writes nothing to the repository.
+#
+# With the optional read-only D1 credentials below, it also adds the alerts Worker's own uptime
+# report, from its five-minute poll runs (apps/alerts/README.md). Without them it skips that part.
+# No pull request runs it: it needs the deployed status page. tools/__tests__ covers the script.
+
+on:
+  schedule:
+    # Mondays, away from the top of the hour, when scheduled runs queue longest.
+    - cron: "43 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: uptime-export-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  export:
+    name: export
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      STATUS_URL: ${{ vars.STATUS_URL }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      ALERTS_D1_DATABASE_ID: ${{ vars.ALERTS_D1_DATABASE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.ALERTS_D1_READ_TOKEN }}
+    steps:
+      - name: Require the status page URL
+        run: |
+          if [ -z "${STATUS_URL}" ]; then
+            echo "::error title=STATUS_URL is not set::The uptime export needs the repository variable STATUS_URL, the URL of the status page."
+            exit 1
+          fi
+      # Pin actions to full SHA: mutable tags can be moved to malicious code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      # Writes its own table to the job summary.
+      - name: Export the status page's uptime
+        run: node tools/uptime-export.mjs "$RUNNER_TEMP/uptime"
+      - name: Install dependencies for the alerts report
+        if: ${{ env.CLOUDFLARE_ACCOUNT_ID != '' && env.ALERTS_D1_DATABASE_ID != '' && env.CLOUDFLARE_API_TOKEN != '' }}
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      # The same two windows as the status export, on five-minute boundaries, which the report requires.
+      - name: Export the alerts Worker's poll uptime
+        if: ${{ env.CLOUDFLARE_ACCOUNT_ID != '' && env.ALERTS_D1_DATABASE_ID != '' && env.CLOUDFLARE_API_TOKEN != '' }}
+        run: |
+          until=$(( $(date -u +%s) / 300 * 300 ))
+          since=$(( until - 8 * 86400 ))
+          month=$(date -u -d "$(date -u +%Y-%m-01)" +%s)
+          iso() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
+          day=$(date -u +%Y-%m-%d)
+          pnpm --silent --filter @cobuilders/safenet-alerts report:uptime "$(iso "$since")" "$(iso "$until")" \
+            > "$RUNNER_TEMP/uptime/alerts-last8d-$day.json"
+          if [ "$month" -lt "$until" ]; then
+            pnpm --silent --filter @cobuilders/safenet-alerts report:uptime "$(iso "$month")" "$(iso "$until")" \
+              > "$RUNNER_TEMP/uptime/alerts-month-to-date-$day.json"
+          fi
+      - name: Say the alerts report was skipped
+        if: ${{ !(env.CLOUDFLARE_ACCOUNT_ID != '' && env.ALERTS_D1_DATABASE_ID != '' && env.CLOUDFLARE_API_TOKEN != '') }}
+        run: |
+          echo "Alerts poll report not included: CLOUDFLARE_ACCOUNT_ID, ALERTS_D1_DATABASE_ID or ALERTS_D1_READ_TOKEN is not set." | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: uptime-${{ github.run_id }}
+          path: ${{ runner.temp }}/uptime/
+          if-no-files-found: error
+          # The most GitHub keeps an artifact.
+          retention-days: 90
+
+  page:
+    name: page
+    needs: [export]
+    if: ${{ failure() }}
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/page-on-red.yml
+    with:
+      needs: ${{ toJSON(needs) }}

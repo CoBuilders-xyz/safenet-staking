@@ -1,13 +1,14 @@
 name: Availability
 
 # Every six hours: the production deployment answers with the interface's title and serves the
-# entry script of its build, and, once deployments.json at the repository root records a release,
-# each public IPFS gateway in packages/core serves that release's index.html. Orbitor HTTP 504
-# is a warning only when production HTML/JS and all other gateways pass. The table goes to
-# the job summary, and the badge in README.md shows the last result.
+# entry script of its build; the ENS name, through eth.limo, serves the same index.html and names
+# its CID; each public IPFS gateway in packages/core serves that CID's index.html; the validator
+# API and the alerts Worker report healthy. The CID comes from what the ENS name serves, so a
+# release needs no change here. Orbitor HTTP 504 is a warning only when every other check passes.
+# The table goes to the job summary, and the badge in README.md shows the last result.
 #
-# On a pull request only when the check or the release record changes, so either runs once
-# before it merges. A red scheduled or dispatched run pages; a red pull request run is seen by its author.
+# On a pull request only when the check changes, so it runs once before it merges. A red
+# scheduled or dispatched run pages; a red pull request run is seen by its author.
 
 on:
   schedule:
@@ -19,7 +20,6 @@ on:
       - .github/workflows/availability.yml
       - apps/web/scripts/availability.ts
       - apps/web/scripts/availability-checks.ts
-      - deployments.json
 
 concurrency:
   group: availability-${{ github.ref }}
@@ -38,13 +38,20 @@ jobs:
     timeout-minutes: 10
     env:
       PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+      # The same repository variables the release build reads.
+      VALIDATOR_INFO_URL: ${{ vars.VITE_VALIDATOR_INFO_URL }}
+      ALERTS_API_URL: ${{ vars.VITE_ALERTS_API_URL }}
     steps:
-      - name: Require the production URL
+      - name: Require the service URLs
         run: |
-          if [ -z "${PRODUCTION_URL}" ]; then
-            echo "::error title=PRODUCTION_URL is not set::The availability check needs the repository variable PRODUCTION_URL, the URL of the production deployment."
-            exit 1
-          fi
+          status=0
+          for name in PRODUCTION_URL VALIDATOR_INFO_URL ALERTS_API_URL; do
+            if [ -z "${!name}" ]; then
+              echo "::error title=${name} is not set::The availability check needs ${name}. PRODUCTION_URL, VITE_VALIDATOR_INFO_URL and VITE_ALERTS_API_URL are repository variables."
+              status=1
+            fi
+          done
+          exit $status
       # Pin actions to full SHA: mutable tags can be moved to malicious code.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,7 +64,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       # Writes its own table to the job summary.
-      - name: Check production and the IPFS gateways
+      - name: Check production, ENS, the IPFS gateways and the Workers
         run: pnpm --filter @cobuilders/safenet-web availability
 
   page:

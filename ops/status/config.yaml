@@ -1,0 +1,375 @@
+# The public status page of Safenet staking: Gatus, deployed on Railway (README.md here).
+#
+# Gatus expands each environment variable in dollar-brace form before it reads this file; an unset one
+# becomes empty. Secrets are only ever such names; no value is written here.
+#
+# Every URL, subgraph ID and ENS name below is also in packages/core or DEPLOY.md, and
+# tools/__tests__/status-config.test.mjs fails when core changes and this file does not.
+#
+# Severity, in the alert description and the Friday payload:
+#   P1  a way in for users is down: the web app on either origin, the API, the alerts Worker.
+#   P2  one redundant piece is down: an IPFS gateway, a subgraph, a Studio fallback, an npm package.
+# Orbitor alone is "warning": it answers 504 now and then while every other path works.
+
+storage:
+  type: sqlite
+  # A file on the Railway volume, so uptime survives a redeploy. The Dockerfile sets the default.
+  path: ${GATUS_SQLITE_PATH}
+  # Raw results per check, for the page and the weekly export: about a day at one a minute.
+  # Uptime is kept apart, hourly then daily, for about 30 days whatever this says.
+  maximum-number-of-results: 1500
+  # State changes per check. The weekly export computes downtime from them.
+  maximum-number-of-events: 1000
+
+web:
+  port: ${PORT}
+
+# No check runs while Gatus itself has no network, so a Railway outage is not read as ours.
+connectivity:
+  checker:
+    target: 1.1.1.1:53
+    interval: 60s
+
+ui:
+  title: Safenet staking status
+  header: Safenet staking status
+  description: Uptime of the Safenet staking interface, its API, its alerts and its data sources, run by CoBuilders.
+  link: https://safenet.cobuilders.xyz
+
+alerting:
+  # An incoming webhook. The P2 and warning alerts below do not use it.
+  slack:
+    webhook-url: ${SLACK_WEBHOOK_URL}
+  # Friday's webhook: one JSON object per alert. Gatus escapes double quotes in the errors, nothing else.
+  custom:
+    url: ${FRIDAY_WEBHOOK_URL}
+    method: POST
+    headers:
+      Content-Type: application/json
+      Authorization: Bearer ${FRIDAY_WEBHOOK_KEY}
+    placeholders:
+      ALERT_TRIGGERED_OR_RESOLVED:
+        TRIGGERED: triggered
+        RESOLVED: resolved
+    body: |
+      {"source":"safenet-status","severity":"P2","status":"[ALERT_TRIGGERED_OR_RESOLVED]","group":"[ENDPOINT_GROUP]","name":"[ENDPOINT_NAME]","url":"[ENDPOINT_URL]","description":"[ALERT_DESCRIPTION]","errors":"[RESULT_ERRORS]"}
+
+# Alert sets, reused by anchor. Gatus ignores keys it does not know, such as these.
+x-alerts-p1: &alerts-p1
+  - type: slack
+    failure-threshold: 3
+    success-threshold: 2
+    send-on-resolved: true
+    description: "P1: users cannot reach this service"
+  - type: custom
+    failure-threshold: 3
+    success-threshold: 2
+    send-on-resolved: true
+    description: "P1: users cannot reach this service"
+    provider-override:
+      body: |
+        {"source":"safenet-status","severity":"P1","status":"[ALERT_TRIGGERED_OR_RESOLVED]","group":"[ENDPOINT_GROUP]","name":"[ENDPOINT_NAME]","url":"[ENDPOINT_URL]","description":"[ALERT_DESCRIPTION]","errors":"[RESULT_ERRORS]"}
+
+# For checks every five minutes: two failures in a row, ten minutes.
+x-alerts-p1-slow: &alerts-p1-slow
+  - type: slack
+    failure-threshold: 2
+    success-threshold: 2
+    send-on-resolved: true
+    description: "P1: users cannot reach this service"
+  - type: custom
+    failure-threshold: 2
+    success-threshold: 2
+    send-on-resolved: true
+    description: "P1: users cannot reach this service"
+    provider-override:
+      body: |
+        {"source":"safenet-status","severity":"P1","status":"[ALERT_TRIGGERED_OR_RESOLVED]","group":"[ENDPOINT_GROUP]","name":"[ENDPOINT_NAME]","url":"[ENDPOINT_URL]","description":"[ALERT_DESCRIPTION]","errors":"[RESULT_ERRORS]"}
+
+x-alerts-p2: &alerts-p2
+  - type: custom
+    failure-threshold: 3
+    success-threshold: 2
+    send-on-resolved: true
+    description: "P2: a redundant piece is down; users still have another path"
+
+x-alerts-warning: &alerts-warning
+  - type: custom
+    failure-threshold: 4
+    success-threshold: 2
+    send-on-resolved: true
+    description: "warning: Orbitor's gateway fails now and then while the other paths work"
+    provider-override:
+      body: |
+        {"source":"safenet-status","severity":"warning","status":"[ALERT_TRIGGERED_OR_RESOLVED]","group":"[ENDPOINT_GROUP]","name":"[ENDPOINT_NAME]","url":"[ENDPOINT_URL]","description":"[ALERT_DESCRIPTION]","errors":"[RESULT_ERRORS]"}
+
+# A daily check alerts on its first failure.
+x-alerts-daily: &alerts-daily
+  - type: custom
+    failure-threshold: 1
+    success-threshold: 1
+    send-on-resolved: true
+    description: "P2: a published package is not on the npm registry"
+
+endpoints:
+  # Web: the interface, on both origins a release moves. A page that names its title and an
+  # entry script under assets/. Gatus cannot fetch the script the page names; the Availability
+  # workflow does, every six hours.
+  - name: Web app (safenet.cobuilders.xyz)
+    group: Web
+    url: https://safenet.cobuilders.xyz/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*<title>Safenet Staking</title>*)"
+      - '[BODY] == pat(*<script type="module" crossorigin src="./assets/index-*.js"*)'
+    alerts: *alerts-p1
+
+  - name: Web app via ENS (safenet.cobuilders.eth.limo)
+    group: Web
+    url: https://safenet.cobuilders.eth.limo/
+    interval: 2m
+    client:
+      timeout: 30s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*<title>Safenet Staking</title>*)"
+      - '[BODY] == pat(*<script type="module" crossorigin src="./assets/index-*.js"*)'
+    alerts: *alerts-p1
+
+  # Distribution: each IPFS gateway in core, through the ENS name. A gateway resolves
+  # /ipns/safenet.cobuilders.eth to the CID the name points at, so this follows every release.
+  - name: IPFS gateway Filebase
+    group: Distribution
+    url: https://ipfs.filebase.io/ipns/safenet.cobuilders.eth/index.html
+    interval: 5m
+    client:
+      timeout: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*<title>Safenet Staking</title>*)"
+    alerts: *alerts-p2
+
+  - name: IPFS gateway Orbitor
+    group: Distribution
+    url: https://ipfs.orbitor.dev/ipns/safenet.cobuilders.eth/index.html
+    interval: 5m
+    client:
+      timeout: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*<title>Safenet Staking</title>*)"
+    alerts: *alerts-warning
+
+  # npm's view of a dist-tag: latest always exists once a version is published.
+  - name: npm @cobuilders/safenet-cli
+    group: Distribution
+    url: https://registry.npmjs.org/@cobuilders/safenet-cli/latest
+    interval: 24h
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].name == @cobuilders/safenet-cli"
+    alerts: *alerts-daily
+
+  - name: npm @cobuilders/safenet-mcp
+    group: Distribution
+    url: https://registry.npmjs.org/@cobuilders/safenet-mcp/latest
+    interval: 24h
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].name == @cobuilders/safenet-mcp"
+    alerts: *alerts-daily
+
+  # API: the validator REST API. /v1/health is not cached and queries both subgraphs on the
+  # Network gateway each time, so it runs every five minutes, not every minute.
+  - name: API health
+    group: API
+    url: https://safenet-api.augusto-ada.workers.dev/v1/health
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status == ok"
+    alerts: *alerts-p1-slow
+
+  - name: API validators
+    group: API
+    url: https://safenet-api.augusto-ada.workers.dev/v1/validators
+    interval: 2m
+    conditions:
+      - "[STATUS] == 200"
+      - "len([BODY]) > 0"
+    alerts: *alerts-p1
+
+  # Alerts: 503 when the latest five-minute poll failed, is incomplete or is over 15 minutes old.
+  - name: Alerts health
+    group: Alerts
+    url: https://safenet-alerts.augusto-ada.workers.dev/health
+    interval: 2m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].healthy == true"
+    alerts: *alerts-p1
+
+  # Indexing: each subgraph on the Network gateway, the production read path. The key goes in a
+  # header, never the URL, so neither the page nor an alert payload carries it. The gateway
+  # answers 200 with "errors" when it cannot serve, so the conditions read the body.
+  - name: Mainnet subgraph (Network)
+    group: Indexing
+    url: https://gateway.thegraph.com/api/subgraphs/id/K1gHS5P5vZU3LApqchuuQxkmZGDDAUavkQUdGDV7Vxs
+    method: POST
+    interval: 5m
+    client:
+      timeout: 30s
+    headers:
+      Content-Type: application/json
+      Authorization: Bearer ${GRAPH_API_KEY}
+    body: '{"query":"{ _meta { block { number } hasIndexingErrors } }"}'
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].data._meta.hasIndexingErrors == false"
+      - "[BODY].data._meta.block.number > 0"
+    alerts: *alerts-p2
+
+  - name: Gnosis subgraph (Network)
+    group: Indexing
+    url: https://gateway.thegraph.com/api/subgraphs/id/9ZnBWftc6QB4tLn2CeYKTCqZkUrwjUNtH4DXvXHahG8q
+    method: POST
+    interval: 5m
+    client:
+      timeout: 30s
+    headers:
+      Content-Type: application/json
+      Authorization: Bearer ${GRAPH_API_KEY}
+    body: '{"query":"{ _meta { block { number } hasIndexingErrors } }"}'
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].data._meta.hasIndexingErrors == false"
+      - "[BODY].data._meta.block.number > 0"
+    alerts: *alerts-p2
+
+  # The Studio deployments core names as the default when no key is set. No key needed.
+  - name: Mainnet subgraph (Studio fallback)
+    group: Indexing
+    url: https://api.studio.thegraph.com/query/1763864/safenet-mainnet/e66567d
+    method: POST
+    interval: 5m
+    client:
+      timeout: 30s
+    headers:
+      Content-Type: application/json
+    body: '{"query":"{ _meta { block { number } hasIndexingErrors } }"}'
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].data._meta.hasIndexingErrors == false"
+      - "[BODY].data._meta.block.number > 0"
+    alerts: *alerts-p2
+
+  - name: Gnosis subgraph (Studio fallback)
+    group: Indexing
+    url: https://api.studio.thegraph.com/query/1763864/safenet-gnosis/e66567d
+    method: POST
+    interval: 5m
+    client:
+      timeout: 30s
+    headers:
+      Content-Type: application/json
+    body: '{"query":"{ _meta { block { number } hasIndexingErrors } }"}'
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].data._meta.hasIndexingErrors == false"
+      - "[BODY].data._meta.block.number > 0"
+    alerts: *alerts-p2
+
+# Suites run their steps in order and pass values between them. Gatus records their results and
+# alerts on them, but keeps no uptime for them: they check correctness, the endpoints above
+# check uptime.
+suites:
+  # The ENS name and Vercel serve one release: the same index.html, byte for byte. A release
+  # moves Vercel, then the ENS name, so the threshold covers the minutes between the two.
+  # Gatus cannot read a response header, so it compares bodies, not x-ipfs-roots; the
+  # Availability workflow reads the CID.
+  - name: ENS and Vercel serve the same release
+    group: Web
+    interval: 5m
+    endpoints:
+      - name: Vercel index.html
+        url: https://safenet.cobuilders.xyz/
+        conditions:
+          - "[STATUS] == 200"
+        store:
+          index: "[BODY]"
+      - name: ENS index.html equals Vercel's
+        url: https://safenet.cobuilders.eth.limo/
+        client:
+          timeout: 30s
+        # A failed comparison would otherwise print both pages in the alert.
+        ui:
+          dont-resolve-failed-conditions: true
+        conditions:
+          - "[STATUS] == 200"
+          - "[BODY] == [CONTEXT].index"
+        alerts: *alerts-p2
+
+  # Freshness. Gatus has no clock to compare a block timestamp with, so each suite asks the
+  # chain for its finalized block, then asks the subgraph for that block by hash. The subgraph
+  # answers only once it has indexed past it. That bounds its lag to the chain's finality:
+  # about 15 minutes on Mainnet, about 3 on Gnosis. The RPC is the first public one in core.
+  - name: Mainnet subgraph is fresh
+    group: Indexing
+    interval: 10m
+    endpoints:
+      - name: Mainnet finalized block
+        url: https://ethereum-rpc.publicnode.com
+        method: POST
+        headers:
+          Content-Type: application/json
+        body: '{"jsonrpc":"2.0","id":1,"method":"eth_getBlockByNumber","params":["finalized",false]}'
+        conditions:
+          - "[STATUS] == 200"
+          - "len([BODY].result.hash) == 66"
+        store:
+          finalized: "[BODY].result.hash"
+      - name: Mainnet subgraph has indexed the finalized block
+        url: https://gateway.thegraph.com/api/subgraphs/id/K1gHS5P5vZU3LApqchuuQxkmZGDDAUavkQUdGDV7Vxs
+        method: POST
+        client:
+          timeout: 30s
+        headers:
+          Content-Type: application/json
+          Authorization: Bearer ${GRAPH_API_KEY}
+        body: '{"query":"{ _meta(block: { hash: \"[CONTEXT].finalized\" }) { block { number } hasIndexingErrors } }"}'
+        conditions:
+          - "[STATUS] == 200"
+          - "[BODY].data._meta.hasIndexingErrors == false"
+          - "[BODY].data._meta.block.number > 0"
+        alerts: *alerts-p2
+
+  - name: Gnosis subgraph is fresh
+    group: Indexing
+    interval: 10m
+    endpoints:
+      - name: Gnosis finalized block
+        url: https://rpc.gnosischain.com
+        method: POST
+        headers:
+          Content-Type: application/json
+        body: '{"jsonrpc":"2.0","id":1,"method":"eth_getBlockByNumber","params":["finalized",false]}'
+        conditions:
+          - "[STATUS] == 200"
+          - "len([BODY].result.hash) == 66"
+        store:
+          finalized: "[BODY].result.hash"
+      - name: Gnosis subgraph has indexed the finalized block
+        url: https://gateway.thegraph.com/api/subgraphs/id/9ZnBWftc6QB4tLn2CeYKTCqZkUrwjUNtH4DXvXHahG8q
+        method: POST
+        client:
+          timeout: 30s
+        headers:
+          Content-Type: application/json
+          Authorization: Bearer ${GRAPH_API_KEY}
+        body: '{"query":"{ _meta(block: { hash: \"[CONTEXT].finalized\" }) { block { number } hasIndexingErrors } }"}'
+        conditions:
+          - "[STATUS] == 200"
+          - "[BODY].data._meta.hasIndexingErrors == false"
+          - "[BODY].data._meta.block.number > 0"
+        alerts: *alerts-p2
