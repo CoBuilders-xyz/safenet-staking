@@ -12,12 +12,14 @@ import {
   annotation,
   applyAvailabilityPolicy,
   type Outcome,
+  checkAlerts,
+  checkApi,
+  checkEns,
   checkGateway,
   checkProduction,
+  ensOrigin,
   entryAsset,
-  latestDeployment,
   pageTitle,
-  parseDeployments,
   summary,
   type Fetch,
 } from "../availability-checks"
@@ -25,7 +27,7 @@ import {
 /** A CIDv1 of the given text, so fixtures pass the parser's CID check without a real release. */
 const cidOf = async (text: string) => CID.create(1, raw.code, await sha256.digest(new TextEncoder().encode(text))).toString()
 const CID_A = await cidOf("a")
-const CID_V0 = CID.createV0(await sha256.digest(new TextEncoder().encode("a"))).toString()
+const CID_B = await cidOf("b")
 
 const TITLE = "Safenet Staking"
 const BASE = "https://app.example.test/"
@@ -63,76 +65,6 @@ const stalled = (error: Error, type = "text/html") =>
     }),
     { status: 200, headers: { "content-type": type } },
   )
-
-describe("parseDeployments", () => {
-  it("reads an array of records", () => {
-    const text = JSON.stringify([{ cid: CID_A, tag: "v1.0.0", pinnedAt: "2026-11-01T00:00:00Z" }])
-    expect(parseDeployments(text)).toEqual([{ cid: CID_A, tag: "v1.0.0", pinnedAt: "2026-11-01T00:00:00Z" }])
-  })
-
-  it("drops fields it does not know", () => {
-    const text = JSON.stringify([{ cid: CID_A, tag: "v1", pinnedAt: "2026-11-01", note: "x" }])
-    expect(parseDeployments(text)[0]).not.toHaveProperty("note")
-  })
-
-  it("reads an empty array as no release", () => {
-    expect(parseDeployments("[]")).toEqual([])
-  })
-
-  it("rejects text that is not JSON", () => {
-    expect(() => parseDeployments("{")).toThrow("deployments.json is not JSON")
-  })
-
-  it("rejects JSON that is not an array", () => {
-    expect(() => parseDeployments('{"cid":"x"}')).toThrow("deployments.json is not an array")
-  })
-
-  it.each(["cid", "tag", "pinnedAt"])("rejects an entry without %s, naming it", (field) => {
-    const entry: Record<string, unknown> = { cid: CID_A, tag: "v1", pinnedAt: "2026-11-01" }
-    delete entry[field]
-    expect(() => parseDeployments(JSON.stringify([entry]))).toThrow(`entry 0 has no ${field}`)
-  })
-
-  it("rejects an empty string and a non-string", () => {
-    expect(() => parseDeployments(JSON.stringify([{ cid: " ", tag: "v1", pinnedAt: "2026-11-01" }]))).toThrow("has no cid")
-    expect(() => parseDeployments(JSON.stringify([{ cid: CID_A, tag: 1, pinnedAt: "2026-11-01" }]))).toThrow("has no tag")
-  })
-
-  it("rejects a null entry", () => {
-    expect(() => parseDeployments("[null]")).toThrow("entry 0 has no cid")
-  })
-
-  it("rejects a cid that is not a CID", () => {
-    expect(() => parseDeployments(JSON.stringify([{ cid: "bafy-not-a-cid", tag: "v1", pinnedAt: "2026-11-01" }]))).toThrow(
-      "entry 0 has a cid that is not a CID",
-    )
-  })
-
-  it("accepts a CIDv0 as well as a CIDv1", () => {
-    expect(parseDeployments(JSON.stringify([{ cid: CID_V0, tag: "v1", pinnedAt: "2026-11-01" }]))[0].cid).toBe(CID_V0)
-  })
-
-  it("rejects a pinnedAt that is not a date", () => {
-    expect(() => parseDeployments(JSON.stringify([{ cid: CID_A, tag: "v1", pinnedAt: "yesterday" }]))).toThrow(
-      "entry 0 has a pinnedAt that is not a date",
-    )
-  })
-})
-
-describe("latestDeployment", () => {
-  it("picks the latest pinnedAt, wherever it sits in the file", () => {
-    const list = [
-      { cid: "b", tag: "v2", pinnedAt: "2026-12-01T00:00:00Z" },
-      { cid: "c", tag: "v3", pinnedAt: "2027-01-01T00:00:00Z" },
-      { cid: "a", tag: "v1", pinnedAt: "2026-11-01T00:00:00Z" },
-    ]
-    expect(latestDeployment(list)?.cid).toBe("c")
-  })
-
-  it("is undefined for no release", () => {
-    expect(latestDeployment([])).toBeUndefined()
-  })
-})
 
 describe("pageTitle and entryAsset", () => {
   it("reads the title", () => {
@@ -275,6 +207,107 @@ describe("checkGateway", () => {
   })
 })
 
+describe("checkEns", () => {
+  const ens = ensOrigin("app.example.eth")
+  const withRoots = (body: string, roots: string | undefined) =>
+    new Response(body, { status: 200, headers: { "content-type": "text/html", ...(roots === undefined ? {} : { "x-ipfs-roots": roots }) } })
+
+  it("is eth.limo for the name", () => {
+    expect(ens).toBe("https://app.example.eth.limo/")
+  })
+
+  it("passes, and returns the root CID, when ENS serves production's index", async () => {
+    const result = await checkEns(fakeFetch({ [ens]: withRoots(INDEX, `${CID_A},${CID_B}`), [BASE]: html(INDEX) }), ens, BASE, TITLE)
+    expect(result.cid).toBe(CID_A)
+    expect(result.outcomes.map((o) => o.ok)).toEqual([true, true, true])
+    expect(result.outcomes[1].detail).toBe(`serves ${CID_A}`)
+  })
+
+  it("fails loudly when ENS and production serve different builds, naming both entry scripts", async () => {
+    const other = INDEX.replace("index-AbC123.js", "index-Old999.js")
+    const result = await checkEns(fakeFetch({ [ens]: withRoots(other, CID_A), [BASE]: html(INDEX) }), ens, BASE, TITLE)
+    expect(result.cid).toBe(CID_A)
+    expect(result.outcomes[2]).toMatchObject({
+      ok: false,
+      detail: expect.stringContaining("ENS names ./assets/index-Old999.js, production ./assets/index-AbC123.js"),
+    })
+  })
+
+  it("fails without a CID when the header is missing or not a CID", async () => {
+    const none = await checkEns(fakeFetch({ [ens]: withRoots(INDEX, undefined), [BASE]: html(INDEX) }), ens, BASE, TITLE)
+    expect(none.cid).toBeUndefined()
+    expect(none.outcomes[1]).toMatchObject({ ok: false, detail: "names no root CID in x-ipfs-roots" })
+    const bad = await checkEns(fakeFetch({ [ens]: withRoots(INDEX, "bafy-not-a-cid"), [BASE]: html(INDEX) }), ens, BASE, TITLE)
+    expect(bad.cid).toBeUndefined()
+    expect(bad.outcomes[1]).toMatchObject({ ok: false, detail: 'x-ipfs-roots names "bafy-not-a-cid", which is not a CID' })
+  })
+
+  it("fails on an ENS origin that is down, and checks nothing else", async () => {
+    const fetchImpl = fakeFetch({ [ens]: html("bad gateway", 502), [BASE]: html(INDEX) })
+    const result = await checkEns(fetchImpl, ens, BASE, TITLE)
+    expect(result).toEqual({ outcomes: [{ target: "ENS", ok: false, detail: "index answered 502" }] })
+    expect(fetchImpl.urls).toEqual([ens])
+  })
+
+  it("fails on another title, and does not claim a match when production is down", async () => {
+    const result = await checkEns(fakeFetch({ [ens]: withRoots("<title>Parked</title>", CID_A), [BASE]: html("", 503) }), ens, BASE, TITLE)
+    expect(result.outcomes[0]).toMatchObject({ ok: false, detail: `index title is "Parked", expected "${TITLE}"` })
+    expect(result.outcomes[2]).toMatchObject({ ok: false, detail: "not compared with production: production did not answer 200" })
+  })
+})
+
+describe("checkApi", () => {
+  const list = "https://api.example.test/v1/validators"
+  const health = "https://api.example.test/v1/health"
+  const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } })
+
+  it("passes on status ok and a non-empty list", async () => {
+    const outcomes = await checkApi(fakeFetch({ [health]: json({ status: "ok" }), [list]: json([{ address: "0x" }]) }), list)
+    expect(outcomes).toEqual([
+      { target: "API", ok: true, detail: '/v1/health answered 200 with status "ok"' },
+      { target: "API", ok: true, detail: "validators answered 200 with 1 entries" },
+    ])
+  })
+
+  it("fails on a degraded health, an empty list, or a list that is not one", async () => {
+    const degraded = await checkApi(fakeFetch({ [health]: json({ status: "degraded" }), [list]: json([]) }), list)
+    expect(degraded.map((o) => o.detail)).toEqual([
+      '/v1/health answered 200 with status "degraded"',
+      "validators answered 200 with an empty list",
+    ])
+    const object = await checkApi(fakeFetch({ [health]: json({}), [list]: json({ error: "x" }) }), list)
+    expect(object.map((o) => o.detail)).toEqual([
+      "/v1/health answered 200 with status null",
+      "validators answered 200 with a body that is not a list",
+    ])
+  })
+
+  it("fails on another status, a body that is not JSON, or no answer", async () => {
+    const outcomes = await checkApi(fakeFetch({ [health]: json({ status: "degraded" }, 503), [list]: new Response("<html>", { status: 200 }) }), list)
+    expect(outcomes.map((o) => o.detail)).toEqual(["/v1/health answered 503", "validators answered 200 with a body that is not JSON"])
+    const slow = await checkApi(fakeFetch({ [health]: timeout(), [list]: timeout() }), list, 1_000)
+    expect(slow.map((o) => o.detail)).toEqual(["/v1/health no answer in 1 s", "validators no answer in 1 s"])
+  })
+})
+
+describe("checkAlerts", () => {
+  const url = "https://alerts.example.test"
+  const health = `${url}/health`
+  const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status })
+
+  it("passes on healthy true", async () => {
+    expect(await checkAlerts(fakeFetch({ [health]: json({ healthy: true }) }), url)).toEqual({
+      target: "alerts", ok: true, detail: "/health answered 200 with healthy true",
+    })
+  })
+
+  it("fails on 503, on healthy false, and on a missing field", async () => {
+    expect(await checkAlerts(fakeFetch({ [health]: json({ healthy: false }, 503) }), url)).toMatchObject({ ok: false, detail: "/health answered 503" })
+    expect(await checkAlerts(fakeFetch({ [health]: json({ healthy: false }) }), url)).toMatchObject({ ok: false })
+    expect(await checkAlerts(fakeFetch({ [health]: json({ healthy: "true" }) }), url)).toMatchObject({ ok: false })
+  })
+})
+
 describe("annotation", () => {
   it("is a notice for a pass and an error for a failure", () => {
     expect(annotation({ target: "production", ok: true, detail: "fine" })).toBe("::notice title=Availability%3A production::fine")
@@ -289,17 +322,17 @@ describe("annotation", () => {
 })
 
 describe("summary", () => {
-  it("writes one row per outcome and names the release checked", () => {
+  it("writes one row per outcome and names the CID checked", () => {
     const text = summary(
       [
         { target: "production", ok: true, detail: "fine" },
         { target: "https://gw.example.test", ok: false, detail: "a | b" },
       ],
-      { cid: "bafy1", tag: "v1", pinnedAt: "2026-11-01" },
+      "bafy1",
     )
     expect(text).toContain("| production | OK | fine |")
     expect(text).toContain("| https://gw.example.test | FAIL | a \\| b |")
-    expect(text).toContain("release `v1`, `bafy1`")
+    expect(text).toContain("checked for `bafy1`, the CID the ENS name serves")
   })
 
   it("escapes what a target served, so a detail cannot add a link, an image or a row", () => {
@@ -308,20 +341,20 @@ describe("summary", () => {
     expect(text.split("\n").filter((line) => line.startsWith("| https://gw.example.test"))).toHaveLength(1)
   })
 
-  it("says IPFS was not checked when no release is recorded", () => {
-    expect(summary([], undefined)).toContain("IPFS: not checked. No release is recorded in `deployments.json`.")
+  it("says IPFS was not checked when the ENS name served no CID", () => {
+    expect(summary([], undefined)).toContain("IPFS: not checked. The ENS name served no CID.")
   })
 })
 
 describe("availability.ts", () => {
-  it("refuses to run without PRODUCTION_URL, and says what is missing", () => {
-    const env = { ...process.env, PRODUCTION_URL: "" }
+  it("refuses to run without its URLs, and names each one missing", () => {
+    const env = { ...process.env, PRODUCTION_URL: "", VALIDATOR_INFO_URL: "", ALERTS_API_URL: " " }
     // Cold Node/tsx startup competes with other packages in CI. This checks the error contract,
     // not startup speed. Bound the child too, since spawnSync blocks the test runner's timer.
     const run = spawnSync(process.execPath, ["--import", "tsx", resolve(import.meta.dirname, "../availability.ts")], { env, encoding: "utf8", timeout: 20_000 })
     expect(run.error).toBeUndefined()
     expect(run.status).toBe(1)
-    expect(run.stderr).toContain("PRODUCTION_URL is not set")
+    expect(run.stderr).toContain("PRODUCTION_URL, VALIDATOR_INFO_URL, ALERTS_API_URL are not set")
   }, 30_000)
 })
 

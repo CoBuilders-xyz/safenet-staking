@@ -14,10 +14,11 @@ SEF's published figures at their publish instant: the Mainnet staked total to th
 validator's Gnosis participation rate as the identical double.
 
 Every six hours, the production deployment is checked: it answers with the interface's title and
-serves the entry script of its build. Once a release is recorded in `deployments.json`, each
-public IPFS gateway in `packages/core` is checked too. An isolated Orbitor HTTP 504 is a visible
-warning only when production HTML, production JavaScript and every other gateway pass. All other
-failures block. Release pin verification remains strict. A red nightly, parity or availability
+serves the entry script of its build. The ENS name must serve the same `index.html`. Each public
+IPFS gateway in `packages/core` must serve the CID that the ENS name serves. The validator API and
+the alerts Worker must report healthy. An isolated Orbitor HTTP 504 is a visible
+warning only when every other check passes. All other
+failures block. Release pin verification remains strict. A red nightly, parity, availability or uptime export
 run opens an issue labelled `ci-red`, or comments on the open one.
 
 ## Layout
@@ -143,30 +144,16 @@ pnpm --filter @cobuilders/safenet-web release:build   # writes apps/web/release/
 pnpm --filter @cobuilders/safenet-web release:pin     # needs PINATA_JWT
 ```
 
-### deployments.json
+### Status page and uptime
 
-`deployments.json` at the repository root records each pinned release, so the availability check
-knows which CID the gateways must serve. Nothing in the repository writes it: after a web release, whoever
-published it adds the entry by hand, in a pull request. It is a JSON array,
-one object per release:
+The Availability workflow, every six hours, reads the CID production serves from the ENS name:
+eth.limo's `x-ipfs-roots` header. It also checks that the ENS name and Vercel serve the same
+`index.html`. A release therefore needs no record in the repository. To find an earlier
+release's CID, rebuild its tag as [`VERIFY.md`](VERIFY.md) shows: the same commit gives the same CID.
 
-```json
-[
-  { "cid": "bafy…", "tag": "web-v20261118.0", "pinnedAt": "2026-11-18T10:00:00Z" }
-]
-```
-
-- `cid`: the root CID that `release:build` wrote to `apps/web/release/CID` and Pinata confirmed.
-  Rebuild it as `VERIFY.md` shows before recording it: the same commit gives the same CID.
-- `tag`: the git tag of the release. A release from before the tags records the commit it
-  built, as `main@<short sha>`.
-- `pinnedAt`: when the pin was confirmed, ISO 8601, in UTC. When only the release run is known,
-  the time that run ended.
-
-The check reads the entry with the latest `pinnedAt`, not the last one in the file. It fails
-when an entry lacks a field, when `cid` is not a CID, or when `pinnedAt` is not a date, and a
-unit test reads the committed file so a bad edit fails its pull request first. Without the file,
-it checks no gateway and says so in its summary.
+The public status page runs Gatus, one check every one to five minutes for each production
+service. [`ops/status/README.md`](ops/status/README.md) lists the checks and the deploy, and
+explains the weekly uptime export.
 
 
 ## Daily snapshots

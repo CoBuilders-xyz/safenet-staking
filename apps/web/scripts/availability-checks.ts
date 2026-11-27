@@ -6,16 +6,8 @@ import { IPFS_GATEWAYS, ORBITOR_IPFS_GATEWAY } from "@cobuilders/safenet-core"
 import { CID } from "multiformats/cid"
 import { gatewayUrl } from "@cobuilders/safenet-snapshots/ipfs"
 
-/** One pinned release, as `deployments.json` at the repository root records it. */
-export interface Deployment {
-  cid: string
-  tag: string
-  /** ISO 8601. */
-  pinnedAt: string
-}
-
 export interface Outcome {
-  /** What was checked, as printed: "production", or a gateway's origin. */
+  /** What was checked, as printed: "production", "ENS", "API", "alerts", or a gateway's origin. */
   target: string
   ok: boolean
   detail: string
@@ -26,44 +18,9 @@ export interface Outcome {
 
 export type Fetch = (url: string, init?: { signal?: AbortSignal }) => Promise<Response>
 
-/**
- * Parses `deployments.json`: an array of `{ "cid", "tag", "pinnedAt" }`, each a non-empty string,
- * `cid` a CID and `pinnedAt` a date. Throws naming the first entry that is not, because a malformed record would
- * otherwise check the wrong release, or none, and pass.
- */
-export function parseDeployments(text: string): Deployment[] {
-  let value: unknown
-  try {
-    value = JSON.parse(text)
-  } catch {
-    throw new Error("deployments.json is not JSON")
-  }
-  if (!Array.isArray(value)) throw new Error("deployments.json is not an array")
-  return value.map((entry: unknown, index) => {
-    const record = (entry ?? {}) as Record<string, unknown>
-    for (const field of ["cid", "tag", "pinnedAt"] as const) {
-      if (typeof record[field] !== "string" || (record[field] as string).trim() === "") {
-        throw new Error(`deployments.json entry ${index} has no ${field}`)
-      }
-    }
-    try {
-      CID.parse(record.cid as string)
-    } catch {
-      throw new Error(`deployments.json entry ${index} has a cid that is not a CID`)
-    }
-    if (Number.isNaN(Date.parse(record.pinnedAt as string))) {
-      throw new Error(`deployments.json entry ${index} has a pinnedAt that is not a date`)
-    }
-    return { cid: record.cid as string, tag: record.tag as string, pinnedAt: record.pinnedAt as string }
-  })
-}
-
-/** The release pinned last, by `pinnedAt`, not by its place in the file. Undefined when empty. */
-export function latestDeployment(deployments: readonly Deployment[]): Deployment | undefined {
-  return deployments.reduce<Deployment | undefined>(
-    (latest, d) => (!latest || Date.parse(d.pinnedAt) > Date.parse(latest.pinnedAt) ? d : latest),
-    undefined,
-  )
+/** The origin through which the ENS name serves the web release: eth.limo, from the name in core. */
+export function ensOrigin(name: string): string {
+  return `https://${name}.limo/`
 }
 
 /** The text of the first `<title>`, trimmed. Undefined when the page has none. */
@@ -151,6 +108,98 @@ export async function checkProduction(fetchImpl: Fetch, baseUrl: string, title: 
 }
 
 /**
+ * The ENS name, through eth.limo: its index answers 200 with the title, the `x-ipfs-roots` header
+ * names the root CID it serves, and that index is byte for byte the one production serves. A
+ * release moves both origins to one build, so a difference means one of them is on another
+ * release. Returns the CID, for the gateways to check, or undefined when the header names none.
+ */
+export async function checkEns(
+  fetchImpl: Fetch, ensUrl: string, productionUrl: string, title: string, timeoutMs = 60_000,
+): Promise<{ outcomes: Outcome[]; cid?: string }> {
+  const target = "ENS"
+  const index = await get(fetchImpl, ensUrl, timeoutMs)
+  if (typeof index === "string") return { outcomes: [{ target, ok: false, detail: `index: ${index}` }] }
+  if (index.status !== 200) return { outcomes: [{ target, ok: false, detail: `index answered ${index.status}` }] }
+  const served = pageTitle(index.text)
+  const outcomes: Outcome[] = [
+    served === title
+      ? { target, ok: true, detail: `index answered 200 with the title "${title}"` }
+      : { target, ok: false, detail: `index title is ${served === undefined ? "missing" : `"${served}"`}, expected "${title}"` },
+  ]
+  const root = index.headers.get("x-ipfs-roots")?.split(",")[0]?.trim()
+  let cid: string | undefined
+  try {
+    cid = root ? CID.parse(root).toString() : undefined
+  } catch {
+    cid = undefined
+  }
+  outcomes.push(
+    cid
+      ? { target, ok: true, detail: `serves ${cid}` }
+      : { target, ok: false, detail: root ? `x-ipfs-roots names "${root}", which is not a CID` : "names no root CID in x-ipfs-roots" },
+  )
+  const production = await get(fetchImpl, productionUrl, timeoutMs)
+  if (typeof production === "string" || production.status !== 200) {
+    outcomes.push({ target, ok: false, detail: "not compared with production: production did not answer 200" })
+  } else if (production.text === index.text) {
+    outcomes.push({ target, ok: true, detail: "serves the same index.html as production" })
+  } else {
+    const name = (html: string) => entryAsset(html) ?? "no entry script"
+    outcomes.push({
+      target, ok: false,
+      detail: `serves another index.html than production: ENS names ${name(index.text)}, production ${name(production.text)}. The two origins are on different releases`,
+    })
+  }
+  return { outcomes, cid }
+}
+
+/** Reads a JSON answer: 200 and a body that parses. Returns the value, or why there is none. */
+async function getJson(fetchImpl: Fetch, url: string, timeoutMs: number): Promise<{ value: unknown } | string> {
+  const answer = await get(fetchImpl, url, timeoutMs)
+  if (typeof answer === "string") return answer
+  if (answer.status !== 200) return `answered ${answer.status}`
+  try {
+    return { value: JSON.parse(answer.text) as unknown }
+  } catch {
+    return "answered 200 with a body that is not JSON"
+  }
+}
+
+/**
+ * The validator API, from the URL of its validator list: `/v1/health` reports `"status": "ok"`,
+ * and the list is a non-empty array.
+ */
+export async function checkApi(fetchImpl: Fetch, validatorsUrl: string, timeoutMs = 30_000): Promise<Outcome[]> {
+  const target = "API"
+  const health = await getJson(fetchImpl, new URL("/v1/health", validatorsUrl).href, timeoutMs)
+  const status = typeof health === "string" ? undefined : (health.value as { status?: unknown } | null)?.status
+  const list = await getJson(fetchImpl, validatorsUrl, timeoutMs)
+  const length = typeof list !== "string" && Array.isArray(list.value) ? list.value.length : undefined
+  return [
+    typeof health === "string"
+      ? { target, ok: false, detail: `/v1/health ${health}` }
+      : status === "ok"
+        ? { target, ok: true, detail: '/v1/health answered 200 with status "ok"' }
+        : { target, ok: false, detail: `/v1/health answered 200 with status ${JSON.stringify(status ?? null)}` },
+    typeof list === "string"
+      ? { target, ok: false, detail: `validators ${list}` }
+      : length
+        ? { target, ok: true, detail: `validators answered 200 with ${length} entries` }
+        : { target, ok: false, detail: length === 0 ? "validators answered 200 with an empty list" : "validators answered 200 with a body that is not a list" },
+  ]
+}
+
+/** The alerts Worker: `/health` answers 200 with `"healthy": true`. */
+export async function checkAlerts(fetchImpl: Fetch, alertsUrl: string, timeoutMs = 30_000): Promise<Outcome> {
+  const target = "alerts"
+  const health = await getJson(fetchImpl, new URL("/health", alertsUrl).href, timeoutMs)
+  if (typeof health === "string") return { target, ok: false, detail: `/health ${health}` }
+  return (health.value as { healthy?: unknown } | null)?.healthy === true
+    ? { target, ok: true, detail: "/health answered 200 with healthy true" }
+    : { target, ok: false, detail: "/health answered 200 without healthy true" }
+}
+
+/**
  * One gateway serves `index.html` of the release: 200 and the expected title. Only the title,
  * not the bytes: a gateway fronted by Cloudflare injects a script into every HTML response.
  */
@@ -185,11 +234,11 @@ export function annotation({ target, ok, detail, advisory }: Outcome): string {
 }
 
 /**
- * The job summary: one row per outcome, and a line when no release is recorded. A detail can
+ * The job summary: one row per outcome, and the CID the gateways were checked for. A detail can
  * quote what a target served, so it is escaped: a parked gateway's title cannot add a link, an
  * image or a row.
  */
-export function summary(outcomes: readonly Outcome[], release: Deployment | undefined): string {
+export function summary(outcomes: readonly Outcome[], cid: string | undefined): string {
   const escape = (text: string) => text.replace(/[\\|[\]()]/g, "\\$&").replace(/\r?\n|\r/g, " ")
   return [
     "## Availability",
@@ -198,9 +247,9 @@ export function summary(outcomes: readonly Outcome[], release: Deployment | unde
     "|---|---|---|",
     ...outcomes.map((o) => `| ${escape(o.target)} | ${o.ok ? "OK" : o.advisory ? "WARN (non-blocking)" : "FAIL"} | ${escape(o.detail)} |`),
     "",
-    release
-      ? `IPFS: release \`${release.tag}\`, \`${release.cid}\`, pinned ${release.pinnedAt}, from \`deployments.json\`.`
-      : "IPFS: not checked. No release is recorded in `deployments.json`.",
+    cid
+      ? `IPFS: the gateways were checked for \`${cid}\`, the CID the ENS name serves.`
+      : "IPFS: not checked. The ENS name served no CID.",
     "",
   ].join("\n")
 }

@@ -71,15 +71,16 @@ has changed. When step 2 or 3 fails, the origins can differ until the rerun: Ver
 promotion just before its request fails, and an ENS transaction can land after its wait ends. The
 run summary says, for each origin, whether it moved, did not change, or may have moved.
 
-After a release, add its CID to `deployments.json` in a pull request. The availability check
-reads the latest entry to know which CID the gateways must serve.
+The availability check reads the new CID from the ENS name, so a release needs no change in the
+repository. The status page compares the ENS name with Vercel the same way (`ops/status/README.md`).
 
 A manual run of *Release* builds only. Use it to see the CID of a commit.
 
 ### Roll back the web
 
 Release the previous good commit again: revert the change on `main`, then draft and publish a web
-release. To act at once, set the ENS contenthash back to the previous CID (in `deployments.json`)
+release. To act at once, set the ENS contenthash back to the previous CID (the
+summary of its release run names it, and a rebuild of its tag as `VERIFY.md` shows gives it again)
 and promote the previous Vercel production deployment in Vercel's dashboard, both by hand.
 
 ### One-time setup
@@ -154,9 +155,10 @@ These still run by hand, from `main`, until each has its own release workflow:
 
 | Check | Where | What it proves |
 |---|---|---|
-| Availability | `availability.yml`, every six hours and on demand | Vercel answers with the title and its entry script; each gateway serves the latest CID in `deployments.json` |
+| Availability | `availability.yml`, every six hours and on demand | Vercel answers with the title and its entry script; the ENS name serves the same `index.html` and names its CID; each gateway serves that CID; the API and the alerts Worker report healthy |
 | Release smoke | `release.yml`, on the new CID | What a visitor without a wallet sees, before the ENS name or Vercel moves |
 | Production smoke | `nightly.yml` | The same suite on the Vercel production domain |
+| Status page | Gatus, `ops/status/`, every one to five minutes | Each production service, with its uptime; alerts to Slack and Friday |
 
 A failed scheduled check opens an issue labelled `ci-red`, or comments on the open one. Close it
 when the cause is fixed.

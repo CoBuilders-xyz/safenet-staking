@@ -1,0 +1,10 @@
+# Railway config as code for the status service. Railway does not read it from the root
+# directory: set the service's config file path to /ops/status/railway.toml (README.md). The root
+# directory, ops/status, holds the Dockerfile. The volume and the domain are set in the dashboard.
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
