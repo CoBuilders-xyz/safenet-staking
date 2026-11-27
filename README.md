@@ -17,7 +17,7 @@ Every six hours, the production deployment is checked: it answers with the inter
 serves the entry script of its build. The ENS name must serve the same `index.html`. Each public
 IPFS gateway in `packages/core` must serve the CID that the ENS name serves. The validator API and
 the alerts Worker must report healthy. An isolated Orbitor HTTP 504 is a visible
-warning only when production HTML, production JavaScript and every other gateway pass. All other
+warning only when every other check passes. All other
 failures block. Release pin verification remains strict. A red nightly, parity, availability or uptime export
 run opens an issue labelled `ci-red`, or comments on the open one.
 

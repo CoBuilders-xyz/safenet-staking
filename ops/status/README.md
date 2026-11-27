@@ -116,15 +116,14 @@ secret. CI runs it as the `status-config` job of `ci.yml`.
 
 ### Announcements
 
-Gatus can show a notice above the checks, for planned maintenance or an incident. Add an
-`announcements` list to `ui` in `config.yaml`, then redeploy:
+Gatus can show a notice above the checks, for planned maintenance or an incident. Add a
+top-level `announcements` list to `config.yaml`, not under `ui`, then redeploy:
 
 ```yaml
-ui:
-  announcements:
-    - timestamp: 2026-12-01T10:00:00Z
-      type: warning # outage, warning, information, operational or none
-      message: Planned maintenance of the alerts Worker, 10:00 to 10:30 UTC.
+announcements:
+  - timestamp: 2026-12-01T10:00:00Z
+    type: warning # outage, warning, information, operational or none
+    message: Planned maintenance of the alerts Worker, 10:00 to 10:30 UTC.
 ```
 
 ## Retention and the uptime record

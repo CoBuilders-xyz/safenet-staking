@@ -70,7 +70,7 @@ jobs:
       - name: Install dependencies for the alerts report
         if: ${{ steps.d1.outputs.present == 'true' }}
         run: pnpm install --frozen-lockfile --ignore-scripts
-      # The same two windows as the status export, on five-minute boundaries, which the report
+      # The same three windows as the status export, on five-minute boundaries, which the report
       # requires. A file is kept only when its query succeeds. A failure here fails the run, but
       # the status export above is still uploaded.
       - name: Export the alerts Worker's poll uptime
@@ -83,14 +83,16 @@ jobs:
           until=$(( $(date -u +%s) / 300 * 300 ))
           since=$(( until - 8 * 86400 ))
           month=$(date -u -d "$(date -u +%Y-%m-01)" +%s)
+          previous=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%s)
           iso() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
           day=$(date -u +%Y-%m-%d)
           report() {
-            pnpm --silent --filter @cobuilders/safenet-alerts report:uptime "$(iso "$1")" "$(iso "$until")" > "$RUNNER_TEMP/alerts.json"
-            mv "$RUNNER_TEMP/alerts.json" "$RUNNER_TEMP/uptime/$2"
+            pnpm --silent --filter @cobuilders/safenet-alerts report:uptime "$(iso "$1")" "$(iso "$2")" > "$RUNNER_TEMP/alerts.json"
+            mv "$RUNNER_TEMP/alerts.json" "$RUNNER_TEMP/uptime/$3"
           }
-          report "$since" "alerts-last8d-$day.json"
-          if [ "$month" -lt "$until" ]; then report "$month" "alerts-month-to-date-$day.json"; fi
+          report "$since" "$until" "alerts-last8d-$day.json"
+          if [ "$month" -lt "$until" ]; then report "$month" "$until" "alerts-month-to-date-$day.json"; fi
+          report "$previous" "$month" "alerts-$(date -u -d "@$previous" +%Y-%m).json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() && steps.gatus.outcome == 'success' }}
         with:

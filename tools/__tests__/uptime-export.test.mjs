@@ -82,8 +82,9 @@ function fakeGatus() {
       events: [event("START", "2026-10-01T00:00:00Z"), event("HEALTHY", "2026-10-01T00:00:00Z"),
         event("UNHEALTHY", "2026-12-06T10:00:00Z"), event("HEALTHY", "2026-12-06T11:00:00Z")],
     },
-    "/api/v1/suites/statuses": [{ key: "web_same", name: "Same | release", group: "Web", results: [
-      { success: true, timestamp: "2026-12-07T09:00:00Z" }, { success: false, timestamp: "2026-12-07T09:05:00Z" }] }],
+    // Gatus answers newest first.
+    "/api/v1/suites/statuses?page=1&pageSize=100": [{ key: "web_same", name: "Same | release", group: "Web", results: [
+      { success: false, timestamp: "2026-12-07T09:05:00Z" }, { success: true, timestamp: "2026-12-07T09:00:00Z" }] }],
   }
   const fetch = async (url) => {
     const path = url.slice("https://status.example.test".length)
@@ -111,12 +112,12 @@ test("buildReport fails when the status page does not answer", async () => {
   await assert.rejects(buildReport(fetch, "https://status.example.test", Date.now()), /answered 502/)
 })
 
-test("renderMarkdown flags a window below 95 %, lists downtime, and escapes names", async () => {
+test("renderMarkdown flags a window and a Gatus uptime below 95 %, lists downtime, and escapes names", async () => {
   const { fetch } = fakeGatus()
   const report = await buildReport(fetch, "https://status.example.test", T("2026-12-07T10:00:00Z"))
   report.checks[0].time.monthToDate.uptime = 0.9
   const text = renderMarkdown(report)
-  assert.match(text, /90\.000 % \*\*below 95 %\*\*/)
+  assert.match(text, /\| 90\.000 % \*\*below 95 %\*\* \| 100\.000 % \| 100\.000 % \| 99\.000 % \| 90\.000 % \*\*below 95 %\*\* \|/)
   assert.match(text, /\| Web \/ Web app \| 2026-12-06T10:00:00.000Z \| 2026-12-06T11:00:00.000Z \| 60 \|/)
   assert.match(text, /\| Web \| Same \\\| release \| 1 of 2 \|/)
 })

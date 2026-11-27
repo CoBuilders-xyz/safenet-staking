@@ -15,7 +15,8 @@
 //           each window the events cover. Gatus writes an event on every change, so one failed
 //           check counts as downtime until the next success, whatever the alert threshold.
 //
-// Suites keep no uptime in Gatus; the report gives the share of their retained runs that passed.
+// Suites keep no uptime in Gatus; the report gives the share of their last 100 runs that passed,
+// the most Gatus's API returns in one page.
 //
 //   STATUS_URL=https://status.example node tools/uptime-export.mjs <output directory>
 //
@@ -118,11 +119,12 @@ export async function buildReport(fetchImpl, statusUrl, now) {
     const time = Object.fromEntries(spans.map((w) => [w.id, availability(events, w.from, w.to)]))
     checks.push({ key, group, name, gatus, time })
   }
-  const suites = (await get(fetchImpl, api("suites/statuses"))).map(({ key, name, group, results = [] }) => ({
+  // Newest first, at most 100 a page.
+  const suites = (await get(fetchImpl, api("suites/statuses?page=1&pageSize=100"))).map(({ key, name, group, results = [] }) => ({
     key, group, name,
     runs: results.length,
     passed: results.filter((r) => r.success).length,
-    since: results[0]?.timestamp ?? null,
+    since: results.reduce((oldest, r) => (oldest === null || Date.parse(r.timestamp) < Date.parse(oldest) ? r.timestamp : oldest), null),
   }))
   return {
     generatedAt: new Date(now).toISOString(),
@@ -135,13 +137,13 @@ export async function buildReport(fetchImpl, statusUrl, now) {
 }
 
 const percent = (value) => (value === null || value === undefined ? "n/a" : `${(value * 100).toFixed(3)} %`)
+const flagged = (value) => `${percent(value)}${value !== null && value !== undefined && value < SLA ? " **below 95 %**" : ""}`
 
 /** One window's cell: the uptime, flagged below the SLA, and the coverage when it is partial. */
 function cell(result) {
   if (result.uptime === null) return "no data"
-  const flag = result.uptime < SLA ? " **below 95 %**" : ""
   const partial = result.coverage < 0.999 ? ` (${(result.coverage * 100).toFixed(1)} % observed)` : ""
-  return `${percent(result.uptime)}${flag}${partial}`
+  return `${flagged(result.uptime)}${partial}`
 }
 
 export function renderMarkdown(report) {
@@ -158,7 +160,7 @@ export function renderMarkdown(report) {
     `| Group | Check | ${last8d.label} | ${monthToDate.label} | ${previousMonth.label} | Checks 24 h | Checks 7 d | Checks 30 d |`,
     "|---|---|---|---|---|---|---|---|",
     ...report.checks.map((c) =>
-      `| ${escape(c.group)} | ${escape(c.name)} | ${cell(c.time.last8d)} | ${cell(c.time.monthToDate)} | ${cell(c.time.previousMonth)} | ${percent(c.gatus["24h"])} | ${percent(c.gatus["7d"])} | ${percent(c.gatus["30d"])} |`),
+      `| ${escape(c.group)} | ${escape(c.name)} | ${cell(c.time.last8d)} | ${cell(c.time.monthToDate)} | ${cell(c.time.previousMonth)} | ${flagged(c.gatus["24h"])} | ${flagged(c.gatus["7d"])} | ${flagged(c.gatus["30d"])} |`),
     "",
     "## Downtime in the last 8 days",
     "",
@@ -171,7 +173,7 @@ export function renderMarkdown(report) {
       lines.push(`| ${escape(o.check)} | ${o.start} | ${o.end ?? "ongoing"} | ${o.minutes} |`)
     }
   }
-  lines.push("", "## Suites", "", "Gatus keeps no uptime for suites. Share of the runs it retains that passed.", "")
+  lines.push("", "## Suites", "", "Gatus keeps no uptime for suites. Share of the last 100 runs that passed.", "")
   lines.push("| Group | Suite | Passed | Since |", "|---|---|---|---|")
   for (const s of report.suites) {
     lines.push(`| ${escape(s.group)} | ${escape(s.name)} | ${s.passed} of ${s.runs} | ${s.since ?? "n/a"} |`)
