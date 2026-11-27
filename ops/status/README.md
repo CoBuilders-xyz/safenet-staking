@@ -150,7 +150,9 @@ The 8-day window overlaps the run before, so a run that fails or comes late lose
 With the repository variables `CLOUDFLARE_ACCOUNT_ID` and `ALERTS_D1_DATABASE_ID`, and the
 repository secret `ALERTS_D1_READ_TOKEN`, a Cloudflare token that can only read D1, the export
 also adds the alerts Worker's own poll report (`apps/alerts/README.md`). Without them, the run says
-so and skips that part.
+so and skips that part. The report covers the same three windows. It counts a missing five-minute
+slot as downtime, so a month in which the Worker was first deployed shows the time before the deploy
+as down.
 
 GitHub keeps an artifact for 90 days at most. So the long-term record is the sequence of exports,
 and each one must be kept somewhere else within 90 days, for example on the COB-539 issue in
