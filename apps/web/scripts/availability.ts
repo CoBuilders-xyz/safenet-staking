@@ -53,10 +53,8 @@ const urls = {
 const missing = Object.entries(urls).filter(([, value]) => !value).map(([name]) => name)
 if (missing.length) fail(`${missing.join(", ")} ${missing.length === 1 ? "is" : "are"} not set. Export the URL of each service.`)
 for (const [name, value] of Object.entries(urls)) {
-  try {
-    new URL(value!)
-  } catch {
-    fail(`${name} is not a URL: give the scheme too, such as https://.`)
+  if (!URL.canParse(value!) || !["http:", "https:"].includes(new URL(value!).protocol)) {
+    fail(`${name} is not an http or https URL: give the scheme too, such as https://.`)
   }
 }
 const productionUrl = urls.PRODUCTION_URL!
