@@ -119,7 +119,7 @@ export async function buildReport(fetchImpl, statusUrl, now) {
     const time = Object.fromEntries(spans.map((w) => [w.id, availability(events, w.from, w.to)]))
     checks.push({ key, group, name, gatus, time })
   }
-  // Newest first, at most 100 a page.
+  // The latest runs, at most 100, in chronological order.
   const suites = (await get(fetchImpl, api("suites/statuses?page=1&pageSize=100"))).map(({ key, name, group, results = [] }) => ({
     key, group, name,
     runs: results.length,

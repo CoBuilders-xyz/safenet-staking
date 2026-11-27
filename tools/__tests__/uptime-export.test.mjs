@@ -82,9 +82,9 @@ function fakeGatus() {
       events: [event("START", "2026-10-01T00:00:00Z"), event("HEALTHY", "2026-10-01T00:00:00Z"),
         event("UNHEALTHY", "2026-12-06T10:00:00Z"), event("HEALTHY", "2026-12-06T11:00:00Z")],
     },
-    // Gatus answers newest first.
+    // Gatus answers the latest runs in chronological order.
     "/api/v1/suites/statuses?page=1&pageSize=100": [{ key: "web_same", name: "Same | release", group: "Web", results: [
-      { success: false, timestamp: "2026-12-07T09:05:00Z" }, { success: true, timestamp: "2026-12-07T09:00:00Z" }] }],
+      { success: true, timestamp: "2026-12-07T09:00:00Z" }, { success: false, timestamp: "2026-12-07T09:05:00Z" }] }],
   }
   const fetch = async (url) => {
     const path = url.slice("https://status.example.test".length)
