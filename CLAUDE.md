@@ -194,8 +194,8 @@ secrets, so a configuration Gatus refuses cannot merge. `uptime-export.yml` runs
 demand: it reads the status page's API at the repository variable `STATUS_URL` and keeps the report
 as a 90-day artifact. Gatus keeps about 30 days of uptime, so the exports are the long-term record.
 
-A red run must reach a person. When a job of `nightly.yml`, `parity.yml` or `availability.yml`
-fails, a last job `page` calls `page-on-red.yml`, which runs `tools/page-on-red.mjs` with
+A red run must reach a person. When a job of `nightly.yml`, `parity.yml`, `availability.yml` or
+`uptime-export.yml` fails, a last job `page` calls `page-on-red.yml`, which runs `tools/page-on-red.mjs` with
 `issues: write`: it opens one issue per workflow, titled "<workflow> is red" and labelled
 `ci-red`, with the run link and the failed jobs, or comments on the open one. It never closes an
 issue; a person closes it once the cause is fixed. A red availability run on a pull request does

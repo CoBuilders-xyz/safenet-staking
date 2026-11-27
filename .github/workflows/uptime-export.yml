@@ -33,9 +33,6 @@ jobs:
     timeout-minutes: 15
     env:
       STATUS_URL: ${{ vars.STATUS_URL }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      ALERTS_D1_DATABASE_ID: ${{ vars.ALERTS_D1_DATABASE_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.ALERTS_D1_READ_TOKEN }}
     steps:
       - name: Require the status page URL
         run: |
@@ -54,30 +51,48 @@ jobs:
           package-manager-cache: false
       # Writes its own table to the job summary.
       - name: Export the status page's uptime
+        id: gatus
         run: node tools/uptime-export.mjs "$RUNNER_TEMP/uptime"
+      # The D1 token reaches only this step and the report step, never the others.
+      - name: Look for the D1 read credentials
+        id: d1
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          ALERTS_D1_DATABASE_ID: ${{ vars.ALERTS_D1_DATABASE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.ALERTS_D1_READ_TOKEN }}
+        run: |
+          if [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$ALERTS_D1_DATABASE_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "Alerts poll report not included: CLOUDFLARE_ACCOUNT_ID, ALERTS_D1_DATABASE_ID or ALERTS_D1_READ_TOKEN is not set." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Install dependencies for the alerts report
-        if: ${{ env.CLOUDFLARE_ACCOUNT_ID != '' && env.ALERTS_D1_DATABASE_ID != '' && env.CLOUDFLARE_API_TOKEN != '' }}
+        if: ${{ steps.d1.outputs.present == 'true' }}
         run: pnpm install --frozen-lockfile --ignore-scripts
-      # The same two windows as the status export, on five-minute boundaries, which the report requires.
+      # The same two windows as the status export, on five-minute boundaries, which the report
+      # requires. A file is kept only when its query succeeds. A failure here fails the run, but
+      # the status export above is still uploaded.
       - name: Export the alerts Worker's poll uptime
-        if: ${{ env.CLOUDFLARE_ACCOUNT_ID != '' && env.ALERTS_D1_DATABASE_ID != '' && env.CLOUDFLARE_API_TOKEN != '' }}
+        if: ${{ steps.d1.outputs.present == 'true' }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          ALERTS_D1_DATABASE_ID: ${{ vars.ALERTS_D1_DATABASE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.ALERTS_D1_READ_TOKEN }}
         run: |
           until=$(( $(date -u +%s) / 300 * 300 ))
           since=$(( until - 8 * 86400 ))
           month=$(date -u -d "$(date -u +%Y-%m-01)" +%s)
           iso() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
           day=$(date -u +%Y-%m-%d)
-          pnpm --silent --filter @cobuilders/safenet-alerts report:uptime "$(iso "$since")" "$(iso "$until")" \
-            > "$RUNNER_TEMP/uptime/alerts-last8d-$day.json"
-          if [ "$month" -lt "$until" ]; then
-            pnpm --silent --filter @cobuilders/safenet-alerts report:uptime "$(iso "$month")" "$(iso "$until")" \
-              > "$RUNNER_TEMP/uptime/alerts-month-to-date-$day.json"
-          fi
-      - name: Say the alerts report was skipped
-        if: ${{ !(env.CLOUDFLARE_ACCOUNT_ID != '' && env.ALERTS_D1_DATABASE_ID != '' && env.CLOUDFLARE_API_TOKEN != '') }}
-        run: |
-          echo "Alerts poll report not included: CLOUDFLARE_ACCOUNT_ID, ALERTS_D1_DATABASE_ID or ALERTS_D1_READ_TOKEN is not set." | tee -a "$GITHUB_STEP_SUMMARY"
+          report() {
+            pnpm --silent --filter @cobuilders/safenet-alerts report:uptime "$(iso "$1")" "$(iso "$until")" > "$RUNNER_TEMP/alerts.json"
+            mv "$RUNNER_TEMP/alerts.json" "$RUNNER_TEMP/uptime/$2"
+          }
+          report "$since" "alerts-last8d-$day.json"
+          if [ "$month" -lt "$until" ]; then report "$month" "alerts-month-to-date-$day.json"; fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() && steps.gatus.outcome == 'success' }}
         with:
           name: uptime-${{ github.run_id }}
           path: ${{ runner.temp }}/uptime/

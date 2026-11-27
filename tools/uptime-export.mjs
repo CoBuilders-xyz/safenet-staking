@@ -44,18 +44,18 @@ export function windows(now) {
  * Healthy time over observed time in [from, to), from Gatus events in chronological order:
  * START when monitoring began, then HEALTHY or UNHEALTHY on each change of state.
  *
- * Before the oldest event Gatus kept, the state is known when that event is a change: it was
- * the other state. Before a START there was no monitoring. So `observedMs` can be less than the
- * window, and `coverage` says how much less. Returns the downtime intervals clipped to the window.
+ * Time before the oldest event Gatus kept is not observed: before a START there was no
+ * monitoring, and before an older event Gatus dropped, the state is unknown. So `observedMs` can
+ * be less than the window, and `coverage` says how much less. Returns the downtime intervals
+ * clipped to the window.
  */
 export function availability(events, from, to) {
   const sorted = events
     .map((e) => ({ type: e.type, at: Date.parse(e.timestamp) }))
     .filter((e) => !Number.isNaN(e.at))
     .sort((a, b) => a.at - b.at)
-  const first = sorted[0]
   /** "up", "down", or undefined while not observed. */
-  let state = first && first.type !== "START" ? (first.type === "HEALTHY" ? "down" : "up") : undefined
+  let state
   let cursor = from
   let observedMs = 0
   let downMs = 0
@@ -155,10 +155,10 @@ export function renderMarkdown(report) {
     "Time: the share of each window a check was healthy, from its state changes. Checks: Gatus's own",
     "uptime, successful checks over all checks.",
     "",
-    `| Group | Check | ${last8d.label} | ${monthToDate.label} | ${previousMonth.label} | Checks 7 d | Checks 30 d |`,
-    "|---|---|---|---|---|---|---|",
+    `| Group | Check | ${last8d.label} | ${monthToDate.label} | ${previousMonth.label} | Checks 24 h | Checks 7 d | Checks 30 d |`,
+    "|---|---|---|---|---|---|---|---|",
     ...report.checks.map((c) =>
-      `| ${escape(c.group)} | ${escape(c.name)} | ${cell(c.time.last8d)} | ${cell(c.time.monthToDate)} | ${cell(c.time.previousMonth)} | ${percent(c.gatus["7d"])} | ${percent(c.gatus["30d"])} |`),
+      `| ${escape(c.group)} | ${escape(c.name)} | ${cell(c.time.last8d)} | ${cell(c.time.monthToDate)} | ${cell(c.time.previousMonth)} | ${percent(c.gatus["24h"])} | ${percent(c.gatus["7d"])} | ${percent(c.gatus["30d"])} |`),
     "",
     "## Downtime in the last 8 days",
     "",

@@ -17,9 +17,9 @@ from a response header.
 | Web | Web app via ENS (safenet.cobuilders.eth.limo) | 2 min | the same | P1 |
 | Distribution | IPFS gateway Filebase | 5 min | `/ipns/safenet.cobuilders.eth/index.html` answers 200 with the title | P2 |
 | Distribution | IPFS gateway Orbitor | 5 min | the same | warning |
-| Distribution | npm @cobuilders/safenet-cli, npm @cobuilders/safenet-mcp | 24 h | the registry answers the `latest` version with the package's name | P2 |
+| Distribution | npm @cobuilders/safenet-cli, npm @cobuilders/safenet-mcp | 24 h | the registry answers the package's `latest` dist-tag with its name: the package is installable. It does not check which version `beta` names | P2 |
 | API | API health | 5 min | `/v1/health` answers 200 with `"status": "ok"` | P1 |
-| API | API validators | 2 min | `/v1/validators` answers 200 with a non-empty array | P1 |
+| API | API validators | 2 min | `/v1/validators` answers 200 with a JSON array whose first element has an `address` | P1 |
 | Alerts | Alerts health | 2 min | `/health` answers 200 with `"healthy": true` | P1 |
 | Indexing | Mainnet subgraph (Network), Gnosis subgraph (Network) | 5 min | the Network gateway answers `_meta` with a block and `hasIndexingErrors: false` | P2 |
 | Indexing | Mainnet subgraph (Studio fallback), Gnosis subgraph (Studio fallback) | 5 min | the same, on the Studio deployments in `packages/core` | P2 |
@@ -55,8 +55,12 @@ Nothing changes here after a release. No CID is configured:
   When that RPC is down, the freshness suite fails at its first step and sends no alert.
 - A gateway check proves that the gateway resolves the ENS name and serves the release. A gateway
   that serves CIDs but cannot resolve ENS names fails it.
-- In the Friday payload, Gatus escapes double quotes in the errors and nothing else. An error with
-  a backslash or a line break makes the body invalid JSON.
+- The Friday payload carries no error text. Gatus escapes almost nothing it substitutes, so an
+  error message could make the JSON invalid and lose the alert. The page shows the errors.
+- When an alert cannot be delivered, Gatus logs the Go error, which names the URL it posted to.
+  For Slack, that URL is the webhook and its credential. Treat the Railway logs as secret, and
+  rotate the Slack webhook if they leak.
+- Every check runs from Railway. A network outage there counts as downtime of every service.
 
 ## Alerts
 
@@ -72,7 +76,7 @@ threshold before it alerts, but the page and the uptime count every failed check
 Friday receives one JSON object per alert, with the header `Authorization: Bearer <FRIDAY_WEBHOOK_KEY>`:
 
 ```json
-{"source":"safenet-status","severity":"P1","status":"triggered","group":"Web","name":"Web app (safenet.cobuilders.xyz)","url":"https://safenet.cobuilders.xyz/","description":"P1: users cannot reach this service","errors":""}
+{"source":"safenet-status","severity":"P1","status":"triggered","group":"Web","name":"Web app (safenet.cobuilders.xyz)","url":"https://safenet.cobuilders.xyz/","description":"P1: users cannot reach this service"}
 ```
 
 `status` is `triggered` or `resolved`. `severity` is `P1`, `P2` or `warning`.
@@ -95,11 +99,12 @@ Without a Slack or Friday value, Gatus starts and ignores that provider: it logs
 
 ## Deploy on Railway
 
-1. Create a service from this repository. Set its root directory to `ops/status`. Railway reads
-   `railway.toml` and builds the `Dockerfile`.
+1. Create a service from this repository. Set its root directory to `ops/status`, and its config
+   file path to `/ops/status/railway.toml`: Railway does not look for the config file in the root
+   directory. It then builds the `Dockerfile` and uses `/health` as the health check.
 2. Add a volume and mount it at `/data`. Without it, a redeploy deletes the uptime history.
 3. Set the variables in [Environment](#environment).
-4. Deploy. The health check is `/health`.
+4. Deploy.
 5. Under Networking, add the custom domain `status.safenet.cobuilders.xyz`. Railway shows a
    CNAME target. At GoDaddy, in the DNS of `cobuilders.xyz`, add a CNAME record with the name
    `status.safenet` and that target. Railway issues the certificate once the record resolves.
@@ -137,7 +142,8 @@ artifact. Per check, the report has:
 
 - Gatus's uptime for 24 hours, 7 days and 30 days: successful checks over all checks;
 - the share of time healthy, from the changes of state, for the last 8 days, the month to date
-  and the previous month, with how much of each window the data covers;
+  and the previous month, with how much of each window the data covers. Time before the oldest
+  change Gatus kept counts as not observed, never as up or down;
 - each period of downtime in the last 8 days.
 
 The 8-day window overlaps the run before, so a run that fails or comes late loses nothing.

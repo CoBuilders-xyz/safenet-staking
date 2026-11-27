@@ -3,8 +3,10 @@
 # Gatus expands each environment variable in dollar-brace form before it reads this file; an unset one
 # becomes empty. Secrets are only ever such names; no value is written here.
 #
-# Every URL, subgraph ID and ENS name below is also in packages/core or DEPLOY.md, and
-# tools/__tests__/status-config.test.mjs fails when core changes and this file does not.
+# The subgraph IDs, Studio URLs, gateways, public RPCs and ENS name below come from packages/core,
+# and tools/__tests__/status-config.test.mjs fails when core changes and this file does not. The
+# Worker URLs are the repository variables VITE_VALIDATOR_INFO_URL and VITE_ALERTS_API_URL, by hand:
+# change them here when the Workers move.
 #
 # Severity, in the alert description and the Friday payload:
 #   P1  a way in for users is down: the web app on either origin, the API, the alerts Worker.
@@ -24,12 +26,6 @@ storage:
 web:
   port: ${PORT}
 
-# No check runs while Gatus itself has no network, so a Railway outage is not read as ours.
-connectivity:
-  checker:
-    target: 1.1.1.1:53
-    interval: 60s
-
 ui:
   title: Safenet staking status
   header: Safenet staking status
@@ -40,7 +36,8 @@ alerting:
   # An incoming webhook. The P2 and warning alerts below do not use it.
   slack:
     webhook-url: ${SLACK_WEBHOOK_URL}
-  # Friday's webhook: one JSON object per alert. Gatus escapes double quotes in the errors, nothing else.
+  # Friday's webhook: one JSON object per alert. Only values from this file go into it: Gatus
+  # escapes nothing else it substitutes, and an error message could make the JSON invalid.
   custom:
     url: ${FRIDAY_WEBHOOK_URL}
     method: POST
@@ -52,7 +49,7 @@ alerting:
         TRIGGERED: triggered
         RESOLVED: resolved
     body: |
-      {"source":"safenet-status","severity":"P2","status":"[ALERT_TRIGGERED_OR_RESOLVED]","group":"[ENDPOINT_GROUP]","name":"[ENDPOINT_NAME]","url":"[ENDPOINT_URL]","description":"[ALERT_DESCRIPTION]","errors":"[RESULT_ERRORS]"}
+      {"source":"safenet-status","severity":"P2","status":"[ALERT_TRIGGERED_OR_RESOLVED]","group":"[ENDPOINT_GROUP]","name":"[ENDPOINT_NAME]","url":"[ENDPOINT_URL]","description":"[ALERT_DESCRIPTION]"}
 
 # Alert sets, reused by anchor. Gatus ignores keys it does not know, such as these.
 x-alerts-p1: &alerts-p1
@@ -68,7 +65,7 @@ x-alerts-p1: &alerts-p1
     description: "P1: users cannot reach this service"
     provider-override:
       body: |
-        {"source":"safenet-status","severity":"P1","status":"[ALERT_TRIGGERED_OR_RESOLVED]","group":"[ENDPOINT_GROUP]","name":"[ENDPOINT_NAME]","url":"[ENDPOINT_URL]","description":"[ALERT_DESCRIPTION]","errors":"[RESULT_ERRORS]"}
+        {"source":"safenet-status","severity":"P1","status":"[ALERT_TRIGGERED_OR_RESOLVED]","group":"[ENDPOINT_GROUP]","name":"[ENDPOINT_NAME]","url":"[ENDPOINT_URL]","description":"[ALERT_DESCRIPTION]"}
 
 # For checks every five minutes: two failures in a row, ten minutes.
 x-alerts-p1-slow: &alerts-p1-slow
@@ -84,7 +81,7 @@ x-alerts-p1-slow: &alerts-p1-slow
     description: "P1: users cannot reach this service"
     provider-override:
       body: |
-        {"source":"safenet-status","severity":"P1","status":"[ALERT_TRIGGERED_OR_RESOLVED]","group":"[ENDPOINT_GROUP]","name":"[ENDPOINT_NAME]","url":"[ENDPOINT_URL]","description":"[ALERT_DESCRIPTION]","errors":"[RESULT_ERRORS]"}
+        {"source":"safenet-status","severity":"P1","status":"[ALERT_TRIGGERED_OR_RESOLVED]","group":"[ENDPOINT_GROUP]","name":"[ENDPOINT_NAME]","url":"[ENDPOINT_URL]","description":"[ALERT_DESCRIPTION]"}
 
 x-alerts-p2: &alerts-p2
   - type: custom
@@ -101,7 +98,7 @@ x-alerts-warning: &alerts-warning
     description: "warning: Orbitor's gateway fails now and then while the other paths work"
     provider-override:
       body: |
-        {"source":"safenet-status","severity":"warning","status":"[ALERT_TRIGGERED_OR_RESOLVED]","group":"[ENDPOINT_GROUP]","name":"[ENDPOINT_NAME]","url":"[ENDPOINT_URL]","description":"[ALERT_DESCRIPTION]","errors":"[RESULT_ERRORS]"}
+        {"source":"safenet-status","severity":"warning","status":"[ALERT_TRIGGERED_OR_RESOLVED]","group":"[ENDPOINT_GROUP]","name":"[ENDPOINT_NAME]","url":"[ENDPOINT_URL]","description":"[ALERT_DESCRIPTION]"}
 
 # A daily check alerts on its first failure.
 x-alerts-daily: &alerts-daily
@@ -197,7 +194,8 @@ endpoints:
     interval: 2m
     conditions:
       - "[STATUS] == 200"
-      - "len([BODY]) > 0"
+      # len() counts the characters of a body that is not JSON, so ask for a first element instead.
+      - "has([BODY][0].address) == true"
     alerts: *alerts-p1
 
   # Alerts: 503 when the latest five-minute poll failed, is incomplete or is over 15 minutes old.

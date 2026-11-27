@@ -27,11 +27,20 @@ test("counts the time between UNHEALTHY and the next HEALTHY as downtime", () =>
   assert.deepEqual(result.outages, [{ start: "2026-11-01T06:00:00.000Z", end: "2026-11-01T07:12:00.000Z", minutes: 72 }])
 })
 
-test("clips an outage that began before the window, and reads its state from a truncated history", () => {
-  // Gatus dropped older events: the oldest kept is HEALTHY, so before it the check was down.
-  const result = availability([event("HEALTHY", "2026-11-01T01:00:00Z")], FROM, TO)
+test("clips an outage that began before the window", () => {
+  const result = availability([event("START", "2026-10-01T00:00:00Z"), event("UNHEALTHY", "2026-10-31T23:00:00Z"),
+    event("HEALTHY", "2026-11-01T01:00:00Z")], FROM, TO)
   assert.equal(result.coverage, 1)
   assert.deepEqual(result.outages, [{ start: "2026-11-01T00:00:00.000Z", end: "2026-11-01T01:00:00.000Z", minutes: 60 }])
+})
+
+test("counts nothing before the oldest event Gatus kept as observed", () => {
+  // Gatus dropped older events: when the oldest kept is HEALTHY, the check was down before it,
+  // but since when is unknown. That time is not observed, neither up nor down.
+  const result = availability([event("HEALTHY", "2026-11-01T06:00:00Z")], FROM, TO)
+  assert.equal(result.uptime, 1)
+  assert.equal(result.coverage, 0.75)
+  assert.deepEqual(result.outages, [])
 })
 
 test("observes nothing before START, and says how much of the window it covers", () => {
